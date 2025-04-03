@@ -64,8 +64,9 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
 
       // Create a new device with the token
+      // Fix for the codec types - use an array type assertion
       const newDevice = new Device(data.token, {
-        codecPreferences: ["opus", "pcmu"],
+        codecPreferences: ["opus", "pcmu"] as any,
         maxAverageBitrate: 16000,
       });
 
@@ -178,6 +179,12 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     return device !== null && status === "ready";
   }, [device, status]);
 
+  // Fix return type mismatch by creating a wrapper function that doesn't return anything
+  const setupDeviceWrapper = useCallback(async (): Promise<void> => {
+    await setupDevice();
+    // No return value needed
+  }, [setupDevice]);
+
   // Set up global access to Twilio functionality
   useEffect(() => {
     window.twilioClient = {
@@ -186,7 +193,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       status,
       makeCall,
       hangupCall,
-      setupDevice,
+      setupDevice: setupDeviceWrapper, // Use the wrapper function here
       isReady,
     };
 
@@ -205,7 +212,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         window.twilioClient.connection = null;
       }
     };
-  }, [device, connection, status, makeCall, hangupCall, setupDevice, isReady]);
+  }, [device, connection, status, makeCall, hangupCall, setupDevice, setupDeviceWrapper, isReady]);
 
   // This component doesn't render anything visible
   return null;
