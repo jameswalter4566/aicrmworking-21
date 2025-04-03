@@ -44,6 +44,7 @@ serve(async (req) => {
     }
 
     console.log("Sample data prepared:", JSON.stringify(sampleData).substring(0, 200) + "...");
+    console.log("Headers to map:", headers);
 
     // Prepare the prompt for OpenAI
     const systemPrompt = `
@@ -140,19 +141,95 @@ serve(async (req) => {
       );
     }
 
-    // Convert the mapping to header indices
+    // Convert the mapping to header indices with improved matching logic
     const headerIndices = {};
+    
+    // Define common patterns for each field to improve matching
+    const fieldPatterns = {
+      firstName: ["first name", "firstname", "first", "given name", "owner name", "name"],
+      lastName: ["last name", "lastname", "last", "surname", "family name"],
+      email: ["email", "e-mail", "mail", "contact email"],
+      mailingAddress: ["mailing address", "address", "postal address", "street address"],
+      propertyAddress: ["property address", "property location", "location", "property", "site address"],
+      phone1: ["phone", "telephone", "contact", "mobile", "cell", "primary phone"],
+      phone2: ["second phone", "other phone", "alternate phone", "phone 2", "secondary phone"]
+    };
+
+    // First try direct mapping from AI suggestions
     for (const [fieldName, headerName] of Object.entries(mapping)) {
-      const index = headers.findIndex(h => 
-        h.toLowerCase() === headerName.toLowerCase() || 
-        headerName.toLowerCase().includes(h.toLowerCase())
+      const headerNameStr = String(headerName).toLowerCase();
+      
+      // Try exact match first
+      let index = headers.findIndex(h => 
+        String(h).toLowerCase() === headerNameStr
       );
+      
+      // If no exact match, try flexible matching
+      if (index === -1) {
+        index = headers.findIndex(h => {
+          const headerLower = String(h).toLowerCase();
+          // Check if either string contains the other
+          return headerLower.includes(headerNameStr) || 
+                 headerNameStr.includes(headerLower) ||
+                 // Check for word matches
+                 headerNameStr.split(/\s+/).some(word => 
+                   word.length > 2 && headerLower.includes(word)
+                 ) ||
+                 headerLower.split(/\s+/).some(word => 
+                   word.length > 2 && headerNameStr.includes(word)
+                 );
+        });
+      }
       
       if (index !== -1) {
         headerIndices[fieldName] = index;
+        console.log(`Mapped ${fieldName} to "${headers[index]}" (index: ${index})`);
+      } else {
+        console.log(`Could not find match for ${fieldName} = "${headerName}"`);
       }
     }
-
+    
+    // Apply pattern-based fallback mapping for fields that weren't mapped
+    for (const [fieldName, patterns] of Object.entries(fieldPatterns)) {
+      if (headerIndices[fieldName] === undefined) {
+        const index = headers.findIndex(h => {
+          const headerLower = String(h).toLowerCase();
+          return patterns.some(pattern => 
+            headerLower.includes(pattern) || pattern.includes(headerLower)
+          );
+        });
+        
+        if (index !== -1) {
+          headerIndices[fieldName] = index;
+          console.log(`Fallback mapped ${fieldName} to "${headers[index]}" (index: ${index})`);
+        }
+      }
+    }
+    
+    // Last resort position-based fallback for essential fields
+    if (headerIndices.firstName === undefined && headers.length > 0) {
+      const potentialNameColumns = headers
+        .map((h, i) => ({ header: h.toLowerCase(), index: i }))
+        .filter(({ header }) => 
+          header.includes("name") || 
+          header.includes("owner") || 
+          header.includes("client")
+        );
+        
+      if (potentialNameColumns.length > 0) {
+        headerIndices.firstName = potentialNameColumns[0].index;
+        console.log(`Position-based fallback: mapped firstName to "${headers[headerIndices.firstName]}"`);
+      } else {
+        headerIndices.firstName = 0;
+        console.log(`Last resort fallback: mapped firstName to first column "${headers[0]}"`);
+      }
+    }
+    
+    if (headerIndices.lastName === undefined && headers.length > 1) {
+      headerIndices.lastName = 1;
+      console.log(`Last resort fallback: mapped lastName to second column "${headers[1]}"`);
+    }
+    
     console.log("Final mapping indices:", headerIndices);
 
     return new Response(
