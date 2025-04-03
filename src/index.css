@@ -77,7 +77,7 @@
 }
 
 .metric-card {
-  @apply bg-white rounded-md p-4 border border-gray-200 shadow-sm;
+  @apply bg-white rounded-2xl p-4 border border-gray-200 shadow-sm;
 }
 
 .table-row:hover {

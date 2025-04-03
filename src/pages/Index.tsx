@@ -25,9 +25,11 @@ const Index = () => {
   return (
     <MainLayout>
       <FilterBar />
-      <MetricsGrid />
+      <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-4">
+        <MetricsGrid />
+      </div>
       
-      <div className="bg-white p-4 rounded-md border border-gray-200 mb-4">
+      <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold text-gray-700 uppercase text-sm">Recent Activity</h2>
           <Button variant="outline" size="sm" className="text-xs">
@@ -49,3 +51,4 @@ const Index = () => {
 };
 
 export default Index;
+

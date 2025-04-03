@@ -11,7 +11,7 @@ interface MetricCardProps {
 
 const MetricCard = ({ title, value, subtitle, icon, chart }: MetricCardProps) => {
   return (
-    <div className="metric-card">
+    <div className="metric-card rounded-2xl">
       <div className="flex flex-col h-full">
         <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">{title}</div>
         <div className="text-2xl font-semibold mb-1">{value}</div>
@@ -23,3 +23,4 @@ const MetricCard = ({ title, value, subtitle, icon, chart }: MetricCardProps) =>
 };
 
 export default MetricCard;
+
