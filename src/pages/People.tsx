@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Filter, Plus } from "lucide-react";
+import { PlusCircle, Search, Filter, Plus, X } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -12,6 +12,22 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { Textarea } from "@/components/ui/textarea";
 
 // Sample data for leads
 const leadsData = [
@@ -53,10 +69,38 @@ const leadsData = [
   },
 ];
 
+// Define the lead type for form submission
+type LeadFormValues = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  mailingAddress: string;
+  propertyAddress: string;
+  phone1: string;
+  phone2: string;
+  stage: string;
+  assigned: string;
+};
+
 const People = () => {
   const [leads, setLeads] = useState(leadsData);
   const [customFields, setCustomFields] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+
+  const form = useForm<LeadFormValues>({
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      mailingAddress: "",
+      propertyAddress: "",
+      phone1: "",
+      phone2: "",
+      stage: "Lead",
+      assigned: "",
+    },
+  });
 
   const addCustomField = () => {
     const fieldName = prompt("Enter field name:");
@@ -65,11 +109,31 @@ const People = () => {
     }
   };
 
+  const onSubmit = (data: LeadFormValues) => {
+    const newLead = {
+      id: leads.length > 0 ? Math.max(...leads.map(lead => lead.id)) + 1 : 1,
+      ...data
+    };
+    setLeads([...leads, newLead]);
+    setIsAddLeadOpen(false);
+    form.reset();
+  };
+
+  const handlePropertyAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    // If the checkbox is checked, we'll automatically fill the property address
+    if (e.target.value === "") {
+      form.setValue("propertyAddress", form.getValues("mailingAddress"));
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Leads</h1>
-        <Button className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg">
+        <Button 
+          className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+          onClick={() => setIsAddLeadOpen(true)}
+        >
           <PlusCircle className="h-4 w-4 mr-2" />
           Add Lead
         </Button>
@@ -156,6 +220,166 @@ const People = () => {
           </Table>
         </div>
       </div>
+
+      {/* Add Lead Dialog */}
+      <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Add New Lead</DialogTitle>
+          </DialogHeader>
+          
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="firstName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>First Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John" {...field} className="rounded-lg" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="lastName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Last Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Doe" {...field} className="rounded-lg" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="john.doe@example.com" {...field} className="rounded-lg" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="phone1"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Primary Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="(555) 123-4567" {...field} className="rounded-lg" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+                
+                <FormField
+                  control={form.control}
+                  name="phone2"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Secondary Phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="(Optional)" {...field} className="rounded-lg" />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="mailingAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Mailing Address</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="123 Main St, City, State, Zip" 
+                        {...field} 
+                        className="rounded-lg"
+                        onBlur={(e) => {
+                          field.onBlur();
+                          // If property address is empty, set it to mailing address
+                          const propertyAddress = form.getValues("propertyAddress");
+                          if (!propertyAddress) {
+                            form.setValue("propertyAddress", e.target.value);
+                          }
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="propertyAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Property Address</FormLabel>
+                    <FormControl>
+                      <Textarea 
+                        placeholder="Same as mailing address or different" 
+                        {...field} 
+                        className="rounded-lg"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          handlePropertyAddressChange(e);
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-center">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-crm-blue focus:ring-crm-blue"
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        form.setValue("propertyAddress", form.getValues("mailingAddress"));
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-gray-600">Same as mailing address</span>
+                </label>
+              </div>
+
+              <DialogFooter className="sm:justify-between flex gap-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  className="rounded-lg"
+                  onClick={() => setIsAddLeadOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+                >
+                  Add Lead
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 };
