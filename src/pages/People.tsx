@@ -199,6 +199,7 @@ const People = () => {
 
   const bulkUpdateDisposition = (newDisposition: string) => {
     updateLeadDisposition(selectedLeads, newDisposition);
+    setSelectedLeads([]);
   };
 
   const getDispositionClass = (disposition: string) => {
