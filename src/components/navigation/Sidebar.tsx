@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -24,7 +23,7 @@ const itemColors = [
 const navItems = [
   { name: "Dashboard", icon: Home, active: false, path: "/" },
   { name: "Leads", icon: Users, active: true, path: "/people" },
-  { name: "Power Dialer", icon: PhoneOutgoing, active: false, path: "#" },
+  { name: "Power Dialer", icon: PhoneOutgoing, active: false, path: "/power-dialer" },
   { name: "Inbox", icon: Inbox, active: false, badge: 5, path: "#" },
   { name: "Tasks", icon: ListTodo, active: false, path: "#" },
   { name: "Calendar", icon: Calendar, active: false, path: "#" },
