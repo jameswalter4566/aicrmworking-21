@@ -46,6 +46,8 @@ import {
   ToggleGroupItem 
 } from "@/components/ui/toggle-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import IntelligentFileUpload from "@/components/IntelligentFileUpload";
+import { Progress } from "@/components/ui/progress";
 
 const leadsData = [
   {
@@ -244,135 +246,17 @@ const People = () => {
     }
   };
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!isDragging) setIsDragging(true);
-  }, [isDragging]);
-
-  const processCSVData = (content: string) => {
-    try {
-      const rows = content.split("\n");
-      const headers = rows[0].split(",").map(h => h.trim());
-      
-      const requiredFields = ["firstName", "lastName", "email"];
-      const missingFields = requiredFields.filter(field => {
-        if (field === "firstName") {
-          return !headers.some(header => 
-            header.toLowerCase().includes("first") && header.toLowerCase().includes("name"));
-        } else if (field === "lastName") {
-          return !headers.some(header => 
-            header.toLowerCase().includes("last") && header.toLowerCase().includes("name"));
-        } else if (field === "email") {
-          return !headers.some(header => 
-            header.toLowerCase().includes("email"));
-        }
-        return true;
-      });
-      
-      if (missingFields.length > 0) {
-        throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
-      }
-      
-      const headerMap = {
-        firstName: headers.findIndex(header => header.toLowerCase().includes("first") && header.toLowerCase().includes("name")),
-        lastName: headers.findIndex(header => header.toLowerCase().includes("last") && header.toLowerCase().includes("name")),
-        email: headers.findIndex(header => header.toLowerCase().includes("email")),
-        mailingAddress: headers.findIndex(header => header.toLowerCase().includes("mailing") || header.toLowerCase().includes("address")),
-        propertyAddress: headers.findIndex(header => header.toLowerCase().includes("property")),
-        phone1: headers.findIndex(header => header.toLowerCase().includes("phone") || header.toLowerCase().includes("mobile")),
-        phone2: headers.findIndex(header => header.toLowerCase().includes("phone2") || header.toLowerCase().includes("secondary")),
-      };
-      
-      const importedLeads = [];
-      for (let i = 1; i < rows.length; i++) {
-        if (!rows[i].trim()) continue;
-        
-        const columns = rows[i].split(",").map(col => col.trim());
-        if (columns.length < 3) continue;
-        
-        const newLead = {
-          id: leads.length + importedLeads.length + i,
-          firstName: headerMap.firstName >= 0 ? columns[headerMap.firstName] : "",
-          lastName: headerMap.lastName >= 0 ? columns[headerMap.lastName] : "",
-          email: headerMap.email >= 0 ? columns[headerMap.email] : "",
-          mailingAddress: headerMap.mailingAddress >= 0 ? columns[headerMap.mailingAddress] : "",
-          propertyAddress: headerMap.propertyAddress >= 0 ? columns[headerMap.propertyAddress] : "",
-          phone1: headerMap.phone1 >= 0 ? columns[headerMap.phone1] : "",
-          phone2: headerMap.phone2 >= 0 ? columns[headerMap.phone2] : "",
-          stage: "Lead",
-          assigned: "",
-        };
-        
-        importedLeads.push(newLead);
-      }
-      
-      return importedLeads;
-    } catch (error) {
-      console.error("CSV parsing error:", error);
-      throw error;
+  const handleImportComplete = (importedLeads: any[]) => {
+    if (importedLeads.length > 0) {
+      setLeads(prevLeads => [...prevLeads, ...importedLeads]);
+      toast.success(`Successfully imported ${importedLeads.length} leads`);
+      setTimeout(() => {
+        setIsImportOpen(false);
+      }, 1500);
+    } else {
+      toast.error("No valid leads found in the file");
     }
   };
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const files = e.dataTransfer.files;
-    if (files.length === 0) return;
-
-    const file = files[0];
-    const fileType = file.name.split('.').pop()?.toLowerCase();
-    
-    if (fileType !== 'csv' && fileType !== 'xls' && fileType !== 'xlsx') {
-      toast.error("Only CSV and Excel files are supported");
-      return;
-    }
-
-    const reader = new FileReader();
-    
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        if (!content) throw new Error("Failed to read file content");
-        
-        if (fileType === 'csv') {
-          const importedLeads = processCSVData(content);
-          
-          if (importedLeads.length > 0) {
-            setLeads(prevLeads => [...prevLeads, ...importedLeads]);
-            setIsImportOpen(false);
-            toast.success(`Successfully imported ${importedLeads.length} leads`);
-          } else {
-            toast.error("No valid leads found in the file");
-          }
-        } else {
-          toast.error("Excel file processing is not implemented in this demo");
-        }
-      } catch (error) {
-        toast.error(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
-      }
-    };
-    
-    reader.onerror = () => {
-      toast.error("Error reading file");
-    };
-
-    reader.readAsText(file);
-  }, [leads]);
 
   const sortLeadsByDisposition = () => {
     const sortedLeads = [...leads].sort((a, b) => {
@@ -786,30 +670,12 @@ const People = () => {
       </Dialog>
 
       <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent className="sm:max-w-[600px] rounded-xl">
+        <DialogContent className="sm:max-w-[700px] rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Import Leads</DialogTitle>
           </DialogHeader>
           
-          <div 
-            className={`border-2 border-dashed rounded-lg p-8 text-center ${
-              isDragging ? 'border-crm-blue bg-crm-lightBlue' : 'border-gray-300'
-            }`}
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Drag and drop your file here</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Supported file formats: .CSV, .XLS, .XLSX
-            </p>
-            <p className="text-xs text-gray-400">
-              Your file should include the following columns:<br />
-              First Name, Last Name, Email, Phone, Mailing Address, Property Address
-            </p>
-          </div>
+          <IntelligentFileUpload onImportComplete={handleImportComplete} />
           
           <DialogFooter className="sm:justify-between flex gap-2 pt-4">
             <Button 
