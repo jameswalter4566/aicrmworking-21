@@ -17,9 +17,9 @@ const MetricCard = ({ title, value, subtitle, icon, iconColor = "bg-crm-blue", c
       <div className="flex flex-col h-full">
         {icon && (
           <div className="mb-3">
-            <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center", `${iconColor}/10`)}>
+            <div className={cn("w-16 h-16 rounded-xl flex items-center justify-center", `${iconColor}/10`)}>
               <div className={cn("text-white", iconColor)}>
-                {icon}
+                {React.cloneElement(icon as React.ReactElement, { size: 20 })}
               </div>
             </div>
           </div>
