@@ -1,3 +1,4 @@
+
 # A string used to distinguish different Supabase projects on the same host. Defaults to the working
 # directory name when running `supabase init`.
 project_id = "imrmboyczebjlbnkgjns"
@@ -71,9 +72,8 @@ redirect_uri = ""
 # or any other third-party OIDC providers.
 url = ""
 
-# Port to use for Functions URL.
 [functions]
-  port = 54328
+port = 54328
 
 [functions.initiate-call]
 # Enable/disable the function locally.
