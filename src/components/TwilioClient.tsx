@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Device, Connection } from "@twilio/voice-sdk";
+import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -16,7 +16,7 @@ declare global {
   interface Window {
     twilioClient: {
       device: Device | null;
-      connection: Connection | null;
+      connection: any;
       status: string;
       makeCall: (number: string) => Promise<void>;
       hangupCall: () => void;
@@ -38,7 +38,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   onError,
 }) => {
   const [device, setDevice] = useState<Device | null>(null);
-  const [connection, setConnection] = useState<Connection | null>(null);
+  const [connection, setConnection] = useState<any>(null);
   const [status, setStatus] = useState<string>("offline");
   const toast = useToast();
 
@@ -65,8 +65,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       // Create a new device with the token
       const newDevice = new Device(data.token, {
-        codecPreferences: ["opus", "pcmu"] as any,
-        enableIceRestart: true,
+        codecPreferences: ["opus", "pcmu"],
         maxAverageBitrate: 16000,
       });
 
