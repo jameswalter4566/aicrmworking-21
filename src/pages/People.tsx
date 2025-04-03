@@ -1,9 +1,8 @@
-
 import React, { useState, useCallback } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Filter, Plus, X, Upload } from "lucide-react";
+import { PlusCircle, Search, Filter, Plus, X, Upload, FileText } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -29,6 +28,9 @@ import {
 import { useForm } from "react-hook-form";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
 
 // Sample data for leads
 const leadsData = [
@@ -90,6 +92,12 @@ const People = () => {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [importedFile, setImportedFile] = useState<File | null>(null);
+  const [parsedHeaders, setParsedHeaders] = useState<string[]>([]);
+  const [parsedData, setParsedData] = useState<any[]>([]);
+  const [importStep, setImportStep] = useState<"upload" | "mapping" | "importing">("upload");
+  const [columnMappings, setColumnMappings] = useState<Record<string, string>>({});
+  const [importLoading, setImportLoading] = useState(false);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -104,6 +112,18 @@ const People = () => {
       assigned: "",
     },
   });
+
+  const fieldMappingOptions = [
+    { value: "firstName", label: "First Name" },
+    { value: "lastName", label: "Last Name" },
+    { value: "email", label: "Email" },
+    { value: "mailingAddress", label: "Mailing Address" },
+    { value: "propertyAddress", label: "Property Address" },
+    { value: "phone1", label: "Primary Phone" },
+    { value: "phone2", label: "Secondary Phone" },
+    { value: "stage", label: "Stage" },
+    { value: "assigned", label: "Assigned To" },
+  ];
 
   const addCustomField = () => {
     const fieldName = prompt("Enter field name:");
@@ -146,71 +166,130 @@ const People = () => {
     if (!isDragging) setIsDragging(true);
   }, [isDragging]);
 
-  const processCSVData = (content: string) => {
-    try {
-      const rows = content.split("\n");
-      const headers = rows[0].split(",").map(h => h.trim());
-      
-      const requiredFields = ["firstName", "lastName", "email"];
-      const missingFields = requiredFields.filter(field => {
-        if (field === "firstName") {
-          return !headers.some(header => 
-            header.toLowerCase().includes("first") && header.toLowerCase().includes("name"));
-        } else if (field === "lastName") {
-          return !headers.some(header => 
-            header.toLowerCase().includes("last") && header.toLowerCase().includes("name"));
-        } else if (field === "email") {
-          return !headers.some(header => 
-            header.toLowerCase().includes("email"));
+  const parseCSVFile = (file: File) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (results) => {
+        try {
+          const headers = results.meta.fields || [];
+          const data = results.data;
+          
+          setParsedHeaders(headers);
+          setParsedData(data);
+          
+          const mappings: Record<string, string> = {};
+          headers.forEach(header => {
+            const normalizedHeader = header.toLowerCase();
+            
+            if (normalizedHeader.includes("first") && normalizedHeader.includes("name")) {
+              mappings[header] = "firstName";
+            } else if (normalizedHeader.includes("last") && normalizedHeader.includes("name")) {
+              mappings[header] = "lastName";
+            } else if (normalizedHeader.includes("email")) {
+              mappings[header] = "email";
+            } else if (normalizedHeader.includes("mailing") || 
+                     (normalizedHeader.includes("address") && !normalizedHeader.includes("property"))) {
+              mappings[header] = "mailingAddress";
+            } else if (normalizedHeader.includes("property")) {
+              mappings[header] = "propertyAddress";
+            } else if (normalizedHeader.includes("phone") || normalizedHeader.includes("mobile")) {
+              if (!Object.values(mappings).includes("phone1")) {
+                mappings[header] = "phone1";
+              } else {
+                mappings[header] = "phone2";
+              }
+            }
+          });
+          
+          setColumnMappings(mappings);
+          setImportStep("mapping");
+          setIsDragging(false);
+        } catch (error) {
+          console.error("CSV parsing error:", error);
+          toast.error("Failed to parse CSV file. Please check the file format.");
+          setIsDragging(false);
         }
-        return true;
-      });
-      
-      if (missingFields.length > 0) {
-        throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+      },
+      error: (error) => {
+        console.error("CSV parsing error:", error);
+        toast.error("Failed to parse CSV file. Please check the file format.");
+        setIsDragging(false);
       }
-      
-      const headerMap = {
-        firstName: headers.findIndex(header => header.toLowerCase().includes("first") && header.toLowerCase().includes("name")),
-        lastName: headers.findIndex(header => header.toLowerCase().includes("last") && header.toLowerCase().includes("name")),
-        email: headers.findIndex(header => header.toLowerCase().includes("email")),
-        mailingAddress: headers.findIndex(header => header.toLowerCase().includes("mailing") || header.toLowerCase().includes("address")),
-        propertyAddress: headers.findIndex(header => header.toLowerCase().includes("property")),
-        phone1: headers.findIndex(header => header.toLowerCase().includes("phone") || header.toLowerCase().includes("mobile")),
-        phone2: headers.findIndex(header => header.toLowerCase().includes("phone2") || header.toLowerCase().includes("secondary")),
-      };
-      
-      const importedLeads = [];
-      for (let i = 1; i < rows.length; i++) {
-        if (!rows[i].trim()) continue;
+    });
+  };
+  
+  const parseExcelFile = (file: File) => {
+    const reader = new FileReader();
+    
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
         
-        const columns = rows[i].split(",").map(col => col.trim());
-        if (columns.length < 3) continue;
+        const worksheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[worksheetName];
         
-        const newLead = {
-          id: leads.length + importedLeads.length + i,
-          firstName: headerMap.firstName >= 0 ? columns[headerMap.firstName] : "",
-          lastName: headerMap.lastName >= 0 ? columns[headerMap.lastName] : "",
-          email: headerMap.email >= 0 ? columns[headerMap.email] : "",
-          mailingAddress: headerMap.mailingAddress >= 0 ? columns[headerMap.mailingAddress] : "",
-          propertyAddress: headerMap.propertyAddress >= 0 ? columns[headerMap.propertyAddress] : "",
-          phone1: headerMap.phone1 >= 0 ? columns[headerMap.phone1] : "",
-          phone2: headerMap.phone2 >= 0 ? columns[headerMap.phone2] : "",
-          stage: "Lead",
-          assigned: "",
-        };
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
         
-        importedLeads.push(newLead);
+        const headers = jsonData[0] as string[];
+        
+        const parsedRows = jsonData.slice(1).map(row => {
+          const rowData: Record<string, any> = {};
+          (row as any[]).forEach((cell, index) => {
+            if (index < headers.length) {
+              rowData[headers[index]] = cell;
+            }
+          });
+          return rowData;
+        });
+        
+        setParsedHeaders(headers);
+        setParsedData(parsedRows);
+        
+        const mappings: Record<string, string> = {};
+        headers.forEach(header => {
+          const normalizedHeader = header.toLowerCase();
+          
+          if (normalizedHeader.includes("first") && normalizedHeader.includes("name")) {
+            mappings[header] = "firstName";
+          } else if (normalizedHeader.includes("last") && normalizedHeader.includes("name")) {
+            mappings[header] = "lastName";
+          } else if (normalizedHeader.includes("email")) {
+            mappings[header] = "email";
+          } else if (normalizedHeader.includes("mailing") || 
+                   (normalizedHeader.includes("address") && !normalizedHeader.includes("property"))) {
+            mappings[header] = "mailingAddress";
+          } else if (normalizedHeader.includes("property")) {
+            mappings[header] = "propertyAddress";
+          } else if (normalizedHeader.includes("phone") || normalizedHeader.includes("mobile")) {
+            if (!Object.values(mappings).includes("phone1")) {
+              mappings[header] = "phone1";
+            } else {
+              mappings[header] = "phone2";
+            }
+          }
+        });
+        
+        setColumnMappings(mappings);
+        setImportStep("mapping");
+        setIsDragging(false);
+      } catch (error) {
+        console.error("Excel parsing error:", error);
+        toast.error("Failed to parse Excel file. Please check the file format.");
+        setIsDragging(false);
       }
-      
-      return importedLeads;
-    } catch (error) {
-      console.error("CSV parsing error:", error);
-      throw error;
-    }
+    };
+    
+    reader.onerror = () => {
+      toast.error("Error reading file. Please try again.");
+      setIsDragging(false);
+    };
+    
+    reader.readAsArrayBuffer(file);
   };
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleFileDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -221,42 +300,96 @@ const People = () => {
     const file = files[0];
     const fileType = file.name.split('.').pop()?.toLowerCase();
     
-    if (fileType !== 'csv' && fileType !== 'xls' && fileType !== 'xlsx') {
-      toast.error("Only CSV and Excel files are supported");
-      return;
+    setImportedFile(file);
+    
+    if (fileType === 'csv') {
+      parseCSVFile(file);
+    } else if (['xlsx', 'xls', 'xlsb', 'xlsm'].includes(fileType || '')) {
+      parseExcelFile(file);
+    } else {
+      toast.error("Unsupported file format. Please upload a CSV or Excel file.");
     }
+  }, []);
 
-    const reader = new FileReader();
-    
-    reader.onload = (event) => {
-      try {
-        const content = event.target?.result as string;
-        if (!content) throw new Error("Failed to read file content");
-        
-        if (fileType === 'csv') {
-          const importedLeads = processCSVData(content);
-          
-          if (importedLeads.length > 0) {
-            setLeads(prevLeads => [...prevLeads, ...importedLeads]);
-            setIsImportOpen(false);
-            toast.success(`Successfully imported ${importedLeads.length} leads`);
-          } else {
-            toast.error("No valid leads found in the file");
-          }
-        } else {
-          toast.error("Excel file processing is not implemented in this demo");
-        }
-      } catch (error) {
-        toast.error(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      const fileType = file.name.split('.').pop()?.toLowerCase();
+      
+      setImportedFile(file);
+      
+      if (fileType === 'csv') {
+        parseCSVFile(file);
+      } else if (['xlsx', 'xls', 'xlsb', 'xlsm'].includes(fileType || '')) {
+        parseExcelFile(file);
+      } else {
+        toast.error("Unsupported file format. Please upload a CSV or Excel file.");
       }
-    };
-    
-    reader.onerror = () => {
-      toast.error("Error reading file");
-    };
+    }
+  };
 
-    reader.readAsText(file);
-  }, [leads]);
+  const handleMappingChange = (header: string, value: string) => {
+    setColumnMappings(prev => ({
+      ...prev,
+      [header]: value
+    }));
+  };
+
+  const importLeads = () => {
+    setImportLoading(true);
+    
+    try {
+      const transformedData = parsedData.map((row, index) => {
+        const lead: Partial<LeadFormValues> & { id: number } = {
+          id: leads.length + index + 1,
+          stage: "Lead",
+          assigned: "",
+        };
+        
+        Object.entries(columnMappings).forEach(([header, field]) => {
+          if (field && row[header] !== undefined) {
+            (lead as any)[field] = row[header];
+          }
+        });
+        
+        return lead;
+      });
+      
+      const validLeads = transformedData.filter(lead => 
+        lead.firstName && lead.lastName && lead.email
+      );
+      
+      if (validLeads.length === 0) {
+        toast.error("No valid leads found in the imported file.");
+        setImportLoading(false);
+        return;
+      }
+      
+      setLeads(prev => [...prev, ...validLeads]);
+      
+      setImportStep("upload");
+      setParsedHeaders([]);
+      setParsedData([]);
+      setColumnMappings({});
+      setImportedFile(null);
+      setIsImportOpen(false);
+      setImportLoading(false);
+      
+      toast.success(`Successfully imported ${validLeads.length} leads.`);
+    } catch (error) {
+      console.error("Import error:", error);
+      toast.error("Failed to import leads. Please try again.");
+      setImportLoading(false);
+    }
+  };
+
+  const cancelImport = () => {
+    setImportStep("upload");
+    setParsedHeaders([]);
+    setParsedData([]);
+    setColumnMappings({});
+    setImportedFile(null);
+  };
 
   return (
     <MainLayout>
@@ -520,41 +653,141 @@ const People = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent className="sm:max-w-[600px] rounded-xl">
+      <Dialog open={isImportOpen} onOpenChange={(open) => {
+        setIsImportOpen(open);
+        if (!open) {
+          cancelImport();
+        }
+      }}>
+        <DialogContent className="sm:max-w-[700px] rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Import Leads</DialogTitle>
           </DialogHeader>
           
-          <div 
-            className={`border-2 border-dashed rounded-lg p-8 text-center ${
-              isDragging ? 'border-crm-blue bg-crm-lightBlue' : 'border-gray-300'
-            }`}
-            onDragEnter={handleDragEnter}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-          >
-            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium mb-2">Drag and drop your file here</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Supported file formats: .CSV, .XLS, .XLSX
-            </p>
-            <p className="text-xs text-gray-400">
-              Your file should include the following columns:<br />
-              First Name, Last Name, Email, Phone, Mailing Address, Property Address
-            </p>
-          </div>
+          {importStep === "upload" ? (
+            <div 
+              className={`border-2 border-dashed rounded-lg p-8 text-center ${
+                isDragging ? 'border-crm-blue bg-crm-lightBlue' : 'border-gray-300'
+              }`}
+              onDragEnter={handleDragEnter}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleFileDrop}
+            >
+              <input 
+                type="file" 
+                id="fileInput" 
+                accept=".csv,.xlsx,.xls,.xlsb,.xlsm"
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium mb-2">Drag and drop your file here</h3>
+              <p className="text-sm text-gray-500 mb-4">
+                Supported file formats: .CSV, .XLS, .XLSX
+              </p>
+              <p className="text-xs text-gray-400 mb-4">
+                Your file should include the following columns:<br />
+                First Name, Last Name, Email, Phone, Mailing Address, Property Address
+              </p>
+              <Button 
+                onClick={() => document.getElementById("fileInput")?.click()}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                Browse Files
+              </Button>
+            </div>
+          ) : importStep === "mapping" ? (
+            <div className="space-y-6">
+              <div className="bg-crm-lightBlue p-4 rounded-lg flex items-center gap-3">
+                <FileText className="h-5 w-5 text-crm-blue" />
+                <div className="flex-1">
+                  <p className="font-medium">{importedFile?.name}</p>
+                  <p className="text-sm text-gray-500">
+                    {parsedData.length} leads found
+                  </p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={cancelImport}
+                  className="text-gray-500"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div>
+                <h3 className="text-lg font-medium mb-4">Map File Headers to Lead Fields</h3>
+                <div className="max-h-[350px] overflow-y-auto pr-2">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="py-2 px-4 text-left text-sm font-medium text-gray-500">File Header</th>
+                        <th className="py-2 px-4 text-left text-sm font-medium text-gray-500">Lead Field</th>
+                        <th className="py-2 px-4 text-left text-sm font-medium text-gray-500">Sample Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {parsedHeaders.map((header) => (
+                        <tr key={header} className="hover:bg-gray-50">
+                          <td className="py-3 px-4 text-sm">{header}</td>
+                          <td className="py-3 px-4">
+                            <select
+                              value={columnMappings[header] || ""}
+                              onChange={(e) => handleMappingChange(header, e.target.value)}
+                              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                            >
+                              <option value="">-- Do not import --</option>
+                              {fieldMappingOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-500 truncate max-w-[200px]">
+                            {parsedData[0] && parsedData[0][header] !== undefined
+                              ? String(parsedData[0][header])
+                              : "--"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : null}
           
           <DialogFooter className="sm:justify-between flex gap-2 pt-4">
             <Button 
               type="button" 
               variant="outline"
               className="rounded-lg"
-              onClick={() => setIsImportOpen(false)}
+              onClick={() => {
+                if (importStep === "upload") {
+                  setIsImportOpen(false);
+                } else {
+                  setImportStep("upload");
+                }
+              }}
             >
-              Cancel
+              {importStep === "upload" ? "Cancel" : "Back"}
             </Button>
+            
+            {importStep === "mapping" && (
+              <Button 
+                type="button"
+                className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+                onClick={importLeads}
+                disabled={importLoading || Object.keys(columnMappings).length === 0}
+              >
+                {importLoading ? "Importing..." : "Import Leads"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
