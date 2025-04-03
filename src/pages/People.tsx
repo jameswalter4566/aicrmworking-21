@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -151,24 +152,32 @@ const People = () => {
       const headers = rows[0].split(",").map(h => h.trim());
       
       const requiredFields = ["firstName", "lastName", "email"];
-      const missingFields = requiredFields.filter(field => !headers.some(h => 
-        h.toLowerCase().includes("first") && h.toLowerCase().includes("name")) ||
-        h.toLowerCase().includes("last") && h.toLowerCase().includes("name") ||
-        h.toLowerCase().includes("email")
-      );
+      const missingFields = requiredFields.filter(field => {
+        if (field === "firstName") {
+          return !headers.some(header => 
+            header.toLowerCase().includes("first") && header.toLowerCase().includes("name"));
+        } else if (field === "lastName") {
+          return !headers.some(header => 
+            header.toLowerCase().includes("last") && header.toLowerCase().includes("name"));
+        } else if (field === "email") {
+          return !headers.some(header => 
+            header.toLowerCase().includes("email"));
+        }
+        return true;
+      });
       
       if (missingFields.length > 0) {
         throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
       }
       
       const headerMap = {
-        firstName: headers.findIndex(h => h.toLowerCase().includes("first") && h.toLowerCase().includes("name")),
-        lastName: headers.findIndex(h => h.toLowerCase().includes("last") && h.toLowerCase().includes("name")),
-        email: headers.findIndex(h => h.toLowerCase().includes("email")),
-        mailingAddress: headers.findIndex(h => h.toLowerCase().includes("mailing") || h.toLowerCase().includes("address")),
-        propertyAddress: headers.findIndex(h => h.toLowerCase().includes("property")),
-        phone1: headers.findIndex(h => h.toLowerCase().includes("phone") || h.toLowerCase().includes("mobile")),
-        phone2: headers.findIndex(h => h.toLowerCase().includes("phone2") || h.toLowerCase().includes("secondary")),
+        firstName: headers.findIndex(header => header.toLowerCase().includes("first") && header.toLowerCase().includes("name")),
+        lastName: headers.findIndex(header => header.toLowerCase().includes("last") && header.toLowerCase().includes("name")),
+        email: headers.findIndex(header => header.toLowerCase().includes("email")),
+        mailingAddress: headers.findIndex(header => header.toLowerCase().includes("mailing") || header.toLowerCase().includes("address")),
+        propertyAddress: headers.findIndex(header => header.toLowerCase().includes("property")),
+        phone1: headers.findIndex(header => header.toLowerCase().includes("phone") || header.toLowerCase().includes("mobile")),
+        phone2: headers.findIndex(header => header.toLowerCase().includes("phone2") || header.toLowerCase().includes("secondary")),
       };
       
       const importedLeads = [];
