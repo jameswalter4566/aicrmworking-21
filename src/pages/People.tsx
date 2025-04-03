@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,51 +49,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
 
-const leadsData = [
-  {
-    id: 1,
-    firstName: "Dan",
-    lastName: "Corkill",
-    email: "hi@followupboss.com",
-    mailingAddress: "123 Main St, San Francisco, CA",
-    propertyAddress: "456 Market St, San Francisco, CA",
-    phone1: "(218) 304-6145",
-    phone2: "",
-    stage: "Lead",
-    assigned: "study bolt",
-    avatar: "",
-    disposition: "Not Contacted",
-  },
-  {
-    id: 2,
-    firstName: "Sarah",
-    lastName: "Johnson",
-    email: "sarah.j@example.com",
-    mailingAddress: "789 Oak Ave, New York, NY",
-    propertyAddress: "321 Pine St, New York, NY",
-    phone1: "(555) 123-4567",
-    phone2: "(555) 987-6543",
-    stage: "Prospect",
-    assigned: "michelle team",
-    avatar: "",
-    disposition: "Contacted",
-  },
-  {
-    id: 3,
-    firstName: "Robert",
-    lastName: "Smith",
-    email: "robert@example.com",
-    mailingAddress: "555 Cedar Ln, Los Angeles, CA",
-    propertyAddress: "Same as mailing",
-    phone1: "(555) 987-6543",
-    phone2: "",
-    stage: "Client",
-    assigned: "john sales",
-    avatar: "",
-    disposition: "Appointment Set",
-  },
-];
-
 const dispositionTypes = [
   "All Leads",
   "Not Contacted",
@@ -127,7 +82,7 @@ type LeadFormValues = {
 };
 
 const People = () => {
-  const [leads, setLeads] = useState(leadsData);
+  const [leads, setLeads] = useState([]);
   const [customFields, setCustomFields] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
@@ -135,6 +90,13 @@ const People = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [activeDisposition, setActiveDisposition] = useState("All Leads");
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+
+  useEffect(() => {
+    const savedLeadsJSON = localStorage.getItem('crm_leads');
+    if (savedLeadsJSON) {
+      setLeads(JSON.parse(savedLeadsJSON));
+    }
+  }, []);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -163,18 +125,20 @@ const People = () => {
         return;
       }
       
-      setLeads(prevLeads => 
-        prevLeads.map(lead => 
-          leadId.includes(lead.id) ? { ...lead, disposition: newDisposition } : lead
-        )
+      const updatedLeads = leads.map(lead => 
+        leadId.includes(lead.id) ? { ...lead, disposition: newDisposition } : lead
       );
+      
+      setLeads(updatedLeads);
+      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
       toast.success(`${leadId.length} leads updated to ${newDisposition}`);
     } else {
-      setLeads(prevLeads => 
-        prevLeads.map(lead => 
-          lead.id === leadId ? { ...lead, disposition: newDisposition } : lead
-        )
+      const updatedLeads = leads.map(lead => 
+        lead.id === leadId ? { ...lead, disposition: newDisposition } : lead
       );
+      
+      setLeads(updatedLeads);
+      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
       toast.success(`Lead disposition updated to ${newDisposition}`);
     }
   };
@@ -233,11 +197,17 @@ const People = () => {
   const onSubmit = (data: LeadFormValues) => {
     const newLead = {
       id: leads.length > 0 ? Math.max(...leads.map(lead => lead.id)) + 1 : 1,
-      ...data
+      ...data,
+      avatar: ""
     };
-    setLeads([...leads, newLead]);
+    
+    const updatedLeads = [...leads, newLead];
+    setLeads(updatedLeads);
+    localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
+    
     setIsAddLeadOpen(false);
     form.reset();
+    toast.success("Lead added successfully");
   };
 
   const handlePropertyAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -248,7 +218,10 @@ const People = () => {
 
   const handleImportComplete = (importedLeads: any[]) => {
     if (importedLeads.length > 0) {
-      setLeads(prevLeads => [...prevLeads, ...importedLeads]);
+      const updatedLeads = [...leads, ...importedLeads];
+      setLeads(updatedLeads);
+      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
+      
       toast.success(`Successfully imported ${importedLeads.length} leads`);
       setTimeout(() => {
         setIsImportOpen(false);

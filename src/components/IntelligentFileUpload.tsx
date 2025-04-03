@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from "react";
 import { Upload, CheckCircle, AlertCircle, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -340,6 +339,31 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
         return "Mapping columns to the right fields...";
       default:
         return "Processing your file...";
+    }
+  };
+
+  // Around line 166-170, update this function:
+  const handleImportComplete = (importedLeads: any[]) => {
+    if (importedLeads.length > 0) {
+      // Get existing leads from localStorage
+      const savedLeadsJSON = localStorage.getItem('crm_leads');
+      const savedLeads = savedLeadsJSON ? JSON.parse(savedLeadsJSON) : [];
+      
+      // Add the imported leads
+      const updatedLeads = [...savedLeads, ...importedLeads];
+      
+      // Save back to localStorage
+      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
+      
+      // Call the callback function
+      onImportComplete(importedLeads);
+      
+      toast.success(`Successfully imported ${importedLeads.length} leads`);
+      setTimeout(() => {
+        setIsImportOpen(false);
+      }, 1500);
+    } else {
+      toast.error("No valid leads found in the file");
     }
   };
 
