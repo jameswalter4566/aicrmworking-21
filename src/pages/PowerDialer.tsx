@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Mic, MicOff } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/toggle-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const leadsData = [
   {
@@ -148,12 +149,42 @@ const PowerDialer = () => {
     "I see they're interested in property in the downtown area.",
     "I'll try to schedule a meeting with our agent.",
   ]);
+  const [callStatuses, setCallStatuses] = useState<Record<number, string>>({});
+  const [callDurations, setCallDurations] = useState<Record<number, number>>({});
+  const [callTimers, setCallTimers] = useState<Record<number, NodeJS.Timeout>>({});
+  const [permissionStatus, setPermissionStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
+  const [isMuted, setIsMuted] = useState(false);
 
-  const startDialSession = () => {
-    setIsDialogOpen(true);
+  // Function to check microphone permissions
+  const checkMicrophonePermissions = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Release the stream since we just needed it to check permissions
+      stream.getTracks().forEach(track => track.stop());
+      setPermissionStatus('granted');
+      return true;
+    } catch (error) {
+      console.error('Error getting audio permission:', error);
+      setPermissionStatus('denied');
+      return false;
+    }
+  };
+
+  const startDialSession = async () => {
+    // Check microphone permissions first
+    if (await checkMicrophonePermissions()) {
+      setIsDialogOpen(true);
+    } else {
+      toast.error("Microphone access is required for calling");
+    }
   };
 
   const startDialing = () => {
+    if (permissionStatus !== 'granted') {
+      toast.error("Microphone access is required for calling");
+      return;
+    }
+
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
       : leads.map(lead => lead.id);
@@ -184,29 +215,72 @@ const PowerDialer = () => {
     
     toast(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
     
-    const callDuration = 5000 + Math.random() * 10000;
+    // Set initial call status to "ringing"
+    setCallStatuses(prev => ({ ...prev, [leadId]: "ringing" }));
     
+    // Start a call duration timer
+    const startTime = Date.now();
+    const timer = setInterval(() => {
+      const duration = Math.floor((Date.now() - startTime) / 1000);
+      setCallDurations(prev => ({ ...prev, [leadId]: duration }));
+    }, 1000);
+    
+    setCallTimers(prev => ({ ...prev, [leadId]: timer }));
+    
+    // Simulate call progress
     setTimeout(() => {
-      const callResults = ["completed", "no-answer", "voicemail", "busy"];
-      const result = callResults[Math.floor(Math.random() * callResults.length)];
+      const callResults = ["in-progress", "no-answer", "voicemail", "busy"];
+      const result = Math.random() > 0.3 ? "in-progress" : callResults[Math.floor(Math.random() * 3) + 1];
       
-      switch(result) {
-        case "completed":
-          toast.success(`Call with ${lead.firstName} completed`);
-          break;
-        case "no-answer":
-          toast.error(`No answer from ${lead.firstName}`);
-          break;
-        case "voicemail":
-          toast.info(`Left voicemail for ${lead.firstName}`);
-          break;
-        case "busy":
-          toast.warning(`${lead.firstName}'s line is busy`);
-          break;
+      setCallStatuses(prev => ({ ...prev, [leadId]: result }));
+      
+      if (result !== "in-progress") {
+        // If call wasn't answered, clear the timer and move to next lead
+        clearInterval(callTimers[leadId]);
+        setTimeout(() => moveToNextLead(leadId), 1000);
+        
+        switch(result) {
+          case "no-answer":
+            toast.error(`No answer from ${lead.firstName}`);
+            break;
+          case "voicemail":
+            toast.info(`Left voicemail for ${lead.firstName}`);
+            break;
+          case "busy":
+            toast.warning(`${lead.firstName}'s line is busy`);
+            break;
+        }
+      } else {
+        // Call was answered, show success notification
+        toast.success(`Connected with ${lead.firstName}`);
+        
+        // For answered calls, simulate call ending after a random duration
+        const callDuration = 15000 + Math.random() * 30000;
+        setTimeout(() => {
+          if (callStatuses[leadId] === "in-progress") {
+            endCall(leadId);
+          }
+        }, callDuration);
       }
-      
-      moveToNextLead(leadId);
-    }, callDuration);
+    }, 3000 + Math.random() * 2000); // Simulate ring time
+  };
+
+  const endCall = (leadId: number) => {
+    const lead = leads.find(l => l.id === leadId);
+    if (!lead) return;
+    
+    // Clear the duration timer
+    if (callTimers[leadId]) {
+      clearInterval(callTimers[leadId]);
+    }
+    
+    // Set final call status
+    setCallStatuses(prev => ({ ...prev, [leadId]: "completed" }));
+    
+    toast.success(`Call with ${lead.firstName} ended`);
+    
+    // Move to next lead
+    moveToNextLead(leadId);
   };
 
   const moveToNextLead = (currentLeadId: number) => {
@@ -231,10 +305,21 @@ const PowerDialer = () => {
   };
 
   const endDialingSession = () => {
+    // Clear all active call timers
+    Object.values(callTimers).forEach(timer => clearInterval(timer));
+    setCallTimers({});
+    
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
+    setCallStatuses({});
+    setCallDurations({});
     toast.info("Dialing session ended");
+  };
+
+  const toggleMute = () => {
+    setIsMuted(!isMuted);
+    toast(isMuted ? "Microphone unmuted" : "Microphone muted");
   };
 
   const handleSelectAllLeads = (checked: boolean) => {
@@ -256,6 +341,31 @@ const PowerDialer = () => {
   const isAllSelected = leads.length > 0 && leads.every(lead => 
     selectedLeads.includes(lead.id)
   );
+
+  // Format call duration
+  const formatCallDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  // Get status badge color
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case "ringing":
+        return "bg-yellow-100 text-yellow-800";
+      case "in-progress":
+        return "bg-green-100 text-green-800";
+      case "completed":
+        return "bg-blue-100 text-blue-800";
+      case "no-answer":
+      case "busy":
+      case "voicemail":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
 
   return (
     <MainLayout>
@@ -305,10 +415,38 @@ const PowerDialer = () => {
                             : 'Initializing calls...'}
                         </span>
                       </div>
-                      <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                        Lines in use: {lineCount}
-                      </Badge>
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-green-100 text-green-800 px-3 py-1">
+                          Lines in use: {lineCount}
+                        </Badge>
+                        
+                        <Button 
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full w-8 h-8 p-0"
+                          onClick={toggleMute}
+                        >
+                          {isMuted ? <MicOff className="h-4 w-4 text-red-500" /> : <Mic className="h-4 w-4" />}
+                        </Button>
+                      </div>
                     </div>
+                    
+                    {activeCallId && (
+                      <div className="bg-gray-50 rounded-lg p-3 mb-3 flex items-center justify-between">
+                        <div>
+                          <span className="text-sm text-gray-500">Status: </span>
+                          <Badge className={getStatusColor(callStatuses[activeCallId] || "unknown")}>
+                            {callStatuses[activeCallId] || "Connecting..."}
+                          </Badge>
+                        </div>
+                        {callDurations[activeCallId] !== undefined && (
+                          <div className="flex items-center text-sm">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {formatCallDuration(callDurations[activeCallId])}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     
                     {dialingMode === "ai" && (
                       <Card className="border rounded-md mb-4 bg-gray-50">
@@ -461,6 +599,7 @@ const PowerDialer = () => {
                   <TableHead>Email</TableHead>
                   <TableHead>Primary Phone</TableHead>
                   <TableHead>Secondary Phone</TableHead>
+                  {isDialing && <TableHead>Call Status</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -499,6 +638,24 @@ const PowerDialer = () => {
                     <TableCell>{lead.email}</TableCell>
                     <TableCell>{lead.phone1}</TableCell>
                     <TableCell>{lead.phone2 || "-"}</TableCell>
+                    {isDialing && (
+                      <TableCell>
+                        {callStatuses[lead.id] ? (
+                          <div className="flex items-center gap-2">
+                            <Badge className={getStatusColor(callStatuses[lead.id])}>
+                              {callStatuses[lead.id]}
+                            </Badge>
+                            {callDurations[lead.id] !== undefined && callStatuses[lead.id] === "in-progress" && (
+                              <span className="text-xs text-gray-500">
+                                {formatCallDuration(callDurations[lead.id])}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">Waiting</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -585,6 +742,15 @@ const PowerDialer = () => {
                 )}
               </div>
             </div>
+            
+            {permissionStatus === 'denied' && (
+              <Alert variant="destructive" className="mt-4">
+                <AlertTitle>Microphone Access Required</AlertTitle>
+                <AlertDescription>
+                  Please allow microphone access in your browser settings to make calls.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
           
           <DialogFooter className="flex sm:justify-between gap-2">
