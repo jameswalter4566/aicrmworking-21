@@ -1,802 +1,536 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Mic, MicOff } from "lucide-react";
-import Phone2 from "@/components/icons/Phone2";
-import Phone3 from "@/components/icons/Phone3";
-import {
-  ToggleGroup,
-  ToggleGroupItem
-} from "@/components/ui/toggle-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Phone, PhoneOff, User, Mail, Home, Clock, Calendar, MoreHorizontal, Play, Pause, Search } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import TwilioClient from "@/components/TwilioClient";
-import { supabase } from "@/integrations/supabase/client";
 
-const TWILIO_PHONE_NUMBER = "+15555555555";
+interface Lead {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone1: string;
+  phone2: string;
+  stage: string;
+  assigned: string;
+  mailingAddress: string;
+  propertyAddress: string;
+  disposition?: string;
+  lastContacted?: string;
+  leadSource?: string;
+  notes?: string;
+  avatar?: string;
+}
 
-const leadsData = [
+const dummyLeads: Lead[] = [
   {
     id: 1,
-    firstName: "Dan",
-    lastName: "Corkill",
-    email: "hi@followupboss.com",
-    phone1: "(218) 304-6145",
-    phone2: "",
-    disposition: "Not Contacted",
-    avatar: "",
+    firstName: "John",
+    lastName: "Smith",
+    email: "john.smith@example.com",
+    phone1: "+15551234567",
+    phone2: "+15557654321",
+    stage: "New Lead",
+    assigned: "Study Bolt",
+    mailingAddress: "123 Main St, Anytown USA",
+    propertyAddress: "456 Oak Ave, Somewhere USA",
+    disposition: "Interested",
+    lastContacted: "2023-05-15",
+    leadSource: "Website",
+    notes: "Looking for a 3-bedroom home in the suburbs",
+    avatar: "/placeholder.svg"
   },
   {
     id: 2,
-    firstName: "Sarah",
-    lastName: "Johnson",
-    email: "sarah.j@example.com",
-    phone1: "(555) 123-4567",
-    phone2: "(555) 987-6543",
-    disposition: "Contacted",
-    avatar: "",
+    firstName: "Jane",
+    lastName: "Doe",
+    email: "jane.doe@example.com",
+    phone1: "+15552345678",
+    phone2: "+15558765432",
+    stage: "Follow Up",
+    assigned: "Study Bolt",
+    mailingAddress: "789 Pine St, Anytown USA",
+    propertyAddress: "321 Maple Dr, Somewhere USA",
+    disposition: "Very Interested",
+    lastContacted: "2023-05-20",
+    leadSource: "Referral",
+    notes: "Preapproved for $450k mortgage",
+    avatar: "/placeholder.svg"
   },
   {
     id: 3,
     firstName: "Robert",
-    lastName: "Smith",
-    email: "robert@example.com",
-    phone1: "(555) 987-6543",
-    phone2: "",
-    disposition: "Appointment Set",
-    avatar: "",
+    lastName: "Johnson",
+    email: "robert.j@example.com",
+    phone1: "+15553456789",
+    phone2: "+15559876543",
+    stage: "New Lead",
+    assigned: "Study Bolt",
+    mailingAddress: "555 Cedar Ln, Anytown USA",
+    propertyAddress: "777 Birch Rd, Somewhere USA",
+    disposition: "Needs Follow Up",
+    lastContacted: "2023-05-10",
+    leadSource: "Open House",
+    notes: "Looking in the downtown area",
+    avatar: "/placeholder.svg"
   },
   {
     id: 4,
-    firstName: "Maria",
-    lastName: "Garcia",
-    email: "maria.g@example.com",
-    phone1: "(555) 222-3333",
-    phone2: "(555) 444-5555",
-    disposition: "Not Contacted",
-    avatar: "",
+    firstName: "Emily",
+    lastName: "Wilson",
+    email: "emily.w@example.com",
+    phone1: "+15554567890",
+    phone2: "+15550987654",
+    stage: "Contacted",
+    assigned: "Study Bolt",
+    mailingAddress: "888 Elm St, Anytown USA",
+    propertyAddress: "999 Walnut Ave, Somewhere USA",
+    disposition: "Call Back",
+    lastContacted: "2023-05-22",
+    leadSource: "Zillow",
+    notes: "Interested in investment properties",
+    avatar: "/placeholder.svg"
   },
   {
     id: 5,
-    firstName: "James",
-    lastName: "Wilson",
-    email: "james.w@example.com",
-    phone1: "(555) 666-7777",
-    phone2: "",
-    disposition: "Not Contacted",
-    avatar: "",
-  },
+    firstName: "Michael",
+    lastName: "Brown",
+    email: "michael.b@example.com",
+    phone1: "+15555678901",
+    phone2: "+15551098765",
+    stage: "Nurturing",
+    assigned: "Study Bolt",
+    mailingAddress: "111 Spruce St, Anytown USA",
+    propertyAddress: "222 Fir Dr, Somewhere USA",
+    disposition: "Not Interested",
+    lastContacted: "2023-05-18",
+    leadSource: "Facebook Ad",
+    notes: "Looking for commercial properties",
+    avatar: "/placeholder.svg"
+  }
 ];
 
-const activityLogsData = {
-  1: [
-    { type: "call", status: "attempted", timestamp: "2023-05-15 10:23 AM", notes: "No answer", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-15 10:30 AM", content: "Hi Dan, I tried reaching out to you. Would you be available later today?", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-15 10:32 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-  2: [
-    { type: "call", status: "completed", timestamp: "2023-05-14 2:45 PM", duration: "4:32", notes: "Discussed property requirements", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-14 3:15 PM", content: "Thanks for the call. Can you send me more info about the property?", sender: "lead" },
-    { type: "sms", status: "sent", timestamp: "2023-05-14 3:20 PM", content: "Of course! I'll email you the details shortly.", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-14 3:25 PM", from: "New Lead", to: "Contacted", sender: "user" },
-  ],
-  3: [
-    { type: "call", status: "completed", timestamp: "2023-05-13 11:15 AM", duration: "7:21", notes: "Scheduled property viewing", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-13 11:25 AM", from: "Contacted", to: "Appointment Set", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-13 11:30 AM", content: "Looking forward to showing you the property on Friday at 3 PM!", sender: "user" },
-    { type: "sms", status: "received", timestamp: "2023-05-13 11:35 AM", content: "Great, I'll see you then. Thank you!", sender: "lead" },
-  ],
-  4: [
-    { type: "call", status: "attempted", timestamp: "2023-05-12 9:10 AM", notes: "Voicemail left", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 9:15 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-  5: [
-    { type: "call", status: "attempted", timestamp: "2023-05-11 4:30 PM", notes: "No answer", sender: "user" },
-    { type: "call", status: "attempted", timestamp: "2023-05-12 10:45 AM", notes: "No answer", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-12 10:50 AM", content: "Hi James, I've tried to reach you. Please call me back when you have a moment.", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 10:55 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-};
-
-const getDispositionClass = (disposition: string) => {
-  switch(disposition) {
-    case "Not Contacted":
-      return "bg-gray-100 text-gray-800";
-    case "Contacted":
-      return "bg-blue-100 text-blue-800";
-    case "Appointment Set":
-      return "bg-purple-100 text-purple-800";
-    case "Submitted":
-      return "bg-green-100 text-green-800";
-    case "Dead":
-      return "bg-red-100 text-red-800";
-    case "DNC":
-      return "bg-yellow-100 text-yellow-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
+type CallStatus = "ready" | "in-progress" | "completed" | "no-answer" | "error";
 
 const PowerDialer = () => {
-  const [leads, setLeads] = useState(leadsData);
-  const [activeCallId, setActiveCallId] = useState<number | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [lineCount, setLineCount] = useState("1");
-  const [isDialing, setIsDialing] = useState(false);
-  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
-  const [dialQueue, setDialQueue] = useState<number[]>([]);
-  const [dialingMode, setDialingMode] = useState<"power" | "ai">("power");
-  const [aiResponses, setAiResponses] = useState<string[]>([
-    "Hello, this is AI assistant calling on behalf of SalesPro CRM.",
-    "I'm analyzing the lead's information...",
-    "I see they're interested in property in the downtown area.",
-    "I'll try to schedule a meeting with our agent.",
-  ]);
+  const [leads, setLeads] = useState<Lead[]>(dummyLeads);
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>(dummyLeads);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [callStatuses, setCallStatuses] = useState<Record<number, CallStatus>>({});
+  const [isDialerActive, setIsDialerActive] = useState(false);
+  const [activeLeadId, setActiveLeadId] = useState<number | null>(null);
+  const [isClientReady, setIsClientReady] = useState(false);
+  const { toast } = useToast();
+  
+  // Filter leads based on search term
+  useEffect(() => {
+    const filtered = leads.filter(lead => 
+      `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      lead.phone1.includes(searchTerm) ||
+      lead.phone2.includes(searchTerm)
+    );
+    setFilteredLeads(filtered);
+  }, [searchTerm, leads]);
 
-  const [callStatus, setCallStatus] = useState<string>("idle");
-  const [isDeviceReady, setIsDeviceReady] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [activityLogs, setActivityLogs] = useState(activityLogsData);
-  const [currentCallDuration, setCurrentCallDuration] = useState(0);
-  const callTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleCallStatusChange = (status: string) => {
-    setCallStatus(status);
-    
-    if (status === 'in-progress') {
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-      }
-      
-      setCurrentCallDuration(0);
-      callTimerRef.current = setInterval(() => {
-        setCurrentCallDuration(prev => prev + 1);
-      }, 1000);
-    } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-        callTimerRef.current = null;
-      }
-      
-      if (activeCallId) {
-        const lead = leads.find(l => l.id === activeCallId);
-        if (lead) {
-          logCallActivity(activeCallId, status === 'completed' ? 'completed' : 'attempted', 
-            status === 'completed' ? `Call completed (${formatCallDuration(currentCallDuration)})` : 'Call failed');
-        }
-        
-        if (isDialing) {
-          moveToNextLead(activeCallId);
-        }
-      }
-    }
-  };
-
-  const formatCallDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  const logCallActivity = (leadId: number, status: string, notes: string) => {
-    const now = new Date();
-    const timestamp = now.toLocaleString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
-    });
-    
-    const newActivity = {
-      type: "call" as const,
-      status: status,
-      timestamp: timestamp,
-      notes: notes,
-      sender: "user" as const
-    };
-    
-    setActivityLogs(prev => {
-      const leadLogs = prev[leadId as keyof typeof prev] || [];
-      return {
-        ...prev,
-        [leadId]: [newActivity, ...leadLogs]
-      };
+  // Handle device ready event
+  const handleDeviceReady = () => {
+    setIsClientReady(true);
+    toast({
+      title: "Dialer Ready",
+      description: "You can now make calls to leads.",
     });
   };
 
-  const toggleMute = () => {
-    if (window.twilioClient) {
-      window.twilioClient.toggleMute();
-      setIsMuted(!isMuted);
+  // Handle call errors
+  const handleCallError = (error: any) => {
+    console.error("Call error:", error);
+    if (activeLeadId) {
+      setCallStatuses(prev => ({ ...prev, [activeLeadId]: "error" }));
+    }
+    toast({
+      variant: "destructive",
+      title: "Call Error",
+      description: error.message || "There was an error with the call",
+    });
+  };
+
+  // Handle call connection
+  const handleCallConnect = (connection: any) => {
+    if (activeLeadId) {
+      setCallStatuses(prev => ({ ...prev, [activeLeadId]: "in-progress" }));
+      toast({
+        title: "Call Connected",
+        description: "You are now connected to the lead.",
+      });
     }
   };
 
-  const endCurrentCall = () => {
-    if (window.twilioClient) {
-      window.twilioClient.hangUp();
+  // Handle call disconnection
+  const handleCallDisconnect = () => {
+    if (activeLeadId) {
+      setCallStatuses(prev => ({ ...prev, [activeLeadId]: "completed" }));
+      setActiveLeadId(null);
+      toast({
+        title: "Call Ended",
+        description: "The call has ended.",
+      });
     }
   };
 
-  const startDialSession = () => {
-    setIsDialogOpen(true);
-  };
-
-  const startDialing = () => {
-    if (!isDeviceReady) {
-      toast.error("Phone system not ready. Please wait a moment and try again.");
-      return;
-    }
-    
-    const leadsToDial = selectedLeads.length > 0 
-      ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
-      : leads.map(lead => lead.id);
-    
-    if (leadsToDial.length === 0) {
-      toast.error("No leads selected to dial");
-      return;
-    }
-    
-    setDialQueue(leadsToDial);
-    setIsDialogOpen(false);
-    setIsDialing(true);
-    
-    const batchSize = parseInt(lineCount);
-    const firstBatch = leadsToDial.slice(0, batchSize);
-    
-    if (firstBatch.length > 0) {
-      const firstLeadId = firstBatch[0];
-      setActiveCallId(firstLeadId);
-      
-      toast.success(`Starting ${dialingMode === "ai" ? "AI" : "power"} dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
-      
-      initiateCall(firstLeadId);
-    }
-  };
-
+  // Initiate a call to a lead
   const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) {
-      toast.error("Lead not found");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Lead not found",
+      });
       return;
     }
-    
-    const formattedPhone = lead.phone1.replace(/\D/g, '');
-    if (!formattedPhone || formattedPhone.length < 10) {
-      toast.error(`Invalid phone number for ${lead.firstName}: ${lead.phone1}`);
-      moveToNextLead(leadId);
+
+    if (!window.twilioClient || !window.twilioClient.isReady()) {
+      toast({
+        variant: "destructive",
+        title: "Phone Not Ready",
+        description: "The phone system is not ready. Please try again.",
+      });
       return;
     }
-    
-    toast.info(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
-    setCallStatus("connecting");
-    setActiveCallId(leadId);
+
+    setActiveLeadId(leadId);
+    setCallStatuses(prev => ({ ...prev, [leadId]: "ready" }));
     
     try {
-      if (window.twilioClient && await window.twilioClient.makeCall(formattedPhone)) {
-        const { data, error } = await supabase.functions.invoke('twilio-dial', {
-          body: {
-            to: `+1${formattedPhone}`,
-            from: TWILIO_PHONE_NUMBER,
-            agentIdentity: "agent"
-          }
-        });
-        
-        if (error) {
-          throw new Error(`Failed to initiate call: ${error.message}`);
-        }
-        
-        logCallActivity(leadId, "initiated", "Call initiated");
-      } else {
-        throw new Error("Device not ready or call preparation failed");
-      }
+      await window.twilioClient.makeCall(lead.phone1);
     } catch (error: any) {
-      console.error("Error initiating call:", error);
-      toast.error(`Call failed: ${error.message}`);
-      setCallStatus("failed");
-      
-      logCallActivity(leadId, "attempted", `Failed: ${error.message}`);
-      
-      moveToNextLead(leadId);
+      console.error("Failed to initiate call:", error);
+      setCallStatuses(prev => ({ ...prev, [leadId]: "error" }));
+      toast({
+        variant: "destructive",
+        title: "Call Failed",
+        description: error.message || "Failed to initiate call",
+      });
     }
   };
 
-  const moveToNextLead = (currentLeadId: number) => {
-    const currentIndex = dialQueue.indexOf(currentLeadId);
-    const linesInUse = parseInt(lineCount);
-    const nextIndex = currentIndex + linesInUse;
-    
-    if (nextIndex < dialQueue.length) {
-      const nextLeadId = dialQueue[nextIndex];
-      
-      setTimeout(() => {
-        initiateCall(nextLeadId);
-      }, 1500);
-    } else {
-      if (dialQueue.slice(Math.max(0, dialQueue.length - linesInUse)).includes(currentLeadId)) {
-        setIsDialing(false);
-        setActiveCallId(null);
-        toast.success("Dialing session completed!");
-      }
+  // End the current call
+  const endCall = (leadId: number) => {
+    if (window.twilioClient && window.twilioClient.connection) {
+      window.twilioClient.hangupCall();
+      setCallStatuses(prev => ({ ...prev, [leadId]: "completed" }));
+      setActiveLeadId(null);
     }
   };
 
-  const endDialingSession = () => {
-    endCurrentCall();
-    
-    setIsDialing(false);
-    setActiveCallId(null);
-    setDialQueue([]);
-    setCallStatus("idle");
-    
-    if (callTimerRef.current) {
-      clearInterval(callTimerRef.current);
-      callTimerRef.current = null;
-    }
-    
-    toast.info("Dialing session ended");
-  };
-
-  const handleSelectAllLeads = (checked: boolean) => {
-    if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id));
-    } else {
-      setSelectedLeads([]);
+  // Get the status badge for a lead
+  const getStatusBadge = (status: CallStatus | undefined) => {
+    switch (status) {
+      case "ready":
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">Connecting...</Badge>;
+      case "in-progress":
+        return <Badge variant="outline" className="bg-green-100 text-green-800">In Progress</Badge>;
+      case "completed":
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Completed</Badge>;
+      case "no-answer":
+        return <Badge variant="outline" className="bg-orange-100 text-orange-800">No Answer</Badge>;
+      case "error":
+        return <Badge variant="outline" className="bg-red-100 text-red-800">Failed</Badge>;
+      default:
+        return null;
     }
   };
-
-  const handleSelectLead = (leadId: number, checked: boolean) => {
-    if (checked) {
-      setSelectedLeads(prev => [...prev, leadId]);
-    } else {
-      setSelectedLeads(prev => prev.filter(id => id !== leadId));
-    }
-  };
-
-  const isAllSelected = leads.length > 0 && leads.every(lead => 
-    selectedLeads.includes(lead.id)
-  );
-  
-  useEffect(() => {
-    return () => {
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-      }
-    };
-  }, []);
 
   return (
     <MainLayout>
+      {/* Invisible TwilioClient component to handle calls */}
       <TwilioClient 
-        isActive={true} 
-        onCallStatusChange={handleCallStatusChange}
-        onDeviceReady={setIsDeviceReady}
+        onDeviceReady={handleDeviceReady}
+        onCallConnect={handleCallConnect}
+        onCallDisconnect={handleCallDisconnect}
+        onError={handleCallError}
       />
       
-      <div className="flex flex-col h-[calc(100vh-64px)]">
-        <div className="flex-1 p-6 overflow-hidden">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">
-              {dialingMode === "ai" ? "AI Dialer" : "Power Dialer"}
-            </h1>
-            {!isDialing ? (
-              <Button 
-                className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
-                onClick={startDialSession}
-                disabled={!isDeviceReady}
-              >
-                <Phone className="h-4 w-4" />
-                {isDeviceReady ? "Start Dialing Session" : "Initializing Phone..."}
-              </Button>
-            ) : (
-              <Button 
-                variant="destructive"
-                className="rounded-lg flex items-center gap-2"
-                onClick={endDialingSession}
-              >
-                <PhoneOff className="h-4 w-4" />
-                End Session
-              </Button>
-            )}
+      <div className="flex flex-col space-y-4">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Power Dialer</h1>
+          <div className="flex items-center space-x-2">
+            <Button 
+              variant={isDialerActive ? "destructive" : "default"}
+              onClick={() => setIsDialerActive(!isDialerActive)}
+              disabled={!isClientReady}
+            >
+              {isDialerActive ? (
+                <>
+                  <Pause className="mr-2 h-4 w-4" />
+                  Pause Dialer
+                </>
+              ) : (
+                <>
+                  <Play className="mr-2 h-4 w-4" />
+                  Start Dialer
+                </>
+              )}
+            </Button>
           </div>
+        </div>
+        
+        <div className="relative">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search leads by name, email, or phone..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
 
-          <div className="grid grid-cols-1 gap-6 h-full">
-            <Card className="shadow-sm">
-              <CardHeader className="bg-crm-blue/5 border-b pb-3">
-                <CardTitle className="text-lg font-medium flex items-center gap-2">
-                  <Phone className="h-5 w-5 text-crm-blue" />
-                  {isDialing ? 'Active Call' : (dialingMode === "ai" ? 'AI Call Dashboard' : 'Call Dashboard')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {isDialing || callStatus !== "idle" ? (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        {callStatus === "connecting" && (
-                          <PhoneCall className="h-5 w-5 text-yellow-500 animate-pulse" />
-                        )}
-                        {callStatus === "in-progress" && (
-                          <PhoneCall className="h-5 w-5 text-green-500 animate-pulse" />
-                        )}
-                        {callStatus === "completed" && (
-                          <PhoneOff className="h-5 w-5 text-gray-500" />
-                        )}
-                        {callStatus === "incoming" && (
-                          <PhoneIncoming className="h-5 w-5 text-blue-500 animate-pulse" />
-                        )}
-                        
-                        <span className="font-medium">
-                          {activeCallId && leads.find(l => l.id === activeCallId) 
-                            ? (
-                                callStatus === "connecting" 
-                                  ? `Dialing ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName}...`
-                                  : callStatus === "in-progress" 
-                                    ? `Connected with ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName} (${formatCallDuration(currentCallDuration)})`
-                                    : callStatus === "completed"
-                                      ? `Call with ${leads.find(l => l.id === activeCallId)?.firstName} ended`
-                                      : `Call with ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName}`
-                              )
-                            : 'Initializing call...'
-                          }
-                        </span>
+        <Tabs defaultValue="all">
+          <TabsList>
+            <TabsTrigger value="all">All Leads</TabsTrigger>
+            <TabsTrigger value="new">New</TabsTrigger>
+            <TabsTrigger value="contacted">Contacted</TabsTrigger>
+            <TabsTrigger value="nurturing">Nurturing</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="all" className="space-y-4 mt-4">
+            {filteredLeads.map(lead => (
+              <Card key={lead.id} className="overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="p-4 flex-1">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center">
+                          <Avatar className="h-10 w-10 mr-3">
+                            <User />
+                          </Avatar>
+                          <div>
+                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
+                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
+                          </div>
+                        </div>
+                        {getStatusBadge(callStatuses[lead.id])}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={`px-3 py-1 ${
-                          callStatus === "in-progress" ? "bg-green-100 text-green-800" :
-                          callStatus === "connecting" ? "bg-yellow-100 text-yellow-800" :
-                          "bg-gray-100 text-gray-800"
-                        }`}>
-                          {callStatus === "idle" ? "Ready" :
-                           callStatus === "connecting" ? "Connecting" :
-                           callStatus === "in-progress" ? "In Call" :
-                           callStatus === "completed" ? "Call Ended" :
-                           callStatus === "failed" ? "Call Failed" :
-                           callStatus}
-                        </Badge>
-                        
-                        {callStatus === "in-progress" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className={`rounded-full w-8 h-8 p-0 ${isMuted ? 'bg-red-100' : ''}`}
-                            onClick={toggleMute}
-                          >
-                            {isMuted ? <MicOff className="h-4 w-4 text-red-500" /> : <Mic className="h-4 w-4" />}
-                          </Button>
-                        )}
-                        
-                        {callStatus === "in-progress" && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            className="rounded-full"
-                            onClick={endCurrentCall}
-                          >
-                            <PhoneOff className="h-4 w-4 mr-1" /> End Call
-                          </Button>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        <div className="flex items-center text-sm">
+                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.phone1}
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.email}
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <Home className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.propertyAddress}
+                        </div>
+                        {lead.lastContacted && (
+                          <div className="flex items-center text-sm">
+                            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
+                            Last Contact: {lead.lastContacted}
+                          </div>
                         )}
                       </div>
                     </div>
                     
-                    {dialingMode === "ai" && callStatus === "in-progress" && (
-                      <Card className="border rounded-md mb-4 bg-gray-50">
-                        <CardHeader className="pb-2 pt-3 px-4 border-b">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-crm-blue" />
-                            AI Assistant
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4">
-                          <div className="flex flex-col gap-2 text-sm">
-                            {aiResponses.map((response, index) => (
-                              <div 
-                                key={index} 
-                                className={`
-                                  ${index === aiResponses.length - 1 ? 'animate-pulse' : ''}
-                                  flex items-start gap-2
-                                `}
-                              >
-                                {index === aiResponses.length - 1 && (
-                                  <span className="block w-2 h-2 rounded-full bg-green-500 mt-2"></span>
-                                )}
-                                <p>{response}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    
-                    <Card className="border rounded-md">
-                      <CardHeader className="pb-2 pt-3 px-4">
-                        <CardTitle className="text-sm font-medium">Activity Log</CardTitle>
-                      </CardHeader>
-                      <ScrollArea className="h-[300px] rounded-md">
-                        <div className="p-4">
-                          {activeCallId && activityLogs[activeCallId as keyof typeof activityLogs] ? (
-                            <div className="space-y-4">
-                              {activityLogs[activeCallId as keyof typeof activityLogs].map((log, index) => (
-                                <div 
-                                  key={index} 
-                                  className={`flex ${log.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                                >
-                                  <div 
-                                    className={`flex max-w-[75%] ${
-                                      log.sender === 'user' 
-                                        ? 'bg-crm-blue text-white rounded-tl-lg rounded-bl-lg rounded-tr-lg' 
-                                        : 'bg-gray-100 text-gray-800 rounded-tr-lg rounded-br-lg rounded-tl-lg'
-                                    } p-3 shadow-sm`}
-                                  >
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-2">
-                                        {log.type === 'call' && (
-                                          log.status === 'attempted' ? 
-                                            <PhoneOff className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-red-500'}`} /> : 
-                                            <PhoneIncoming className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-green-500'}`} />
-                                        )}
-                                        {log.type === 'sms' && (
-                                          <MessageSquare className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-blue-500'}`} />
-                                        )}
-                                        {log.type === 'disposition' && (
-                                          <User className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-purple-500'}`} />
-                                        )}
-                                        <span className={`font-medium text-sm ${log.sender === 'user' ? 'text-white' : 'text-gray-800'}`}>
-                                          {log.type === 'call' && `Call ${log.status}`}
-                                          {log.type === 'sms' && `Message ${log.status === 'received' ? 'received' : 'sent'}`}
-                                          {log.type === 'disposition' && 'Status Changed'}
-                                        </span>
-                                      </div>
-                                      <div className={`text-sm ${log.sender === 'user' ? 'text-white/90' : 'text-gray-700'}`}>
-                                        {log.type === 'call' && log.notes}
-                                        {log.type === 'sms' && log.content}
-                                        {log.type === 'disposition' && `From "${log.from}" to "${log.to}"`}
-                                      </div>
-                                      <div className={`text-xs ${log.sender === 'user' ? 'text-white/70' : 'text-gray-500'} mt-1 flex items-center`}>
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        {log.timestamp}
-                                        {log.type === 'call' && log.duration && (
-                                          <span className="ml-2">Duration: {log.duration}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-10 text-gray-500">
-                              {isDialing ? 'Loading activity log...' : 'No active call selected'}
-                            </div>
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </Card>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[300px] gap-4">
-                    <div className="w-20 h-20 rounded-full bg-crm-blue/10 flex items-center justify-center">
-                      {dialingMode === "ai" ? (
-                        <Bot className="h-10 w-10 text-crm-blue" />
+                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
+                      {callStatuses[lead.id] === "in-progress" ? (
+                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
+                          <PhoneOff className="h-4 w-4 mr-2" />
+                          End Call
+                        </Button>
                       ) : (
-                        <Phone className="h-10 w-10 text-crm-blue" />
+                        <Button 
+                          variant="default" 
+                          onClick={() => initiateCall(lead.id)}
+                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
+                        >
+                          <Phone className="h-4 w-4 mr-2" />
+                          Call Now
+                        </Button>
+                      )}
+                      
+                      <Button variant="ghost" size="icon" className="mt-2">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+          
+          <TabsContent value="new" className="mt-4">
+            {filteredLeads.filter(l => l.stage === "New Lead").map(lead => (
+              <Card key={lead.id} className="overflow-hidden mb-4">
+                <CardContent className="p-0">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="p-4 flex-1">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center">
+                          <Avatar className="h-10 w-10 mr-3">
+                            <User />
+                          </Avatar>
+                          <div>
+                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
+                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
+                          </div>
+                        </div>
+                        {getStatusBadge(callStatuses[lead.id])}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        <div className="flex items-center text-sm">
+                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.phone1}
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.email}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
+                      {callStatuses[lead.id] === "in-progress" ? (
+                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
+                          <PhoneOff className="h-4 w-4 mr-2" />
+                          End Call
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="default" 
+                          onClick={() => initiateCall(lead.id)}
+                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
+                        >
+                          <Phone className="h-4 w-4 mr-2" />
+                          Call Now
+                        </Button>
                       )}
                     </div>
-                    <div className="text-center">
-                      <h3 className="text-lg font-medium mb-2">
-                        {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Power Dialing Session"}
-                      </h3>
-                      <p className="text-gray-500 max-w-md">
-                        {dialingMode === "ai"
-                          ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
-                          : "Call multiple leads in sequence with our power dialer. Select leads from the table below or dial all leads."
-                        }
-                      </p>
-                    </div>
-                    <Button 
-                      className="mt-4 bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
-                      onClick={startDialSession}
-                      disabled={!isDeviceReady}
-                    >
-                      {isDeviceReady ? "Start Dialing" : "Initializing Phone..."}
-                    </Button>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="border-t p-6 bg-white">
-          <div className="mb-4 flex justify-between items-center">
-            <h2 className="text-lg font-medium">Leads to Dial</h2>
-            <div className="text-sm text-gray-500">
-              {selectedLeads.length > 0 ? `${selectedLeads.length} leads selected` : 'All leads will be dialed'}
-            </div>
-          </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
           
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-            <Table>
-              <TableHeader className="bg-crm-blue/10">
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox 
-                      checked={isAllSelected}
-                      onCheckedChange={handleSelectAllLeads}
-                      aria-label="Select all"
-                    />
-                  </TableHead>
-                  <TableHead>Disposition</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Primary Phone</TableHead>
-                  <TableHead>Secondary Phone</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leads.map((lead) => (
-                  <TableRow 
-                    key={lead.id} 
-                    className={`
-                      hover:bg-gray-50 
-                      ${activeCallId === lead.id ? 'bg-blue-50' : ''}
-                    `}
-                  >
-                    <TableCell>
-                      <Checkbox 
-                        checked={selectedLeads.includes(lead.id)}
-                        onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
-                        aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getDispositionClass(lead.disposition)}>
-                        {lead.disposition}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {lead.avatar ? (
-                          <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                        ) : (
-                          <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                            {lead.firstName.charAt(0)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <span>{lead.firstName} {lead.lastName}</span>
-                    </TableCell>
-                    <TableCell>{lead.email}</TableCell>
-                    <TableCell>{lead.phone1}</TableCell>
-                    <TableCell>{lead.phone2 || "-"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
+          <TabsContent value="contacted" className="mt-4">
+            {filteredLeads.filter(l => l.stage === "Contacted").map(lead => (
+              <Card key={lead.id} className="overflow-hidden mb-4">
+                <CardContent className="p-0">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="p-4 flex-1">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center">
+                          <Avatar className="h-10 w-10 mr-3">
+                            <User />
+                          </Avatar>
+                          <div>
+                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
+                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
+                          </div>
+                        </div>
+                        {getStatusBadge(callStatuses[lead.id])}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        <div className="flex items-center text-sm">
+                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.phone1}
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.email}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
+                      {callStatuses[lead.id] === "in-progress" ? (
+                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
+                          <PhoneOff className="h-4 w-4 mr-2" />
+                          End Call
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="default" 
+                          onClick={() => initiateCall(lead.id)}
+                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
+                        >
+                          <Phone className="h-4 w-4 mr-2" />
+                          Call Now
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+          
+          <TabsContent value="nurturing" className="mt-4">
+            {filteredLeads.filter(l => l.stage === "Nurturing").map(lead => (
+              <Card key={lead.id} className="overflow-hidden mb-4">
+                <CardContent className="p-0">
+                  <div className="flex flex-col sm:flex-row">
+                    <div className="p-4 flex-1">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center">
+                          <Avatar className="h-10 w-10 mr-3">
+                            <User />
+                          </Avatar>
+                          <div>
+                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
+                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
+                          </div>
+                        </div>
+                        {getStatusBadge(callStatuses[lead.id])}
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        <div className="flex items-center text-sm">
+                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.phone1}
+                        </div>
+                        <div className="flex items-center text-sm">
+                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
+                          {lead.email}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
+                      {callStatuses[lead.id] === "in-progress" ? (
+                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
+                          <PhoneOff className="h-4 w-4 mr-2" />
+                          End Call
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="default" 
+                          onClick={() => initiateCall(lead.id)}
+                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
+                        >
+                          <Phone className="h-4 w-4 mr-2" />
+                          Call Now
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+        </Tabs>
       </div>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Dialer Settings</DialogTitle>
-          </DialogHeader>
-          
-          <div className="py-4 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-2">Dialing Mode</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Button
-                  variant="outline"
-                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "power" ? "border-crm-blue bg-crm-blue/5" : ""}`}
-                  onClick={() => setDialingMode("power")}
-                >
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-crm-blue" />
-                    <div className="flex-1">
-                      <div className="font-medium">Power Dialer</div>
-                      <div className="text-xs text-gray-500">
-                        Manually call leads in sequence
-                      </div>
-                    </div>
-                  </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "ai" ? "border-crm-blue bg-crm-blue/5" : ""}`}
-                  onClick={() => setDialingMode("ai")}
-                >
-                  <div className="flex items-center gap-2">
-                    <Bot className="h-5 w-5 text-crm-blue" />
-                    <div className="flex-1">
-                      <div className="font-medium">AI Dialer</div>
-                      <div className="text-xs text-gray-500">
-                        AI assistant handles calls
-                      </div>
-                    </div>
-                  </div>
-                </Button>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Concurrent Lines</h3>
-              <ToggleGroup 
-                type="single" 
-                value={lineCount}
-                onValueChange={(value) => {
-                  if (value) setLineCount(value);
-                }}
-                className="justify-start border rounded-lg p-1"
-              >
-                <ToggleGroupItem value="1" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone className="h-4 w-4" />
-                  <span>1 Line</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="2" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone2 className="h-4 w-4" />
-                  <span>2 Lines</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="3" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone3 className="h-4 w-4" />
-                  <span>3 Lines</span>
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Leads to Dial</h3>
-              <div className="bg-gray-50 p-3 rounded-lg text-sm">
-                {selectedLeads.length > 0 ? (
-                  <span className="font-medium">{selectedLeads.length} leads selected</span>
-                ) : (
-                  <span>All leads will be dialed ({leads.length} total)</span>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex sm:justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-lg"
-              onClick={() => setIsDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
-              onClick={startDialing}
-              disabled={!isDeviceReady}
-            >
-              {isDeviceReady ? "Start Dialing" : "Initializing Phone..."}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </MainLayout>
   );
 };

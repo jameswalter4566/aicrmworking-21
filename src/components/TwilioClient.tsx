@@ -1,50 +1,53 @@
 
-import React, { useEffect, useState, useRef } from 'react';
-import { Device } from '@twilio/voice-sdk';
-import { toast } from 'sonner';
+import React, { useState, useEffect, useCallback } from "react";
+import { Device, Connection } from "@twilio/voice-sdk";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
 interface TwilioClientProps {
-  isActive: boolean;
-  onCallStatusChange: (status: string) => void;
-  onDeviceReady: (isReady: boolean) => void;
+  onCallConnect?: (connection: any) => void;
+  onCallDisconnect?: () => void;
+  onDeviceReady?: (device: any) => void;
+  onError?: (error: any) => void;
 }
 
-const TwilioClient: React.FC<TwilioClientProps> = ({ 
-  isActive, 
-  onCallStatusChange,
-  onDeviceReady
+// Declare global window interface extension
+declare global {
+  interface Window {
+    twilioClient: {
+      device: Device | null;
+      connection: Connection | null;
+      status: string;
+      makeCall: (number: string) => Promise<void>;
+      hangupCall: () => void;
+      setupDevice: () => Promise<void>;
+      isReady: () => boolean;
+    };
+  }
+}
+
+/**
+ * TwilioClient component for handling voice calls
+ * This component doesn't render anything but provides the Twilio functionality
+ * to the application through a global window object
+ */
+const TwilioClient: React.FC<TwilioClientProps> = ({
+  onCallConnect,
+  onCallDisconnect,
+  onDeviceReady,
+  onError,
 }) => {
   const [device, setDevice] = useState<Device | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isOnCall, setIsOnCall] = useState(false);
-  const activeCall = useRef<any>(null);
+  const [connection, setConnection] = useState<Connection | null>(null);
+  const [status, setStatus] = useState<string>("offline");
+  const toast = useToast();
 
-  useEffect(() => {
-    if (isActive && !isInitialized) {
-      initializeTwilioDevice();
-    }
-
-    return () => {
-      if (device) {
-        device.destroy();
-      }
-    };
-  }, [isActive, isInitialized]);
-
-  const generateUniqueIdentity = () => {
-    return `agent-${Math.random().toString(36).substring(2, 15)}`;
-  };
-
-  const initializeTwilioDevice = async () => {
+  // Initialize the Twilio device
+  const setupDevice = useCallback(async () => {
     try {
-      // Generate a unique identity for this agent
-      const identity = generateUniqueIdentity();
-      
-      // Get token from Supabase function
-      const { data, error } = await supabase.functions.invoke('twilio-token', {
-        body: { identity }
+      // Fetch a token from our Supabase function
+      const { data, error } = await supabase.functions.invoke("twilio-token", {
+        method: "POST",
       });
 
       if (error) {
@@ -52,129 +55,161 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
 
       if (!data || !data.token) {
-        throw new Error('No token received from server');
+        throw new Error("No token received from server");
       }
 
-      // Create a new Twilio Device
-      const twilioDevice = new Device(data.token, {
-        logLevel: 1, // Info
-        codecPreferences: ['opus', 'pcmu']
-      });
-
-      // Set up event listeners
-      twilioDevice.on('registered', () => {
-        console.log('Twilio device registered');
-        onDeviceReady(true);
-      });
-
-      twilioDevice.on('error', (error) => {
-        console.error('Twilio device error:', error);
-        toast.error(`Twilio error: ${error.message}`);
-        onCallStatusChange('error');
-      });
-
-      twilioDevice.on('incoming', (call) => {
-        activeCall.current = call;
-        setIsOnCall(true);
-        onCallStatusChange('incoming');
-        
-        call.on('accept', () => {
-          onCallStatusChange('in-progress');
-        });
-        
-        call.on('disconnect', () => {
-          setIsOnCall(false);
-          activeCall.current = null;
-          onCallStatusChange('completed');
-        });
-        
-        call.on('cancel', () => {
-          setIsOnCall(false);
-          activeCall.current = null;
-          onCallStatusChange('canceled');
-        });
-      });
-
-      twilioDevice.on('connect', (call) => {
-        activeCall.current = call;
-        setIsOnCall(true);
-        onCallStatusChange('in-progress');
-      });
-
-      twilioDevice.on('disconnect', () => {
-        setIsOnCall(false);
-        activeCall.current = null;
-        onCallStatusChange('completed');
-      });
-
-      // Register the device
-      await twilioDevice.register();
-      setDevice(twilioDevice);
-      setIsInitialized(true);
-      
-      toast.success('Phone system initialized');
-    } catch (error) {
-      console.error('Failed to initialize Twilio:', error);
-      toast.error(`Failed to initialize phone system: ${error.message}`);
-      onDeviceReady(false);
-    }
-  };
-
-  const makeCall = async (phoneNumber: string) => {
-    if (!device || !device.isRegistered()) {
-      toast.error('Phone system not ready');
-      return false;
-    }
-
-    try {
-      // The actual calling happens via the Twilio-dial function
-      // This just prepares the device to receive the call
-      toast.info(`Preparing to call ${phoneNumber}...`);
-      onCallStatusChange('connecting');
-      return true;
-    } catch (error) {
-      toast.error(`Call failed: ${error.message}`);
-      onCallStatusChange('failed');
-      return false;
-    }
-  };
-
-  const hangUp = () => {
-    if (activeCall.current) {
-      activeCall.current.disconnect();
-      activeCall.current = null;
-      setIsOnCall(false);
-      onCallStatusChange('completed');
-      toast.info('Call ended');
-    }
-  };
-
-  const toggleMute = () => {
-    if (activeCall.current) {
-      if (isMuted) {
-        activeCall.current.mute(false);
-        setIsMuted(false);
-        toast.info('Microphone unmuted');
-      } else {
-        activeCall.current.mute(true);
-        setIsMuted(true);
-        toast.info('Microphone muted');
+      // Clean up existing device if it exists
+      if (device) {
+        device.destroy();
       }
-    }
-  };
 
-  // Expose methods to parent component
-  React.useEffect(() => {
-    // @ts-ignore - Adding functions to window for debugging
+      // Create a new device with the token
+      const newDevice = new Device(data.token, {
+        codecPreferences: ["opus", "pcmu"] as any,
+        enableIceRestart: true,
+        maxAverageBitrate: 16000,
+      });
+
+      // Setup event listeners
+      newDevice.on("ready", () => {
+        setStatus("ready");
+        if (onDeviceReady) onDeviceReady(newDevice);
+        toast.toast({
+          title: "Phone Ready",
+          description: "Your phone is ready to make calls.",
+        });
+      });
+
+      newDevice.on("error", (err) => {
+        console.error("Twilio device error:", err);
+        setStatus("error");
+        if (onError) onError(err);
+        toast.toast({
+          variant: "destructive",
+          title: "Call Error",
+          description: err.message || "An error occurred with the phone",
+        });
+      });
+
+      newDevice.on("disconnect", () => {
+        setConnection(null);
+        setStatus("ready");
+        if (onCallDisconnect) onCallDisconnect();
+        toast.toast({
+          title: "Call Ended",
+          description: "The call has ended.",
+        });
+      });
+
+      newDevice.on("connect", (conn) => {
+        setConnection(conn);
+        setStatus("busy");
+        if (onCallConnect) onCallConnect(conn);
+      });
+
+      await newDevice.register();
+      setDevice(newDevice);
+      setStatus("ready");
+      return newDevice;
+    } catch (err: any) {
+      console.error("Error setting up Twilio device:", err);
+      setStatus("error");
+      if (onError) onError(err);
+      toast.toast({
+        variant: "destructive",
+        title: "Setup Error",
+        description: err.message || "Failed to set up the phone",
+      });
+      return null;
+    }
+  }, [device, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
+
+  const makeCall = useCallback(
+    async (phoneNumber: string) => {
+      try {
+        if (!device || !device.register) {
+          await setupDevice();
+        }
+
+        // Check if device is ready
+        if (!device) {
+          throw new Error("Phone device is not ready. Try again.");
+        }
+
+        // Call the Supabase function to initiate the call
+        const { data, error } = await supabase.functions.invoke("twilio-dial", {
+          method: "POST",
+          body: { phoneNumber },
+        });
+
+        if (error) {
+          throw new Error(`Error initiating call: ${error.message}`);
+        }
+
+        if (!data || !data.success) {
+          throw new Error(data?.message || "Failed to initiate call");
+        }
+
+        toast.toast({
+          title: "Calling...",
+          description: `Dialing ${phoneNumber}`,
+        });
+      } catch (err: any) {
+        console.error("Error making call:", err);
+        if (onError) onError(err);
+        toast.toast({
+          variant: "destructive",
+          title: "Call Error",
+          description: err.message || "Failed to make the call",
+        });
+      }
+    },
+    [device, setupDevice, onError, toast]
+  );
+
+  const hangupCall = useCallback(() => {
+    if (connection) {
+      connection.disconnect();
+      setConnection(null);
+      setStatus("ready");
+    }
+  }, [connection]);
+
+  const isReady = useCallback(() => {
+    return device !== null && status === "ready";
+  }, [device, status]);
+
+  // Set up global access to Twilio functionality
+  useEffect(() => {
     window.twilioClient = {
+      device,
+      connection,
+      status,
       makeCall,
-      hangUp,
-      toggleMute,
-      getStatus: () => ({ isInitialized, isOnCall, isMuted })
+      hangupCall,
+      setupDevice,
+      isReady,
     };
-  }, [isInitialized, isOnCall, isMuted]);
 
-  return null; // This is a non-UI component
+    // Initial setup
+    if (!device) {
+      setupDevice();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (device) {
+        device.destroy();
+      }
+      if (window.twilioClient) {
+        window.twilioClient.device = null;
+        window.twilioClient.connection = null;
+      }
+    };
+  }, [device, connection, status, makeCall, hangupCall, setupDevice, isReady]);
+
+  // This component doesn't render anything visible
+  return null;
 };
 
 export default TwilioClient;
