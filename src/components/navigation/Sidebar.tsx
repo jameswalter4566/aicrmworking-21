@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -80,7 +81,7 @@ const Sidebar = () => {
                       item.active ? "text-crm-blue" : "text-white group-hover:text-crm-blue"
                     )}
                   />
-                  <span className="truncate">{item.name}</span>
+                  <span className="truncate text-white">{item.name}</span>
                   {item.badge && (
                     <span className="ml-auto bg-crm-red text-white text-xs px-1.5 py-0.5 rounded-full absolute top-0 right-0">
                       {item.badge}
@@ -123,7 +124,7 @@ const Sidebar = () => {
                 "flex items-center py-2 text-sm font-medium rounded-md mx-2 group relative transition-all",
                 item.active 
                   ? "bg-white text-crm-blue"
-                  : "text-white hover:text-crm-blue",
+                  : "text-white hover:text-white",
                 expanded ? "px-4" : "px-0 justify-center"
               )}
             >
@@ -136,13 +137,13 @@ const Sidebar = () => {
               <item.icon
                 className={cn(
                   "h-5 w-5 flex-shrink-0",
-                  item.active ? "text-crm-blue" : "text-white group-hover:text-crm-blue",
+                  item.active ? "text-crm-blue" : "text-white group-hover:text-white",
                   expanded ? "mr-3" : "mr-0",
-                  "relative z-10" // Ensure icon stays above the color background
+                  "relative z-10"
                 )}
               />
               {expanded && (
-                <span className="relative z-10">
+                <span className="relative z-10 text-white">
                   {item.name}
                 </span>
               )}
