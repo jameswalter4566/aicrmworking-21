@@ -435,38 +435,36 @@ const People = () => {
       </div>
 
       {selectedLeads.length > 0 && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-start gap-4">
           <span className="text-sm font-medium text-gray-700">
             {selectedLeads.length} {selectedLeads.length === 1 ? 'lead' : 'leads'} selected
           </span>
-          <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="rounded-lg">
-                  Set Disposition <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
-                  <DropdownMenuItem 
-                    key={disposition}
-                    onClick={() => bulkUpdateDisposition(disposition)}
-                    className={dispositionColors[disposition as keyof typeof dispositionColors]}
-                  >
-                    {disposition}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="rounded-lg"
-              onClick={() => setSelectedLeads([])}
-            >
-              Clear Selection
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="rounded-lg">
+                Set Disposition <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
+                <DropdownMenuItem 
+                  key={disposition}
+                  onClick={() => bulkUpdateDisposition(disposition)}
+                  className={dispositionColors[disposition as keyof typeof dispositionColors]}
+                >
+                  {disposition}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="rounded-lg"
+            onClick={() => setSelectedLeads([])}
+          >
+            Clear Selection
+          </Button>
         </div>
       )}
 
