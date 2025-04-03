@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -8,17 +7,17 @@ import {
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Define color backgrounds for each nav item
+// Define darker, more solid background colors for each nav item
 const itemColors = [
-  "bg-blue-100", // Dashboard
-  "bg-purple-100", // People
-  "bg-green-100", // Power Dialer
-  "bg-yellow-100", // Inbox
-  "bg-pink-100", // Tasks
-  "bg-orange-100", // Calendar
-  "bg-teal-100", // Deals
-  "bg-indigo-100", // Reporting
-  "bg-gray-100", // Admin
+  "bg-blue-600", // Dashboard
+  "bg-purple-600", // People
+  "bg-green-600", // Power Dialer
+  "bg-yellow-600", // Inbox
+  "bg-pink-600", // Tasks
+  "bg-orange-600", // Calendar
+  "bg-teal-600", // Deals
+  "bg-indigo-600", // Reporting
+  "bg-gray-600", // Admin
 ];
 
 const navItems = [
