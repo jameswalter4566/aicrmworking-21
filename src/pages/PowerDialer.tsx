@@ -21,7 +21,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Phone2, Phone3 } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User } from "lucide-react";
+import Phone2 from "@/components/icons/Phone2";
+import Phone3 from "@/components/icons/Phone3";
 import {
   ToggleGroup,
   ToggleGroupItem
