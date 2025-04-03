@@ -16,7 +16,7 @@ const MetricCard = ({ title, value, subtitle, icon, iconColor = "bg-crm-blue", c
     <div className="metric-card rounded-2xl">
       <div className="flex flex-col h-full">
         {icon && (
-          <div> {/* Removed mb-3 class */}
+          <div className="mb-3">
             <div className={cn(
               "w-16 h-16 rounded-xl flex items-center justify-center", 
               `bg-${iconColor.replace('bg-', '')}/10`
