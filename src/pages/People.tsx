@@ -1,9 +1,8 @@
-
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Filter, Plus, X } from "lucide-react";
+import { PlusCircle, Search, Filter, Plus, X, Upload } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -28,6 +27,7 @@ import {
 } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 // Sample data for leads
 const leadsData = [
@@ -87,6 +87,8 @@ const People = () => {
   const [customFields, setCustomFields] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -120,23 +122,153 @@ const People = () => {
   };
 
   const handlePropertyAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    // If the checkbox is checked, we'll automatically fill the property address
     if (e.target.value === "") {
       form.setValue("propertyAddress", form.getValues("mailingAddress"));
     }
   };
 
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDragging) setIsDragging(true);
+  }, [isDragging]);
+
+  const processCSVData = (content: string) => {
+    try {
+      const rows = content.split("\n");
+      const headers = rows[0].split(",").map(h => h.trim());
+      
+      const requiredFields = ["firstName", "lastName", "email"];
+      const missingFields = requiredFields.filter(field => !headers.some(h => 
+        h.toLowerCase().includes("first") && h.toLowerCase().includes("name")) ||
+        h.toLowerCase().includes("last") && h.toLowerCase().includes("name") ||
+        h.toLowerCase().includes("email")
+      );
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required fields: ${missingFields.join(", ")}`);
+      }
+      
+      const headerMap = {
+        firstName: headers.findIndex(h => h.toLowerCase().includes("first") && h.toLowerCase().includes("name")),
+        lastName: headers.findIndex(h => h.toLowerCase().includes("last") && h.toLowerCase().includes("name")),
+        email: headers.findIndex(h => h.toLowerCase().includes("email")),
+        mailingAddress: headers.findIndex(h => h.toLowerCase().includes("mailing") || h.toLowerCase().includes("address")),
+        propertyAddress: headers.findIndex(h => h.toLowerCase().includes("property")),
+        phone1: headers.findIndex(h => h.toLowerCase().includes("phone") || h.toLowerCase().includes("mobile")),
+        phone2: headers.findIndex(h => h.toLowerCase().includes("phone2") || h.toLowerCase().includes("secondary")),
+      };
+      
+      const importedLeads = [];
+      for (let i = 1; i < rows.length; i++) {
+        if (!rows[i].trim()) continue;
+        
+        const columns = rows[i].split(",").map(col => col.trim());
+        if (columns.length < 3) continue;
+        
+        const newLead = {
+          id: leads.length + importedLeads.length + i,
+          firstName: headerMap.firstName >= 0 ? columns[headerMap.firstName] : "",
+          lastName: headerMap.lastName >= 0 ? columns[headerMap.lastName] : "",
+          email: headerMap.email >= 0 ? columns[headerMap.email] : "",
+          mailingAddress: headerMap.mailingAddress >= 0 ? columns[headerMap.mailingAddress] : "",
+          propertyAddress: headerMap.propertyAddress >= 0 ? columns[headerMap.propertyAddress] : "",
+          phone1: headerMap.phone1 >= 0 ? columns[headerMap.phone1] : "",
+          phone2: headerMap.phone2 >= 0 ? columns[headerMap.phone2] : "",
+          stage: "Lead",
+          assigned: "",
+        };
+        
+        importedLeads.push(newLead);
+      }
+      
+      return importedLeads;
+    } catch (error) {
+      console.error("CSV parsing error:", error);
+      throw error;
+    }
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files.length === 0) return;
+
+    const file = files[0];
+    const fileType = file.name.split('.').pop()?.toLowerCase();
+    
+    if (fileType !== 'csv' && fileType !== 'xls' && fileType !== 'xlsx') {
+      toast.error("Only CSV and Excel files are supported");
+      return;
+    }
+
+    const reader = new FileReader();
+    
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        if (!content) throw new Error("Failed to read file content");
+        
+        if (fileType === 'csv') {
+          const importedLeads = processCSVData(content);
+          
+          if (importedLeads.length > 0) {
+            setLeads(prevLeads => [...prevLeads, ...importedLeads]);
+            setIsImportOpen(false);
+            toast.success(`Successfully imported ${importedLeads.length} leads`);
+          } else {
+            toast.error("No valid leads found in the file");
+          }
+        } else {
+          toast.error("Excel file processing is not implemented in this demo");
+        }
+      } catch (error) {
+        toast.error(`Import failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    };
+    
+    reader.onerror = () => {
+      toast.error("Error reading file");
+    };
+
+    reader.readAsText(file);
+  }, [leads]);
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Leads</h1>
-        <Button 
-          className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
-          onClick={() => setIsAddLeadOpen(true)}
-        >
-          <PlusCircle className="h-4 w-4 mr-2" />
-          Add Lead
-        </Button>
+        <div className="flex gap-3">
+          <Button 
+            className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+            onClick={() => setIsAddLeadOpen(true)}
+          >
+            <PlusCircle className="h-4 w-4 mr-2" />
+            Add Lead
+          </Button>
+          <Button 
+            className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+            onClick={() => setIsImportOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import Lead List
+          </Button>
+        </div>
       </div>
 
       <div className="flex space-x-4 mb-6">
@@ -221,7 +353,6 @@ const People = () => {
         </div>
       </div>
 
-      {/* Add Lead Dialog */}
       <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
         <DialogContent className="sm:max-w-[600px] rounded-xl">
           <DialogHeader>
@@ -312,7 +443,6 @@ const People = () => {
                         className="rounded-lg"
                         onBlur={(e) => {
                           field.onBlur();
-                          // If property address is empty, set it to mailing address
                           const propertyAddress = form.getValues("propertyAddress");
                           if (!propertyAddress) {
                             form.setValue("propertyAddress", e.target.value);
@@ -378,6 +508,45 @@ const People = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Import Leads</DialogTitle>
+          </DialogHeader>
+          
+          <div 
+            className={`border-2 border-dashed rounded-lg p-8 text-center ${
+              isDragging ? 'border-crm-blue bg-crm-lightBlue' : 'border-gray-300'
+            }`}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          >
+            <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <h3 className="text-lg font-medium mb-2">Drag and drop your file here</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Supported file formats: .CSV, .XLS, .XLSX
+            </p>
+            <p className="text-xs text-gray-400">
+              Your file should include the following columns:<br />
+              First Name, Last Name, Email, Phone, Mailing Address, Property Address
+            </p>
+          </div>
+          
+          <DialogFooter className="sm:justify-between flex gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setIsImportOpen(false)}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </MainLayout>
