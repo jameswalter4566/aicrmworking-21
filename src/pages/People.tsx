@@ -2,7 +2,7 @@ import React, { useState, useCallback } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Filter, Plus, Upload, ChevronDown } from "lucide-react";
+import { PlusCircle, Search, Filter, Plus, Upload, ChevronDown, Check } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -45,6 +45,7 @@ import {
   ToggleGroup, 
   ToggleGroupItem 
 } from "@/components/ui/toggle-group";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const leadsData = [
   {
@@ -131,6 +132,7 @@ const People = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeDisposition, setActiveDisposition] = useState("All Leads");
+  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -152,13 +154,51 @@ const People = () => {
     return lead.disposition === activeDisposition;
   });
 
-  const updateLeadDisposition = (leadId: number, newDisposition: string) => {
-    setLeads(prevLeads => 
-      prevLeads.map(lead => 
-        lead.id === leadId ? { ...lead, disposition: newDisposition } : lead
-      )
-    );
-    toast.success(`Lead disposition updated to ${newDisposition}`);
+  const updateLeadDisposition = (leadId: number | number[], newDisposition: string) => {
+    if (Array.isArray(leadId)) {
+      if (leadId.length === 0) {
+        toast.error("No leads selected");
+        return;
+      }
+      
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          leadId.includes(lead.id) ? { ...lead, disposition: newDisposition } : lead
+        )
+      );
+      toast.success(`${leadId.length} leads updated to ${newDisposition}`);
+    } else {
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          lead.id === leadId ? { ...lead, disposition: newDisposition } : lead
+        )
+      );
+      toast.success(`Lead disposition updated to ${newDisposition}`);
+    }
+  };
+
+  const handleSelectAllLeads = (checked: boolean) => {
+    if (checked) {
+      setSelectedLeads(filteredLeads.map(lead => lead.id));
+    } else {
+      setSelectedLeads([]);
+    }
+  };
+
+  const handleSelectLead = (leadId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedLeads(prev => [...prev, leadId]);
+    } else {
+      setSelectedLeads(prev => prev.filter(id => id !== leadId));
+    }
+  };
+
+  const isAllSelected = filteredLeads.length > 0 && filteredLeads.every(lead => 
+    selectedLeads.includes(lead.id)
+  );
+
+  const bulkUpdateDisposition = (newDisposition: string) => {
+    updateLeadDisposition(selectedLeads, newDisposition);
   };
 
   const getDispositionClass = (disposition: string) => {
@@ -394,6 +434,42 @@ const People = () => {
         </Button>
       </div>
 
+      {selectedLeads.length > 0 && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-700">
+            {selectedLeads.length} {selectedLeads.length === 1 ? 'lead' : 'leads'} selected
+          </span>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="rounded-lg">
+                  Set Disposition <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
+                  <DropdownMenuItem 
+                    key={disposition}
+                    onClick={() => bulkUpdateDisposition(disposition)}
+                    className={dispositionColors[disposition as keyof typeof dispositionColors]}
+                  >
+                    {disposition}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="rounded-lg"
+              onClick={() => setSelectedLeads([])}
+            >
+              Clear Selection
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex items-center bg-crm-lightBlue">
           <h2 className="font-medium text-gray-700">All Leads</h2>
@@ -414,6 +490,13 @@ const People = () => {
           <Table>
             <TableHeader className="bg-crm-blue/10">
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox 
+                    checked={isAllSelected}
+                    onCheckedChange={handleSelectAllLeads}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>
                   <DropdownMenu>
                     <DropdownMenuTrigger className="flex items-center cursor-pointer focus:outline-none group">
@@ -456,6 +539,13 @@ const People = () => {
                     key={lead.id} 
                     className="hover:bg-crm-lightBlue transition-all duration-200 cursor-pointer my-4 shadow-sm hover:shadow-md hover:scale-[1.01]"
                   >
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedLeads.includes(lead.id)}
+                        onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
+                        aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                      />
+                    </TableCell>
                     <TableCell>
                       <Popover>
                         <PopoverTrigger asChild>
@@ -506,7 +596,7 @@ const People = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={10 + customFields.length} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={11 + customFields.length} className="text-center py-8 text-gray-500">
                     No leads found. Add your first lead to get started.
                   </TableCell>
                 </TableRow>
