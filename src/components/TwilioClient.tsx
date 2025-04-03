@@ -83,11 +83,11 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       newDevice.on("error", (err) => {
         console.error("Twilio device error:", err);
         setStatus("error");
-        if (onError) onError(err);
+        if (onError && err) onError(err);
         toast.toast({
           variant: "destructive",
           title: "Call Error",
-          description: err.message || "An error occurred with the phone",
+          description: err?.message || "An error occurred with the phone",
         });
       });
 
@@ -118,7 +118,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       toast.toast({
         variant: "destructive",
         title: "Setup Error",
-        description: err.message || "Failed to set up the phone",
+        description: err?.message || "Failed to set up the phone",
       });
       return null;
     }
@@ -160,7 +160,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         toast.toast({
           variant: "destructive",
           title: "Call Error",
-          description: err.message || "Failed to make the call",
+          description: err?.message || "Failed to make the call",
         });
       }
     },

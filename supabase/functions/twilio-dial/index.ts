@@ -18,10 +18,14 @@ serve(async (req) => {
   try {
     // Get Twilio credentials from environment
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken = Deno.env.get('TWILIO_API_SECRET');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');  // Changed from API_SECRET to AUTH_TOKEN
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
 
     if (!accountSid || !authToken) {
+      console.error('Missing required Twilio credentials:', {
+        accountSid: !!accountSid,
+        authToken: !!authToken
+      });
       throw new Error('Missing required Twilio credentials');
     }
 

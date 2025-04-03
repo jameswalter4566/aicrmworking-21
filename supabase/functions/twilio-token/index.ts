@@ -23,11 +23,24 @@ serve(async (req) => {
     const twimlAppSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
     if (!accountSid || !apiKey || !apiSecret || !twimlAppSid) {
+      console.error('Missing required Twilio credentials:', {
+        accountSid: !!accountSid,
+        apiKey: !!apiKey,
+        apiSecret: !!apiSecret,
+        twimlAppSid: !!twimlAppSid
+      });
       throw new Error('Missing required Twilio credentials');
     }
 
-    // Set a default identity if none is provided
-    const identity = "user" + Math.floor(Math.random() * 10000);
+    // Get the identity from the request body or set a default
+    let identity;
+    try {
+      const requestData = await req.json();
+      identity = requestData.identity || "user" + Math.floor(Math.random() * 10000);
+    } catch (e) {
+      // If request parsing fails, use a default identity
+      identity = "user" + Math.floor(Math.random() * 10000);
+    }
     
     console.log("Creating token for identity:", identity);
 
