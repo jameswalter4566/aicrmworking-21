@@ -2,13 +2,15 @@
 import React from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
-  BarChart2, Settings, Home, DollarSign 
+  BarChart2, Settings, Home, DollarSign, 
+  PhoneOutgoing
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Dashboard", icon: Home, active: true },
   { name: "People", icon: Users, active: false },
+  { name: "Power Dialer", icon: PhoneOutgoing, active: false },
   { name: "Inbox", icon: Inbox, active: false, badge: 5 },
   { name: "Tasks", icon: ListTodo, active: false },
   { name: "Calendar", icon: Calendar, active: false },
