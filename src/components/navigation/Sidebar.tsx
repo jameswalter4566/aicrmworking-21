@@ -19,14 +19,14 @@ const navItems = [
 
 const Sidebar = () => {
   return (
-    <div className="hidden md:block w-60 bg-white border-r border-gray-200">
+    <div className="hidden md:block w-60 bg-crm-blue h-screen">
       <div className="py-4">
         <div className="px-4 py-2 mb-4">
           <div className="flex items-center">
-            <div className="h-8 w-8 flex items-center justify-center bg-crm-blue text-white rounded">
+            <div className="h-8 w-8 flex items-center justify-center bg-white text-crm-blue rounded">
               <span className="font-bold">CRM</span>
             </div>
-            <span className="ml-2 text-lg font-semibold">SalesPro</span>
+            <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>
           </div>
         </div>
         <div className="space-y-1">
@@ -35,16 +35,16 @@ const Sidebar = () => {
               key={item.name}
               href="#"
               className={cn(
-                "flex items-center px-4 py-2 text-sm font-medium rounded-md group",
+                "flex items-center px-4 py-2 text-sm font-medium rounded-md mx-2 group",
                 item.active 
-                  ? "text-crm-blue bg-crm-lightBlue"
-                  : "text-gray-600 hover:text-crm-blue hover:bg-gray-50"
+                  ? "bg-white text-crm-blue"
+                  : "text-white hover:bg-white/90 hover:text-crm-blue"
               )}
             >
               <item.icon
                 className={cn(
                   "mr-3 h-5 w-5 flex-shrink-0",
-                  item.active ? "text-crm-blue" : "text-gray-400 group-hover:text-crm-blue"
+                  item.active ? "text-crm-blue" : "text-white group-hover:text-crm-blue"
                 )}
               />
               {item.name}
