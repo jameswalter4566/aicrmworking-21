@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -8,7 +7,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// Define darker, more solid background colors for each nav item
 const itemColors = [
   "bg-blue-600", // Dashboard
   "bg-purple-600", // People
@@ -42,7 +40,6 @@ const Sidebar = () => {
     setMobileMenuOpen(prev => !prev);
   };
 
-  // Mobile Sidebar
   if (isMobile) {
     return (
       <div className="w-full bg-crm-blue">
@@ -69,7 +66,7 @@ const Sidebar = () => {
                   key={item.name}
                   href="#"
                   className={cn(
-                    "flex flex-col items-center px-2 py-2 text-xs font-medium rounded-md",
+                    "flex flex-col items-center px-3 py-3 text-sm font-medium rounded-md",
                     item.active 
                       ? "bg-white text-crm-blue"
                       : "text-white hover:bg-white/90 hover:text-crm-blue"
@@ -77,13 +74,13 @@ const Sidebar = () => {
                 >
                   <item.icon
                     className={cn(
-                      "h-5 w-5 mb-1",
+                      "h-6 w-6 mb-2",
                       item.active ? "text-crm-blue" : "text-white group-hover:text-crm-blue"
                     )}
                   />
-                  <span className="truncate text-white">{item.name}</span>
+                  <span className="truncate text-white text-base">{item.name}</span>
                   {item.badge && (
-                    <span className="ml-auto bg-crm-red text-white text-xs px-1.5 py-0.5 rounded-full absolute top-0 right-0">
+                    <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full absolute top-0 right-0">
                       {item.badge}
                     </span>
                   )}
@@ -96,18 +93,17 @@ const Sidebar = () => {
     );
   }
 
-  // Desktop Sidebar with collapsible behavior
   return (
     <div 
       className={cn(
         "hidden md:block bg-crm-blue h-screen transition-all duration-300",
-        expanded ? "w-60" : "w-16"
+        expanded ? "w-72" : "w-20"
       )}
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
     >
-      <div className="py-4">
-        <div className={cn("px-4 py-2 mb-4", expanded ? "" : "flex justify-center")}>
+      <div className="py-6">
+        <div className={cn("px-4 py-3 mb-6", expanded ? "" : "flex justify-center")}>
           <div className="flex items-center">
             <div className="h-8 w-8 flex items-center justify-center bg-white text-crm-blue rounded">
               <span className="font-bold">CRM</span>
@@ -115,17 +111,17 @@ const Sidebar = () => {
             {expanded && <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>}
           </div>
         </div>
-        <div className="space-y-1">
+        <div className="space-y-2">
           {navItems.map((item, index) => (
             <a
               key={item.name}
               href="#"
               className={cn(
-                "flex items-center py-2 text-sm font-medium rounded-md mx-2 group relative transition-all",
+                "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                 item.active 
                   ? "bg-white text-crm-blue"
                   : "text-white hover:text-white",
-                expanded ? "px-4" : "px-0 justify-center"
+                expanded ? "px-5" : "px-0 justify-center"
               )}
             >
               <div 
@@ -136,24 +132,24 @@ const Sidebar = () => {
               />
               <item.icon
                 className={cn(
-                  "h-5 w-5 flex-shrink-0",
+                  "h-6 w-6 flex-shrink-0",
                   item.active ? "text-crm-blue" : "text-white group-hover:text-white",
-                  expanded ? "mr-3" : "mr-0",
+                  expanded ? "mr-4" : "mr-0",
                   "relative z-10"
                 )}
               />
               {expanded && (
-                <span className="relative z-10 text-white">
+                <span className="relative z-10 text-white text-base">
                   {item.name}
                 </span>
               )}
               {expanded && item.badge && (
-                <span className="ml-auto bg-crm-red text-white text-xs px-2 py-0.5 rounded-full relative z-10">
+                <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full relative z-10">
                   {item.badge}
                 </span>
               )}
               {!expanded && item.badge && (
-                <span className="absolute top-0 right-0 bg-crm-red w-2 h-2 rounded-full relative z-10"></span>
+                <span className="absolute top-0 right-0 bg-crm-red w-2.5 h-2.5 rounded-full relative z-10"></span>
               )}
             </a>
           ))}
