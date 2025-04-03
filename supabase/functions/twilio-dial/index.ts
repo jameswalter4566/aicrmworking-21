@@ -19,17 +19,33 @@ serve(async (req) => {
     // Get Twilio credentials from environment
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_API_SECRET');
+    const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
 
     if (!accountSid || !authToken) {
       throw new Error('Missing required Twilio credentials');
     }
 
-    // Parse request body
-    const { to, from, agentIdentity } = await req.json();
+    // Initialize with default values in case request body is missing fields
+    let to = '';
+    let from = twilioPhoneNumber || '';
+    let agentIdentity = 'anonymous';
     
-    if (!to || !from || !agentIdentity) {
-      throw new Error('Missing required parameters: to, from, and agentIdentity are required');
+    try {
+      // Parse request body
+      const requestData = await req.json();
+      to = requestData.phoneNumber || requestData.to || '';
+      from = requestData.from || twilioPhoneNumber || '';
+      agentIdentity = requestData.agentIdentity || 'anonymous';
+    } catch (e) {
+      console.error("Error parsing request body:", e);
+      throw new Error('Invalid request body format');
     }
+    
+    if (!to) {
+      throw new Error('Missing required parameter: phone number');
+    }
+
+    console.log(`Initiating call to ${to} from ${from}`);
 
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -60,7 +76,10 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error initiating Twilio call:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to initiate call" }),
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || "Failed to initiate call" 
+      }),
       { status: 400, headers: corsHeaders }
     );
   }

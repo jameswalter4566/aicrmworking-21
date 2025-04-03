@@ -26,12 +26,10 @@ serve(async (req) => {
       throw new Error('Missing required Twilio credentials');
     }
 
-    // Parse request body
-    const { identity } = await req.json();
+    // Set a default identity if none is provided
+    const identity = "user" + Math.floor(Math.random() * 10000);
     
-    if (!identity) {
-      throw new Error('Identity is required');
-    }
+    console.log("Creating token for identity:", identity);
 
     // Create an access token
     const AccessToken = twilio.jwt.AccessToken;
