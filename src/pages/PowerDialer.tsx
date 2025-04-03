@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,9 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Phone, PhoneOff, User, Mail, Home, Clock, Calendar, MoreHorizontal, Play, Pause, Search } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { 
+  Phone, 
+  PhoneOff, 
+  User, 
+  Mail, 
+  Home, 
+  Clock, 
+  Calendar, 
+  MoreHorizontal, 
+  Play, 
+  Pause, 
+  Search,
+  PhoneCall
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TwilioClient from "@/components/TwilioClient";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import Phone3 from "@/components/icons/Phone3";
 
 interface Lead {
   id: number;
@@ -26,6 +43,15 @@ interface Lead {
   leadSource?: string;
   notes?: string;
   avatar?: string;
+}
+
+interface ActivityLog {
+  id: number;
+  leadId: number;
+  type: 'call_attempt' | 'call_received' | 'message_sent' | 'message_received' | 'disposition_change' | 'system';
+  timestamp: string;
+  message: string;
+  disposition?: string;
 }
 
 const dummyLeads: Lead[] = [
@@ -116,7 +142,71 @@ const dummyLeads: Lead[] = [
   }
 ];
 
+// Generate dummy activity logs
+const generateDummyLogs = (leadId: number): ActivityLog[] => {
+  const types: Array<ActivityLog['type']> = [
+    'call_attempt', 'call_received', 'message_sent', 
+    'message_received', 'disposition_change', 'system'
+  ];
+  
+  const logs: ActivityLog[] = [];
+  const now = new Date();
+  
+  // Generate 5-10 random logs
+  const count = 5 + Math.floor(Math.random() * 6);
+  
+  for (let i = 0; i < count; i++) {
+    const type = types[Math.floor(Math.random() * types.length)];
+    const minutesAgo = Math.floor(Math.random() * 60 * 24); // Random time in the last 24 hours
+    const timestamp = new Date(now.getTime() - minutesAgo * 60 * 1000).toISOString();
+    
+    let message = '';
+    let disposition = undefined;
+    
+    switch (type) {
+      case 'call_attempt':
+        message = 'Outbound call attempt';
+        break;
+      case 'call_received':
+        message = 'Inbound call received';
+        break;
+      case 'message_sent':
+        message = 'SMS sent: "Hi there, following up on our conversation about your property needs."';
+        break;
+      case 'message_received':
+        message = 'SMS received: "Thanks for reaching out. I\'m still interested in exploring options."';
+        break;
+      case 'disposition_change':
+        disposition = ['Interested', 'Very Interested', 'Not Interested', 'Call Back', 'Needs Follow Up'][Math.floor(Math.random() * 5)];
+        message = `Disposition changed to ${disposition}`;
+        break;
+      case 'system':
+        message = 'Lead imported from Zillow';
+        break;
+    }
+    
+    logs.push({
+      id: leadId * 100 + i,
+      leadId,
+      type,
+      timestamp,
+      message,
+      disposition
+    });
+  }
+  
+  // Sort logs by timestamp (newest first)
+  return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+};
+
+// Generate activity logs for all leads
+const dummyActivityLogs: Record<number, ActivityLog[]> = {};
+dummyLeads.forEach(lead => {
+  dummyActivityLogs[lead.id] = generateDummyLogs(lead.id);
+});
+
 type CallStatus = "ready" | "in-progress" | "completed" | "no-answer" | "error";
+type DialingMode = "single" | "power";
 
 const PowerDialer = () => {
   const [leads, setLeads] = useState<Lead[]>(dummyLeads);
@@ -126,6 +216,9 @@ const PowerDialer = () => {
   const [isDialerActive, setIsDialerActive] = useState(false);
   const [activeLeadId, setActiveLeadId] = useState<number | null>(null);
   const [isClientReady, setIsClientReady] = useState(false);
+  const [dialingMode, setDialingMode] = useState<DialingMode>("single");
+  const [simultaneousLines, setSimultaneousLines] = useState<number>(1);
+  const [activityLogs, setActivityLogs] = useState<Record<number, ActivityLog[]>>(dummyActivityLogs);
   const { toast } = useToast();
   
   // Filter leads based on search term
@@ -153,6 +246,10 @@ const PowerDialer = () => {
     console.error("Call error:", error);
     if (activeLeadId) {
       setCallStatuses(prev => ({ ...prev, [activeLeadId]: "error" }));
+      addActivityLog(activeLeadId, {
+        type: 'system',
+        message: `Call error: ${error.message || 'Unknown error'}`,
+      });
     }
     toast({
       variant: "destructive",
@@ -165,6 +262,10 @@ const PowerDialer = () => {
   const handleCallConnect = (connection: any) => {
     if (activeLeadId) {
       setCallStatuses(prev => ({ ...prev, [activeLeadId]: "in-progress" }));
+      addActivityLog(activeLeadId, {
+        type: 'call_attempt',
+        message: 'Call connected',
+      });
       toast({
         title: "Call Connected",
         description: "You are now connected to the lead.",
@@ -176,12 +277,32 @@ const PowerDialer = () => {
   const handleCallDisconnect = () => {
     if (activeLeadId) {
       setCallStatuses(prev => ({ ...prev, [activeLeadId]: "completed" }));
+      addActivityLog(activeLeadId, {
+        type: 'call_attempt',
+        message: 'Call ended',
+      });
       setActiveLeadId(null);
       toast({
         title: "Call Ended",
         description: "The call has ended.",
       });
     }
+  };
+
+  // Add an activity log for a lead
+  const addActivityLog = (leadId: number, log: Omit<ActivityLog, 'id' | 'leadId' | 'timestamp'>) => {
+    const timestamp = new Date().toISOString();
+    const newLog: ActivityLog = {
+      id: Date.now(),
+      leadId,
+      timestamp,
+      ...log
+    };
+
+    setActivityLogs(prev => ({
+      ...prev,
+      [leadId]: [newLog, ...(prev[leadId] || [])]
+    }));
   };
 
   // Initiate a call to a lead
@@ -208,11 +329,20 @@ const PowerDialer = () => {
     setActiveLeadId(leadId);
     setCallStatuses(prev => ({ ...prev, [leadId]: "ready" }));
     
+    addActivityLog(leadId, {
+      type: 'call_attempt',
+      message: 'Initiating call...',
+    });
+    
     try {
       await window.twilioClient.makeCall(lead.phone1);
     } catch (error: any) {
       console.error("Failed to initiate call:", error);
       setCallStatuses(prev => ({ ...prev, [leadId]: "error" }));
+      addActivityLog(leadId, {
+        type: 'system',
+        message: `Call error: ${error.message || 'Failed to initiate call'}`,
+      });
       toast({
         variant: "destructive",
         title: "Call Failed",
@@ -227,7 +357,47 @@ const PowerDialer = () => {
       window.twilioClient.hangupCall();
       setCallStatuses(prev => ({ ...prev, [leadId]: "completed" }));
       setActiveLeadId(null);
+      addActivityLog(leadId, {
+        type: 'call_attempt',
+        message: 'Call manually ended',
+      });
     }
+  };
+
+  // Start the power dialer session
+  const startDialerSession = () => {
+    if (!isClientReady) {
+      toast({
+        variant: "destructive",
+        title: "Phone Not Ready",
+        description: "The phone system is not ready. Please try again.",
+      });
+      return;
+    }
+
+    setIsDialerActive(true);
+    toast({
+      title: "Power Dialer Active",
+      description: `Starting to call leads with ${simultaneousLines} line${simultaneousLines > 1 ? 's' : ''}.`,
+    });
+    
+    // In a real implementation, this would start cycling through leads
+    // Here we just pick the first lead for demo purposes
+    if (filteredLeads.length > 0 && !activeLeadId) {
+      initiateCall(filteredLeads[0].id);
+    }
+  };
+
+  // Stop the power dialer session
+  const stopDialerSession = () => {
+    setIsDialerActive(false);
+    if (activeLeadId) {
+      endCall(activeLeadId);
+    }
+    toast({
+      title: "Power Dialer Paused",
+      description: "Dialing session has been paused.",
+    });
   };
 
   // Get the status badge for a lead
@@ -248,6 +418,12 @@ const PowerDialer = () => {
     }
   };
 
+  // Format timestamp for display
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
   return (
     <MainLayout>
       {/* Invisible TwilioClient component to handle calls */}
@@ -258,278 +434,226 @@ const PowerDialer = () => {
         onError={handleCallError}
       />
       
-      <div className="flex flex-col space-y-4">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Power Dialer</h1>
-          <div className="flex items-center space-x-2">
-            <Button 
-              variant={isDialerActive ? "destructive" : "default"}
-              onClick={() => setIsDialerActive(!isDialerActive)}
-              disabled={!isClientReady}
-            >
-              {isDialerActive ? (
-                <>
-                  <Pause className="mr-2 h-4 w-4" />
-                  Pause Dialer
-                </>
+      <div className="flex flex-col h-[calc(100vh-7rem)] space-y-4">
+        {/* Upper section - Dialer Controls and Activity Log */}
+        <div className="h-1/2 grid grid-cols-1 md:grid-cols-5 gap-4">
+          {/* Dialer controls */}
+          <Card className="md:col-span-2 flex flex-col">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Phone3 className="h-6 w-6 mr-2 text-primary" />
+                Power Dialer
+              </CardTitle>
+              <CardDescription>
+                Call multiple leads automatically
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col justify-between">
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-sm font-medium mb-2">Dialing Mode</h3>
+                  <div className="flex space-x-4">
+                    <Button 
+                      variant={dialingMode === "single" ? "default" : "outline"}
+                      onClick={() => setDialingMode("single")}
+                      className="flex-1"
+                    >
+                      Single Dial
+                    </Button>
+                    <Button 
+                      variant={dialingMode === "power" ? "default" : "outline"}
+                      onClick={() => setDialingMode("power")}
+                      className="flex-1"
+                    >
+                      Power Dial
+                    </Button>
+                  </div>
+                </div>
+                
+                {dialingMode === "power" && (
+                  <div>
+                    <h3 className="text-sm font-medium mb-2">Simultaneous Lines</h3>
+                    <RadioGroup className="flex space-x-4" value={simultaneousLines.toString()} onValueChange={(val) => setSimultaneousLines(parseInt(val))}>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="1" id="lines-1" />
+                        <label htmlFor="lines-1">1 Line</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="2" id="lines-2" />
+                        <label htmlFor="lines-2">2 Lines</label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="3" id="lines-3" />
+                        <label htmlFor="lines-3">3 Lines</label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
+                
+                <div className="flex items-center justify-center">
+                  <Button 
+                    variant={isDialerActive ? "destructive" : "default"}
+                    size="lg"
+                    className="w-full"
+                    onClick={isDialerActive ? stopDialerSession : startDialerSession}
+                    disabled={!isClientReady}
+                  >
+                    {isDialerActive ? (
+                      <>
+                        <Pause className="mr-2 h-5 w-5" />
+                        Stop Dialing
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-5 w-5" />
+                        Start Dialing
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Status indicators */}
+              <div className="mt-4 p-3 bg-slate-50 rounded-md flex items-center justify-between">
+                <div className="flex items-center">
+                  <div className={`h-3 w-3 rounded-full mr-2 ${isClientReady ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-sm">{isClientReady ? 'Phone Ready' : 'Phone Not Ready'}</span>
+                </div>
+                {activeLeadId && (
+                  <Badge variant="outline" className="bg-blue-100 text-blue-800">
+                    Active Call
+                  </Badge>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          
+          {/* Activity log */}
+          <Card className="md:col-span-3 flex flex-col">
+            <CardHeader className="pb-2">
+              <CardTitle>Activity Log</CardTitle>
+              <CardDescription>
+                {activeLeadId 
+                  ? `Showing activity for ${leads.find(l => l.id === activeLeadId)?.firstName} ${leads.find(l => l.id === activeLeadId)?.lastName}`
+                  : 'Select a lead to view activity'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto">
+              {activeLeadId ? (
+                <div className="space-y-3">
+                  {activityLogs[activeLeadId]?.map(log => (
+                    <div 
+                      key={log.id} 
+                      className={`flex ${['message_sent', 'call_attempt', 'disposition_change'].includes(log.type) ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div 
+                        className={`max-w-[80%] rounded-lg p-3 ${
+                          ['message_sent', 'call_attempt', 'disposition_change'].includes(log.type)
+                            ? 'bg-blue-100 text-blue-800'
+                            : ['message_received', 'call_received'].includes(log.type)
+                              ? 'bg-gray-100 text-gray-800'
+                              : 'bg-yellow-50 text-yellow-800'
+                        }`}
+                      >
+                        <div className="text-sm">{log.message}</div>
+                        <div className="text-xs mt-1 opacity-70">{formatTimestamp(log.timestamp)}</div>
+                      </div>
+                    </div>
+                  ))}
+                  {(!activityLogs[activeLeadId] || activityLogs[activeLeadId].length === 0) && (
+                    <div className="text-center text-muted-foreground py-8">
+                      No activity recorded for this lead
+                    </div>
+                  )}
+                </div>
               ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Start Dialer
-                </>
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                  <PhoneCall className="h-12 w-12 mb-4 opacity-30" />
+                  <p>Select a lead to view their activity</p>
+                </div>
               )}
-            </Button>
-          </div>
+            </CardContent>
+          </Card>
         </div>
         
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search leads by name, email, or phone..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-
-        <Tabs defaultValue="all">
-          <TabsList>
-            <TabsTrigger value="all">All Leads</TabsTrigger>
-            <TabsTrigger value="new">New</TabsTrigger>
-            <TabsTrigger value="contacted">Contacted</TabsTrigger>
-            <TabsTrigger value="nurturing">Nurturing</TabsTrigger>
-          </TabsList>
+        {/* Lower section - Lead List */}
+        <div className="h-1/2 flex flex-col">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Leads</h2>
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search leads..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+          </div>
           
-          <TabsContent value="all" className="space-y-4 mt-4">
-            {filteredLeads.map(lead => (
-              <Card key={lead.id} className="overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className="p-4 flex-1">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center">
-                          <Avatar className="h-10 w-10 mr-3">
-                            <User />
-                          </Avatar>
-                          <div>
-                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
-                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
-                          </div>
-                        </div>
-                        {getStatusBadge(callStatuses[lead.id])}
+          <div className="flex-1 overflow-y-auto bg-white rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Last Contacted</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.map(lead => (
+                  <TableRow 
+                    key={lead.id} 
+                    className={`cursor-pointer ${activeLeadId === lead.id ? 'bg-blue-50' : ''}`}
+                    onClick={() => setActiveLeadId(lead.id)}
+                  >
+                    <TableCell className="font-medium">
+                      <div className="flex items-center">
+                        <Avatar className="h-8 w-8 mr-2">
+                          <User className="h-4 w-4" />
+                        </Avatar>
+                        {lead.firstName} {lead.lastName}
                       </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.phone1}
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.email}
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Home className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.propertyAddress}
-                        </div>
-                        {lead.lastContacted && (
-                          <div className="flex items-center text-sm">
-                            <Calendar className="h-4 w-4 mr-2 text-muted-foreground" />
-                            Last Contact: {lead.lastContacted}
-                          </div>
+                    </TableCell>
+                    <TableCell>{lead.phone1}</TableCell>
+                    <TableCell>
+                      {getStatusBadge(callStatuses[lead.id]) || (
+                        <Badge variant="outline" className="bg-gray-100">{lead.stage}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{lead.lastContacted || 'Never'}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end space-x-2">
+                        {callStatuses[lead.id] === "in-progress" ? (
+                          <Button 
+                            variant="destructive" 
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); endCall(lead.id); }}
+                          >
+                            <PhoneOff className="h-4 w-4 mr-2" />
+                            End
+                          </Button>
+                        ) : (
+                          <Button 
+                            variant={activeLeadId === lead.id ? "default" : "outline"} 
+                            size="sm"
+                            onClick={(e) => { e.stopPropagation(); initiateCall(lead.id); }}
+                            disabled={!isClientReady || callStatuses[lead.id] === "ready" || (activeLeadId !== null && activeLeadId !== lead.id)}
+                          >
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call
+                          </Button>
                         )}
                       </div>
-                    </div>
-                    
-                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
-                      {callStatuses[lead.id] === "in-progress" ? (
-                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
-                          <PhoneOff className="h-4 w-4 mr-2" />
-                          End Call
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="default" 
-                          onClick={() => initiateCall(lead.id)}
-                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
-                        >
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call Now
-                        </Button>
-                      )}
-                      
-                      <Button variant="ghost" size="icon" className="mt-2">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-          
-          <TabsContent value="new" className="mt-4">
-            {filteredLeads.filter(l => l.stage === "New Lead").map(lead => (
-              <Card key={lead.id} className="overflow-hidden mb-4">
-                <CardContent className="p-0">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className="p-4 flex-1">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center">
-                          <Avatar className="h-10 w-10 mr-3">
-                            <User />
-                          </Avatar>
-                          <div>
-                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
-                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
-                          </div>
-                        </div>
-                        {getStatusBadge(callStatuses[lead.id])}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.phone1}
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.email}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
-                      {callStatuses[lead.id] === "in-progress" ? (
-                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
-                          <PhoneOff className="h-4 w-4 mr-2" />
-                          End Call
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="default" 
-                          onClick={() => initiateCall(lead.id)}
-                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
-                        >
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call Now
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-          
-          <TabsContent value="contacted" className="mt-4">
-            {filteredLeads.filter(l => l.stage === "Contacted").map(lead => (
-              <Card key={lead.id} className="overflow-hidden mb-4">
-                <CardContent className="p-0">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className="p-4 flex-1">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center">
-                          <Avatar className="h-10 w-10 mr-3">
-                            <User />
-                          </Avatar>
-                          <div>
-                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
-                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
-                          </div>
-                        </div>
-                        {getStatusBadge(callStatuses[lead.id])}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.phone1}
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.email}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
-                      {callStatuses[lead.id] === "in-progress" ? (
-                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
-                          <PhoneOff className="h-4 w-4 mr-2" />
-                          End Call
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="default" 
-                          onClick={() => initiateCall(lead.id)}
-                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
-                        >
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call Now
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-          
-          <TabsContent value="nurturing" className="mt-4">
-            {filteredLeads.filter(l => l.stage === "Nurturing").map(lead => (
-              <Card key={lead.id} className="overflow-hidden mb-4">
-                <CardContent className="p-0">
-                  <div className="flex flex-col sm:flex-row">
-                    <div className="p-4 flex-1">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center">
-                          <Avatar className="h-10 w-10 mr-3">
-                            <User />
-                          </Avatar>
-                          <div>
-                            <h3 className="font-medium">{lead.firstName} {lead.lastName}</h3>
-                            <p className="text-sm text-muted-foreground">{lead.stage}</p>
-                          </div>
-                        </div>
-                        {getStatusBadge(callStatuses[lead.id])}
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
-                        <div className="flex items-center text-sm">
-                          <Phone className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.phone1}
-                        </div>
-                        <div className="flex items-center text-sm">
-                          <Mail className="h-4 w-4 mr-2 text-muted-foreground" />
-                          {lead.email}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-row sm:flex-col sm:border-l border-t sm:border-t-0 justify-evenly p-4 bg-slate-50">
-                      {callStatuses[lead.id] === "in-progress" ? (
-                        <Button variant="destructive" onClick={() => endCall(lead.id)}>
-                          <PhoneOff className="h-4 w-4 mr-2" />
-                          End Call
-                        </Button>
-                      ) : (
-                        <Button 
-                          variant="default" 
-                          onClick={() => initiateCall(lead.id)}
-                          disabled={!isClientReady || callStatuses[lead.id] === "ready" || activeLeadId !== null}
-                        >
-                          <Phone className="h-4 w-4 mr-2" />
-                          Call Now
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
     </MainLayout>
   );
