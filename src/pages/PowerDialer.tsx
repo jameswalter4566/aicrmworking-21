@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -31,7 +30,6 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 
-// Mock data - in a real app, this would come from your leads database
 const leadsData = [
   {
     id: 1,
@@ -85,34 +83,33 @@ const leadsData = [
   },
 ];
 
-// Mock activity logs for the leads
 const activityLogsData = {
   1: [
-    { type: "call", status: "attempted", timestamp: "2023-05-15 10:23 AM", notes: "No answer" },
-    { type: "sms", status: "sent", timestamp: "2023-05-15 10:30 AM", content: "Hi Dan, I tried reaching out to you. Would you be available later today?" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-15 10:32 AM", from: "New Lead", to: "Not Contacted" },
+    { type: "call", status: "attempted", timestamp: "2023-05-15 10:23 AM", notes: "No answer", sender: "user" },
+    { type: "sms", status: "sent", timestamp: "2023-05-15 10:30 AM", content: "Hi Dan, I tried reaching out to you. Would you be available later today?", sender: "user" },
+    { type: "disposition", status: "changed", timestamp: "2023-05-15 10:32 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
   ],
   2: [
-    { type: "call", status: "completed", timestamp: "2023-05-14 2:45 PM", duration: "4:32", notes: "Discussed property requirements" },
-    { type: "sms", status: "received", timestamp: "2023-05-14 3:15 PM", content: "Thanks for the call. Can you send me more info about the property?" },
-    { type: "sms", status: "sent", timestamp: "2023-05-14 3:20 PM", content: "Of course! I'll email you the details shortly." },
-    { type: "disposition", status: "changed", timestamp: "2023-05-14 3:25 PM", from: "New Lead", to: "Contacted" },
+    { type: "call", status: "completed", timestamp: "2023-05-14 2:45 PM", duration: "4:32", notes: "Discussed property requirements", sender: "user" },
+    { type: "sms", status: "sent", timestamp: "2023-05-14 3:15 PM", content: "Thanks for the call. Can you send me more info about the property?", sender: "lead" },
+    { type: "sms", status: "sent", timestamp: "2023-05-14 3:20 PM", content: "Of course! I'll email you the details shortly.", sender: "user" },
+    { type: "disposition", status: "changed", timestamp: "2023-05-14 3:25 PM", from: "New Lead", to: "Contacted", sender: "user" },
   ],
   3: [
-    { type: "call", status: "completed", timestamp: "2023-05-13 11:15 AM", duration: "7:21", notes: "Scheduled property viewing" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-13 11:25 AM", from: "Contacted", to: "Appointment Set" },
-    { type: "sms", status: "sent", timestamp: "2023-05-13 11:30 AM", content: "Looking forward to showing you the property on Friday at 3 PM!" },
-    { type: "sms", status: "received", timestamp: "2023-05-13 11:35 AM", content: "Great, I'll see you then. Thank you!" },
+    { type: "call", status: "completed", timestamp: "2023-05-13 11:15 AM", duration: "7:21", notes: "Scheduled property viewing", sender: "user" },
+    { type: "disposition", status: "changed", timestamp: "2023-05-13 11:25 AM", from: "Contacted", to: "Appointment Set", sender: "user" },
+    { type: "sms", status: "sent", timestamp: "2023-05-13 11:30 AM", content: "Looking forward to showing you the property on Friday at 3 PM!", sender: "user" },
+    { type: "sms", status: "received", timestamp: "2023-05-13 11:35 AM", content: "Great, I'll see you then. Thank you!", sender: "lead" },
   ],
   4: [
-    { type: "call", status: "attempted", timestamp: "2023-05-12 9:10 AM", notes: "Voicemail left" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 9:15 AM", from: "New Lead", to: "Not Contacted" },
+    { type: "call", status: "attempted", timestamp: "2023-05-12 9:10 AM", notes: "Voicemail left", sender: "user" },
+    { type: "disposition", status: "changed", timestamp: "2023-05-12 9:15 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
   ],
   5: [
-    { type: "call", status: "attempted", timestamp: "2023-05-11 4:30 PM", notes: "No answer" },
-    { type: "call", status: "attempted", timestamp: "2023-05-12 10:45 AM", notes: "No answer" },
-    { type: "sms", status: "sent", timestamp: "2023-05-12 10:50 AM", content: "Hi James, I've tried to reach you. Please call me back when you have a moment." },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 10:55 AM", from: "New Lead", to: "Not Contacted" },
+    { type: "call", status: "attempted", timestamp: "2023-05-11 4:30 PM", notes: "No answer", sender: "user" },
+    { type: "call", status: "attempted", timestamp: "2023-05-12 10:45 AM", notes: "No answer", sender: "user" },
+    { type: "sms", status: "sent", timestamp: "2023-05-12 10:50 AM", content: "Hi James, I've tried to reach you. Please call me back when you have a moment.", sender: "user" },
+    { type: "disposition", status: "changed", timestamp: "2023-05-12 10:55 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
   ],
 };
 
@@ -157,20 +154,18 @@ const PowerDialer = () => {
     setIsDialogOpen(false);
     setIsDialing(true);
     
-    // Simulate starting calls for the first batch
     const batchSize = parseInt(lineCount);
     const firstBatch = leadsToDial.slice(0, batchSize);
     
     if (firstBatch.length > 0) {
       setActiveCallId(firstBatch[0]);
       
-      // Simulate automated calling sequence
       toast.success(`Starting power dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
       
       firstBatch.forEach((leadId, index) => {
         setTimeout(() => {
           simulateCall(leadId);
-        }, index * 500); // Stagger the calls slightly
+        }, index * 500);
       });
     }
   };
@@ -181,11 +176,9 @@ const PowerDialer = () => {
     
     toast(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
     
-    // Simulate call duration
-    const callDuration = 5000 + Math.random() * 10000; // 5-15 seconds
+    const callDuration = 5000 + Math.random() * 10000;
     
     setTimeout(() => {
-      // Simulate call ending
       const callResults = ["completed", "no-answer", "voicemail", "busy"];
       const result = callResults[Math.floor(Math.random() * callResults.length)];
       
@@ -204,34 +197,24 @@ const PowerDialer = () => {
           break;
       }
       
-      // Move to next lead in queue
       moveToNextLead(leadId);
     }, callDuration);
   };
 
   const moveToNextLead = (currentLeadId: number) => {
-    // Get index of current lead in queue
     const currentIndex = dialQueue.indexOf(currentLeadId);
-    
-    // Determine how many lines we're using
     const linesInUse = parseInt(lineCount);
-    
-    // Calculate the next lead to call based on line count
     const nextIndex = currentIndex + linesInUse;
     
     if (nextIndex < dialQueue.length) {
-      // There are more leads to call
       const nextLeadId = dialQueue[nextIndex];
       simulateCall(nextLeadId);
       
-      // Update active call if this is the main line
       if (activeCallId === currentLeadId) {
         setActiveCallId(nextLeadId);
       }
     } else {
-      // Check if this was the last active call
       if (dialQueue.slice(Math.max(0, dialQueue.length - linesInUse)).includes(currentLeadId)) {
-        // All calls are done
         setIsDialing(false);
         setActiveCallId(null);
         toast.success("Dialing session completed!");
@@ -324,44 +307,51 @@ const PowerDialer = () => {
                       <ScrollArea className="h-[300px] rounded-md">
                         <div className="p-4">
                           {activeCallId && activityLogsData[activeCallId as keyof typeof activityLogsData] ? (
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               {activityLogsData[activeCallId as keyof typeof activityLogsData].map((log, index) => (
-                                <div key={index} className="flex items-start gap-3 pb-3 border-b last:border-0">
-                                  <div className="mt-0.5">
-                                    {log.type === 'call' && (
-                                      log.status === 'attempted' ? 
-                                        <PhoneOff className="h-5 w-5 text-red-500" /> : 
-                                        <PhoneIncoming className="h-5 w-5 text-green-500" />
-                                    )}
-                                    {log.type === 'sms' && (
-                                      <MessageSquare className="h-5 w-5 text-blue-500" />
-                                    )}
-                                    {log.type === 'disposition' && (
-                                      <User className="h-5 w-5 text-purple-500" />
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <div className="flex items-center justify-between">
-                                      <span className="font-medium text-sm">
-                                        {log.type === 'call' && `Call ${log.status}`}
-                                        {log.type === 'sms' && `Message ${log.status}`}
-                                        {log.type === 'disposition' && 'Disposition Changed'}
-                                      </span>
-                                      <span className="text-xs text-gray-500 flex items-center gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {log.timestamp}
-                                      </span>
-                                    </div>
-                                    <div className="mt-1 text-sm">
-                                      {log.type === 'call' && log.notes}
-                                      {log.type === 'sms' && log.content}
-                                      {log.type === 'disposition' && `Changed from "${log.from}" to "${log.to}"`}
-                                    </div>
-                                    {log.type === 'call' && log.duration && (
-                                      <div className="mt-1 text-xs text-gray-500">
-                                        Duration: {log.duration}
+                                <div 
+                                  key={index} 
+                                  className={`flex ${log.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                                >
+                                  <div 
+                                    className={`flex max-w-[75%] ${
+                                      log.sender === 'user' 
+                                        ? 'bg-crm-blue text-white rounded-tl-lg rounded-bl-lg rounded-tr-lg' 
+                                        : 'bg-gray-100 text-gray-800 rounded-tr-lg rounded-br-lg rounded-tl-lg'
+                                    } p-3 shadow-sm`}
+                                  >
+                                    <div className="flex flex-col gap-1">
+                                      <div className="flex items-center gap-2">
+                                        {log.type === 'call' && (
+                                          log.status === 'attempted' ? 
+                                            <PhoneOff className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-red-500'}`} /> : 
+                                            <PhoneIncoming className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-green-500'}`} />
+                                        )}
+                                        {log.type === 'sms' && (
+                                          <MessageSquare className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-blue-500'}`} />
+                                        )}
+                                        {log.type === 'disposition' && (
+                                          <User className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-purple-500'}`} />
+                                        )}
+                                        <span className={`font-medium text-sm ${log.sender === 'user' ? 'text-white' : 'text-gray-800'}`}>
+                                          {log.type === 'call' && `Call ${log.status}`}
+                                          {log.type === 'sms' && `Message ${log.status === 'received' ? 'received' : 'sent'}`}
+                                          {log.type === 'disposition' && 'Status Changed'}
+                                        </span>
                                       </div>
-                                    )}
+                                      <div className={`text-sm ${log.sender === 'user' ? 'text-white/90' : 'text-gray-700'}`}>
+                                        {log.type === 'call' && log.notes}
+                                        {log.type === 'sms' && log.content}
+                                        {log.type === 'disposition' && `From "${log.from}" to "${log.to}"`}
+                                      </div>
+                                      <div className={`text-xs ${log.sender === 'user' ? 'text-white/70' : 'text-gray-500'} mt-1 flex items-center`}>
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        {log.timestamp}
+                                        {log.type === 'call' && log.duration && (
+                                          <span className="ml-2">Duration: {log.duration}</span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 </div>
                               ))}
