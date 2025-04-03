@@ -138,6 +138,7 @@ const PowerDialer = () => {
   };
 
   const startDialSession = async () => {
+    console.log("Starting dial session");
     if (await checkMicrophonePermissions()) {
       setIsDialogOpen(true);
     } else {
@@ -145,7 +146,8 @@ const PowerDialer = () => {
     }
   };
 
-  const startDialing = () => {
+  const startDialing = async () => {
+    console.log("Initiating dialing process");
     if (permissionStatus !== 'granted') {
       toast.error("Microphone access is required for calling");
       return;
@@ -154,6 +156,11 @@ const PowerDialer = () => {
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
       : leads.map(lead => lead.id);
+    
+    if (leadsToDial.length === 0) {
+      toast.error("No leads to dial");
+      return;
+    }
     
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
@@ -167,18 +174,25 @@ const PowerDialer = () => {
       
       toast.success(`Starting ${dialingMode === "ai" ? "AI" : "power"} dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
       
-      firstBatch.forEach((leadId, index) => {
+      console.log(`Starting to dial ${firstBatch.length} leads`, firstBatch);
+      
+      for (let i = 0; i < firstBatch.length; i++) {
+        const leadId = firstBatch[i];
         setTimeout(() => {
-          simulateCall(leadId);
-        }, index * 500);
-      });
+          initiateCall(leadId);
+        }, i * 500);
+      }
     }
   };
 
-  const simulateCall = (leadId: number) => {
+  const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
-    if (!lead) return;
+    if (!lead) {
+      console.error("Lead not found:", leadId);
+      return;
+    }
     
+    console.log(`Initiating real call to ${lead.firstName} ${lead.lastName} at ${lead.phone1}`);
     toast(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
     
     setCallStatuses(prev => ({ ...prev, [leadId]: "ringing" }));
@@ -191,28 +205,23 @@ const PowerDialer = () => {
     
     setCallTimers(prev => ({ ...prev, [leadId]: timer }));
     
-    setTimeout(() => {
-      const callResults = ["in-progress", "no-answer", "voicemail", "busy"];
-      const result = Math.random() > 0.3 ? "in-progress" : callResults[Math.floor(Math.random() * 3) + 1];
-      
-      setCallStatuses(prev => ({ ...prev, [leadId]: result }));
-      
-      if (result !== "in-progress") {
-        clearInterval(callTimers[leadId]);
-        setTimeout(() => moveToNextLead(leadId), 1000);
-        
-        switch(result) {
-          case "no-answer":
-            toast.error(`No answer from ${lead.firstName}`);
-            break;
-          case "voicemail":
-            toast.info(`Left voicemail for ${lead.firstName}`);
-            break;
-          case "busy":
-            toast.warning(`${lead.firstName}'s line is busy`);
-            break;
+    try {
+      const { data, error } = await supabase.functions.invoke('initiate-call', {
+        body: {
+          phoneNumber: lead.phone1,
+          leadId: lead.id,
+          agentId: 'current-user'
         }
-      } else {
+      });
+
+      console.log('Edge function response:', data, error);
+      
+      if (error) {
+        throw new Error(error.message || 'Error initiating call');
+      }
+      
+      if (data.success) {
+        setCallStatuses(prev => ({ ...prev, [leadId]: "in-progress" }));
         toast.success(`Connected with ${lead.firstName}`);
         
         const callDuration = 15000 + Math.random() * 30000;
@@ -221,8 +230,19 @@ const PowerDialer = () => {
             endCall(leadId);
           }
         }, callDuration);
+      } else {
+        clearInterval(timer);
+        setCallStatuses(prev => ({ ...prev, [leadId]: "failed" }));
+        toast.error(`Failed to connect with ${lead.firstName}`);
+        moveToNextLead(leadId);
       }
-    }, 3000 + Math.random() * 2000);
+    } catch (error) {
+      console.error("Error initiating call:", error);
+      toast.error(`Failed to call ${lead.firstName}: ${error.message}`);
+      clearInterval(timer);
+      setCallStatuses(prev => ({ ...prev, [leadId]: "failed" }));
+      moveToNextLead(leadId);
+    }
   };
 
   const endCall = (leadId: number) => {
@@ -247,7 +267,7 @@ const PowerDialer = () => {
     
     if (nextIndex < dialQueue.length) {
       const nextLeadId = dialQueue[nextIndex];
-      simulateCall(nextLeadId);
+      initiateCall(nextLeadId);
       
       if (activeCallId === currentLeadId) {
         setActiveCallId(nextLeadId);
@@ -315,6 +335,7 @@ const PowerDialer = () => {
       case "no-answer":
       case "busy":
       case "voicemail":
+      case "failed":
         return "bg-red-100 text-red-800";
       default:
         return "bg-gray-100 text-gray-800";
