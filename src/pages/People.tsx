@@ -25,6 +25,12 @@ import {
   FormItem,
   FormLabel,
 } from "@/components/ui/form";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useForm } from "react-hook-form";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -318,6 +324,14 @@ const People = () => {
     reader.readAsText(file);
   }, [leads]);
 
+  const sortLeadsByDisposition = () => {
+    const sortedLeads = [...leads].sort((a, b) => {
+      return a.disposition.localeCompare(b.disposition);
+    });
+    setLeads(sortedLeads);
+    toast.success("Leads sorted by disposition");
+  };
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -392,10 +406,25 @@ const People = () => {
             <TableHeader className="bg-crm-blue/10">
               <TableRow>
                 <TableHead>
-                  <div className="flex items-center cursor-pointer group">
-                    <span>Disposition</span>
-                    <ChevronDown className="ml-2 h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="flex items-center cursor-pointer focus:outline-none group">
+                      <span>Disposition</span>
+                      <ChevronDown className="ml-2 h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-48 bg-white">
+                      <DropdownMenuItem onClick={sortLeadsByDisposition}>
+                        Sort by Disposition
+                      </DropdownMenuItem>
+                      {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
+                        <DropdownMenuItem 
+                          key={disposition}
+                          onClick={() => setActiveDisposition(disposition)}
+                        >
+                          Filter: {disposition}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableHead>
                 <TableHead>Avatar</TableHead>
                 <TableHead>First Name</TableHead>
