@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -140,6 +141,13 @@ const PowerDialer = () => {
   const [isDialing, setIsDialing] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [dialQueue, setDialQueue] = useState<number[]>([]);
+  const [dialingMode, setDialingMode] = useState<"power" | "ai">("power");
+  const [aiResponses, setAiResponses] = useState<string[]>([
+    "Hello, this is AI assistant calling on behalf of SalesPro CRM.",
+    "I'm analyzing the lead's information...",
+    "I see they're interested in property in the downtown area.",
+    "I'll try to schedule a meeting with our agent.",
+  ]);
 
   const startDialSession = () => {
     setIsDialogOpen(true);
@@ -160,7 +168,7 @@ const PowerDialer = () => {
     if (firstBatch.length > 0) {
       setActiveCallId(firstBatch[0]);
       
-      toast.success(`Starting power dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
+      toast.success(`Starting ${dialingMode === "ai" ? "AI" : "power"} dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
       
       firstBatch.forEach((leadId, index) => {
         setTimeout(() => {
@@ -254,7 +262,9 @@ const PowerDialer = () => {
       <div className="flex flex-col h-[calc(100vh-64px)]">
         <div className="flex-1 p-6 overflow-hidden">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">Power Dialer</h1>
+            <h1 className="text-2xl font-bold">
+              {dialingMode === "ai" ? "AI Dialer" : "Power Dialer"}
+            </h1>
             {!isDialing ? (
               <Button 
                 className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
@@ -280,7 +290,7 @@ const PowerDialer = () => {
               <CardHeader className="bg-crm-blue/5 border-b pb-3">
                 <CardTitle className="text-lg font-medium flex items-center gap-2">
                   <Phone className="h-5 w-5 text-crm-blue" />
-                  {isDialing ? 'Active Call' : 'Call Dashboard'}
+                  {isDialing ? 'Active Call' : (dialingMode === "ai" ? 'AI Call Dashboard' : 'Call Dashboard')}
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
@@ -299,6 +309,35 @@ const PowerDialer = () => {
                         Lines in use: {lineCount}
                       </Badge>
                     </div>
+                    
+                    {dialingMode === "ai" && (
+                      <Card className="border rounded-md mb-4 bg-gray-50">
+                        <CardHeader className="pb-2 pt-3 px-4 border-b">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Bot className="h-4 w-4 text-crm-blue" />
+                            AI Assistant
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4">
+                          <div className="flex flex-col gap-2 text-sm">
+                            {aiResponses.map((response, index) => (
+                              <div 
+                                key={index} 
+                                className={`
+                                  ${index === aiResponses.length - 1 ? 'animate-pulse' : ''}
+                                  flex items-start gap-2
+                                `}
+                              >
+                                {index === aiResponses.length - 1 && (
+                                  <span className="block w-2 h-2 rounded-full bg-green-500 mt-2"></span>
+                                )}
+                                <p>{response}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
                     
                     <Card className="border rounded-md">
                       <CardHeader className="pb-2 pt-3 px-4">
@@ -368,12 +407,21 @@ const PowerDialer = () => {
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[300px] gap-4">
                     <div className="w-20 h-20 rounded-full bg-crm-blue/10 flex items-center justify-center">
-                      <Phone className="h-10 w-10 text-crm-blue" />
+                      {dialingMode === "ai" ? (
+                        <Bot className="h-10 w-10 text-crm-blue" />
+                      ) : (
+                        <Phone className="h-10 w-10 text-crm-blue" />
+                      )}
                     </div>
                     <div className="text-center">
-                      <h3 className="text-lg font-medium mb-2">Start a Power Dialing Session</h3>
+                      <h3 className="text-lg font-medium mb-2">
+                        {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Power Dialing Session"}
+                      </h3>
                       <p className="text-gray-500 max-w-md">
-                        Call multiple leads in sequence with our power dialer. Select leads from the table below or dial all leads.
+                        {dialingMode === "ai"
+                          ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
+                          : "Call multiple leads in sequence with our power dialer. Select leads from the table below or dial all leads."
+                        }
                       </p>
                     </div>
                     <Button 
@@ -462,26 +510,44 @@ const PowerDialer = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-xl">
           <DialogHeader>
-            <DialogTitle className="text-xl">Power Dialer Settings</DialogTitle>
+            <DialogTitle className="text-xl">Dialer Settings</DialogTitle>
           </DialogHeader>
           
           <div className="py-4 space-y-4">
             <div>
               <h3 className="text-sm font-medium mb-2">Dialing Mode</h3>
-              <Button
-                variant="outline"
-                className="w-full justify-start text-left h-auto py-3 rounded-lg"
-              >
-                <div className="flex items-center gap-2">
-                  <Phone className="h-5 w-5 text-crm-blue" />
-                  <div className="flex-1">
-                    <div className="font-medium">Power Dialer</div>
-                    <div className="text-xs text-gray-500">
-                      Automatically call leads in sequence
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  variant="outline"
+                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "power" ? "border-crm-blue bg-crm-blue/5" : ""}`}
+                  onClick={() => setDialingMode("power")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-5 w-5 text-crm-blue" />
+                    <div className="flex-1">
+                      <div className="font-medium">Power Dialer</div>
+                      <div className="text-xs text-gray-500">
+                        Manually call leads in sequence
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Button>
+                </Button>
+                <Button
+                  variant="outline"
+                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "ai" ? "border-crm-blue bg-crm-blue/5" : ""}`}
+                  onClick={() => setDialingMode("ai")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-5 w-5 text-crm-blue" />
+                    <div className="flex-1">
+                      <div className="font-medium">AI Dialer</div>
+                      <div className="text-xs text-gray-500">
+                        AI assistant handles calls
+                      </div>
+                    </div>
+                  </div>
+                </Button>
+              </div>
             </div>
             
             <div>
