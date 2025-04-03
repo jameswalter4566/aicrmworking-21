@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -96,7 +97,7 @@ const Sidebar = () => {
   return (
     <div 
       className={cn(
-        "hidden md:block bg-crm-blue h-screen transition-all duration-300",
+        "hidden md:block bg-crm-blue h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl", // Added rounded top-right and bottom-right edges
         expanded ? "w-72" : "w-20"
       )}
       onMouseEnter={() => setExpanded(true)}
