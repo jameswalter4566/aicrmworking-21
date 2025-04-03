@@ -1,1 +1,11 @@
+
 project_id = "imrmboyczebjlbnkgjns"
+
+[functions.twilio-token]
+verify_jwt = false
+
+[functions.twilio-dial]
+verify_jwt = false
+
+[functions.twilio-status]
+verify_jwt = false

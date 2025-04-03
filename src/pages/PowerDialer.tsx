@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Mic, MicOff } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -30,6 +29,10 @@ import {
 } from "@/components/ui/toggle-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import TwilioClient from "@/components/TwilioClient";
+import { supabase } from "@/integrations/supabase/client";
+
+const TWILIO_PHONE_NUMBER = "+15555555555";
 
 const leadsData = [
   {
@@ -149,14 +152,110 @@ const PowerDialer = () => {
     "I'll try to schedule a meeting with our agent.",
   ]);
 
+  const [callStatus, setCallStatus] = useState<string>("idle");
+  const [isDeviceReady, setIsDeviceReady] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [activityLogs, setActivityLogs] = useState(activityLogsData);
+  const [currentCallDuration, setCurrentCallDuration] = useState(0);
+  const callTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleCallStatusChange = (status: string) => {
+    setCallStatus(status);
+    
+    if (status === 'in-progress') {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+      }
+      
+      setCurrentCallDuration(0);
+      callTimerRef.current = setInterval(() => {
+        setCurrentCallDuration(prev => prev + 1);
+      }, 1000);
+    } else if (status === 'completed' || status === 'failed' || status === 'canceled') {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+      
+      if (activeCallId) {
+        const lead = leads.find(l => l.id === activeCallId);
+        if (lead) {
+          logCallActivity(activeCallId, status === 'completed' ? 'completed' : 'attempted', 
+            status === 'completed' ? `Call completed (${formatCallDuration(currentCallDuration)})` : 'Call failed');
+        }
+        
+        if (isDialing) {
+          moveToNextLead(activeCallId);
+        }
+      }
+    }
+  };
+
+  const formatCallDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+
+  const logCallActivity = (leadId: number, status: string, notes: string) => {
+    const now = new Date();
+    const timestamp = now.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    const newActivity = {
+      type: "call" as const,
+      status: status,
+      timestamp: timestamp,
+      notes: notes,
+      sender: "user" as const
+    };
+    
+    setActivityLogs(prev => {
+      const leadLogs = prev[leadId as keyof typeof prev] || [];
+      return {
+        ...prev,
+        [leadId]: [newActivity, ...leadLogs]
+      };
+    });
+  };
+
+  const toggleMute = () => {
+    if (window.twilioClient) {
+      window.twilioClient.toggleMute();
+      setIsMuted(!isMuted);
+    }
+  };
+
+  const endCurrentCall = () => {
+    if (window.twilioClient) {
+      window.twilioClient.hangUp();
+    }
+  };
+
   const startDialSession = () => {
     setIsDialogOpen(true);
   };
 
   const startDialing = () => {
+    if (!isDeviceReady) {
+      toast.error("Phone system not ready. Please wait a moment and try again.");
+      return;
+    }
+    
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
       : leads.map(lead => lead.id);
+    
+    if (leadsToDial.length === 0) {
+      toast.error("No leads selected to dial");
+      return;
+    }
     
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
@@ -166,47 +265,60 @@ const PowerDialer = () => {
     const firstBatch = leadsToDial.slice(0, batchSize);
     
     if (firstBatch.length > 0) {
-      setActiveCallId(firstBatch[0]);
+      const firstLeadId = firstBatch[0];
+      setActiveCallId(firstLeadId);
       
       toast.success(`Starting ${dialingMode === "ai" ? "AI" : "power"} dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
       
-      firstBatch.forEach((leadId, index) => {
-        setTimeout(() => {
-          simulateCall(leadId);
-        }, index * 500);
-      });
+      initiateCall(firstLeadId);
     }
   };
 
-  const simulateCall = (leadId: number) => {
+  const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
-    if (!lead) return;
+    if (!lead) {
+      toast.error("Lead not found");
+      return;
+    }
     
-    toast(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
+    const formattedPhone = lead.phone1.replace(/\D/g, '');
+    if (!formattedPhone || formattedPhone.length < 10) {
+      toast.error(`Invalid phone number for ${lead.firstName}: ${lead.phone1}`);
+      moveToNextLead(leadId);
+      return;
+    }
     
-    const callDuration = 5000 + Math.random() * 10000;
+    toast.info(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
+    setCallStatus("connecting");
+    setActiveCallId(leadId);
     
-    setTimeout(() => {
-      const callResults = ["completed", "no-answer", "voicemail", "busy"];
-      const result = callResults[Math.floor(Math.random() * callResults.length)];
-      
-      switch(result) {
-        case "completed":
-          toast.success(`Call with ${lead.firstName} completed`);
-          break;
-        case "no-answer":
-          toast.error(`No answer from ${lead.firstName}`);
-          break;
-        case "voicemail":
-          toast.info(`Left voicemail for ${lead.firstName}`);
-          break;
-        case "busy":
-          toast.warning(`${lead.firstName}'s line is busy`);
-          break;
+    try {
+      if (window.twilioClient && await window.twilioClient.makeCall(formattedPhone)) {
+        const { data, error } = await supabase.functions.invoke('twilio-dial', {
+          body: {
+            to: `+1${formattedPhone}`,
+            from: TWILIO_PHONE_NUMBER,
+            agentIdentity: "agent"
+          }
+        });
+        
+        if (error) {
+          throw new Error(`Failed to initiate call: ${error.message}`);
+        }
+        
+        logCallActivity(leadId, "initiated", "Call initiated");
+      } else {
+        throw new Error("Device not ready or call preparation failed");
       }
+    } catch (error: any) {
+      console.error("Error initiating call:", error);
+      toast.error(`Call failed: ${error.message}`);
+      setCallStatus("failed");
+      
+      logCallActivity(leadId, "attempted", `Failed: ${error.message}`);
       
       moveToNextLead(leadId);
-    }, callDuration);
+    }
   };
 
   const moveToNextLead = (currentLeadId: number) => {
@@ -216,11 +328,10 @@ const PowerDialer = () => {
     
     if (nextIndex < dialQueue.length) {
       const nextLeadId = dialQueue[nextIndex];
-      simulateCall(nextLeadId);
       
-      if (activeCallId === currentLeadId) {
-        setActiveCallId(nextLeadId);
-      }
+      setTimeout(() => {
+        initiateCall(nextLeadId);
+      }, 1500);
     } else {
       if (dialQueue.slice(Math.max(0, dialQueue.length - linesInUse)).includes(currentLeadId)) {
         setIsDialing(false);
@@ -231,9 +342,18 @@ const PowerDialer = () => {
   };
 
   const endDialingSession = () => {
+    endCurrentCall();
+    
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
+    setCallStatus("idle");
+    
+    if (callTimerRef.current) {
+      clearInterval(callTimerRef.current);
+      callTimerRef.current = null;
+    }
+    
     toast.info("Dialing session ended");
   };
 
@@ -256,9 +376,23 @@ const PowerDialer = () => {
   const isAllSelected = leads.length > 0 && leads.every(lead => 
     selectedLeads.includes(lead.id)
   );
+  
+  useEffect(() => {
+    return () => {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <MainLayout>
+      <TwilioClient 
+        isActive={true} 
+        onCallStatusChange={handleCallStatusChange}
+        onDeviceReady={setIsDeviceReady}
+      />
+      
       <div className="flex flex-col h-[calc(100vh-64px)]">
         <div className="flex-1 p-6 overflow-hidden">
           <div className="flex justify-between items-center mb-4">
@@ -269,9 +403,10 @@ const PowerDialer = () => {
               <Button 
                 className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
                 onClick={startDialSession}
+                disabled={!isDeviceReady}
               >
                 <Phone className="h-4 w-4" />
-                Start Dialing Session
+                {isDeviceReady ? "Start Dialing Session" : "Initializing Phone..."}
               </Button>
             ) : (
               <Button 
@@ -294,23 +429,77 @@ const PowerDialer = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
-                {isDialing ? (
+                {isDialing || callStatus !== "idle" ? (
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <PhoneCall className="h-5 w-5 text-green-500 animate-pulse" />
+                        {callStatus === "connecting" && (
+                          <PhoneCall className="h-5 w-5 text-yellow-500 animate-pulse" />
+                        )}
+                        {callStatus === "in-progress" && (
+                          <PhoneCall className="h-5 w-5 text-green-500 animate-pulse" />
+                        )}
+                        {callStatus === "completed" && (
+                          <PhoneOff className="h-5 w-5 text-gray-500" />
+                        )}
+                        {callStatus === "incoming" && (
+                          <PhoneIncoming className="h-5 w-5 text-blue-500 animate-pulse" />
+                        )}
+                        
                         <span className="font-medium">
                           {activeCallId && leads.find(l => l.id === activeCallId) 
-                            ? `Calling ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName}`
-                            : 'Initializing calls...'}
+                            ? (
+                                callStatus === "connecting" 
+                                  ? `Dialing ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName}...`
+                                  : callStatus === "in-progress" 
+                                    ? `Connected with ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName} (${formatCallDuration(currentCallDuration)})`
+                                    : callStatus === "completed"
+                                      ? `Call with ${leads.find(l => l.id === activeCallId)?.firstName} ended`
+                                      : `Call with ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName}`
+                              )
+                            : 'Initializing call...'
+                          }
                         </span>
                       </div>
-                      <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                        Lines in use: {lineCount}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={`px-3 py-1 ${
+                          callStatus === "in-progress" ? "bg-green-100 text-green-800" :
+                          callStatus === "connecting" ? "bg-yellow-100 text-yellow-800" :
+                          "bg-gray-100 text-gray-800"
+                        }`}>
+                          {callStatus === "idle" ? "Ready" :
+                           callStatus === "connecting" ? "Connecting" :
+                           callStatus === "in-progress" ? "In Call" :
+                           callStatus === "completed" ? "Call Ended" :
+                           callStatus === "failed" ? "Call Failed" :
+                           callStatus}
+                        </Badge>
+                        
+                        {callStatus === "in-progress" && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={`rounded-full w-8 h-8 p-0 ${isMuted ? 'bg-red-100' : ''}`}
+                            onClick={toggleMute}
+                          >
+                            {isMuted ? <MicOff className="h-4 w-4 text-red-500" /> : <Mic className="h-4 w-4" />}
+                          </Button>
+                        )}
+                        
+                        {callStatus === "in-progress" && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="rounded-full"
+                            onClick={endCurrentCall}
+                          >
+                            <PhoneOff className="h-4 w-4 mr-1" /> End Call
+                          </Button>
+                        )}
+                      </div>
                     </div>
                     
-                    {dialingMode === "ai" && (
+                    {dialingMode === "ai" && callStatus === "in-progress" && (
                       <Card className="border rounded-md mb-4 bg-gray-50">
                         <CardHeader className="pb-2 pt-3 px-4 border-b">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -345,9 +534,9 @@ const PowerDialer = () => {
                       </CardHeader>
                       <ScrollArea className="h-[300px] rounded-md">
                         <div className="p-4">
-                          {activeCallId && activityLogsData[activeCallId as keyof typeof activityLogsData] ? (
+                          {activeCallId && activityLogs[activeCallId as keyof typeof activityLogs] ? (
                             <div className="space-y-4">
-                              {activityLogsData[activeCallId as keyof typeof activityLogsData].map((log, index) => (
+                              {activityLogs[activeCallId as keyof typeof activityLogs].map((log, index) => (
                                 <div 
                                   key={index} 
                                   className={`flex ${log.sender === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -427,8 +616,9 @@ const PowerDialer = () => {
                     <Button 
                       className="mt-4 bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
                       onClick={startDialSession}
+                      disabled={!isDeviceReady}
                     >
-                      Start Dialing
+                      {isDeviceReady ? "Start Dialing" : "Initializing Phone..."}
                     </Button>
                   </div>
                 )}
@@ -600,8 +790,9 @@ const PowerDialer = () => {
               type="button"
               className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
               onClick={startDialing}
+              disabled={!isDeviceReady}
             >
-              Start Dialing
+              {isDeviceReady ? "Start Dialing" : "Initializing Phone..."}
             </Button>
           </DialogFooter>
         </DialogContent>
