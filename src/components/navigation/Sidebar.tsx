@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 
 const itemColors = [
   "bg-blue-600", // Dashboard
-  "bg-purple-600", // People
+  "bg-purple-600", // Leads
   "bg-green-600", // Power Dialer
   "bg-yellow-600", // Inbox
   "bg-pink-600", // Tasks
@@ -22,7 +22,7 @@ const itemColors = [
 
 const navItems = [
   { name: "Dashboard", icon: Home, active: true },
-  { name: "People", icon: Users, active: false },
+  { name: "Leads", icon: Users, active: false },
   { name: "Power Dialer", icon: PhoneOutgoing, active: false },
   { name: "Inbox", icon: Inbox, active: false, badge: 5 },
   { name: "Tasks", icon: ListTodo, active: false },
