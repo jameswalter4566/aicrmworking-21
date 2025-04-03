@@ -59,7 +59,6 @@ const People = () => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const addCustomField = () => {
-    // Todo: Implement functionality to add custom fields
     const fieldName = prompt("Enter field name:");
     if (fieldName && fieldName.trim() !== "") {
       setCustomFields([...customFields, fieldName.trim()]);

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Link } from "react-router-dom";
 
 const itemColors = [
   "bg-blue-600", // Dashboard
@@ -21,15 +22,15 @@ const itemColors = [
 ];
 
 const navItems = [
-  { name: "Dashboard", icon: Home, active: true },
-  { name: "Leads", icon: Users, active: false },
-  { name: "Power Dialer", icon: PhoneOutgoing, active: false },
-  { name: "Inbox", icon: Inbox, active: false, badge: 5 },
-  { name: "Tasks", icon: ListTodo, active: false },
-  { name: "Calendar", icon: Calendar, active: false },
-  { name: "Deals", icon: DollarSign, active: false },
-  { name: "Reporting", icon: BarChart2, active: false },
-  { name: "Admin", icon: Settings, active: false },
+  { name: "Dashboard", icon: Home, active: false, path: "/" },
+  { name: "Leads", icon: Users, active: true, path: "/people" },
+  { name: "Power Dialer", icon: PhoneOutgoing, active: false, path: "#" },
+  { name: "Inbox", icon: Inbox, active: false, badge: 5, path: "#" },
+  { name: "Tasks", icon: ListTodo, active: false, path: "#" },
+  { name: "Calendar", icon: Calendar, active: false, path: "#" },
+  { name: "Deals", icon: DollarSign, active: false, path: "/deals" },
+  { name: "Reporting", icon: BarChart2, active: false, path: "#" },
+  { name: "Admin", icon: Settings, active: false, path: "#" },
 ];
 
 const Sidebar = () => {
@@ -63,9 +64,9 @@ const Sidebar = () => {
           <div className="px-2 pb-3 pt-1">
             <div className="grid grid-cols-3 gap-2">
               {navItems.map((item) => (
-                <a
+                <Link
                   key={item.name}
-                  href="#"
+                  to={item.path}
                   className={cn(
                     "flex flex-col items-center px-3 py-3 text-sm font-medium rounded-md",
                     item.active 
@@ -85,7 +86,7 @@ const Sidebar = () => {
                       {item.badge}
                     </span>
                   )}
-                </a>
+                </Link>
               ))}
             </div>
           </div>
@@ -97,7 +98,7 @@ const Sidebar = () => {
   return (
     <div 
       className={cn(
-        "hidden md:block bg-crm-blue h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl", // Added rounded top-right and bottom-right edges
+        "hidden md:block bg-crm-blue h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl",
         expanded ? "w-72" : "w-20"
       )}
       onMouseEnter={() => setExpanded(true)}
@@ -114,9 +115,9 @@ const Sidebar = () => {
         </div>
         <div className="space-y-2">
           {navItems.map((item, index) => (
-            <a
+            <Link
               key={item.name}
-              href="#"
+              to={item.path}
               className={cn(
                 "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                 item.active 
@@ -152,7 +153,7 @@ const Sidebar = () => {
               {!expanded && item.badge && (
                 <span className="absolute top-0 right-0 bg-crm-red w-2.5 h-2.5 rounded-full relative z-10"></span>
               )}
-            </a>
+            </Link>
           ))}
         </div>
       </div>
