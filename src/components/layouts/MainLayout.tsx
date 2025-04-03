@@ -1,6 +1,7 @@
 
 import React from "react";
 import Navbar from "../navigation/Navbar";
+import Sidebar from "../navigation/Sidebar";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -8,11 +9,14 @@ interface MainLayoutProps {
 
 const MainLayout = ({ children }: MainLayoutProps) => {
   return (
-    <div className="min-h-screen flex flex-col font-poppins font-semibold">
+    <div className="min-h-screen flex flex-col">
       <Navbar />
-      <main className="flex-1 bg-gray-50 p-6">
-        {children}
-      </main>
+      <div className="flex flex-1">
+        <Sidebar />
+        <main className="flex-1 bg-gray-50 p-6">
+          {children}
+        </main>
+      </div>
     </div>
   );
 };

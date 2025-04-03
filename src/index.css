@@ -69,11 +69,11 @@
 
 @layer base {
   * {
-    @apply border-border font-poppins font-semibold;
+    @apply border-border;
   }
 
   body {
-    @apply bg-gray-50 text-foreground font-poppins;
+    @apply bg-gray-50 text-foreground;
   }
 }
 
