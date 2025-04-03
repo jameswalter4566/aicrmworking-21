@@ -30,8 +30,18 @@ import { useForm } from "react-hook-form";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { 
+  ToggleGroup, 
+  ToggleGroupItem 
+} from "@/components/ui/toggle-group";
 
-// Sample data for leads
+// Sample data for leads with dispositions
 const leadsData = [
   {
     id: 1,
@@ -45,6 +55,7 @@ const leadsData = [
     stage: "Lead",
     assigned: "study bolt",
     avatar: "",
+    disposition: "Not Contacted",
   },
   {
     id: 2,
@@ -58,6 +69,7 @@ const leadsData = [
     stage: "Prospect",
     assigned: "michelle team",
     avatar: "",
+    disposition: "Contacted",
   },
   {
     id: 3,
@@ -71,7 +83,19 @@ const leadsData = [
     stage: "Client",
     assigned: "john sales",
     avatar: "",
+    disposition: "Appointment Set",
   },
+];
+
+// Define disposition types
+const dispositionTypes = [
+  "All Leads",
+  "Not Contacted",
+  "Contacted",
+  "Appointment Set",
+  "Submitted",
+  "Dead",
+  "DNC"
 ];
 
 // Define the lead type for form submission
@@ -85,6 +109,7 @@ type LeadFormValues = {
   phone2: string;
   stage: string;
   assigned: string;
+  disposition: string;
 };
 
 const People = () => {
@@ -94,6 +119,7 @@ const People = () => {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [activeDisposition, setActiveDisposition] = useState("All Leads");
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -106,8 +132,45 @@ const People = () => {
       phone2: "",
       stage: "Lead",
       assigned: "",
+      disposition: "Not Contacted",
     },
   });
+
+  // Filter leads based on active disposition
+  const filteredLeads = leads.filter(lead => {
+    if (activeDisposition === "All Leads") return true;
+    return lead.disposition === activeDisposition;
+  });
+
+  // Update lead disposition
+  const updateLeadDisposition = (leadId: number, newDisposition: string) => {
+    setLeads(prevLeads => 
+      prevLeads.map(lead => 
+        lead.id === leadId ? { ...lead, disposition: newDisposition } : lead
+      )
+    );
+    toast.success(`Lead disposition updated to ${newDisposition}`);
+  };
+
+  // Disposition badge color class
+  const getDispositionClass = (disposition: string) => {
+    switch(disposition) {
+      case "Not Contacted":
+        return "disposition-not-contacted";
+      case "Contacted":
+        return "disposition-contacted";
+      case "Appointment Set":
+        return "disposition-appointment";
+      case "Submitted":
+        return "disposition-submitted";
+      case "Dead":
+        return "disposition-dead";
+      case "DNC":
+        return "disposition-dnc";
+      default:
+        return "disposition-not-contacted";
+    }
+  };
 
   const addCustomField = () => {
     const fieldName = prompt("Enter field name:");
@@ -284,6 +347,19 @@ const People = () => {
         </div>
       </div>
 
+      {/* Disposition filters */}
+      <div className="disposition-filters">
+        {dispositionTypes.map((disposition) => (
+          <button
+            key={disposition}
+            className={`disposition-filter-button ${activeDisposition === disposition ? 'active' : ''}`}
+            onClick={() => setActiveDisposition(disposition)}
+          >
+            {disposition}
+          </button>
+        ))}
+      </div>
+
       <div className="flex space-x-4 mb-6">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -323,6 +399,7 @@ const People = () => {
           <Table>
             <TableHeader className="bg-crm-blue/10">
               <TableRow>
+                <TableHead>Disposition</TableHead>
                 <TableHead>Avatar</TableHead>
                 <TableHead>First Name</TableHead>
                 <TableHead>Last Name</TableHead>
@@ -337,12 +414,37 @@ const People = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads.length > 0 ? (
-                leads.map((lead) => (
+              {filteredLeads.length > 0 ? (
+                filteredLeads.map((lead) => (
                   <TableRow 
                     key={lead.id} 
                     className="hover:bg-crm-lightBlue transition-colors duration-200 cursor-pointer my-2"
                   >
+                    <TableCell>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="ghost" className="p-0 h-auto">
+                            <Badge className={`disposition-badge ${getDispositionClass(lead.disposition)}`}>
+                              {lead.disposition}
+                            </Badge>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-48 p-2">
+                          <div className="flex flex-col space-y-1">
+                            {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
+                              <Button 
+                                key={disposition}
+                                variant="ghost" 
+                                className="justify-start text-sm"
+                                onClick={() => updateLeadDisposition(lead.id, disposition)}
+                              >
+                                {disposition}
+                              </Button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </TableCell>
                     <TableCell>
                       <Avatar className="h-10 w-10">
                         {lead.avatar ? (
@@ -368,7 +470,7 @@ const People = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={9 + customFields.length} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={10 + customFields.length} className="text-center py-8 text-gray-500">
                     No leads found. Add your first lead to get started.
                   </TableCell>
                 </TableRow>
@@ -454,6 +556,28 @@ const People = () => {
                   )}
                 />
               </div>
+
+              <FormField
+                control={form.control}
+                name="disposition"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Disposition</FormLabel>
+                    <FormControl>
+                      <select 
+                        className="w-full p-2 border border-gray-300 rounded-lg" 
+                        {...field}
+                      >
+                        {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
+                          <option key={disposition} value={disposition}>
+                            {disposition}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
               <FormField
                 control={form.control}
