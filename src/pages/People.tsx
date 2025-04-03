@@ -69,7 +69,7 @@ const People = () => {
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Leads</h1>
-        <Button className="bg-crm-blue hover:bg-crm-blue/90">
+        <Button className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg">
           <PlusCircle className="h-4 w-4 mr-2" />
           Add Lead
         </Button>
@@ -83,25 +83,25 @@ const People = () => {
           <Input
             type="text"
             placeholder="Search leads..."
-            className="pl-10 w-full"
+            className="pl-10 w-full rounded-lg"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="flex items-center">
+        <Button variant="outline" className="flex items-center rounded-lg">
           <Filter className="h-4 w-4 mr-2" />
           Filters
         </Button>
       </div>
 
-      <div className="bg-white rounded-md border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex items-center">
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-200 flex items-center bg-crm-lightBlue">
           <h2 className="font-medium text-gray-700">All Leads</h2>
           <div className="ml-auto">
             <Button 
               variant="ghost" 
               size="sm" 
-              className="text-gray-500 hover:text-gray-700"
+              className="text-gray-500 hover:text-gray-700 rounded-lg"
               onClick={addCustomField}
             >
               <Plus className="h-4 w-4 mr-1" />
@@ -112,7 +112,7 @@ const People = () => {
         
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-crm-blue/10">
               <TableRow>
                 <TableHead>First Name</TableHead>
                 <TableHead>Last Name</TableHead>
@@ -129,7 +129,10 @@ const People = () => {
             <TableBody>
               {leads.length > 0 ? (
                 leads.map((lead) => (
-                  <TableRow key={lead.id} className="hover:bg-gray-50">
+                  <TableRow 
+                    key={lead.id} 
+                    className="hover:bg-crm-lightBlue transition-colors duration-200 cursor-pointer"
+                  >
                     <TableCell>{lead.firstName}</TableCell>
                     <TableCell>{lead.lastName}</TableCell>
                     <TableCell>{lead.mailingAddress}</TableCell>
