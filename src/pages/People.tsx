@@ -101,6 +101,15 @@ const dispositionTypes = [
   "DNC"
 ];
 
+const dispositionColors = {
+  "Not Contacted": "bg-gray-100 text-gray-800 hover:bg-gray-200",
+  "Contacted": "bg-blue-100 text-blue-800 hover:bg-blue-200",
+  "Appointment Set": "bg-purple-100 text-purple-800 hover:bg-purple-200",
+  "Submitted": "bg-green-100 text-green-800 hover:bg-green-200",
+  "Dead": "bg-red-100 text-red-800 hover:bg-red-200",
+  "DNC": "bg-yellow-100 text-yellow-800 hover:bg-yellow-200"
+};
+
 type LeadFormValues = {
   firstName: string;
   lastName: string;
@@ -419,8 +428,9 @@ const People = () => {
                         <DropdownMenuItem 
                           key={disposition}
                           onClick={() => setActiveDisposition(disposition)}
+                          className={dispositionColors[disposition as keyof typeof dispositionColors]}
                         >
-                          Filter: {disposition}
+                          {disposition}
                         </DropdownMenuItem>
                       ))}
                     </DropdownMenuContent>
@@ -461,7 +471,7 @@ const People = () => {
                               <Button 
                                 key={disposition}
                                 variant="ghost" 
-                                className="justify-start text-sm"
+                                className={`justify-start text-sm ${dispositionColors[disposition as keyof typeof dispositionColors]}`}
                                 onClick={() => updateLeadDisposition(lead.id, disposition)}
                               >
                                 {disposition}
