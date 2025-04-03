@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -206,11 +207,10 @@ const PowerDialer = () => {
     setCallTimers(prev => ({ ...prev, [leadId]: timer }));
     
     try {
+      console.log("Calling Supabase function initiate-call...");
+      
       const { data, error } = await supabase.functions.invoke('initiate-call', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: {
           phoneNumber: lead.phone1,
           leadId: lead.id,
@@ -218,13 +218,14 @@ const PowerDialer = () => {
         }
       });
 
-      console.log('Edge function response:', data, error);
-      
       if (error) {
-        throw new Error(error.message || 'Error initiating call');
+        console.error("Supabase function error:", error);
+        throw new Error(error.message || `Failed to call ${lead.firstName}`);
       }
       
-      if (data.success) {
+      console.log('Edge function response:', data);
+      
+      if (data && data.success) {
         setCallStatuses(prev => ({ ...prev, [leadId]: "in-progress" }));
         toast.success(`Connected with ${lead.firstName}`);
         
@@ -237,12 +238,12 @@ const PowerDialer = () => {
       } else {
         clearInterval(timer);
         setCallStatuses(prev => ({ ...prev, [leadId]: "failed" }));
-        toast.error(`Failed to connect with ${lead.firstName}`);
+        toast.error(`Failed to connect with ${lead.firstName}: ${data?.error || 'Unknown error'}`);
         moveToNextLead(leadId);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error initiating call:", error);
-      toast.error(`Failed to call ${lead.firstName}: ${error.message}`);
+      toast.error(`Failed to call ${lead.firstName}: ${error.message || 'Unknown error'}`);
       clearInterval(timer);
       setCallStatuses(prev => ({ ...prev, [leadId]: "failed" }));
       moveToNextLead(leadId);
