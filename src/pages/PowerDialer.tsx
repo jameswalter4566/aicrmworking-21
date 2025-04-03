@@ -211,12 +211,17 @@ const PowerDialer = () => {
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) {
         console.error("Error getting auth session:", sessionError);
+        throw new Error(`Authentication error: ${sessionError.message}`);
       }
       
       const headers: Record<string, string> = {};
       if (sessionData?.session?.access_token) {
         headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
+      } else {
+        console.warn("No access token available for authentication");
       }
+      
+      console.log("Invoking function with auth headers:", !!headers['Authorization']);
       
       const { data, error } = await supabase.functions.invoke('initiate-call', {
         method: 'POST',
