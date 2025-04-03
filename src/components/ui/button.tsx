@@ -20,6 +20,7 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         disposition: "px-3 py-1 rounded-full text-xs font-semibold",
+        dialer: "bg-crm-blue text-white hover:bg-crm-blue/90 transition-all duration-200",
       },
       size: {
         default: "h-10 px-4 py-2",
