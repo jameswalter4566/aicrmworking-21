@@ -44,10 +44,10 @@ const People = () => {
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">People</h1>
+        <h1 className="text-2xl font-bold">Leads</h1>
         <Button className="bg-crm-blue hover:bg-crm-blue/90">
           <PlusCircle className="h-4 w-4 mr-2" />
-          Add Person
+          Add Lead
         </Button>
       </div>
 
@@ -58,7 +58,7 @@ const People = () => {
           </div>
           <Input
             type="text"
-            placeholder="Search people..."
+            placeholder="Search leads..."
             className="pl-10 w-full"
           />
         </div>
