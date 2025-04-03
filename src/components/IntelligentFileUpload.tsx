@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from "react";
 import { Upload, CheckCircle, AlertCircle, Brain } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,12 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface IntelligentFileUploadProps {
   onImportComplete: (importedLeads: any[]) => void;
-  setIsImportOpen?: (open: boolean) => void;
 }
 
 const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({ 
-  onImportComplete,
-  setIsImportOpen
+  onImportComplete 
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -68,6 +67,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
       size: formatFileSize(file.size)
     });
 
+    // Simulate initial reading progress
     const progressInterval = setInterval(() => {
       setProgress(prev => {
         const newProgress = prev + 5;
@@ -90,11 +90,13 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
           setProgress(40);
           setProcessingStage('analyzing');
           
+          // Parse CSV to get headers and sample data
           const rows = content.split("\n");
           if (rows.length < 2) throw new Error("File has insufficient data");
           
           const headers = rows[0].split(",").map(h => h.trim());
           
+          // Get sample data for AI analysis
           const sampleData = [];
           for (let i = 1; i < Math.min(6, rows.length); i++) {
             if (!rows[i].trim()) continue;
@@ -102,9 +104,11 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
             sampleData.push(columns);
           }
           
+          // Update progress to show we're analyzing
           setProgress(50);
           
           try {
+            // Call OpenAI via Supabase Edge Function
             setProcessingStage('analyzing');
             const aiResponse = await supabase.functions.invoke('analyze-csv-data', {
               body: { headers, columnData: sampleData }
@@ -114,12 +118,15 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
               throw new Error(`AI analysis failed: ${aiResponse.error.message}`);
             }
             
+            // Update progress to show we're mapping
             setProgress(70);
             setProcessingStage('mapping');
             
             const headerMap = aiResponse.data.mapping || {};
             
+            // Fallback to traditional mapping if AI doesn't find matches
             if (Object.keys(headerMap).length < 2) {
+              // Use traditional mapping as fallback
               const fieldMappings = {
                 firstName: ["first name", "firstname", "first", "given name", "givenname", "name"],
                 lastName: ["last name", "lastname", "last", "surname", "family name", "familyname"],
@@ -146,10 +153,12 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
               });
             }
             
+            // Fallback to position-based mapping for essential fields if needed
             if (headerMap.firstName === undefined && headers.length > 0) headerMap.firstName = 0;
             if (headerMap.lastName === undefined && headers.length > 1) headerMap.lastName = 1;
             if (headerMap.email === undefined && headers.length > 2) headerMap.email = 2;
             
+            // Process the data with the AI-enhanced mapping
             const importedLeads = [];
             for (let i = 1; i < rows.length; i++) {
               if (!rows[i].trim()) continue;
@@ -158,7 +167,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
               if (columns.length < Math.min(3, headers.length)) continue;
               
               const newLead = {
-                id: Date.now() + i,
+                id: Date.now() + i, // Unique ID
                 firstName: headerMap.firstName >= 0 && headerMap.firstName < columns.length ? columns[headerMap.firstName] : "",
                 lastName: headerMap.lastName >= 0 && headerMap.lastName < columns.length ? columns[headerMap.lastName] : "",
                 email: headerMap.email >= 0 && headerMap.email < columns.length ? columns[headerMap.email] : "",
@@ -172,11 +181,13 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
                 disposition: "Not Contacted",
               };
               
+              // Require at least a first name or email to be valid
               if (newLead.firstName || newLead.email) {
                 importedLeads.push(newLead);
               }
             }
             
+            // Complete the progress bar
             setProgress(100);
             
             if (importedLeads.length > 0) {
@@ -192,6 +203,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
             console.error("AI processing error:", aiError);
             toast.error(`AI analysis failed: ${aiError.message}`);
             
+            // Fallback to traditional processing
             const importedLeads = processCSVData(content);
             
             if (importedLeads.length > 0) {
@@ -250,6 +262,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
       
       const headers = rows[0].split(",").map(h => h.trim());
       
+      // Intelligent field mapping with common variations
       const fieldMappings = {
         firstName: ["first name", "firstname", "first", "given name", "givenname", "name"],
         lastName: ["last name", "lastname", "last", "surname", "family name", "familyname"],
@@ -260,9 +273,11 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
         phone2: ["phone2", "secondary phone", "other phone", "alternate phone", "work phone"],
       };
       
+      // AI-like intelligent mapping
       const headerMap: Record<string, number> = {};
       
       Object.entries(fieldMappings).forEach(([fieldName, variations]) => {
+        // Find the best matching header
         const matchIndex = headers.findIndex(header => 
           variations.some(variation => 
             header.toLowerCase().includes(variation) || 
@@ -275,6 +290,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
         }
       });
       
+      // Fallback to position-based mapping if needed fields missing
       if (headerMap.firstName === undefined && headers.length > 0) headerMap.firstName = 0;
       if (headerMap.lastName === undefined && headers.length > 1) headerMap.lastName = 1;
       if (headerMap.email === undefined && headers.length > 2) headerMap.email = 2;
@@ -287,7 +303,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
         if (columns.length < Math.min(3, headers.length)) continue;
         
         const newLead = {
-          id: Date.now() + i,
+          id: Date.now() + i, // Unique ID
           firstName: headerMap.firstName >= 0 && headerMap.firstName < columns.length ? columns[headerMap.firstName] : "",
           lastName: headerMap.lastName >= 0 && headerMap.lastName < columns.length ? columns[headerMap.lastName] : "",
           email: headerMap.email >= 0 && headerMap.email < columns.length ? columns[headerMap.email] : "",
@@ -301,6 +317,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
           disposition: "Not Contacted",
         };
         
+        // Require at least a first name or email to be valid
         if (newLead.firstName || newLead.email) {
           importedLeads.push(newLead);
         }
@@ -323,29 +340,6 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
         return "Mapping columns to the right fields...";
       default:
         return "Processing your file...";
-    }
-  };
-
-  const handleImportComplete = (importedLeads: any[]) => {
-    if (importedLeads.length > 0) {
-      const savedLeadsJSON = localStorage.getItem('crm_leads');
-      const savedLeads = savedLeadsJSON ? JSON.parse(savedLeadsJSON) : [];
-      
-      const updatedLeads = [...savedLeads, ...importedLeads];
-      
-      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
-      
-      onImportComplete(importedLeads);
-      
-      toast.success(`Successfully imported ${importedLeads.length} leads`);
-      
-      if (setIsImportOpen) {
-        setTimeout(() => {
-          setIsImportOpen(false);
-        }, 1500);
-      }
-    } else {
-      toast.error("No valid leads found in the file");
     }
   };
 

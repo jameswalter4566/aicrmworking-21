@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Mic, MicOff } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -29,8 +30,59 @@ import {
 } from "@/components/ui/toggle-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { supabase } from "@/integrations/supabase/client";
+
+const leadsData = [
+  {
+    id: 1,
+    firstName: "Dan",
+    lastName: "Corkill",
+    email: "hi@followupboss.com",
+    phone1: "(218) 304-6145",
+    phone2: "",
+    disposition: "Not Contacted",
+    avatar: "",
+  },
+  {
+    id: 2,
+    firstName: "Sarah",
+    lastName: "Johnson",
+    email: "sarah.j@example.com",
+    phone1: "(555) 123-4567",
+    phone2: "(555) 987-6543",
+    disposition: "Contacted",
+    avatar: "",
+  },
+  {
+    id: 3,
+    firstName: "Robert",
+    lastName: "Smith",
+    email: "robert@example.com",
+    phone1: "(555) 987-6543",
+    phone2: "",
+    disposition: "Appointment Set",
+    avatar: "",
+  },
+  {
+    id: 4,
+    firstName: "Maria",
+    lastName: "Garcia",
+    email: "maria.g@example.com",
+    phone1: "(555) 222-3333",
+    phone2: "(555) 444-5555",
+    disposition: "Not Contacted",
+    avatar: "",
+  },
+  {
+    id: 5,
+    firstName: "James",
+    lastName: "Wilson",
+    email: "james.w@example.com",
+    phone1: "(555) 666-7777",
+    phone2: "",
+    disposition: "Not Contacted",
+    avatar: "",
+  },
+];
 
 const activityLogsData = {
   1: [
@@ -82,7 +134,7 @@ const getDispositionClass = (disposition: string) => {
 };
 
 const PowerDialer = () => {
-  const [leads, setLeads] = useState([]);
+  const [leads, setLeads] = useState(leadsData);
   const [activeCallId, setActiveCallId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [lineCount, setLineCount] = useState("1");
@@ -96,71 +148,15 @@ const PowerDialer = () => {
     "I see they're interested in property in the downtown area.",
     "I'll try to schedule a meeting with our agent.",
   ]);
-  const [callStatuses, setCallStatuses] = useState<Record<number, string>>({});
-  const [callDurations, setCallDurations] = useState<Record<number, number>>({});
-  const [callTimers, setCallTimers] = useState<Record<number, NodeJS.Timeout>>({});
-  const [permissionStatus, setPermissionStatus] = useState<'pending' | 'granted' | 'denied'>('pending');
-  const [isMuted, setIsMuted] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchLeads = async () => {
-      setIsLoading(true);
-      try {
-        const savedLeads = localStorage.getItem('crm_leads');
-        if (savedLeads) {
-          setLeads(JSON.parse(savedLeads));
-        } else {
-          setLeads([]);
-        }
-      } catch (error) {
-        console.error("Error loading leads:", error);
-        toast.error("Failed to load leads");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchLeads();
-  }, []);
-
-  const checkMicrophonePermissions = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-      setPermissionStatus('granted');
-      return true;
-    } catch (error) {
-      console.error('Error getting audio permission:', error);
-      setPermissionStatus('denied');
-      return false;
-    }
+  const startDialSession = () => {
+    setIsDialogOpen(true);
   };
 
-  const startDialSession = async () => {
-    console.log("Starting dial session");
-    if (await checkMicrophonePermissions()) {
-      setIsDialogOpen(true);
-    } else {
-      toast.error("Microphone access is required for calling");
-    }
-  };
-
-  const startDialing = async () => {
-    console.log("Initiating dialing process");
-    if (permissionStatus !== 'granted') {
-      toast.error("Microphone access is required for calling");
-      return;
-    }
-
+  const startDialing = () => {
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
       : leads.map(lead => lead.id);
-    
-    if (leadsToDial.length === 0) {
-      toast.error("No leads to dial");
-      return;
-    }
     
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
@@ -174,110 +170,43 @@ const PowerDialer = () => {
       
       toast.success(`Starting ${dialingMode === "ai" ? "AI" : "power"} dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
       
-      console.log(`Starting to dial ${firstBatch.length} leads`, firstBatch);
-      
-      for (let i = 0; i < firstBatch.length; i++) {
-        const leadId = firstBatch[i];
+      firstBatch.forEach((leadId, index) => {
         setTimeout(() => {
-          initiateCall(leadId);
-        }, i * 500);
-      }
-    }
-  };
-
-  const initiateCall = async (leadId: number) => {
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead) {
-      console.error("Lead not found:", leadId);
-      return;
-    }
-    
-    console.log(`Initiating real call to ${lead.firstName} ${lead.lastName} at ${lead.phone1}`);
-    toast(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
-    
-    setCallStatuses(prev => ({ ...prev, [leadId]: "ringing" }));
-    
-    const startTime = Date.now();
-    const timer = setInterval(() => {
-      const duration = Math.floor((Date.now() - startTime) / 1000);
-      setCallDurations(prev => ({ ...prev, [leadId]: duration }));
-    }, 1000);
-    
-    setCallTimers(prev => ({ ...prev, [leadId]: timer }));
-    
-    try {
-      console.log("Calling Supabase function initiate-call...");
-      
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Error getting auth session:", sessionError);
-        throw new Error(`Authentication error: ${sessionError.message}`);
-      }
-      
-      const headers: Record<string, string> = {};
-      if (sessionData?.session?.access_token) {
-        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
-      } else {
-        console.warn("No access token available for authentication");
-      }
-      
-      console.log("Invoking function with auth headers:", !!headers['Authorization']);
-      
-      const { data, error } = await supabase.functions.invoke('initiate-call', {
-        method: 'POST',
-        headers,
-        body: {
-          phoneNumber: lead.phone1,
-          leadId: lead.id,
-          agentId: 'current-user'
-        }
+          simulateCall(leadId);
+        }, index * 500);
       });
-
-      if (error) {
-        console.error("Supabase function error:", error);
-        throw new Error(error.message || `Failed to call ${lead.firstName}`);
-      }
-      
-      console.log('Edge function response:', data);
-      
-      if (data && data.success) {
-        setCallStatuses(prev => ({ ...prev, [leadId]: "in-progress" }));
-        toast.success(`Connected with ${lead.firstName}`);
-        
-        const callDuration = 15000 + Math.random() * 30000;
-        setTimeout(() => {
-          if (callStatuses[leadId] === "in-progress") {
-            endCall(leadId);
-          }
-        }, callDuration);
-      } else {
-        clearInterval(timer);
-        setCallStatuses(prev => ({ ...prev, [leadId]: "failed" }));
-        toast.error(`Failed to connect with ${lead.firstName}: ${data?.error || 'Unknown error'}`);
-        moveToNextLead(leadId);
-      }
-    } catch (error: any) {
-      console.error("Error initiating call:", error);
-      toast.error(`Failed to call ${lead.firstName}: ${error.message || 'Unknown error'}`);
-      clearInterval(timer);
-      setCallStatuses(prev => ({ ...prev, [leadId]: "failed" }));
-      moveToNextLead(leadId);
     }
   };
 
-  const endCall = (leadId: number) => {
+  const simulateCall = (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) return;
     
-    if (callTimers[leadId]) {
-      clearInterval(callTimers[leadId]);
-    }
+    toast(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
     
-    setCallStatuses(prev => ({ ...prev, [leadId]: "completed" }));
+    const callDuration = 5000 + Math.random() * 10000;
     
-    toast.success(`Call with ${lead.firstName} ended`);
-    
-    moveToNextLead(leadId);
+    setTimeout(() => {
+      const callResults = ["completed", "no-answer", "voicemail", "busy"];
+      const result = callResults[Math.floor(Math.random() * callResults.length)];
+      
+      switch(result) {
+        case "completed":
+          toast.success(`Call with ${lead.firstName} completed`);
+          break;
+        case "no-answer":
+          toast.error(`No answer from ${lead.firstName}`);
+          break;
+        case "voicemail":
+          toast.info(`Left voicemail for ${lead.firstName}`);
+          break;
+        case "busy":
+          toast.warning(`${lead.firstName}'s line is busy`);
+          break;
+      }
+      
+      moveToNextLead(leadId);
+    }, callDuration);
   };
 
   const moveToNextLead = (currentLeadId: number) => {
@@ -287,7 +216,7 @@ const PowerDialer = () => {
     
     if (nextIndex < dialQueue.length) {
       const nextLeadId = dialQueue[nextIndex];
-      initiateCall(nextLeadId);
+      simulateCall(nextLeadId);
       
       if (activeCallId === currentLeadId) {
         setActiveCallId(nextLeadId);
@@ -302,20 +231,10 @@ const PowerDialer = () => {
   };
 
   const endDialingSession = () => {
-    Object.values(callTimers).forEach(timer => clearInterval(timer));
-    setCallTimers({});
-    
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
-    setCallStatuses({});
-    setCallDurations({});
     toast.info("Dialing session ended");
-  };
-
-  const toggleMute = () => {
-    setIsMuted(!isMuted);
-    toast(isMuted ? "Microphone unmuted" : "Microphone muted");
   };
 
   const handleSelectAllLeads = (checked: boolean) => {
@@ -338,57 +257,6 @@ const PowerDialer = () => {
     selectedLeads.includes(lead.id)
   );
 
-  const formatCallDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case "ringing":
-        return "bg-yellow-100 text-yellow-800";
-      case "in-progress":
-        return "bg-green-100 text-green-800";
-      case "completed":
-        return "bg-blue-100 text-blue-800";
-      case "no-answer":
-      case "busy":
-      case "voicemail":
-      case "failed":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const updateLeadDisposition = (leadId: number | number[], newDisposition: string) => {
-    if (Array.isArray(leadId)) {
-      if (leadId.length === 0) {
-        toast.error("No leads selected");
-        return;
-      }
-      
-      const updatedLeads = leads.map(lead => 
-        leadId.includes(lead.id) ? { ...lead, disposition: newDisposition } : lead
-      );
-      
-      setLeads(updatedLeads);
-      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
-      
-      toast.success(`${leadId.length} leads updated to ${newDisposition}`);
-    } else {
-      const updatedLeads = leads.map(lead => 
-        lead.id === leadId ? { ...lead, disposition: newDisposition } : lead
-      );
-      
-      setLeads(updatedLeads);
-      localStorage.setItem('crm_leads', JSON.stringify(updatedLeads));
-      
-      toast.success(`Lead disposition updated to ${newDisposition}`);
-    }
-  };
-
   return (
     <MainLayout>
       <div className="flex flex-col h-[calc(100vh-64px)]">
@@ -401,7 +269,6 @@ const PowerDialer = () => {
               <Button 
                 className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
                 onClick={startDialSession}
-                disabled={leads.length === 0}
               >
                 <Phone className="h-4 w-4" />
                 Start Dialing Session
@@ -438,38 +305,10 @@ const PowerDialer = () => {
                             : 'Initializing calls...'}
                         </span>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                          Lines in use: {lineCount}
-                        </Badge>
-                        
-                        <Button 
-                          variant="outline"
-                          size="sm"
-                          className="rounded-full w-8 h-8 p-0"
-                          onClick={toggleMute}
-                        >
-                          {isMuted ? <MicOff className="h-4 w-4 text-red-500" /> : <Mic className="h-4 w-4" />}
-                        </Button>
-                      </div>
+                      <Badge className="bg-green-100 text-green-800 px-3 py-1">
+                        Lines in use: {lineCount}
+                      </Badge>
                     </div>
-                    
-                    {activeCallId && (
-                      <div className="bg-gray-50 rounded-lg p-3 mb-3 flex items-center justify-between">
-                        <div>
-                          <span className="text-sm text-gray-500">Status: </span>
-                          <Badge className={getStatusColor(callStatuses[activeCallId] || "unknown")}>
-                            {callStatuses[activeCallId] || "Connecting..."}
-                          </Badge>
-                        </div>
-                        {callDurations[activeCallId] !== undefined && (
-                          <div className="flex items-center text-sm">
-                            <Clock className="h-3 w-3 mr-1" />
-                            {formatCallDuration(callDurations[activeCallId])}
-                          </div>
-                        )}
-                      </div>
-                    )}
                     
                     {dialingMode === "ai" && (
                       <Card className="border rounded-md mb-4 bg-gray-50">
@@ -567,41 +406,30 @@ const PowerDialer = () => {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[300px] gap-4">
-                    {leads.length === 0 ? (
-                      <div className="text-center">
-                        <h3 className="text-lg font-medium mb-2 text-gray-700">No Leads Available</h3>
-                        <p className="text-gray-500 max-w-md">
-                          You need to add leads in the People page before you can start a dialing session.
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="w-20 h-20 rounded-full bg-crm-blue/10 flex items-center justify-center">
-                          {dialingMode === "ai" ? (
-                            <Bot className="h-10 w-10 text-crm-blue" />
-                          ) : (
-                            <Phone className="h-10 w-10 text-crm-blue" />
-                          )}
-                        </div>
-                        <div className="text-center">
-                          <h3 className="text-lg font-medium mb-2">
-                            {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Power Dialing Session"}
-                          </h3>
-                          <p className="text-gray-500 max-w-md">
-                            {dialingMode === "ai"
-                              ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
-                              : "Call multiple leads in sequence with our power dialer. Select leads from the table below or dial all leads."
-                            }
-                          </p>
-                        </div>
-                        <Button 
-                          className="mt-4 bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
-                          onClick={startDialSession}
-                        >
-                          Start Dialing
-                        </Button>
-                      </>
-                    )}
+                    <div className="w-20 h-20 rounded-full bg-crm-blue/10 flex items-center justify-center">
+                      {dialingMode === "ai" ? (
+                        <Bot className="h-10 w-10 text-crm-blue" />
+                      ) : (
+                        <Phone className="h-10 w-10 text-crm-blue" />
+                      )}
+                    </div>
+                    <div className="text-center">
+                      <h3 className="text-lg font-medium mb-2">
+                        {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Power Dialing Session"}
+                      </h3>
+                      <p className="text-gray-500 max-w-md">
+                        {dialingMode === "ai"
+                          ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
+                          : "Call multiple leads in sequence with our power dialer. Select leads from the table below or dial all leads."
+                        }
+                      </p>
+                    </div>
+                    <Button 
+                      className="mt-4 bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+                      onClick={startDialSession}
+                    >
+                      Start Dialing
+                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -626,7 +454,6 @@ const PowerDialer = () => {
                       checked={isAllSelected}
                       onCheckedChange={handleSelectAllLeads}
                       aria-label="Select all"
-                      disabled={leads.length === 0}
                     />
                   </TableHead>
                   <TableHead>Disposition</TableHead>
@@ -634,80 +461,46 @@ const PowerDialer = () => {
                   <TableHead>Email</TableHead>
                   <TableHead>Primary Phone</TableHead>
                   <TableHead>Secondary Phone</TableHead>
-                  {isDialing && <TableHead>Call Status</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leads.length > 0 ? (
-                  leads.map((lead) => (
-                    <TableRow 
-                      key={lead.id} 
-                      className={`
-                        hover:bg-gray-50 
-                        ${activeCallId === lead.id ? 'bg-blue-50' : ''}
-                      `}
-                    >
-                      <TableCell>
-                        <Checkbox 
-                          checked={selectedLeads.includes(lead.id)}
-                          onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
-                          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getDispositionClass(lead.disposition)}>
-                          {lead.disposition}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          {lead.avatar ? (
-                            <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                          ) : (
-                            <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                              {lead.firstName.charAt(0)}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <span>{lead.firstName} {lead.lastName}</span>
-                      </TableCell>
-                      <TableCell>{lead.email}</TableCell>
-                      <TableCell>{lead.phone1}</TableCell>
-                      <TableCell>{lead.phone2 || "-"}</TableCell>
-                      {isDialing && (
-                        <TableCell>
-                          {callStatuses[lead.id] ? (
-                            <div className="flex items-center gap-2">
-                              <Badge className={getStatusColor(callStatuses[lead.id])}>
-                                {callStatuses[lead.id]}
-                              </Badge>
-                              {callDurations[lead.id] !== undefined && callStatuses[lead.id] === "in-progress" && (
-                                <span className="text-xs text-gray-500">
-                                  {formatCallDuration(callDurations[lead.id])}
-                                </span>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-sm">Waiting</span>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={isDialing ? 7 : 6} className="text-center py-8 text-gray-500">
-                      {isLoading ? (
-                        <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-500"></div>
-                          <span className="ml-2">Loading leads...</span>
-                        </div>
-                      ) : (
-                        "No leads available. Add leads in the People page first."
-                      )}
+                {leads.map((lead) => (
+                  <TableRow 
+                    key={lead.id} 
+                    className={`
+                      hover:bg-gray-50 
+                      ${activeCallId === lead.id ? 'bg-blue-50' : ''}
+                    `}
+                  >
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedLeads.includes(lead.id)}
+                        onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
+                        aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                      />
                     </TableCell>
+                    <TableCell>
+                      <Badge className={getDispositionClass(lead.disposition)}>
+                        {lead.disposition}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8">
+                        {lead.avatar ? (
+                          <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                        ) : (
+                          <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
+                            {lead.firstName.charAt(0)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <span>{lead.firstName} {lead.lastName}</span>
+                    </TableCell>
+                    <TableCell>{lead.email}</TableCell>
+                    <TableCell>{lead.phone1}</TableCell>
+                    <TableCell>{lead.phone2 || "-"}</TableCell>
                   </TableRow>
-                )}
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -792,15 +585,6 @@ const PowerDialer = () => {
                 )}
               </div>
             </div>
-            
-            {permissionStatus === 'denied' && (
-              <Alert variant="destructive" className="mt-4">
-                <AlertTitle>Microphone Access Required</AlertTitle>
-                <AlertDescription>
-                  Please allow microphone access in your browser settings to make calls.
-                </AlertDescription>
-              </Alert>
-            )}
           </div>
           
           <DialogFooter className="flex sm:justify-between gap-2">
@@ -816,7 +600,6 @@ const PowerDialer = () => {
               type="button"
               className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
               onClick={startDialing}
-              disabled={leads.length === 0}
             >
               Start Dialing
             </Button>
