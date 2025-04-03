@@ -1,9 +1,8 @@
-
 import React, { useState, useCallback } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Filter, Plus, X, Upload } from "lucide-react";
+import { PlusCircle, Search, Filter, Plus, Upload, ChevronDown } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -41,7 +40,6 @@ import {
   ToggleGroupItem 
 } from "@/components/ui/toggle-group";
 
-// Sample data for leads with dispositions
 const leadsData = [
   {
     id: 1,
@@ -87,7 +85,6 @@ const leadsData = [
   },
 ];
 
-// Define disposition types
 const dispositionTypes = [
   "All Leads",
   "Not Contacted",
@@ -98,7 +95,6 @@ const dispositionTypes = [
   "DNC"
 ];
 
-// Define the lead type for form submission
 type LeadFormValues = {
   firstName: string;
   lastName: string;
@@ -136,13 +132,11 @@ const People = () => {
     },
   });
 
-  // Filter leads based on active disposition
   const filteredLeads = leads.filter(lead => {
     if (activeDisposition === "All Leads") return true;
     return lead.disposition === activeDisposition;
   });
 
-  // Update lead disposition
   const updateLeadDisposition = (leadId: number, newDisposition: string) => {
     setLeads(prevLeads => 
       prevLeads.map(lead => 
@@ -152,7 +146,6 @@ const People = () => {
     toast.success(`Lead disposition updated to ${newDisposition}`);
   };
 
-  // Disposition badge color class
   const getDispositionClass = (disposition: string) => {
     switch(disposition) {
       case "Not Contacted":
@@ -347,7 +340,6 @@ const People = () => {
         </div>
       </div>
 
-      {/* Disposition filters */}
       <div className="disposition-filters">
         {dispositionTypes.map((disposition) => (
           <button
@@ -399,7 +391,12 @@ const People = () => {
           <Table>
             <TableHeader className="bg-crm-blue/10">
               <TableRow>
-                <TableHead>Disposition</TableHead>
+                <TableHead>
+                  <div className="flex items-center cursor-pointer group">
+                    <span>Disposition</span>
+                    <ChevronDown className="ml-2 h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </TableHead>
                 <TableHead>Avatar</TableHead>
                 <TableHead>First Name</TableHead>
                 <TableHead>Last Name</TableHead>
@@ -418,7 +415,7 @@ const People = () => {
                 filteredLeads.map((lead) => (
                   <TableRow 
                     key={lead.id} 
-                    className="hover:bg-crm-lightBlue transition-colors duration-200 cursor-pointer my-2"
+                    className="hover:bg-crm-lightBlue transition-all duration-200 cursor-pointer my-4 shadow-sm hover:shadow-md hover:scale-[1.01]"
                   >
                     <TableCell>
                       <Popover>
