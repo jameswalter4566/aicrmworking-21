@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -209,8 +208,19 @@ const PowerDialer = () => {
     try {
       console.log("Calling Supabase function initiate-call...");
       
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error("Error getting auth session:", sessionError);
+      }
+      
+      const headers: Record<string, string> = {};
+      if (sessionData?.session?.access_token) {
+        headers['Authorization'] = `Bearer ${sessionData.session.access_token}`;
+      }
+      
       const { data, error } = await supabase.functions.invoke('initiate-call', {
         method: 'POST',
+        headers,
         body: {
           phoneNumber: lead.phone1,
           leadId: lead.id,
