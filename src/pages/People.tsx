@@ -29,6 +29,7 @@ import {
 import { useForm } from "react-hook-form";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 // Sample data for leads
 const leadsData = [
@@ -43,6 +44,7 @@ const leadsData = [
     phone2: "",
     stage: "Lead",
     assigned: "study bolt",
+    avatar: "",
   },
   {
     id: 2,
@@ -55,6 +57,7 @@ const leadsData = [
     phone2: "(555) 987-6543",
     stage: "Prospect",
     assigned: "michelle team",
+    avatar: "",
   },
   {
     id: 3,
@@ -67,6 +70,7 @@ const leadsData = [
     phone2: "",
     stage: "Client",
     assigned: "john sales",
+    avatar: "",
   },
 ];
 
@@ -319,6 +323,7 @@ const People = () => {
           <Table>
             <TableHeader className="bg-crm-blue/10">
               <TableRow>
+                <TableHead>Avatar</TableHead>
                 <TableHead>First Name</TableHead>
                 <TableHead>Last Name</TableHead>
                 <TableHead>Mailing Address</TableHead>
@@ -336,8 +341,19 @@ const People = () => {
                 leads.map((lead) => (
                   <TableRow 
                     key={lead.id} 
-                    className="hover:bg-crm-lightBlue transition-colors duration-200 cursor-pointer"
+                    className="hover:bg-crm-lightBlue transition-colors duration-200 cursor-pointer my-2"
                   >
+                    <TableCell>
+                      <Avatar className="h-10 w-10">
+                        {lead.avatar ? (
+                          <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                        ) : (
+                          <AvatarFallback className="bg-crm-lightBlue text-crm-blue">
+                            {lead.firstName.charAt(0)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                    </TableCell>
                     <TableCell>{lead.firstName}</TableCell>
                     <TableCell>{lead.lastName}</TableCell>
                     <TableCell>{lead.mailingAddress}</TableCell>
@@ -352,7 +368,7 @@ const People = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7 + customFields.length} className="text-center py-8 text-gray-500">
+                  <TableCell colSpan={9 + customFields.length} className="text-center py-8 text-gray-500">
                     No leads found. Add your first lead to get started.
                   </TableCell>
                 </TableRow>
