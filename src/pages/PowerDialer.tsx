@@ -207,6 +207,10 @@ const PowerDialer = () => {
     
     try {
       const { data, error } = await supabase.functions.invoke('initiate-call', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: {
           phoneNumber: lead.phone1,
           leadId: lead.id,
