@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Phone, Mail, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
@@ -27,6 +27,9 @@ const ActivityTable = ({ contacts }: ActivityTableProps) => {
         <thead className="bg-gray-50">
           <tr>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              Avatar
+            </th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
               Name
             </th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -49,21 +52,23 @@ const ActivityTable = ({ contacts }: ActivityTableProps) => {
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200">
+        <tbody className="divide-y divide-gray-200 bg-white">
           {contacts.map((contact) => (
-            <tr key={contact.id} className="table-row">
+            <tr key={contact.id} className="table-row hover:bg-gray-50 my-2 rounded-lg shadow-sm">
+              <td className="px-6 py-4 whitespace-nowrap">
+                <Avatar className="h-10 w-10">
+                  {contact.avatar ? (
+                    <AvatarImage src={contact.avatar} alt={contact.name} />
+                  ) : (
+                    <AvatarFallback className="bg-crm-lightBlue text-crm-blue">
+                      {contact.name.charAt(0)}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+              </td>
               <td className="px-6 py-4 whitespace-nowrap">
                 <div className="flex items-center">
-                  <div className="flex-shrink-0 h-8 w-8">
-                    <Avatar>
-                      {contact.avatar ? (
-                        <img src={contact.avatar} alt={contact.name} />
-                      ) : (
-                        <span className="text-xs">{contact.name.charAt(0)}</span>
-                      )}
-                    </Avatar>
-                  </div>
-                  <div className="ml-4">
+                  <div className="ml-0">
                     <div className="text-sm font-medium text-gray-900">{contact.name}</div>
                   </div>
                 </div>
