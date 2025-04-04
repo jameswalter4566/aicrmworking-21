@@ -97,7 +97,11 @@ serve(async (req) => {
       }
 
       case 'getContacts': {
-        const searchParams = requestUrl.searchParams;
+        const body = await req.json();
+        // Extract searchParams string from the request body
+        const searchParamsString = body.searchParams || '';
+        const searchParams = new URLSearchParams(searchParamsString);
+        
         return await getContacts(
           searchParams,
           THOUGHTLY_API_TOKEN,
@@ -154,6 +158,16 @@ async function createSingleContact(contactData, apiToken, teamId) {
       attributes.id = String(contactData.id);
     }
     
+    // Store first and last name separately in attributes
+    if (contactData.firstName) {
+      attributes.firstName = contactData.firstName;
+    }
+    
+    if (contactData.lastName) {
+      attributes.lastName = contactData.lastName;
+    }
+    
+    // Create a simplified payload exactly matching the API requirements
     const payload = {
       phone_number: phone,
       name: `${contactData.firstName || ""} ${contactData.lastName || ""}`.trim(),
@@ -164,6 +178,7 @@ async function createSingleContact(contactData, apiToken, teamId) {
     };
     
     console.log(`Sending payload to Thoughtly:`, payload);
+    console.log(`Phone number formatted as: "${phone}"`);
     
     const response = await fetch(`${THOUGHTLY_API_URL}/contact/create`, {
       method: 'POST',
@@ -222,7 +237,7 @@ async function createBulkContacts(contacts, apiToken, teamId) {
   // Process each contact sequentially to avoid rate limits
   for (const contact of contacts) {
     try {
-      // Make sure phone_number exists and is properly formatted - UPDATED APPROACH
+      // Make sure phone_number exists and is properly formatted
       const phone = formatPhoneNumber(contact.phone1 || contact.phone || "");
       
       if (!phone) {
@@ -249,6 +264,16 @@ async function createBulkContacts(contacts, apiToken, teamId) {
         attributes.id = String(contact.id);
       }
       
+      // Store first and last name separately in attributes
+      if (contact.firstName) {
+        attributes.firstName = contact.firstName;
+      }
+      
+      if (contact.lastName) {
+        attributes.lastName = contact.lastName;
+      }
+      
+      // Create a simplified payload exactly matching the API requirements
       const payload = {
         phone_number: phone,
         name: `${contact.firstName || ""} ${contact.lastName || ""}`.trim(),
