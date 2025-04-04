@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -82,7 +81,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
   const initializeAudioContext = useCallback(() => {
     try {
-      // Try to create and start the AudioContext right away
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContext) {
         const audioContext = new AudioContext();
@@ -135,8 +133,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       console.log("Creating new Twilio device with token");
       const newDevice = new Device(token, {
-        // Add more specific options to improve device initialization
-        codecPreferences: ['pcmu', 'opus'],
+        codecPreferences: ['PCMU', 'OPUS'],
         maxAverageBitrate: 16000,
         forceAggressiveIceNomination: true,
         enableIceRestart: true
@@ -342,7 +339,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
     if (!deviceInitializedRef.current && !device) {
       console.log("Performing initial Twilio device setup");
-      // First try to initialize audio context right away
       initializeAudioContext();
       
       const timer = setTimeout(() => {
