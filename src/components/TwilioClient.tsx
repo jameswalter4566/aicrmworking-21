@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -138,10 +139,16 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       console.log("Creating new Twilio device with token");
       
+      // Create device with proper options according to Twilio docs
       const newDevice = new Device(token, {
-        maxAverageBitrate: 16000,
-        forceAggressiveIceNomination: true,
-        edge: 'tokyo'
+        maxAverageBitrate: 16000, // Control bandwidth for voice quality
+        forceAggressiveIceNomination: true, // Helps reduce call connect time
+        edge: ['ashburn', 'tokyo', 'sydney'], // Using array for auto-fallback functionality
+        enableImprovedSignalingErrorPrecision: true, // Better error reporting
+        closeProtection: true, // Prevent accidental page close during active call
+        codecPreferences: ["opus", "pcmu"], // Prefer opus codec for better quality
+        appName: "PowerDialer", // Improves logging in Insights
+        appVersion: "1.0.0" // For versioning in logs
       });
 
       deviceRef.current = newDevice;
@@ -279,23 +286,24 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
           throw new Error("Phone device is not ready. Try again.");
         }
 
-        const { data, error } = await supabase.functions.invoke("twilio-dial", {
-          method: "POST",
-          body: { phoneNumber },
+        // This implementation follows Twilio's recommended approach for initiating calls
+        // We're using the device.connect() method with params object to pass the To parameter
+        const call = await currentDevice.connect({
+          params: { 
+            To: phoneNumber 
+          }
         });
-
-        if (error) {
-          throw new Error(`Error initiating call: ${error.message || "Unknown error"}`);
-        }
-
-        if (!data || !data.success) {
-          throw new Error(data?.message || "Failed to initiate call");
-        }
-
+        
+        // The call is now initiated via the device.connect() method
+        // We'll track this call in our state
+        setConnection(call);
+        
         toast({
           title: "Calling...",
           description: `Dialing ${phoneNumber}`,
         });
+        
+        return call;
       } catch (error: any) {
         console.error("Error making call:", error);
         
@@ -313,6 +321,8 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
             errorNotifiedRef.current = false;
           }, 3000);
         }
+        
+        throw error;
       }
     },
     [status, setupDeviceAfterInteraction, onError, toast]
@@ -349,6 +359,28 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       await setupDeviceAfterInteraction();
     }
   }, [fetchToken, audioContextInitialized, setupDeviceAfterInteraction]);
+
+  // Listen for the tokenWillExpire event and automatically refresh the token
+  useEffect(() => {
+    if (device) {
+      const handleTokenWillExpire = async () => {
+        console.log("Token will expire soon, refreshing...");
+        try {
+          const newToken = await fetchToken();
+          device.updateToken(newToken);
+          console.log("Token refreshed successfully");
+        } catch (error) {
+          console.error("Failed to refresh token:", error);
+        }
+      };
+      
+      device.on('tokenWillExpire', handleTokenWillExpire);
+      
+      return () => {
+        device.off('tokenWillExpire', handleTokenWillExpire);
+      };
+    }
+  }, [device, fetchToken]);
 
   useEffect(() => {
     window.twilioClient = {

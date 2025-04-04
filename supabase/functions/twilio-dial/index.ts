@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import twilio from 'npm:twilio';
 
@@ -60,23 +59,21 @@ serve(async (req) => {
 
     const client = twilio(accountSid, authToken);
     
-    // TwiML for the call
-    const twiml = '<Response><Say>Hello. This is a test call from your application.</Say></Response>';
-    
     // Call parameters
     const callParams: any = {
       to: to,
       from: from,
-      twiml: twiml,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-status?agentIdentity=${encodeURIComponent(agentIdentity)}`,
       statusCallbackMethod: 'POST'
     };
 
-    // If TwiML App SID is available, use it instead of twiml
+    // If TwiML App SID is available, use it
     if (twimlAppSid) {
-      delete callParams.twiml;
       callParams.applicationSid = twimlAppSid;
+    } else {
+      // Otherwise, use TwiML directly
+      callParams.twiml = '<Response><Say>Hello. This is a test call from your application.</Say></Response>';
     }
 
     // Using Twilio's API to create a new call
