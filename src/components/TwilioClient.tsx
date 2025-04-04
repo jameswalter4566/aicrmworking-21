@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -100,7 +99,8 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       const newDevice = new Device(data.token, {
         codecPreferences: ['opus', 'pcmu'] as any[],
         disableAudioContextSounds: false,
-        maxAverageBitrate: 16000
+        maxAverageBitrate: 16000,
+        debug: true // Enable debugging
       });
 
       errorNotifiedRef.current = false;
@@ -127,31 +127,26 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         
         if (onError && err) onError(err);
         
-        // Special handling for token issues
-        const isTokenError = err && (
-          err.message?.includes("AccessTokenInvalid") || 
-          err.message?.includes("token") || 
-          err.code === 20101
-        );
+        // Create more specific error messages
+        let errorMessage = "An error occurred with the phone";
+        if (err && err.message) {
+          if (err.message.includes("token")) {
+            errorMessage = "Authentication error. Please refresh the page and try again.";
+          } else if (err.message.includes("microphone") || err.message.includes("audio")) {
+            errorMessage = "Microphone access error. Please check your browser permissions.";
+          } else {
+            errorMessage = err.message;
+          }
+        }
         
         if (!errorNotifiedRef.current) {
           errorNotifiedRef.current = true;
           
-          if (isTokenError) {
-            toast.toast({
-              variant: "destructive",
-              title: "Authentication Error",
-              description: "Your phone session has expired. Please refresh the page to reconnect.",
-            });
-            // Stop retry attempts on token errors
-            setupAttemptsRef.current = MAX_SETUP_ATTEMPTS;
-          } else {
-            toast.toast({
-              variant: "destructive",
-              title: "Call Error",
-              description: err?.message || "An error occurred with the phone",
-            });
-          }
+          toast.toast({
+            variant: "destructive",
+            title: "Call Error",
+            description: errorMessage,
+          });
           
           setTimeout(() => {
             errorNotifiedRef.current = false;

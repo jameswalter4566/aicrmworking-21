@@ -16,11 +16,9 @@ serve(async (req) => {
   }
 
   try {
-    // Get Twilio credentials from environment
+    // Get Twilio credentials from environment - only use the essential ones
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const apiKey = Deno.env.get('TWILIO_API_KEY'); // Optional, but recommended
-    const apiSecret = Deno.env.get('TWILIO_API_SECRET'); // Optional, but recommended
     const applicationSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
     if (!accountSid || !authToken) {
@@ -43,38 +41,41 @@ serve(async (req) => {
     
     console.log("Creating token for identity:", identity);
 
-    // Create an access token using Twilio's AccessToken constructor
-    const AccessToken = twilio.jwt.AccessToken;
-    const VoiceGrant = AccessToken.VoiceGrant;
-
-    // Create a Voice grant for this token
-    const voiceGrant = new VoiceGrant({
-      incomingAllow: true,
-      outgoingApplicationSid: applicationSid,
-    });
-
-    // Create an access token with the correct parameters
-    // If API Key/Secret are available, use them. Otherwise, fall back to accountSid/authToken
-    const token = apiKey && apiSecret
-      ? new AccessToken(accountSid, apiKey, apiSecret, { identity, ttl: 3600 })
-      : new AccessToken(accountSid, accountSid, authToken, { identity, ttl: 3600 });
+    // Create a capability token using Twilio's ClientCapability constructor
+    const ClientCapability = twilio.jwt.ClientCapability;
     
-    // Add the voice grant to the token
-    token.addGrant(voiceGrant);
+    // Create a capability token that only uses accountSid and authToken
+    const capability = new ClientCapability({
+      accountSid: accountSid,
+      authToken: authToken
+    });
+    
+    // Allow incoming calls
+    capability.addScope(new ClientCapability.IncomingClientScope(identity));
+    
+    // Allow outgoing calls if we have an applicationSid
+    if (applicationSid) {
+      capability.addScope(new ClientCapability.OutgoingClientScope({
+        applicationSid: applicationSid,
+        clientName: identity
+      }));
+    }
 
+    // Generate the token
+    const token = capability.toJwt();
+    
     // Log token details for debugging (not the actual token for security)
-    console.log("Token created for:", {
+    console.log("Capability token created for:", {
       identity,
       accountSid: accountSid.substring(0, 8) + "...",
-      hasApiKey: !!apiKey,
-      hasVoiceGrant: !!voiceGrant,
-      ttl: "3600 seconds (1 hour)"
+      hasOutgoingCapability: !!applicationSid,
+      hasIncomingCapability: true
     });
 
     // Generate the token and send it back
     return new Response(
       JSON.stringify({
-        token: token.toJwt(),
+        token: token,
         identity: identity,
       }),
       { headers: { ...corsHeaders } }
