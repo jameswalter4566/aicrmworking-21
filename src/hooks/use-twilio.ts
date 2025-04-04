@@ -1,13 +1,22 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
+
+export interface ActiveCall {
+  callSid: string;
+  phoneNumber: string;
+  status: 'connecting' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+  leadId: string | number;
+}
 
 export const useTwilio = () => {
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [activeCalls, setActiveCalls] = useState<Record<string, any>>({});
+  const [activeCalls, setActiveCalls] = useState<Record<string, ActiveCall>>({});
+  const statusCheckIntervals = useRef<Record<string, number>>({});
 
+  // Initialize Twilio on component mount
   useEffect(() => {
     const initializeTwilio = async () => {
       setIsLoading(true);
@@ -28,7 +37,7 @@ export const useTwilio = () => {
         if (!deviceInitialized) {
           toast({
             title: "Error",
-            description: "Failed to initialize phone system.",
+            description: "Failed to initialize phone system. Please check the console for details.",
             variant: "destructive",
           });
         } else {
@@ -41,7 +50,7 @@ export const useTwilio = () => {
         console.error('Error initializing Twilio:', error);
         toast({
           title: "Error",
-          description: "Failed to set up phone system.",
+          description: "Failed to set up phone system. Please check console for details.",
           variant: "destructive",
         });
       } finally {
@@ -52,15 +61,104 @@ export const useTwilio = () => {
     initializeTwilio();
 
     return () => {
+      // Cleanup all status check intervals
+      Object.values(statusCheckIntervals.current).forEach(intervalId => {
+        clearInterval(intervalId);
+      });
+      
       twilioService.cleanup();
     };
   }, []);
 
-  const makeCall = async (phoneNumber: string, leadId: string | number) => {
+  // Function to start monitoring call status
+  const monitorCallStatus = useCallback((leadId: string | number, callSid: string) => {
+    const leadIdStr = String(leadId);
+    
+    // Clear any existing interval for this lead
+    if (statusCheckIntervals.current[leadIdStr]) {
+      clearInterval(statusCheckIntervals.current[leadIdStr]);
+    }
+    
+    // Set up a new interval to check call status every 3 seconds
+    const intervalId = window.setInterval(async () => {
+      try {
+        const status = await twilioService.checkCallStatus(callSid);
+        
+        if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
+          // Call has ended, clear the interval
+          clearInterval(statusCheckIntervals.current[leadIdStr]);
+          delete statusCheckIntervals.current[leadIdStr];
+          
+          // Update the call status
+          setActiveCalls(prev => {
+            if (!prev[leadIdStr]) return prev;
+            
+            return {
+              ...prev,
+              [leadIdStr]: {
+                ...prev[leadIdStr],
+                status: status as ActiveCall['status']
+              }
+            };
+          });
+          
+          // Show toast based on the status
+          switch(status) {
+            case "completed":
+              toast({
+                title: "Call Completed",
+                description: `Call has ended normally.`,
+              });
+              break;
+            case "busy":
+              toast({
+                title: "Line Busy",
+                description: `The phone line was busy.`,
+                variant: "destructive",
+              });
+              break;
+            case "no-answer":
+              toast({
+                title: "No Answer",
+                description: `The call was not answered.`,
+                variant: "destructive",
+              });
+              break;
+            default:
+              toast({
+                title: "Call Failed",
+                description: `Call ended with status: ${status}`,
+                variant: "destructive",
+              });
+          }
+        } else if (status === "in-progress" && activeCalls[leadIdStr]?.status !== "in-progress") {
+          // Update to in-progress if it wasn't already
+          setActiveCalls(prev => ({
+            ...prev,
+            [leadIdStr]: {
+              ...prev[leadIdStr],
+              status: "in-progress"
+            }
+          }));
+          
+          toast({
+            title: "Call Connected",
+            description: `Call is now in progress.`,
+          });
+        }
+      } catch (error) {
+        console.error(`Error monitoring call ${callSid}:`, error);
+      }
+    }, 3000);
+    
+    statusCheckIntervals.current[leadIdStr] = intervalId;
+  }, [activeCalls]);
+
+  const makeCall = useCallback(async (phoneNumber: string, leadId: string | number) => {
     if (!initialized) {
       toast({
         title: "Error",
-        description: "Phone system not initialized.",
+        description: "Phone system not initialized. Please refresh and try again.",
         variant: "destructive",
       });
       return { success: false };
@@ -69,19 +167,25 @@ export const useTwilio = () => {
     const result = await twilioService.makeCall(phoneNumber);
     
     if (result.success && result.callSid) {
+      const leadIdStr = String(leadId);
+      
       setActiveCalls(prev => ({
         ...prev,
-        [String(leadId)]: { 
-          callSid: result.callSid,
+        [leadIdStr]: { 
+          callSid: result.callSid!,
           phoneNumber,
-          status: 'in-progress' 
+          status: 'connecting',
+          leadId
         }
       }));
       
       toast({
-        title: "Call Connected",
-        description: `Call to ${phoneNumber} is now active.`,
+        title: "Dialing",
+        description: `Calling ${phoneNumber}...`,
       });
+      
+      // Start monitoring the call status
+      monitorCallStatus(leadId, result.callSid);
     } else {
       toast({
         title: "Call Failed",
@@ -91,12 +195,22 @@ export const useTwilio = () => {
     }
 
     return result;
-  };
+  }, [initialized, monitorCallStatus]);
 
-  const endCall = async (leadId: string | number) => {
+  const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
+    
     if (activeCalls[leadIdStr]) {
+      // Stop monitoring this call
+      if (statusCheckIntervals.current[leadIdStr]) {
+        clearInterval(statusCheckIntervals.current[leadIdStr]);
+        delete statusCheckIntervals.current[leadIdStr];
+      }
+      
+      // End the call
       await twilioService.endCall();
+      
+      // Remove from active calls
       setActiveCalls(prev => {
         const newCalls = {...prev};
         delete newCalls[leadIdStr];
@@ -110,10 +224,18 @@ export const useTwilio = () => {
       
       return true;
     }
+    
     return false;
-  };
+  }, [activeCalls]);
 
-  const endAllCalls = async () => {
+  const endAllCalls = useCallback(async () => {
+    // Stop all monitoring
+    Object.values(statusCheckIntervals.current).forEach(intervalId => {
+      clearInterval(intervalId);
+    });
+    statusCheckIntervals.current = {};
+    
+    // End all calls
     await twilioService.endCall();
     setActiveCalls({});
     
@@ -121,7 +243,7 @@ export const useTwilio = () => {
       title: "All Calls Ended",
       description: `All active calls have been disconnected.`,
     });
-  };
+  }, []);
 
   return {
     initialized,
@@ -129,6 +251,6 @@ export const useTwilio = () => {
     activeCalls,
     makeCall,
     endCall,
-    endAllCalls
+    endAllCalls,
   };
 };

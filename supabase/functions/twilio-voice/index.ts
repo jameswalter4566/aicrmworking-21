@@ -24,45 +24,52 @@ serve(async (req) => {
     const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET')
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
 
-    // Log for debugging
-    console.log('Function invoked with Twilio credentials setup.');
+    // Validate credentials are present
+    const missingCredentials = []
+    if (!TWILIO_ACCOUNT_SID) missingCredentials.push('TWILIO_ACCOUNT_SID')
+    if (!TWILIO_AUTH_TOKEN) missingCredentials.push('TWILIO_AUTH_TOKEN')
+    if (!TWILIO_PHONE_NUMBER) missingCredentials.push('TWILIO_PHONE_NUMBER')
 
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
-      console.error('Missing Twilio credentials:', {
-        accountSid: !!TWILIO_ACCOUNT_SID,
-        authToken: !!TWILIO_AUTH_TOKEN,
-        phoneNumber: !!TWILIO_PHONE_NUMBER,
-      });
-      
+    if (missingCredentials.length > 0) {
+      console.error(`Missing required Twilio credentials: ${missingCredentials.join(', ')}`)
       return new Response(
         JSON.stringify({ 
-          error: 'Missing Twilio credentials',
-          missing: {
-            accountSid: !TWILIO_ACCOUNT_SID,
-            authToken: !TWILIO_AUTH_TOKEN,
-            phoneNumber: !TWILIO_PHONE_NUMBER,
-          }
+          error: 'Missing required Twilio credentials', 
+          missingCredentials 
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
       )
     }
 
-    const { action, phoneNumber, callbackUrl, callSid } = await req.json()
-    console.log(`Processing action: ${action}`);
+    // Parse the request body
+    const requestData = await req.json()
+    const { action, phoneNumber, callbackUrl, callSid } = requestData
+    console.log(`Processing action: ${action}`)
 
     switch (action) {
       case 'makeCall': {
         if (!phoneNumber) {
-          throw new Error('Phone number is required')
+          return new Response(
+            JSON.stringify({ error: 'Phone number is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
 
+        console.log(`Initiating call to ${phoneNumber} from ${TWILIO_PHONE_NUMBER}`)
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
 
         // Create TwiML to instruct Twilio how to handle the call
         const twimlResponse = `
           <Response>
-            <Say>Hello, this is a call from the CRM system.</Say>
+            <Say voice="alice">Hello, this is a call from the CRM system.</Say>
             <Pause length="1"/>
+            <Say voice="alice">Please hold while we connect you with a representative.</Say>
+            <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30">
+              <Client>browser</Client>
+            </Dial>
           </Response>
         `
 
@@ -80,8 +87,21 @@ serve(async (req) => {
           }),
         })
 
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`Twilio API error (${response.status}): ${errorText}`)
+          return new Response(
+            JSON.stringify({ 
+              error: 'Twilio API error', 
+              status: response.status, 
+              details: errorText 
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         const data = await response.json()
-        console.log('Call initiated with SID:', data.sid);
+        console.log(`Call initiated with SID: ${data.sid}`)
         
         return new Response(
           JSON.stringify({ success: true, callSid: data.sid }),
@@ -91,9 +111,13 @@ serve(async (req) => {
 
       case 'getCallStatus': {
         if (!callSid) {
-          throw new Error('Call SID is required')
+          return new Response(
+            JSON.stringify({ error: 'Call SID is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
 
+        console.log(`Getting status for call: ${callSid}`)
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls/${callSid}.json`
 
         const response = await fetch(twilioUrl, {
@@ -103,8 +127,21 @@ serve(async (req) => {
           },
         })
 
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`Twilio API error (${response.status}): ${errorText}`)
+          return new Response(
+            JSON.stringify({ 
+              error: 'Failed to retrieve call status', 
+              status: response.status, 
+              details: errorText 
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
         const data = await response.json()
-        console.log('Call status retrieved:', data.status);
+        console.log(`Call status: ${data.status}`)
         
         return new Response(
           JSON.stringify({ status: data.status }),
@@ -113,62 +150,73 @@ serve(async (req) => {
       }
 
       case 'generateToken': {
-        if (!TWILIO_API_KEY || !TWILIO_API_SECRET || !TWILIO_TWIML_APP_SID) {
-          console.error('Missing Twilio token generation credentials:', {
-            apiKey: !!TWILIO_API_KEY,
-            apiSecret: !!TWILIO_API_SECRET,
-            twimlAppSid: !!TWILIO_TWIML_APP_SID,
-          });
+        const tokenCredentialsMissing = []
+        if (!TWILIO_API_KEY) tokenCredentialsMissing.push('TWILIO_API_KEY')
+        if (!TWILIO_API_SECRET) tokenCredentialsMissing.push('TWILIO_API_SECRET')
+        if (!TWILIO_TWIML_APP_SID) tokenCredentialsMissing.push('TWILIO_TWIML_APP_SID')
+        
+        if (tokenCredentialsMissing.length > 0) {
+          console.error(`Missing token generation credentials: ${tokenCredentialsMissing.join(', ')}`)
           
           return new Response(
             JSON.stringify({ 
               error: 'Missing required Twilio credentials for token generation',
-              missingCredentials: {
-                apiKey: !TWILIO_API_KEY,
-                apiSecret: !TWILIO_API_SECRET,
-                twimlAppSid: !TWILIO_TWIML_APP_SID
-              }
+              missingCredentials: tokenCredentialsMissing
             }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
+        console.log("Generating Twilio Client token")
+        
         // Create a unique ID for this client
         const identity = crypto.randomUUID()
         
-        // Create JWT token for Twilio Client
-        const AccessToken = twilio.jwt.AccessToken
-        const VoiceGrant = AccessToken.VoiceGrant
+        try {
+          // Create JWT token for Twilio Client
+          const AccessToken = twilio.jwt.AccessToken
+          const VoiceGrant = AccessToken.VoiceGrant
 
-        const accessToken = new AccessToken(
-          TWILIO_ACCOUNT_SID,
-          TWILIO_API_KEY,
-          TWILIO_API_SECRET,
-          { identity }
-        )
+          const accessToken = new AccessToken(
+            TWILIO_ACCOUNT_SID,
+            TWILIO_API_KEY,
+            TWILIO_API_SECRET,
+            { identity }
+          )
 
-        const voiceGrant = new VoiceGrant({
-          outgoingApplicationSid: TWILIO_TWIML_APP_SID,
-          incomingAllow: true
-        })
+          const voiceGrant = new VoiceGrant({
+            outgoingApplicationSid: TWILIO_TWIML_APP_SID,
+            incomingAllow: true
+          })
 
-        accessToken.addGrant(voiceGrant)
-        console.log('Token generated for identity:', identity);
-        
-        return new Response(
-          JSON.stringify({ token: accessToken.toJwt() }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+          accessToken.addGrant(voiceGrant)
+          const token = accessToken.toJwt()
+          console.log(`Token generated for identity: ${identity}`)
+          
+          return new Response(
+            JSON.stringify({ token }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } catch (tokenError) {
+          console.error('Error generating token:', tokenError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to generate token', details: tokenError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
       }
 
       default:
-        throw new Error('Invalid action')
+        return new Response(
+          JSON.stringify({ error: 'Invalid action' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
     }
   } catch (error) {
     console.error('Twilio Voice Function Error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
