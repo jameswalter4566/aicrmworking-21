@@ -140,19 +140,19 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     
     if (warningName === 'low-mos') {
       toast({
-        variant: "warning",
+        variant: "default",
         title: "Call Quality Issue",
         description: "Poor call quality detected. You may experience degraded audio.",
       });
     } else if (warningName === 'high-jitter' || warningName === 'high-packet-loss') {
       toast({
-        variant: "warning",
+        variant: "default",
         title: "Network Issue",
         description: "Network instability detected. Call quality may be affected.",
       });
     } else if (warningName === 'high-rtt') {
       toast({
-        variant: "warning",
+        variant: "default",
         title: "Connection Delay",
         description: "High latency detected. There may be delays in the conversation.",
       });
