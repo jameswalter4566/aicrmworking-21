@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -33,8 +32,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { twilioService } from "@/services/twilio";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
+import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 
-const leadsData = [
+const defaultLeads = [
   {
     id: 1,
     firstName: "Dan",
@@ -87,34 +87,26 @@ const leadsData = [
   },
 ];
 
-const activityLogsData = {
-  1: [
-    { type: "call", status: "attempted", timestamp: "2023-05-15 10:23 AM", notes: "No answer", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-15 10:30 AM", content: "Hi Dan, I tried reaching out to you. Would you be available later today?", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-15 10:32 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-  2: [
-    { type: "call", status: "completed", timestamp: "2023-05-14 2:45 PM", duration: "4:32", notes: "Discussed property requirements", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-14 3:15 PM", content: "Thanks for the call. Can you send me more info about the property?", sender: "lead" },
-    { type: "sms", status: "sent", timestamp: "2023-05-14 3:20 PM", content: "Of course! I'll email you the details shortly.", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-14 3:25 PM", from: "New Lead", to: "Contacted", sender: "user" },
-  ],
-  3: [
-    { type: "call", status: "completed", timestamp: "2023-05-13 11:15 AM", duration: "7:21", notes: "Scheduled property viewing", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-13 11:25 AM", from: "Contacted", to: "Appointment Set", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-13 11:30 AM", content: "Looking forward to showing you the property on Friday at 3 PM!", sender: "user" },
-    { type: "sms", status: "received", timestamp: "2023-05-13 11:35 AM", content: "Great, I'll see you then. Thank you!", sender: "lead" },
-  ],
-  4: [
-    { type: "call", status: "attempted", timestamp: "2023-05-12 9:10 AM", notes: "Voicemail left", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 9:15 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-  5: [
-    { type: "call", status: "attempted", timestamp: "2023-05-11 4:30 PM", notes: "No answer", sender: "user" },
-    { type: "call", status: "attempted", timestamp: "2023-05-12 10:45 AM", notes: "No answer", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-12 10:50 AM", content: "Hi James, I've tried to reach you. Please call me back when you have a moment.", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 10:55 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
+const mapThoughtlyContactToLead = (contact: any): ThoughtlyContact => {
+  let firstName = '', lastName = '';
+  if (contact.name) {
+    const nameParts = contact.name.split(' ');
+    firstName = nameParts[0] || '';
+    lastName = nameParts.slice(1).join(' ') || '';
+  }
+
+  return {
+    id: contact.attributes?.id ? Number(contact.attributes.id) : Date.now(),
+    firstName: contact.attributes?.firstName || firstName,
+    lastName: contact.attributes?.lastName || lastName,
+    email: contact.email || '',
+    phone1: contact.phone_number || '',
+    phone2: contact.attributes?.phone2 || '',
+    disposition: contact.attributes?.disposition || 'Not Contacted',
+    avatar: contact.attributes?.avatar || '',
+    tags: contact.tags || [],
+    countryCode: contact.country_code || 'US'
+  };
 };
 
 const getDispositionClass = (disposition: string) => {
@@ -137,9 +129,11 @@ const getDispositionClass = (disposition: string) => {
 };
 
 const AIDialer = () => {
-  const [leads, setLeads] = useState(leadsData);
+  const [leads, setLeads] = useState<ThoughtlyContact[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeCallId, setActiveCallId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [lineCount, setLineCount] = useState("1");
   const [isDialing, setIsDialing] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
@@ -153,8 +147,39 @@ const AIDialer = () => {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
+  
+  useEffect(() => {
+    fetchThoughtlyContacts();
+  }, []);
 
-  // Show import dialog when all leads are selected
+  const fetchThoughtlyContacts = async () => {
+    setIsLoading(true);
+    try {
+      const response = await thoughtlyService.getContacts({
+        limit: 50
+      });
+      
+      if (response?.success && response?.data) {
+        const mappedLeads = response.data.map(mapThoughtlyContactToLead);
+        setLeads(mappedLeads);
+        setThoughtlyContacts(response.data);
+        console.log("Fetched leads from Thoughtly:", mappedLeads);
+      } else {
+        setLeads(defaultLeads);
+      }
+    } catch (error) {
+      console.error("Error fetching Thoughtly contacts:", error);
+      toast({
+        title: "Error",
+        description: "Failed to retrieve contacts. Using sample data instead.",
+        variant: "destructive",
+      });
+      setLeads(defaultLeads);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (selectedLeads.length === leads.length && selectedLeads.length > 0) {
       setIsImportDialogOpen(true);
@@ -167,46 +192,24 @@ const AIDialer = () => {
 
   const startDialing = async () => {
     const leadsToDial = selectedLeads.length > 0 
-      ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
-      : leads.map(lead => lead.id);
+      ? leads.filter(lead => selectedLeads.includes(lead.id!)).map(lead => lead.id!)
+      : leads.map(lead => lead.id!);
     
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
+    setIsDialing(true);
     
-    try {
-      // Fetch contacts from Thoughtly before starting the dialing
-      const response = await thoughtlyService.getContacts({
-        limit: 50 // Adjust as needed
-      });
-      
-      if (response?.success && response?.data) {
-        setThoughtlyContacts(response.data);
-        toast({
-          title: "Contacts retrieved",
-          description: `Successfully loaded ${response.data.length} contacts from Thoughtly`,
-        });
-      }
-      
-      setIsDialing(true);
-      
-    } catch (error) {
-      console.error("Error fetching Thoughtly contacts:", error);
-      toast({
-        title: "Error",
-        description: "Failed to retrieve contacts from Thoughtly. Check console for details.",
-        variant: "destructive",
-      });
-      // Still allow dialing to start even if contact fetching fails
-      setIsDialing(true);
-    }
+    toast({
+      title: "AI Dialing Started",
+      description: `Now dialing ${leadsToDial.length} leads`,
+    });
   };
 
   const handleSelectAllLeads = (checked: boolean) => {
     if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id));
+      setSelectedLeads(leads.map(lead => lead.id!));
     } else {
       setSelectedLeads([]);
-      // Close the import dialog if it's open
       setIsImportDialogOpen(false);
     }
   };
@@ -216,19 +219,17 @@ const AIDialer = () => {
       const newSelectedLeads = [...selectedLeads, leadId];
       setSelectedLeads(newSelectedLeads);
       
-      // Check if all leads are now selected
       if (newSelectedLeads.length === leads.length) {
         setIsImportDialogOpen(true);
       }
     } else {
       setSelectedLeads(prev => prev.filter(id => id !== leadId));
-      // Close the import dialog if it was open
       setIsImportDialogOpen(false);
     }
   };
 
   const isAllSelected = leads.length > 0 && leads.every(lead => 
-    selectedLeads.includes(lead.id)
+    lead.id && selectedLeads.includes(lead.id)
   );
 
   const endDialingSession = () => {
@@ -248,25 +249,15 @@ const AIDialer = () => {
     setIsImporting(true);
     
     try {
-      // Get the selected leads data
-      const leadsToImport = leads.filter(lead => selectedLeads.includes(lead.id));
+      const leadsToImport = leads.filter(lead => lead.id && selectedLeads.includes(lead.id));
       
-      // Convert to ThoughtlyContact format
-      const thoughtlyContacts: ThoughtlyContact[] = leadsToImport.map(lead => ({
-        ...lead,
-        countryCode: "US", // Default country code
-        tags: ["CRM Import"] // Default tag
-      }));
-      
-      // Send to Thoughtly API
-      const result = await thoughtlyService.createBulkContacts(thoughtlyContacts);
+      const result = await thoughtlyService.createBulkContacts(leadsToImport);
       
       toast({
         title: "Import Successful",
         description: `Successfully imported ${result.summary.successful} out of ${result.summary.total} leads to AI Dialer.`,
       });
       
-      // Close the dialog
       setIsImportDialogOpen(false);
     } catch (error) {
       console.error("Error importing leads to Thoughtly:", error);
@@ -280,30 +271,74 @@ const AIDialer = () => {
     }
   };
 
+  const handleFileUploadComplete = async (importedLeads: ThoughtlyContact[]) => {
+    try {
+      const leadsWithIds = importedLeads.map((lead, index) => ({
+        ...lead,
+        id: lead.id || Date.now() + index,
+        disposition: lead.disposition || "Not Contacted",
+        countryCode: "US",
+        tags: ["CRM Import"]
+      }));
+      
+      const result = await thoughtlyService.syncLeads(leadsWithIds);
+      
+      if (result?.data) {
+        const mappedLeads = result.data.map(mapThoughtlyContactToLead);
+        setLeads(mappedLeads);
+        
+        toast({
+          title: "Leads Synced",
+          description: `Successfully imported and synced ${leadsWithIds.length} leads across all dialer services.`,
+        });
+      }
+      
+      setIsFileUploadOpen(false);
+    } catch (error) {
+      console.error("Error syncing imported leads:", error);
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync imported leads with the dialer service.",
+        variant: "destructive"
+      });
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex flex-col h-[calc(100vh-64px)]">
         <div className="flex-1 p-6 overflow-hidden">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">AI Dialer</h1>
-            {!isDialing ? (
-              <Button 
-                className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
-                onClick={startDialSession}
-              >
-                <Phone className="h-4 w-4" />
-                Start Dialing Session
-              </Button>
-            ) : (
-              <Button 
-                variant="destructive"
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
                 className="rounded-lg flex items-center gap-2"
-                onClick={endDialingSession}
+                onClick={() => setIsFileUploadOpen(true)}
               >
-                <PhoneOff className="h-4 w-4" />
-                End Session
+                <Upload className="h-4 w-4" />
+                Import Leads
               </Button>
-            )}
+              
+              {!isDialing ? (
+                <Button 
+                  className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
+                  onClick={startDialSession}
+                >
+                  <Phone className="h-4 w-4" />
+                  Start Dialing Session
+                </Button>
+              ) : (
+                <Button 
+                  variant="destructive"
+                  className="rounded-lg flex items-center gap-2"
+                  onClick={endDialingSession}
+                >
+                  <PhoneOff className="h-4 w-4" />
+                  End Session
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-6 h-full">
@@ -397,7 +432,11 @@ const AIDialer = () => {
           <div className="mb-4 flex justify-between items-center">
             <h2 className="text-lg font-medium">Leads to Dial</h2>
             <div className="text-sm text-gray-500">
-              {selectedLeads.length > 0 ? `${selectedLeads.length} leads selected` : 'All leads will be dialed'}
+              {isLoading ? 'Loading leads...' : (
+                selectedLeads.length > 0 ? 
+                `${selectedLeads.length} leads selected` : 
+                `${leads.length} leads available`
+              )}
             </div>
           </div>
           
@@ -420,50 +459,63 @@ const AIDialer = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leads.map((lead) => (
-                  <TableRow 
-                    key={lead.id} 
-                    className={`
-                      hover:bg-gray-50 
-                      ${activeCallId === lead.id ? 'bg-blue-50' : ''}
-                    `}
-                  >
-                    <TableCell>
-                      <Checkbox 
-                        checked={selectedLeads.includes(lead.id)}
-                        onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
-                        aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                      />
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      Loading leads...
                     </TableCell>
-                    <TableCell>
-                      <Badge className={getDispositionClass(lead.disposition)}>
-                        {lead.disposition}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {lead.avatar ? (
-                          <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                        ) : (
-                          <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                            {lead.firstName.charAt(0)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <span>{lead.firstName} {lead.lastName}</span>
-                    </TableCell>
-                    <TableCell>{lead.email}</TableCell>
-                    <TableCell>{lead.phone1}</TableCell>
-                    <TableCell>{lead.phone2 || "-"}</TableCell>
                   </TableRow>
-                ))}
+                ) : leads.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      No leads found. Import leads to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  leads.map((lead) => (
+                    <TableRow 
+                      key={lead.id} 
+                      className={`
+                        hover:bg-gray-50 
+                        ${activeCallId === lead.id ? 'bg-blue-50' : ''}
+                      `}
+                    >
+                      <TableCell>
+                        <Checkbox 
+                          checked={lead.id ? selectedLeads.includes(lead.id) : false}
+                          onCheckedChange={(checked) => lead.id && handleSelectLead(lead.id, !!checked)}
+                          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
+                          {lead.disposition || 'Not Contacted'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          {lead.avatar ? (
+                            <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                          ) : (
+                            <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
+                              {lead.firstName ? lead.firstName.charAt(0) : '?'}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <span>{lead.firstName} {lead.lastName}</span>
+                      </TableCell>
+                      <TableCell>{lead.email}</TableCell>
+                      <TableCell>{lead.phone1}</TableCell>
+                      <TableCell>{lead.phone2 || "-"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
         </div>
       </div>
 
-      {/* Original dialer settings dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-xl">
           <DialogHeader>
@@ -528,7 +580,6 @@ const AIDialer = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Import leads dialog */}
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-xl">
           <DialogHeader>
@@ -574,6 +625,30 @@ const AIDialer = () => {
               ) : (
                 <>Import Leads</>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      <Dialog open={isFileUploadOpen} onOpenChange={setIsFileUploadOpen}>
+        <DialogContent className="sm:max-w-[600px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Import Leads</DialogTitle>
+            <DialogDescription>
+              Upload a CSV file with your leads data. Our AI will analyze and map the columns automatically.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <IntelligentFileUpload onImportComplete={handleFileUploadComplete} />
+          
+          <DialogFooter className="flex sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setIsFileUploadOpen(false)}
+            >
+              Cancel
             </Button>
           </DialogFooter>
         </DialogContent>

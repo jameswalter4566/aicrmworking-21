@@ -143,5 +143,58 @@ export const thoughtlyService = {
       console.error('Error in getContacts:', error);
       throw error;
     }
+  },
+
+  /**
+   * Sync local leads data with Thoughtly contacts
+   * @param leads Local leads data to sync
+   * @returns Array of synced leads
+   */
+  async syncLeads(leads: ThoughtlyContact[]) {
+    try {
+      // First get all contacts from Thoughtly
+      const existingContacts = await this.getContacts({
+        limit: 100 // Adjust as needed
+      });
+      
+      // Create a map of existing contacts by ID for easy lookup
+      const contactMap = new Map();
+      if (existingContacts?.success && existingContacts?.data) {
+        existingContacts.data.forEach(contact => {
+          if (contact.attributes?.id) {
+            contactMap.set(contact.attributes.id, contact);
+          }
+        });
+      }
+
+      // Filter out leads that already exist in Thoughtly
+      const newLeads = leads.filter(lead => !contactMap.has(String(lead.id)));
+      
+      if (newLeads.length === 0) {
+        // No new leads to add
+        return {
+          success: true,
+          message: "All leads already exist in Thoughtly",
+          data: existingContacts?.data || []
+        };
+      }
+
+      // Add any new leads to Thoughtly
+      const result = await this.createBulkContacts(newLeads);
+      
+      // Return the updated list of contacts
+      const updatedContacts = await this.getContacts({
+        limit: 100 // Adjust as needed
+      });
+      
+      return {
+        success: true,
+        imported: result,
+        data: updatedContacts?.data || []
+      };
+    } catch (error) {
+      console.error('Error syncing leads:', error);
+      throw error;
+    }
   }
 };
