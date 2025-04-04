@@ -142,7 +142,7 @@ const Sidebar = () => {
                 className={cn(
                   "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                   active 
-                    ? "bg-white text-crm-blue"
+                    ? `bg-white text-crm-blue ${itemColors[index]}` // Use the assigned color for active state
                     : "text-white hover:text-white",
                   expanded ? "px-5" : "px-0 justify-center"
                 )}
