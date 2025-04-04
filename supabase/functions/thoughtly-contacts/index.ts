@@ -14,6 +14,26 @@ console.log("Thoughtly Contacts function loaded and ready")
 // Base Thoughtly API URL 
 const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 
+// Fixed API credentials - hardcoded for now as requested
+const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o"
+const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f"
+
+// Utility function to format phone numbers
+function formatPhoneNumber(phoneNumber) {
+  if (!phoneNumber) return "";
+  
+  // Remove all non-numeric characters
+  const digitsOnly = phoneNumber.replace(/\D/g, '');
+  
+  // Check if the number already has the country code (assuming US)
+  if (digitsOnly.length === 10) {
+    return digitsOnly; // Just return the 10 digits without country code
+  } else {
+    // Return whatever we have, might be already formatted or might be invalid
+    return digitsOnly;
+  }
+}
+
 // Main serve function to handle requests
 serve(async (req) => {
   console.log(`Received ${req.method} request to ${req.url}`)
@@ -28,10 +48,6 @@ serve(async (req) => {
   }
 
   try {
-    // Get Thoughtly credentials from environment variables
-    const THOUGHTLY_API_TOKEN = Deno.env.get('THOUGHTLY_API_TOKEN')
-    const THOUGHTLY_TEAM_ID = Deno.env.get('THOUGHTLY_TEAM_ID')
-
     // Check if required credentials are available
     if (!THOUGHTLY_API_TOKEN || !THOUGHTLY_TEAM_ID) {
       console.error("Missing Thoughtly API credentials")
@@ -49,15 +65,28 @@ serve(async (req) => {
 
     // Process the request based on the action
     const requestUrl = new URL(req.url)
-    const action = req.method === 'GET' 
-      ? 'getContacts' // If it's a GET request, assume it's for getting contacts
-      : await req.json().then(data => data.action) // Otherwise extract action from body
-
-    console.log(`Processing action: ${action}`)
+    
+    // Clone the request to safely parse the body once
+    const reqClone = req.clone();
+    
+    let action;
+    if (req.method === 'GET') {
+      action = 'getContacts'; // If it's a GET request, assume it's for getting contacts
+    } else {
+      // For POST requests, parse the body to get the action
+      const body = await reqClone.json();
+      action = body.action;
+      console.log(`Processing POST action: ${action}`, body);
+    }
 
     switch (action) {
       case 'createContact': {
-        const { contacts } = await req.json()
+        const body = await req.json(); // Safe to read the body now
+        const { contacts } = body;
+        
+        console.log(`createContact action with contacts:`, 
+                   Array.isArray(contacts) ? `${contacts.length} contacts` : '1 contact');
+        
         // Handle single contact creation
         if (!Array.isArray(contacts)) {
           return await createSingleContact(
@@ -76,34 +105,64 @@ serve(async (req) => {
       }
 
       case 'getContacts': {
-        const searchParams = requestUrl.searchParams
+        const searchParams = requestUrl.searchParams;
         return await getContacts(
           searchParams,
           THOUGHTLY_API_TOKEN,
           THOUGHTLY_TEAM_ID
-        )
+        );
       }
 
       default:
         return new Response(
           JSON.stringify({ error: 'Invalid action' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        );
     }
   } catch (error) {
-    console.error('Thoughtly Function Error:', error)
+    console.error('Thoughtly Function Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   }
-})
+});
 
 // Function to create a single contact in Thoughtly
 async function createSingleContact(contactData, apiToken, teamId) {
-  console.log(`Creating single contact: ${contactData.name}`)
+  console.log(`Creating single contact: ${contactData.firstName} ${contactData.lastName}`);
   
   try {
+    // Make sure phone_number exists and is properly formatted
+    const phone = formatPhoneNumber(contactData.phone1 || contactData.phone || "");
+    
+    if (!phone) {
+      console.error('Error: Missing phone number for contact', contactData);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing phone number', 
+          contact: contactData 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    const payload = {
+      phone_number: phone,
+      name: `${contactData.firstName || ""} ${contactData.lastName || ""}`.trim(),
+      email: contactData.email || "",
+      country_code: contactData.countryCode || "US",
+      tags: contactData.tags || [],
+      attributes: {
+        ...contactData.attributes || {},
+        source: "CRM Import",
+        disposition: contactData.disposition || "Not Contacted",
+        importDate: new Date().toISOString()
+      }
+    };
+    
+    console.log(`Sending payload to Thoughtly:`, payload);
+    
     const response = await fetch(`${THOUGHTLY_API_URL}/contact/create`, {
       method: 'POST',
       headers: {
@@ -111,32 +170,22 @@ async function createSingleContact(contactData, apiToken, teamId) {
         'x-api-token': apiToken,
         'team_id': teamId
       },
-      body: JSON.stringify({
-        phone_number: contactData.phone1 || contactData.phone || "",
-        name: `${contactData.firstName || ""} ${contactData.lastName || ""}`.trim(),
-        email: contactData.email || "",
-        country_code: contactData.countryCode || "US",
-        tags: contactData.tags || [],
-        attributes: {
-          ...contactData.attributes || {},
-          source: "CRM Import",
-          disposition: contactData.disposition || "Not Contacted",
-          importDate: new Date().toISOString()
-        }
-      })
-    })
+      body: JSON.stringify(payload)
+    });
 
-    const data = await response.json()
+    const data = await response.json();
     
     if (!response.ok) {
-      console.error(`Error creating contact: ${JSON.stringify(data)}`)
+      console.error(`Error creating contact: ${JSON.stringify(data)}`);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to create contact in Thoughtly', 
-          details: data.error || 'Unknown error'
+          details: data.error || 'Unknown error',
+          status: response.status,
+          contactData: payload
         }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
     return new Response(
@@ -146,31 +195,60 @@ async function createSingleContact(contactData, apiToken, teamId) {
         data: data.data
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   } catch (error) {
-    console.error('Error in createSingleContact:', error)
+    console.error('Error in createSingleContact:', error);
     return new Response(
       JSON.stringify({ 
         error: 'Failed to create contact in Thoughtly', 
         details: error.message
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   }
 }
 
 // Function to create multiple contacts in Thoughtly
 async function createBulkContacts(contacts, apiToken, teamId) {
-  console.log(`Creating ${contacts.length} contacts in bulk`)
+  console.log(`Creating ${contacts.length} contacts in bulk`);
   
   const results = {
     success: [],
     errors: []
-  }
+  };
 
   // Process each contact sequentially to avoid rate limits
   for (const contact of contacts) {
     try {
+      // Make sure phone_number exists and is properly formatted
+      const phone = formatPhoneNumber(contact.phone1 || contact.phone || "");
+      
+      if (!phone) {
+        console.error('Error: Missing phone number for contact', contact);
+        results.errors.push({
+          contact,
+          error: 'Missing phone number'
+        });
+        continue;
+      }
+      
+      const payload = {
+        phone_number: phone,
+        name: `${contact.firstName || ""} ${contact.lastName || ""}`.trim(),
+        email: contact.email || "",
+        country_code: contact.countryCode || "US",
+        tags: contact.tags || [],
+        attributes: {
+          ...contact.attributes || {},
+          source: "CRM Import",
+          disposition: contact.disposition || "Not Contacted",
+          importDate: new Date().toISOString(),
+          id: contact.id || null
+        }
+      };
+      
+      console.log(`Sending payload to Thoughtly for ${contact.firstName}:`, payload);
+      
       const response = await fetch(`${THOUGHTLY_API_URL}/contact/create`, {
         method: 'POST',
         headers: {
@@ -178,48 +256,35 @@ async function createBulkContacts(contacts, apiToken, teamId) {
           'x-api-token': apiToken,
           'team_id': teamId
         },
-        body: JSON.stringify({
-          phone_number: contact.phone1 || contact.phone || "",
-          name: `${contact.firstName || ""} ${contact.lastName || ""}`.trim(),
-          email: contact.email || "",
-          country_code: contact.countryCode || "US",
-          tags: contact.tags || [],
-          attributes: {
-            ...contact.attributes || {},
-            source: "CRM Import",
-            disposition: contact.disposition || "Not Contacted",
-            importDate: new Date().toISOString(),
-            id: contact.id || null
-          }
-        })
-      })
+        body: JSON.stringify(payload)
+      });
 
-      const data = await response.json()
+      const data = await response.json();
       
       if (!response.ok) {
-        console.error(`Error creating contact: ${JSON.stringify(data)}`)
+        console.error(`Error creating contact: ${JSON.stringify(data)}`);
         results.errors.push({
           contact,
           error: data.error || 'Unknown error',
           status: response.status
-        })
+        });
       } else {
         results.success.push({
           originalId: contact.id,
           thoughtlyId: data.data?.id || null,
           data: data.data
-        })
+        });
       }
       
       // Add a small delay to avoid hitting rate limits
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 100));
       
     } catch (error) {
-      console.error(`Error creating contact ${contact.id}:`, error)
+      console.error(`Error creating contact ${contact.id}:`, error);
       results.errors.push({
         contact,
         error: error.message
-      })
+      });
     }
   }
 
@@ -233,15 +298,15 @@ async function createBulkContacts(contacts, apiToken, teamId) {
       results
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  )
+  );
 }
 
 // Function to get contacts from Thoughtly API
 async function getContacts(searchParams, apiToken, teamId) {
-  console.log("Getting contacts from Thoughtly API")
+  console.log("Getting contacts from Thoughtly API");
   
   // Build query string from searchParams if any
-  const queryString = searchParams.toString() ? `?${searchParams.toString()}` : ''
+  const queryString = searchParams.toString() ? `?${searchParams.toString()}` : '';
   
   try {
     const response = await fetch(`${THOUGHTLY_API_URL}/contact${queryString}`, {
@@ -251,22 +316,22 @@ async function getContacts(searchParams, apiToken, teamId) {
         'x-api-token': apiToken,
         'team_id': teamId
       }
-    })
+    });
 
-    const data = await response.json()
+    const data = await response.json();
     
     if (!response.ok) {
-      console.error(`Error getting contacts: ${JSON.stringify(data)}`)
+      console.error(`Error getting contacts: ${JSON.stringify(data)}`);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to get contacts from Thoughtly', 
           details: data.error || 'Unknown error'
         }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+      );
     }
 
-    console.log(`Successfully retrieved contacts from Thoughtly`)
+    console.log(`Successfully retrieved contacts from Thoughtly`);
     
     return new Response(
       JSON.stringify({
@@ -274,15 +339,15 @@ async function getContacts(searchParams, apiToken, teamId) {
         data: data.data
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   } catch (error) {
-    console.error('Error in getContacts:', error)
+    console.error('Error in getContacts:', error);
     return new Response(
       JSON.stringify({ 
         error: 'Failed to get contacts from Thoughtly API', 
         details: error.message
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+    );
   }
 }
