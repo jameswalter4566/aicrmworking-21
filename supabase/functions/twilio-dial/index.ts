@@ -18,27 +18,28 @@ serve(async (req) => {
   try {
     // Get Twilio credentials from environment
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');  // Changed from API_SECRET to AUTH_TOKEN
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
 
-    if (!accountSid || !authToken) {
+    if (!accountSid || !authToken || !twilioPhoneNumber) {
       console.error('Missing required Twilio credentials:', {
         accountSid: !!accountSid,
-        authToken: !!authToken
+        authToken: !!authToken,
+        twilioPhoneNumber: !!twilioPhoneNumber
       });
       throw new Error('Missing required Twilio credentials');
     }
 
     // Initialize with default values in case request body is missing fields
     let to = '';
-    let from = twilioPhoneNumber || '';
+    let from = twilioPhoneNumber;
     let agentIdentity = 'anonymous';
     
     try {
       // Parse request body
       const requestData = await req.json();
       to = requestData.phoneNumber || requestData.to || '';
-      from = requestData.from || twilioPhoneNumber || '';
+      from = requestData.from || twilioPhoneNumber;
       agentIdentity = requestData.agentIdentity || 'anonymous';
     } catch (e) {
       console.error("Error parsing request body:", e);
@@ -51,20 +52,13 @@ serve(async (req) => {
 
     console.log(`Initiating call to ${to} from ${from}`);
 
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Dial callerId="${from}">
-    <Number>${to}</Number>
-  </Dial>
-</Response>`;
-
     const client = twilio(accountSid, authToken);
     
     // Using Twilio's API to create a new call
     const call = await client.calls.create({
       to: to,
       from: from,
-      twiml: twiml,
+      url: `https://handler.twilio.com/twiml/EH${accountSid}`, // Default TwiML that allows the call
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-status?agentIdentity=${encodeURIComponent(agentIdentity)}`,
       statusCallbackMethod: 'POST'

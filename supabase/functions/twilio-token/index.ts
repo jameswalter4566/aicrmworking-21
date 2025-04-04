@@ -18,16 +18,12 @@ serve(async (req) => {
   try {
     // Get Twilio credentials from environment
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const apiKey = Deno.env.get('TWILIO_API_KEY');
-    const apiSecret = Deno.env.get('TWILIO_API_SECRET');
-    const twimlAppSid = Deno.env.get('TWILIO_TWIML_APP_SID');
+    const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
 
-    if (!accountSid || !apiKey || !apiSecret || !twimlAppSid) {
+    if (!accountSid || !authToken) {
       console.error('Missing required Twilio credentials:', {
         accountSid: !!accountSid,
-        apiKey: !!apiKey,
-        apiSecret: !!apiSecret,
-        twimlAppSid: !!twimlAppSid
+        authToken: !!authToken
       });
       throw new Error('Missing required Twilio credentials');
     }
@@ -44,18 +40,18 @@ serve(async (req) => {
     
     console.log("Creating token for identity:", identity);
 
-    // Create an access token
+    // Create an access token using Twilio client
+    const client = twilio(accountSid, authToken);
     const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
 
     // Create a Voice grant for this token
     const voiceGrant = new VoiceGrant({
-      outgoingApplicationSid: twimlAppSid,
       incomingAllow: true,
     });
 
     // Create an access token which we will sign and return to the client
-    const token = new AccessToken(accountSid, apiKey, apiSecret, { identity });
+    const token = new AccessToken(accountSid, accountSid, authToken, { identity });
     token.addGrant(voiceGrant);
 
     // Generate the token and send it back
