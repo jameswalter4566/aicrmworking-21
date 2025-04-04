@@ -133,7 +133,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       console.log("Creating new Twilio device with token");
       const newDevice = new Device(token, {
-        codecPreferences: ['pcmu', 'opus'],
         maxAverageBitrate: 16000,
         forceAggressiveIceNomination: true
       });
