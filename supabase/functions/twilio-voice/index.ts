@@ -7,12 +7,17 @@ import twilio from 'https://esm.sh/twilio@4.23.0'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+  'Access-Control-Max-Age': '86400', // 24 hours cache for preflight requests
 }
 
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { 
+      status: 204, 
+      headers: corsHeaders 
+    })
   }
 
   try {
@@ -23,6 +28,8 @@ serve(async (req) => {
     const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY')
     const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET')
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
+
+    console.log("Environment variables loaded, checking for required credentials...")
 
     // Validate credentials are present
     const missingCredentials = []
@@ -45,7 +52,17 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const requestData = await req.json()
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      console.error("Failed to parse request body:", e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid request body' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
     const { action, phoneNumber, callbackUrl, callSid } = requestData
     console.log(`Processing action: ${action}`)
 
@@ -150,6 +167,8 @@ serve(async (req) => {
       }
 
       case 'generateToken': {
+        console.log("Generating token - checking credentials...")
+        
         const tokenCredentialsMissing = []
         if (!TWILIO_API_KEY) tokenCredentialsMissing.push('TWILIO_API_KEY')
         if (!TWILIO_API_SECRET) tokenCredentialsMissing.push('TWILIO_API_SECRET')
@@ -167,7 +186,7 @@ serve(async (req) => {
           )
         }
 
-        console.log("Generating Twilio Client token")
+        console.log("All credentials present, generating Twilio Client token")
         
         // Create a unique ID for this client
         const identity = crypto.randomUUID()

@@ -21,18 +21,28 @@ const loadTwilioScript = async () => {
 
   console.log("Loading Twilio script...");
   return new Promise<any>((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://sdk.twilio.com/js/client/v1.14/twilio.min.js';
-    script.async = true;
-    script.onload = () => {
-      console.log("Twilio script loaded successfully");
-      resolve((window as any).Twilio);
-    };
-    script.onerror = () => {
-      console.error("Failed to load Twilio script");
-      reject(new Error('Failed to load Twilio script'));
-    };
-    document.body.appendChild(script);
+    try {
+      const script = document.createElement('script');
+      script.src = 'https://sdk.twilio.com/js/client/v1.14/twilio.min.js';
+      script.async = true;
+      script.onload = () => {
+        console.log("Twilio script loaded successfully");
+        if (!(window as any).Twilio) {
+          console.error("Twilio not found in window even after script load");
+          reject(new Error('Twilio not found in window after script load'));
+          return;
+        }
+        resolve((window as any).Twilio);
+      };
+      script.onerror = (e) => {
+        console.error("Failed to load Twilio script", e);
+        reject(new Error('Failed to load Twilio script'));
+      };
+      document.body.appendChild(script);
+    } catch (error) {
+      console.error("Error during Twilio script loading:", error);
+      reject(error);
+    }
   });
 };
 
@@ -58,6 +68,21 @@ const initializeTwilioDevice = async () => {
   try {
     console.log("Starting Twilio device initialization...");
     
+    // Load Twilio script first - this needs to happen before anything else
+    const Twilio = await loadTwilioScript();
+    
+    if (!Twilio) {
+      console.error("Failed to load Twilio script");
+      throw new Error('Failed to load Twilio script');
+    }
+    
+    if (!Twilio.Device) {
+      console.error("Twilio.Device is not available");
+      throw new Error('Twilio Device not available');
+    }
+    
+    console.log("Twilio script loaded successfully, now generating token");
+    
     // Generate token from our edge function
     const { data, error } = await supabase.functions.invoke('twilio-voice', {
       body: { action: 'generateToken' },
@@ -74,14 +99,6 @@ const initializeTwilioDevice = async () => {
     }
 
     console.log("Successfully obtained Twilio token");
-    
-    // Load Twilio script
-    const Twilio = await loadTwilioScript();
-    
-    if (!Twilio || !Twilio.Device) {
-      console.error("Twilio or Twilio.Device is not available");
-      throw new Error('Twilio Device not available');
-    }
     
     // Create Twilio device
     twilioDevice = new Twilio.Device();
