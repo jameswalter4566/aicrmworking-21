@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'https://esm.sh/twilio@4.23.0'
 
-// CORS headers for browser requests
+// CORS headers for browser requests - properly configured for preflight requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -12,12 +12,12 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight requests - this is critical for browser API calls to work
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
-      status: 204, 
-      headers: corsHeaders 
-    })
+      headers: corsHeaders,
+      status: 204 // No Content is the correct response for OPTIONS preflight
+    });
   }
 
   try {
