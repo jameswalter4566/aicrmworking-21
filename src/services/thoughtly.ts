@@ -13,6 +13,8 @@ export interface ThoughtlyContact {
   tags?: string[];
   countryCode?: string;
   avatar?: string;  // Avatar property is now included in the interface
+  mailingAddress?: string;
+  propertyAddress?: string;
 }
 
 // Utility function to strip phone number of all non-numeric characters
@@ -23,7 +25,7 @@ function stripPhoneNumber(phoneNumber?: string): string {
 
 export const thoughtlyService = {
   /**
-   * Create a single contact in Thoughtly
+   * Create a single contact in Supabase
    * @param contact The contact data to create
    * @returns The created contact data
    */
@@ -38,7 +40,7 @@ export const thoughtlyService = {
       });
 
       if (error) {
-        console.error('Error creating Thoughtly contact:', error);
+        console.error('Error creating contact:', error);
         throw error;
       }
 
@@ -50,7 +52,7 @@ export const thoughtlyService = {
   },
 
   /**
-   * Create multiple contacts in Thoughtly
+   * Create multiple contacts in Supabase
    * @param contacts Array of contacts to create
    * @returns Summary of successful and failed imports
    */
@@ -65,7 +67,7 @@ export const thoughtlyService = {
       });
 
       if (error) {
-        console.error('Error creating bulk Thoughtly contacts:', error);
+        console.error('Error creating bulk contacts:', error);
         throw error;
       }
 
@@ -77,9 +79,9 @@ export const thoughtlyService = {
   },
 
   /**
-   * Get contacts from Thoughtly
+   * Get contacts from Supabase
    * @param params Optional search parameters
-   * @returns Array of contacts from Thoughtly
+   * @returns Array of contacts from Supabase
    */
   async getContacts(params?: {
     search?: string;
@@ -92,36 +94,8 @@ export const thoughtlyService = {
     limit?: number;
   }) {
     try {
-      // Convert params to URLSearchParams if provided
-      const urlParams = new URLSearchParams();
-      if (params) {
-        Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined) {
-            if (Array.isArray(value)) {
-              // Handle arrays like tags
-              value.forEach(item => urlParams.append(key, item));
-            } else {
-              urlParams.append(key, String(value));
-            }
-          }
-        });
-      }
-
-      // Build the querystring
-      const queryString = urlParams.toString() 
-        ? `?${urlParams.toString()}`
-        : '';
-
-      const { data, error } = await supabase.functions.invoke(`thoughtly-contacts${queryString}`, {
-        method: 'GET'
-      });
-
-      if (error) {
-        console.error('Error fetching Thoughtly contacts:', error);
-        throw error;
-      }
-
-      return data;
+      // We'll implement this via retrieve-leads instead
+      return this.retrieveLeads();
     } catch (error) {
       console.error('Error in getContacts:', error);
       throw error;
@@ -129,51 +103,22 @@ export const thoughtlyService = {
   },
 
   /**
-   * Sync local leads data with Thoughtly contacts
+   * Sync local leads data with Supabase contacts
    * @param leads Local leads data to sync
    * @returns Array of synced leads
    */
   async syncLeads(leads: ThoughtlyContact[]) {
     try {
-      // First get all contacts from Thoughtly
-      const existingContacts = await this.getContacts({
-        limit: 100 // Adjust as needed
-      });
-      
-      // Create a map of existing contacts by ID for easy lookup
-      const contactMap = new Map();
-      if (existingContacts?.success && existingContacts?.data) {
-        existingContacts.data.forEach(contact => {
-          if (contact.attributes?.id) {
-            contactMap.set(contact.attributes.id, contact);
-          }
-        });
-      }
-
-      // Filter out leads that already exist in Thoughtly
-      const newLeads = leads.filter(lead => !contactMap.has(String(lead.id)));
-      
-      if (newLeads.length === 0) {
-        // No new leads to add
-        return {
-          success: true,
-          message: "All leads already exist in Thoughtly",
-          data: existingContacts?.data || []
-        };
-      }
-
-      // Add any new leads to Thoughtly using the store-leads function
-      const result = await this.createBulkContacts(newLeads);
+      // Store all leads using bulk contacts
+      const result = await this.createBulkContacts(leads);
       
       // Return the updated list of contacts
-      const updatedContacts = await this.getContacts({
-        limit: 100 // Adjust as needed
-      });
+      const updatedContacts = await this.retrieveLeads();
       
       return {
         success: true,
         imported: result,
-        data: updatedContacts?.data || []
+        data: updatedContacts || []
       };
     } catch (error) {
       console.error('Error syncing leads:', error);
@@ -182,12 +127,12 @@ export const thoughtlyService = {
   },
   
   /**
-   * Retrieve leads from all available sources via the retrieve-leads edge function
+   * Retrieve leads from Supabase via the retrieve-leads edge function
    * @returns Array of leads from all sources
    */
   async retrieveLeads() {
     try {
-      console.log('Retrieving leads from all sources');
+      console.log('Retrieving leads from Supabase');
       
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { source: 'all' }
@@ -203,34 +148,8 @@ export const thoughtlyService = {
         throw new Error(data.error || 'Failed to retrieve leads');
       }
       
-      // Map the retrieved leads to the expected format
-      const mappedLeads = Array.isArray(data.data) 
-        ? data.data.map((contact: any) => {
-            let firstName = '', lastName = '';
-            if (contact.name) {
-              const nameParts = contact.name.split(' ');
-              firstName = nameParts[0] || '';
-              lastName = nameParts.slice(1).join(' ') || '';
-            }
-
-            return {
-              id: contact.attributes?.id ? Number(contact.attributes.id) : Date.now(),
-              firstName: contact.attributes?.firstName || firstName,
-              lastName: contact.attributes?.lastName || lastName,
-              email: contact.email || '',
-              phone1: contact.phone_number || '',
-              phone2: contact.attributes?.phone2 || '',
-              disposition: contact.attributes?.disposition || 'Not Contacted',
-              avatar: contact.attributes?.avatar || '',
-              tags: contact.tags || [],
-              countryCode: contact.country_code || 'US'
-            } as ThoughtlyContact;
-          })
-        : [];
-      
-      console.log(`Retrieved and mapped ${mappedLeads.length} leads`);
-      
-      return mappedLeads;
+      // Return the leads as they come from our retrieve function
+      return data.data || [];
     } catch (error) {
       console.error('Error in retrieveLeads:', error);
       throw error;

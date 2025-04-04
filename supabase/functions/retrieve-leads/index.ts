@@ -14,10 +14,6 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Get thoughtly API credentials from env
-const thoughtlyApiToken = Deno.env.get('THOUGHTLY_API_TOKEN') || '';
-const thoughtlyTeamId = Deno.env.get('THOUGHTLY_TEAM_ID') || '';
-
 // Main function to handle requests
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -26,22 +22,11 @@ Deno.serve(async (req) => {
   }
   
   try {
-    const { source } = await req.json();
+    const { source } = await req.json() || { source: 'all' };
     console.log(`Retrieving leads from source: ${source || 'all'}`);
     
-    let leads = [];
-    
-    // Fetch leads based on the requested source
-    if (!source || source === 'all' || source === 'thoughtly') {
-      const thoughtlyLeads = await fetchThoughtlyLeads();
-      leads = [...leads, ...thoughtlyLeads];
-    }
-    
-    // In the future, you can add more sources here:
-    // if (!source || source === 'all' || source === 'crm') {
-    //   const crmLeads = await fetchCRMLeads();
-    //   leads = [...leads, ...crmLeads];
-    // }
+    // Fetch leads from Supabase
+    const leads = await fetchLeadsFromSupabase();
     
     console.log(`Successfully retrieved ${leads.length} leads`);
     
@@ -71,35 +56,41 @@ Deno.serve(async (req) => {
   }
 });
 
-// Function to fetch leads from Thoughtly
-async function fetchThoughtlyLeads() {
-  if (!thoughtlyApiToken || !thoughtlyTeamId) {
-    console.warn('Thoughtly API credentials not found in environment variables');
-    return [];
-  }
-  
+// Function to fetch leads from Supabase
+async function fetchLeadsFromSupabase() {
   try {
-    const url = `https://api.thoughtly.ai/v1/teams/${thoughtlyTeamId}/contacts`;
+    // Query the leads table in Supabase
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false });
     
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${thoughtlyApiToken}`
-      }
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to fetch from Thoughtly: ${response.status} - ${errorText}`);
+    if (error) {
+      throw new Error(`Failed to fetch leads from Supabase: ${error.message}`);
     }
     
-    const data = await response.json();
-    console.log(`Retrieved ${data.data?.length || 0} leads from Thoughtly`);
+    // Transform the data to match the expected format
+    const transformedLeads = data.map(lead => ({
+      id: lead.id,
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      email: lead.email,
+      phone1: lead.phone1,
+      phone2: lead.phone2,
+      disposition: lead.disposition,
+      avatar: lead.avatar,
+      mailingAddress: lead.mailing_address,
+      propertyAddress: lead.property_address,
+      tags: lead.tags,
+      createdAt: lead.created_at,
+      updatedAt: lead.updated_at
+    }));
     
-    return data.data || [];
+    console.log(`Retrieved ${transformedLeads.length} leads from Supabase`);
+    
+    return transformedLeads;
   } catch (error) {
-    console.error(`Error fetching from Thoughtly API: ${error.message}`);
+    console.error(`Error fetching leads from Supabase: ${error.message}`);
     return [];
   }
 }

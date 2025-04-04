@@ -14,10 +14,6 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Get thoughtly API credentials from env
-const thoughtlyApiToken = Deno.env.get('THOUGHTLY_API_TOKEN') || '';
-const thoughtlyTeamId = Deno.env.get('THOUGHTLY_TEAM_ID') || '';
-
 // Main function to handle requests
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -34,8 +30,8 @@ Deno.serve(async (req) => {
     
     console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'}`);
     
-    // Store leads in Thoughtly (our current storage system)
-    const result = await storeLeadsInThoughtly(leads);
+    // Store leads directly in Supabase
+    const result = await storeLeadsInSupabase(leads);
     
     return new Response(
       JSON.stringify({ 
@@ -64,53 +60,43 @@ Deno.serve(async (req) => {
   }
 });
 
-// Function to store leads in Thoughtly
-async function storeLeadsInThoughtly(leads) {
-  if (!thoughtlyApiToken || !thoughtlyTeamId) {
-    throw new Error('Thoughtly API credentials not found in environment variables');
-  }
-  
+// Function to store leads in Supabase
+async function storeLeadsInSupabase(leads) {
   try {
-    // Process the leads to ensure they have the correct format for Thoughtly
+    // Process the leads to ensure they have the correct format for our database
     const processedLeads = leads.map(lead => ({
-      firstName: lead.firstName || '',
-      lastName: lead.lastName || '',
+      id: lead.id || Date.now(),
+      first_name: lead.firstName || '',
+      last_name: lead.lastName || '',
       email: lead.email || '',
-      phone_number: lead.phone1 || '', // Map to Thoughtly's phone_number field
+      phone1: lead.phone1 || '',
+      phone2: lead.phone2 || '',
+      disposition: lead.disposition || 'Not Contacted',
+      avatar: lead.avatar || '',
+      mailing_address: lead.mailingAddress || '',
+      property_address: lead.propertyAddress || '',
       tags: lead.tags || [],
-      attributes: {
-        id: lead.id || Date.now(),
-        firstName: lead.firstName || '',
-        lastName: lead.lastName || '',
-        phone2: lead.phone2 || '',
-        disposition: lead.disposition || 'Not Contacted',
-        avatar: lead.avatar || '',
-      },
-      country_code: lead.countryCode || 'US'
+      created_at: new Date(),
+      updated_at: new Date()
     }));
     
-    const url = `https://api.thoughtly.ai/v1/teams/${thoughtlyTeamId}/contacts/bulk`;
+    // Insert leads into the leads table in Supabase
+    const { data, error } = await supabase
+      .from('leads')
+      .upsert(processedLeads, { 
+        onConflict: 'id',
+        ignoreDuplicates: false
+      });
     
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${thoughtlyApiToken}`
-      },
-      body: JSON.stringify(processedLeads)
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to store leads in Thoughtly: ${response.status} - ${errorText}`);
+    if (error) {
+      throw new Error(`Failed to store leads in Supabase: ${error.message}`);
     }
     
-    const data = await response.json();
-    console.log(`Successfully stored ${processedLeads.length} leads in Thoughtly`);
+    console.log(`Successfully stored ${processedLeads.length} leads in Supabase`);
     
-    return data;
+    return data || processedLeads;
   } catch (error) {
-    console.error(`Error storing leads in Thoughtly API: ${error.message}`);
+    console.error(`Error storing leads in Supabase: ${error.message}`);
     throw error;
   }
 }
