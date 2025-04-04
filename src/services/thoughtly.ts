@@ -29,22 +29,11 @@ export const thoughtlyService = {
    */
   async createContact(contact: ThoughtlyContact) {
     try {
-      // Ensure there are no duplicate tags
-      if (contact.tags) {
-        contact.tags = [...new Set(contact.tags)];
-      }
-      
-      // Process phone numbers to ensure they're in the correct format
-      const processedContact = {
-        ...contact,
-        phone1: stripPhoneNumber(contact.phone1),
-        phone2: stripPhoneNumber(contact.phone2)
-      };
-
-      const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
+      // Store the contact using the store-leads edge function
+      const { data, error } = await supabase.functions.invoke('store-leads', {
         body: {
-          action: 'createContact',
-          contacts: processedContact
+          leads: [contact],
+          leadType: 'single'
         }
       });
 
@@ -67,18 +56,11 @@ export const thoughtlyService = {
    */
   async createBulkContacts(contacts: ThoughtlyContact[]) {
     try {
-      // Pre-process all contacts to ensure phone numbers are correctly formatted
-      const processedContacts = contacts.map(contact => ({
-        ...contact,
-        phone1: stripPhoneNumber(contact.phone1),
-        phone2: stripPhoneNumber(contact.phone2),
-        tags: contact.tags ? [...new Set(contact.tags)] : []
-      }));
-
-      const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
+      // Store the contacts using the store-leads edge function
+      const { data, error } = await supabase.functions.invoke('store-leads', {
         body: {
-          action: 'createContact',
-          contacts: processedContacts
+          leads: contacts,
+          leadType: 'bulk'
         }
       });
 
@@ -180,7 +162,7 @@ export const thoughtlyService = {
         };
       }
 
-      // Add any new leads to Thoughtly
+      // Add any new leads to Thoughtly using the store-leads function
       const result = await this.createBulkContacts(newLeads);
       
       // Return the updated list of contacts

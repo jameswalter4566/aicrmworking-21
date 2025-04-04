@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,6 +151,21 @@ const People = () => {
     },
   });
 
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        const fetchedLeads = await thoughtlyService.retrieveLeads();
+        if (fetchedLeads && fetchedLeads.length > 0) {
+          setLeads(fetchedLeads);
+        }
+      } catch (error) {
+        console.error("Error fetching leads:", error);
+      }
+    };
+
+    fetchLeads();
+  }, []);
+
   const filteredLeads = leads.filter(lead => {
     if (activeDisposition === "All Leads") return true;
     return lead.disposition === activeDisposition;
@@ -230,15 +245,23 @@ const People = () => {
     }
   };
 
-  const onSubmit = (data: LeadFormValues) => {
+  const onSubmit = async (data: LeadFormValues) => {
     const newLead = {
-      id: leads.length > 0 ? Math.max(...leads.map(lead => lead.id)) + 1 : 1,
+      id: leads.length > 0 ? Math.max(...leads.map(lead => lead.id || 0)) + 1 : 1,
       ...data,
       avatar: "",
     };
-    setLeads([...leads, newLead]);
-    setIsAddLeadOpen(false);
-    form.reset();
+
+    try {
+      await thoughtlyService.createContact(newLead);
+      
+      setLeads([...leads, newLead]);
+      setIsAddLeadOpen(false);
+      form.reset();
+    } catch (error) {
+      console.error("Failed to add lead:", error);
+      toast.error("Failed to add lead. Please try again.");
+    }
   };
 
   const handlePropertyAddressChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -247,13 +270,20 @@ const People = () => {
     }
   };
 
-  const handleImportComplete = (importedLeads: any[]) => {
+  const handleImportComplete = async (importedLeads: any[]) => {
     if (importedLeads.length > 0) {
-      setLeads(prevLeads => [...prevLeads, ...importedLeads]);
-      toast.success(`Successfully imported ${importedLeads.length} leads`);
-      setTimeout(() => {
-        setIsImportOpen(false);
-      }, 1500);
+      try {
+        await thoughtlyService.createBulkContacts(importedLeads);
+        
+        setLeads(prevLeads => [...prevLeads, ...importedLeads]);
+        toast.success(`Successfully imported ${importedLeads.length} leads`);
+        setTimeout(() => {
+          setIsImportOpen(false);
+        }, 1500);
+      } catch (error) {
+        console.error("Failed to import leads:", error);
+        toast.error("Failed to import leads. Please try again.");
+      }
     } else {
       toast.error("No valid leads found in the file");
     }
