@@ -266,14 +266,14 @@ const PowerDialer = () => {
             toast({
               title: "Line Busy",
               description: `${leads.find(l => l.id === leadId)?.firstName}'s line is busy`,
-              variant: "warning",
+              variant: "destructive",
             });
             break;
           case "no-answer":
             toast({
               title: "No Answer",
               description: `${leads.find(l => l.id === leadId)?.firstName} did not answer`,
-              variant: "warning",
+              variant: "destructive",
             });
             break;
           default:

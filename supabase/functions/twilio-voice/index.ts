@@ -1,6 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
+import twilio from 'https://esm.sh/twilio@4.23.0'
 
 // CORS headers for browser requests
 const corsHeaders = {
@@ -19,6 +20,9 @@ serve(async (req) => {
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
+    const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY')
+    const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET')
+    const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
 
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
       return new Response(
@@ -27,7 +31,7 @@ serve(async (req) => {
       )
     }
 
-    const { action, phoneNumber, callbackUrl } = await req.json()
+    const { action, phoneNumber, callbackUrl, callSid } = await req.json()
 
     switch (action) {
       case 'makeCall': {
@@ -42,9 +46,6 @@ serve(async (req) => {
           <Response>
             <Say>Hello, this is a call from the CRM system.</Say>
             <Pause length="1"/>
-            <Connect>
-              <Stream url="wss://${callbackUrl}"/>
-            </Connect>
           </Response>
         `
 
@@ -71,8 +72,6 @@ serve(async (req) => {
       }
 
       case 'getCallStatus': {
-        const { callSid } = await req.json()
-        
         if (!callSid) {
           throw new Error('Call SID is required')
         }
@@ -95,11 +94,43 @@ serve(async (req) => {
       }
 
       case 'generateToken': {
-        // Generate a token for Twilio Client - in a production app this would be more sophisticated
+        if (!TWILIO_API_KEY || !TWILIO_API_SECRET || !TWILIO_TWIML_APP_SID) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Missing required Twilio credentials for token generation',
+              missingCredentials: {
+                apiKey: !TWILIO_API_KEY,
+                apiSecret: !TWILIO_API_SECRET,
+                twimlAppSid: !TWILIO_TWIML_APP_SID
+              }
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // Create a unique ID for this client
         const identity = crypto.randomUUID()
         
+        // Create JWT token for Twilio Client
+        const AccessToken = twilio.jwt.AccessToken
+        const VoiceGrant = AccessToken.VoiceGrant
+
+        const accessToken = new AccessToken(
+          TWILIO_ACCOUNT_SID,
+          TWILIO_API_KEY,
+          TWILIO_API_SECRET,
+          { identity }
+        )
+
+        const voiceGrant = new VoiceGrant({
+          outgoingApplicationSid: TWILIO_TWIML_APP_SID,
+          incomingAllow: true
+        })
+
+        accessToken.addGrant(voiceGrant)
+        
         return new Response(
-          JSON.stringify({ token: identity }),
+          JSON.stringify({ token: accessToken.toJwt() }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
@@ -108,6 +139,7 @@ serve(async (req) => {
         throw new Error('Invalid action')
     }
   } catch (error) {
+    console.error('Twilio Voice Function Error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
