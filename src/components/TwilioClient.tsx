@@ -95,11 +95,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       const newDevice = new Device(data.token, {
         codecPreferences: ['opus', 'pcmu'] as any[],
         disableAudioContextSounds: false,
-        maxAverageBitrate: 16000,
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
-        ]
+        maxAverageBitrate: 16000
       });
 
       errorNotifiedRef.current = false;
