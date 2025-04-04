@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    // Get Twilio credentials from environment - only use the essential ones
+    // Get Twilio credentials from environment
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const applicationSid = Deno.env.get('TWILIO_TWIML_APP_SID');

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -94,6 +95,21 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         } catch (e) {
           console.warn("Error destroying existing device:", e);
         }
+      }
+
+      // Try to initialize audio context first to address user gesture issues
+      try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+          const audioContext = new AudioContext();
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+          }
+          console.log("AudioContext initialized successfully:", audioContext.state);
+        }
+      } catch (audioError) {
+        console.warn("Could not initialize AudioContext:", audioError);
+        // Continue anyway, as Device will try to initialize it internally
       }
 
       console.log("Creating new Twilio device with token");
