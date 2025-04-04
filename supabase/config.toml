@@ -3,18 +3,9 @@ project_id = "imrmboyczebjlbnkgjns"
 
 [functions.twilio-token]
 verify_jwt = false
-# Add environment variables here
-[functions.twilio-token.environment]
-TWILIO_ACCOUNT_SID = ""
-TWILIO_AUTH_TOKEN = ""
 
 [functions.twilio-dial]
 verify_jwt = false
-# Add environment variables here
-[functions.twilio-dial.environment]
-TWILIO_ACCOUNT_SID = ""
-TWILIO_AUTH_TOKEN = ""
-TWILIO_PHONE_NUMBER = ""
 
 [functions.twilio-status]
 verify_jwt = false
