@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Device } from "@twilio/voice-sdk";
+import { Device, Call } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,7 @@ declare global {
       device: Device | null;
       connection: any;
       status: string;
-      makeCall: (number: string) => Promise<void>;
+      makeCall: (number: string) => Promise<Call | void>;
       hangupCall: () => void;
       setupDevice: () => Promise<void>;
       isReady: () => boolean;
@@ -139,16 +138,15 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       console.log("Creating new Twilio device with token");
       
-      // Create device with proper options according to Twilio docs
       const newDevice = new Device(token, {
-        maxAverageBitrate: 16000, // Control bandwidth for voice quality
-        forceAggressiveIceNomination: true, // Helps reduce call connect time
-        edge: ['ashburn', 'tokyo', 'sydney'], // Using array for auto-fallback functionality
-        enableImprovedSignalingErrorPrecision: true, // Better error reporting
-        closeProtection: true, // Prevent accidental page close during active call
-        codecPreferences: ["opus", "pcmu"], // Prefer opus codec for better quality
-        appName: "PowerDialer", // Improves logging in Insights
-        appVersion: "1.0.0" // For versioning in logs
+        maxAverageBitrate: 16000,
+        forceAggressiveIceNomination: true,
+        edge: ['ashburn', 'tokyo', 'sydney'],
+        enableImprovedSignalingErrorPrecision: true,
+        closeProtection: true,
+        codecPreferences: ["opus", "pcmu"] as any,
+        appName: "PowerDialer",
+        appVersion: "1.0.0"
       });
 
       deviceRef.current = newDevice;
@@ -274,7 +272,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   }, [device, status, isInitializing, audioContextInitialized, fetchToken, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
 
   const makeCall = useCallback(
-    async (phoneNumber: string) => {
+    async (phoneNumber: string): Promise<Call | void> => {
       try {
         let currentDevice = deviceRef.current;
         
@@ -286,16 +284,12 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
           throw new Error("Phone device is not ready. Try again.");
         }
 
-        // This implementation follows Twilio's recommended approach for initiating calls
-        // We're using the device.connect() method with params object to pass the To parameter
         const call = await currentDevice.connect({
           params: { 
             To: phoneNumber 
           }
         });
         
-        // The call is now initiated via the device.connect() method
-        // We'll track this call in our state
         setConnection(call);
         
         toast({
@@ -360,7 +354,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     }
   }, [fetchToken, audioContextInitialized, setupDeviceAfterInteraction]);
 
-  // Listen for the tokenWillExpire event and automatically refresh the token
   useEffect(() => {
     if (device) {
       const handleTokenWillExpire = async () => {
