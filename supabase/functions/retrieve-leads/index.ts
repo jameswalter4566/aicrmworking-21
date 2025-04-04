@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
     const { source } = await req.json() || { source: 'all' };
     console.log(`Retrieving leads from source: ${source || 'all'}`);
     
-    // Fetch leads from Supabase
+    // Fetch leads from Supabase database directly
     const leads = await fetchLeadsFromSupabase();
     
     console.log(`Successfully retrieved ${leads.length} leads`);
@@ -66,7 +66,7 @@ async function fetchLeadsFromSupabase() {
       .order('created_at', { ascending: false });
     
     if (error) {
-      throw new Error(`Failed to fetch leads from Supabase: ${error.message}`);
+      throw new Error(`Failed to fetch leads from Supabase database: ${error.message}`);
     }
     
     // Transform the data to match the expected format
@@ -86,11 +86,11 @@ async function fetchLeadsFromSupabase() {
       updatedAt: lead.updated_at
     }));
     
-    console.log(`Retrieved ${transformedLeads.length} leads from Supabase`);
+    console.log(`Retrieved ${transformedLeads.length} leads from Supabase database`);
     
     return transformedLeads;
   } catch (error) {
-    console.error(`Error fetching leads from Supabase: ${error.message}`);
+    console.error(`Error fetching leads from Supabase database: ${error.message}`);
     return [];
   }
 }

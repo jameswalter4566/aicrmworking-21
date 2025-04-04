@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
     
     console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'}`);
     
-    // Store leads directly in Supabase
+    // Store leads directly in Supabase database
     const result = await storeLeadsInSupabase(leads);
     
     return new Response(
@@ -76,11 +76,11 @@ async function storeLeadsInSupabase(leads) {
       mailing_address: lead.mailingAddress || '',
       property_address: lead.propertyAddress || '',
       tags: lead.tags || [],
-      created_at: new Date(),
-      updated_at: new Date()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     }));
     
-    // Insert leads into the leads table in Supabase
+    // Insert leads into the leads table in Supabase database
     const { data, error } = await supabase
       .from('leads')
       .upsert(processedLeads, { 
@@ -89,14 +89,14 @@ async function storeLeadsInSupabase(leads) {
       });
     
     if (error) {
-      throw new Error(`Failed to store leads in Supabase: ${error.message}`);
+      throw new Error(`Failed to store leads in Supabase database: ${error.message}`);
     }
     
-    console.log(`Successfully stored ${processedLeads.length} leads in Supabase`);
+    console.log(`Successfully stored ${processedLeads.length} leads in Supabase database`);
     
     return data || processedLeads;
   } catch (error) {
-    console.error(`Error storing leads in Supabase: ${error.message}`);
+    console.error(`Error storing leads in Supabase database: ${error.message}`);
     throw error;
   }
 }
