@@ -38,76 +38,43 @@ serve(async (req) => {
     
     console.log("Creating token for identity:", identity);
 
-    // Determine which token approach to use based on the available Twilio modules
-    const hasAccessToken = !!(twilio.jwt && twilio.jwt.AccessToken);
+    // Use ClientCapability consistently (avoiding AccessToken approach)
+    const ClientCapability = twilio.jwt.ClientCapability;
     
-    let token;
+    // Create a capability token with the correct account credentials
+    const capability = new ClientCapability({
+      accountSid: accountSid,
+      authToken: authToken,
+      ttl: 3600 // Token time-to-live in seconds (1 hour)
+    });
     
-    if (hasAccessToken) {
-      // Use AccessToken (modern approach)
-      const AccessToken = twilio.jwt.AccessToken;
-      const VoiceGrant = AccessToken.VoiceGrant;
-
-      // Create an access token with a TTL of 1 hour (3600 seconds)
-      const accessToken = new AccessToken(
-        accountSid,
-        applicationSid || 'AP00000000000000000000000000000000', // API key sid or app sid
-        authToken, // API key secret or auth token
-        { identity: identity, ttl: 3600 }
-      );
-
-      // Create a Voice grant for this token
-      const voiceGrant = new VoiceGrant({
-        outgoingApplicationSid: applicationSid,
-        incomingAllow: true
-      });
-
-      // Add the grant to the token
-      accessToken.addGrant(voiceGrant);
-      
-      // Generate the token
-      token = accessToken.toJwt();
-      
-      console.log("Created AccessToken for:", identity, "length:", token.length);
+    // Allow incoming calls - use the identity as the client name
+    capability.addScope(new ClientCapability.IncomingClientScope(identity));
+    
+    // Allow outgoing calls if we have an applicationSid
+    if (applicationSid) {
+      capability.addScope(new ClientCapability.OutgoingClientScope({
+        applicationSid: applicationSid,
+        clientName: identity,
+        params: {
+          identity: identity
+        }
+      }));
     } else {
-      // Fallback to ClientCapability (older approach)
-      const ClientCapability = twilio.jwt.ClientCapability;
-      
-      // Create a capability token with the correct account credentials
-      const capability = new ClientCapability({
-        accountSid: accountSid,
-        authToken: authToken,
-        ttl: 3600 // Token time-to-live in seconds (1 hour)
-      });
-      
-      // Allow incoming calls - use the identity as the client name
-      capability.addScope(new ClientCapability.IncomingClientScope(identity));
-      
-      // Allow outgoing calls if we have an applicationSid
-      if (applicationSid) {
-        capability.addScope(new ClientCapability.OutgoingClientScope({
-          applicationSid: applicationSid,
-          clientName: identity,
-          params: {
-            identity: identity
-          }
-        }));
-      } else {
-        console.warn("No TWILIO_TWIML_APP_SID provided. Outgoing calls will not work.");
-      }
-
-      // Generate the token
-      token = capability.toJwt();
-      
-      console.log("Created ClientCapability token for:", identity, "length:", token.length);
+      console.warn("No TWILIO_TWIML_APP_SID provided. Outgoing calls will not work.");
     }
+
+    // Generate the token
+    const token = capability.toJwt();
+    
+    console.log("Created ClientCapability token for:", identity, "length:", token.length);
 
     // Return the token and identity
     return new Response(
       JSON.stringify({
         token: token,
         identity: identity,
-        tokenType: hasAccessToken ? "AccessToken" : "ClientCapability"
+        tokenType: "ClientCapability"
       }),
       { headers: { ...corsHeaders } }
     );
