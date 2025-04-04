@@ -233,7 +233,8 @@ const People = () => {
   const onSubmit = (data: LeadFormValues) => {
     const newLead = {
       id: leads.length > 0 ? Math.max(...leads.map(lead => lead.id)) + 1 : 1,
-      ...data
+      ...data,
+      avatar: "",
     };
     setLeads([...leads, newLead]);
     setIsAddLeadOpen(false);

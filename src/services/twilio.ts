@@ -2,8 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imltcm1ib3ljemViamxibmtnam5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2Njg1MDQsImV4cCI6MjA1OTI0NDUwNH0.scafe8itFDyN5mFcCiyS1uugV5-7s9xhaKoqYuXGJwQ";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Import twilio client using dynamic import to prevent prototype errors
@@ -18,8 +18,21 @@ let activeConnection: any = null;
 // Load the Twilio Device class dynamically
 const loadTwilioDevice = async () => {
   try {
-    const twilioModule = await import('twilio-client');
+    // Use dynamic import with a fallback to window.Twilio
+    const twilioModule = await import('twilio-client').catch(() => {
+      if ((window as any).Twilio && (window as any).Twilio.Device) {
+        return { Device: (window as any).Twilio.Device };
+      }
+      throw new Error('Twilio Device not found');
+    });
+    
     Device = twilioModule.Device;
+    
+    // Ensure Device is a valid constructor
+    if (typeof Device !== 'function') {
+      throw new Error('Invalid Twilio Device constructor');
+    }
+    
     return true;
   } catch (error) {
     console.error('Error loading Twilio client:', error);
