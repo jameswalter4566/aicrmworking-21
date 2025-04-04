@@ -18,7 +18,7 @@ const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o"
 const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f"
 
-// Utility function to format phone numbers - UPDATED
+// Utility function to strictly format phone numbers for API - UPDATED
 function formatPhoneNumber(phoneNumber) {
   if (!phoneNumber) return "";
   
@@ -222,7 +222,7 @@ async function createBulkContacts(contacts, apiToken, teamId) {
   // Process each contact sequentially to avoid rate limits
   for (const contact of contacts) {
     try {
-      // Make sure phone_number exists and is properly formatted
+      // Make sure phone_number exists and is properly formatted - UPDATED APPROACH
       const phone = formatPhoneNumber(contact.phone1 || contact.phone || "");
       
       if (!phone) {
@@ -258,7 +258,8 @@ async function createBulkContacts(contacts, apiToken, teamId) {
         attributes: attributes
       };
       
-      console.log(`Sending payload to Thoughtly for ${contact.firstName}:`, payload);
+      console.log(`Sending payload for ${contact.firstName} ${contact.lastName}:`);
+      console.log(`Phone: ${phone} (original: ${contact.phone1})`);
       
       const response = await fetch(`${THOUGHTLY_API_URL}/contact/create`, {
         method: 'POST',
