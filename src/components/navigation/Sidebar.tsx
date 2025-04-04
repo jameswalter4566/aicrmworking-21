@@ -138,7 +138,7 @@ const Sidebar = () => {
                 className={cn(
                   "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                   active 
-                    ? `bg-white text-crm-blue ${itemColors[index]}`
+                    ? itemColors[index]
                     : "text-white hover:text-white",
                   expanded ? "px-5" : "px-0 justify-center"
                 )}
@@ -160,7 +160,7 @@ const Sidebar = () => {
                 {expanded && (
                   <span className={cn(
                     "relative z-10", 
-                    active ? "text-crm-blue" : "text-white"
+                    active ? "text-white" : "text-white"
                   )}>
                     {item.name}
                   </span>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -153,18 +152,15 @@ const AIDialer = () => {
     fetchLeads();
   }, []);
   
-  // Updated function to use the new edge function
   const fetchLeads = async () => {
     setIsLoading(true);
     try {
-      // Use the new retrieveLeads method to get leads from all sources
       const retrievedLeads = await thoughtlyService.retrieveLeads();
       
       if (retrievedLeads && Array.isArray(retrievedLeads) && retrievedLeads.length > 0) {
         setLeads(retrievedLeads);
         console.log("Loaded leads from retrieve-leads function:", retrievedLeads);
       } else {
-        // Fallback to default leads if needed
         console.log("No leads retrieved, using default data");
         setLeads(defaultLeads);
       }
@@ -256,7 +252,7 @@ const AIDialer = () => {
       
       toast({
         title: "Import Successful",
-        description: `Successfully imported ${result.summary.successful} out of ${result.summary.total} leads to AI Dialer.`,
+        description: `Successfully imported ${result.summary?.successful || 0} out of ${result.summary?.total || leadsToImport.length} leads to Thoughtly's AI Dialer.`,
       });
       
       setIsImportDialogOpen(false);
@@ -264,7 +260,7 @@ const AIDialer = () => {
       console.error("Error importing leads to Thoughtly:", error);
       toast({
         title: "Import Failed",
-        description: "Failed to import leads to AI Dialer. See console for details.",
+        description: "Failed to import leads to Thoughtly. See console for details.",
         variant: "destructive"
       });
     } finally {
@@ -285,12 +281,12 @@ const AIDialer = () => {
       const result = await thoughtlyService.syncLeads(leadsWithIds);
       
       if (result?.data) {
-        const mappedLeads = result.data.map(mapThoughtlyContactToLead);
+        const mappedLeads = Array.isArray(result.data) ? result.data.map(mapThoughtlyContactToLead) : [];
         setLeads(mappedLeads);
         
         toast({
           title: "Leads Synced",
-          description: `Successfully imported and synced ${leadsWithIds.length} leads across all dialer services.`,
+          description: `Successfully imported and synced ${leadsWithIds.length} leads to Thoughtly's AI Dialer.`,
         });
       }
       
@@ -299,7 +295,7 @@ const AIDialer = () => {
       console.error("Error syncing imported leads:", error);
       toast({
         title: "Sync Failed",
-        description: "Failed to sync imported leads with the dialer service.",
+        description: "Failed to sync imported leads with Thoughtly's AI Dialer.",
         variant: "destructive"
       });
     }
