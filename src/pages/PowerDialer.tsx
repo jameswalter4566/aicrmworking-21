@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -870,5 +871,24 @@ const PowerDialer = () => {
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); initiateCall(lead.id); }}
                             disabled={callStatuses[lead.id] === "ready" || 
-                                     (isDialerActive && dialingMode === "power") || 
-                                     (activeLeadId
+                                    (isDialerActive && dialingMode === "power") || 
+                                    (activeLeadId !== null && activeLeadId !== lead.id)}
+                          >
+                            <Phone className="h-4 w-4 mr-2" />
+                            Call
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      </div>
+    </MainLayout>
+  );
+};
+
+export default PowerDialer;
