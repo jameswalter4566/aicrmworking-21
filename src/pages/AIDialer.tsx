@@ -16,12 +16,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -31,6 +32,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { twilioService } from "@/services/twilio";
+import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 
 const leadsData = [
   {
@@ -148,19 +150,55 @@ const AIDialer = () => {
     "I see they're interested in property in the downtown area.",
     "I'll try to schedule a meeting with our agent.",
   ]);
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
+
+  // Show import dialog when all leads are selected
+  useEffect(() => {
+    if (selectedLeads.length === leads.length && selectedLeads.length > 0) {
+      setIsImportDialogOpen(true);
+    }
+  }, [selectedLeads, leads.length]);
 
   const startDialSession = () => {
     setIsDialogOpen(true);
   };
 
-  const startDialing = () => {
+  const startDialing = async () => {
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
       : leads.map(lead => lead.id);
     
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
-    setIsDialing(true);
+    
+    try {
+      // Fetch contacts from Thoughtly before starting the dialing
+      const response = await thoughtlyService.getContacts({
+        limit: 50 // Adjust as needed
+      });
+      
+      if (response?.success && response?.data) {
+        setThoughtlyContacts(response.data);
+        toast({
+          title: "Contacts retrieved",
+          description: `Successfully loaded ${response.data.length} contacts from Thoughtly`,
+        });
+      }
+      
+      setIsDialing(true);
+      
+    } catch (error) {
+      console.error("Error fetching Thoughtly contacts:", error);
+      toast({
+        title: "Error",
+        description: "Failed to retrieve contacts from Thoughtly. Check console for details.",
+        variant: "destructive",
+      });
+      // Still allow dialing to start even if contact fetching fails
+      setIsDialing(true);
+    }
   };
 
   const handleSelectAllLeads = (checked: boolean) => {
@@ -168,14 +206,24 @@ const AIDialer = () => {
       setSelectedLeads(leads.map(lead => lead.id));
     } else {
       setSelectedLeads([]);
+      // Close the import dialog if it's open
+      setIsImportDialogOpen(false);
     }
   };
 
   const handleSelectLead = (leadId: number, checked: boolean) => {
     if (checked) {
-      setSelectedLeads(prev => [...prev, leadId]);
+      const newSelectedLeads = [...selectedLeads, leadId];
+      setSelectedLeads(newSelectedLeads);
+      
+      // Check if all leads are now selected
+      if (newSelectedLeads.length === leads.length) {
+        setIsImportDialogOpen(true);
+      }
     } else {
       setSelectedLeads(prev => prev.filter(id => id !== leadId));
+      // Close the import dialog if it was open
+      setIsImportDialogOpen(false);
     }
   };
 
@@ -192,6 +240,44 @@ const AIDialer = () => {
       title: "Session Ended",
       description: "AI dialing session has been terminated",
     });
+  };
+
+  const importLeadsToThoughtly = async () => {
+    if (selectedLeads.length === 0) return;
+    
+    setIsImporting(true);
+    
+    try {
+      // Get the selected leads data
+      const leadsToImport = leads.filter(lead => selectedLeads.includes(lead.id));
+      
+      // Convert to ThoughtlyContact format
+      const thoughtlyContacts: ThoughtlyContact[] = leadsToImport.map(lead => ({
+        ...lead,
+        countryCode: "US", // Default country code
+        tags: ["CRM Import"] // Default tag
+      }));
+      
+      // Send to Thoughtly API
+      const result = await thoughtlyService.createBulkContacts(thoughtlyContacts);
+      
+      toast({
+        title: "Import Successful",
+        description: `Successfully imported ${result.summary.successful} out of ${result.summary.total} leads to AI Dialer.`,
+      });
+      
+      // Close the dialog
+      setIsImportDialogOpen(false);
+    } catch (error) {
+      console.error("Error importing leads to Thoughtly:", error);
+      toast({
+        title: "Import Failed",
+        description: "Failed to import leads to AI Dialer. See console for details.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -377,6 +463,7 @@ const AIDialer = () => {
         </div>
       </div>
 
+      {/* Original dialer settings dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-xl">
           <DialogHeader>
@@ -436,6 +523,57 @@ const AIDialer = () => {
               onClick={startDialing}
             >
               Start Dialing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import leads dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Import Leads into AI Dialer</DialogTitle>
+            <DialogDescription>
+              Import all selected leads to the AI Dialer system to prepare them for automated calls.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <div className="flex items-center gap-3 p-4 bg-blue-50 text-blue-800 rounded-lg">
+              <Upload className="h-5 w-5 text-blue-500" />
+              <div>
+                <p className="font-medium">Import {selectedLeads.length} leads to AI Dialer</p>
+                <p className="text-sm text-blue-700">
+                  This will make the leads available for AI calling campaigns
+                </p>
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setIsImportDialogOpen(false)}
+              disabled={isImporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+              onClick={importLeadsToThoughtly}
+              disabled={isImporting}
+            >
+              {isImporting ? (
+                <>
+                  <span className="animate-spin mr-2">⏳</span>
+                  Importing...
+                </>
+              ) : (
+                <>Import Leads</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

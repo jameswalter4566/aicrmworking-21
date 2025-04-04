@@ -65,5 +65,57 @@ export const thoughtlyService = {
       console.error('Error in createBulkContacts:', error);
       throw error;
     }
+  },
+
+  /**
+   * Get contacts from Thoughtly
+   * @param params Optional search parameters
+   * @returns Array of contacts from Thoughtly
+   */
+  async getContacts(params?: {
+    search?: string;
+    phone_numbers_only?: boolean;
+    tags?: string[];
+    excluded_tags?: string[];
+    sort?: string;
+    sortDirection?: 'asc' | 'desc';
+    page?: number;
+    limit?: number;
+  }) {
+    try {
+      // Convert params to URLSearchParams if provided
+      const urlParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            if (Array.isArray(value)) {
+              // Handle arrays like tags
+              value.forEach(item => urlParams.append(key, item));
+            } else {
+              urlParams.append(key, String(value));
+            }
+          }
+        });
+      }
+
+      // Build the querystring
+      const queryString = urlParams.toString() 
+        ? `?${urlParams.toString()}`
+        : '';
+
+      const { data, error } = await supabase.functions.invoke(`thoughtly-contacts${queryString}`, {
+        method: 'GET'
+      });
+
+      if (error) {
+        console.error('Error fetching Thoughtly contacts:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getContacts:', error);
+      throw error;
+    }
   }
 };

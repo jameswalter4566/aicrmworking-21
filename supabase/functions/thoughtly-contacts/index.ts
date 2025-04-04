@@ -48,11 +48,16 @@ serve(async (req) => {
     }
 
     // Process the request based on the action
-    const { action, contacts } = await req.json()
+    const requestUrl = new URL(req.url)
+    const action = req.method === 'GET' 
+      ? 'getContacts' // If it's a GET request, assume it's for getting contacts
+      : await req.json().then(data => data.action) // Otherwise extract action from body
+
     console.log(`Processing action: ${action}`)
 
     switch (action) {
       case 'createContact': {
+        const { contacts } = await req.json()
         // Handle single contact creation
         if (!Array.isArray(contacts)) {
           return await createSingleContact(
@@ -66,6 +71,15 @@ serve(async (req) => {
         return await createBulkContacts(
           contacts, 
           THOUGHTLY_API_TOKEN, 
+          THOUGHTLY_TEAM_ID
+        )
+      }
+
+      case 'getContacts': {
+        const searchParams = requestUrl.searchParams
+        return await getContacts(
+          searchParams,
+          THOUGHTLY_API_TOKEN,
           THOUGHTLY_TEAM_ID
         )
       }
@@ -220,4 +234,55 @@ async function createBulkContacts(contacts, apiToken, teamId) {
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
+}
+
+// Function to get contacts from Thoughtly API
+async function getContacts(searchParams, apiToken, teamId) {
+  console.log("Getting contacts from Thoughtly API")
+  
+  // Build query string from searchParams if any
+  const queryString = searchParams.toString() ? `?${searchParams.toString()}` : ''
+  
+  try {
+    const response = await fetch(`${THOUGHTLY_API_URL}/contact${queryString}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-token': apiToken,
+        'team_id': teamId
+      }
+    })
+
+    const data = await response.json()
+    
+    if (!response.ok) {
+      console.error(`Error getting contacts: ${JSON.stringify(data)}`)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to get contacts from Thoughtly', 
+          details: data.error || 'Unknown error'
+        }),
+        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`Successfully retrieved contacts from Thoughtly`)
+    
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: data.data
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  } catch (error) {
+    console.error('Error in getContacts:', error)
+    return new Response(
+      JSON.stringify({ 
+        error: 'Failed to get contacts from Thoughtly API', 
+        details: error.message
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
+  }
 }
