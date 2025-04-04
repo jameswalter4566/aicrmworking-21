@@ -18,20 +18,12 @@ const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o"
 const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f"
 
-// Utility function to format phone numbers
+// Utility function to format phone numbers - UPDATED
 function formatPhoneNumber(phoneNumber) {
   if (!phoneNumber) return "";
   
-  // Remove all non-numeric characters
-  const digitsOnly = phoneNumber.replace(/\D/g, '');
-  
-  // Check if the number already has the country code (assuming US)
-  if (digitsOnly.length === 10) {
-    return digitsOnly; // Just return the 10 digits without country code
-  } else {
-    // Return whatever we have, might be already formatted or might be invalid
-    return digitsOnly;
-  }
+  // Remove ALL non-numeric characters (parentheses, spaces, dashes, plus signs, etc.)
+  return phoneNumber.replace(/\D/g, '');
 }
 
 // Main serve function to handle requests
