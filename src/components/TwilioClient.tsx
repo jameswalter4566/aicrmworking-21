@@ -5,8 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Phone, Loader2 } from "lucide-react";
 
-type Codec = 'opus' | 'pcmu';
-
 interface TwilioClientProps {
   onCallConnect?: (connection: any) => void;
   onCallDisconnect?: () => void;
