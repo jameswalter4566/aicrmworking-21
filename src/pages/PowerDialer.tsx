@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -142,7 +141,6 @@ const dummyLeads: Lead[] = [
   }
 ];
 
-// Generate dummy activity logs
 const generateDummyLogs = (leadId: number): ActivityLog[] => {
   const types: Array<ActivityLog['type']> = [
     'call_attempt', 'call_received', 'message_sent', 
@@ -152,12 +150,11 @@ const generateDummyLogs = (leadId: number): ActivityLog[] => {
   const logs: ActivityLog[] = [];
   const now = new Date();
   
-  // Generate 5-10 random logs
   const count = 5 + Math.floor(Math.random() * 6);
   
   for (let i = 0; i < count; i++) {
     const type = types[Math.floor(Math.random() * types.length)];
-    const minutesAgo = Math.floor(Math.random() * 60 * 24); // Random time in the last 24 hours
+    const minutesAgo = Math.floor(Math.random() * 60 * 24);
     const timestamp = new Date(now.getTime() - minutesAgo * 60 * 1000).toISOString();
     
     let message = '';
@@ -195,11 +192,9 @@ const generateDummyLogs = (leadId: number): ActivityLog[] => {
     });
   }
   
-  // Sort logs by timestamp (newest first)
   return logs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 };
 
-// Generate activity logs for all leads
 const dummyActivityLogs: Record<number, ActivityLog[]> = {};
 dummyLeads.forEach(lead => {
   dummyActivityLogs[lead.id] = generateDummyLogs(lead.id);
@@ -219,9 +214,11 @@ const PowerDialer = () => {
   const [dialingMode, setDialingMode] = useState<DialingMode>("single");
   const [simultaneousLines, setSimultaneousLines] = useState<number>(1);
   const [activityLogs, setActivityLogs] = useState<Record<number, ActivityLog[]>>(dummyActivityLogs);
+  const [dialerIntervalRef, setDialerIntervalRef] = useState<number | null>(null);
+  const [dialQueue, setDialQueue] = useState<number[]>([]);
+  const [activeCallsCount, setActiveCallsCount] = useState(0);
   const { toast } = useToast();
   
-  // Filter leads based on search term
   useEffect(() => {
     const filtered = leads.filter(lead => 
       `${lead.firstName} ${lead.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -232,7 +229,6 @@ const PowerDialer = () => {
     setFilteredLeads(filtered);
   }, [searchTerm, leads]);
 
-  // Handle device ready event
   const handleDeviceReady = () => {
     setIsClientReady(true);
     toast({
@@ -241,7 +237,6 @@ const PowerDialer = () => {
     });
   };
 
-  // Handle call errors
   const handleCallError = (error: any) => {
     console.error("Call error:", error);
     if (activeLeadId) {
@@ -250,6 +245,12 @@ const PowerDialer = () => {
         type: 'system',
         message: `Call error: ${error.message || 'Unknown error'}`,
       });
+      
+      setActiveCallsCount(prev => Math.max(0, prev - 1));
+      
+      if (isDialerActive && dialingMode === "power") {
+        processNextLeadInQueue();
+      }
     }
     toast({
       variant: "destructive",
@@ -258,7 +259,6 @@ const PowerDialer = () => {
     });
   };
 
-  // Handle call connection
   const handleCallConnect = (connection: any) => {
     if (activeLeadId) {
       setCallStatuses(prev => ({ ...prev, [activeLeadId]: "in-progress" }));
@@ -273,7 +273,6 @@ const PowerDialer = () => {
     }
   };
 
-  // Handle call disconnection
   const handleCallDisconnect = () => {
     if (activeLeadId) {
       setCallStatuses(prev => ({ ...prev, [activeLeadId]: "completed" }));
@@ -281,6 +280,13 @@ const PowerDialer = () => {
         type: 'call_attempt',
         message: 'Call ended',
       });
+      
+      setActiveCallsCount(prev => Math.max(0, prev - 1));
+      
+      if (isDialerActive && dialingMode === "power") {
+        processNextLeadInQueue();
+      }
+      
       setActiveLeadId(null);
       toast({
         title: "Call Ended",
@@ -289,7 +295,6 @@ const PowerDialer = () => {
     }
   };
 
-  // Add an activity log for a lead
   const addActivityLog = (leadId: number, log: Omit<ActivityLog, 'id' | 'leadId' | 'timestamp'>) => {
     const timestamp = new Date().toISOString();
     const newLog: ActivityLog = {
@@ -305,7 +310,48 @@ const PowerDialer = () => {
     }));
   };
 
-  // Initiate a call to a lead
+  const processNextLeadInQueue = () => {
+    if (!isDialerActive || activeCallsCount >= simultaneousLines) {
+      return;
+    }
+    
+    if (dialQueue.length === 0) {
+      const newQueue = filteredLeads
+        .filter(lead => !callStatuses[lead.id] || 
+                       (callStatuses[lead.id] !== "in-progress" && 
+                        callStatuses[lead.id] !== "ready"))
+        .map(lead => lead.id);
+      
+      if (newQueue.length === 0) {
+        stopDialerSession();
+        toast({
+          title: "Dialing Complete",
+          description: "All available leads have been called.",
+        });
+        return;
+      }
+      
+      setDialQueue(newQueue);
+      return;
+    }
+    
+    const nextLeadId = dialQueue[0];
+    const updatedQueue = dialQueue.slice(1);
+    setDialQueue(updatedQueue);
+    
+    initiateCall(nextLeadId);
+  };
+
+  useEffect(() => {
+    if (isDialerActive && activeCallsCount < simultaneousLines && dialQueue.length > 0) {
+      const timer = setTimeout(() => {
+        processNextLeadInQueue();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isDialerActive, activeCallsCount, simultaneousLines, dialQueue.length]);
+
   const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) {
@@ -326,6 +372,8 @@ const PowerDialer = () => {
       return;
     }
 
+    setActiveCallsCount(prev => prev + 1);
+    
     setActiveLeadId(leadId);
     setCallStatuses(prev => ({ ...prev, [leadId]: "ready" }));
     
@@ -339,6 +387,8 @@ const PowerDialer = () => {
     } catch (error: any) {
       console.error("Failed to initiate call:", error);
       setCallStatuses(prev => ({ ...prev, [leadId]: "error" }));
+      setActiveCallsCount(prev => Math.max(0, prev - 1));
+      
       addActivityLog(leadId, {
         type: 'system',
         message: `Call error: ${error.message || 'Failed to initiate call'}`,
@@ -348,24 +398,32 @@ const PowerDialer = () => {
         title: "Call Failed",
         description: error.message || "Failed to initiate call",
       });
+      
+      if (isDialerActive && dialingMode === "power") {
+        processNextLeadInQueue();
+      }
     }
   };
 
-  // End the current call
   const endCall = (leadId: number) => {
     if (window.twilioClient && window.twilioClient.connection) {
       window.twilioClient.hangupCall();
       setCallStatuses(prev => ({ ...prev, [leadId]: "completed" }));
       setActiveLeadId(null);
+      setActiveCallsCount(prev => Math.max(0, prev - 1));
+      
       addActivityLog(leadId, {
         type: 'call_attempt',
         message: 'Call manually ended',
       });
+      
+      if (isDialerActive && dialingMode === "power") {
+        processNextLeadInQueue();
+      }
     }
   };
 
-  // Start the power dialer session
-  const startDialerSession = () => {
+  const startSingleDialSession = () => {
     if (!isClientReady) {
       toast({
         variant: "destructive",
@@ -374,33 +432,97 @@ const PowerDialer = () => {
       });
       return;
     }
+    
+    setIsDialerActive(true);
+    toast({
+      title: "Single Dialer Active",
+      description: "Starting to call leads one at a time.",
+    });
+    
+    const newQueue = filteredLeads
+      .filter(lead => !callStatuses[lead.id] || 
+                     (callStatuses[lead.id] !== "in-progress" && 
+                      callStatuses[lead.id] !== "ready"))
+      .map(lead => lead.id);
+    
+    if (newQueue.length === 0) {
+      setIsDialerActive(false);
+      toast({
+        title: "No Leads Available",
+        description: "All leads have been contacted. Reset call statuses to try again.",
+      });
+      return;
+    }
+    
+    setDialQueue(newQueue);
+    processNextLeadInQueue();
+  };
 
+  const startPowerDialSession = () => {
+    if (!isClientReady) {
+      toast({
+        variant: "destructive",
+        title: "Phone Not Ready",
+        description: "The phone system is not ready. Please try again.",
+      });
+      return;
+    }
+    
     setIsDialerActive(true);
     toast({
       title: "Power Dialer Active",
       description: `Starting to call leads with ${simultaneousLines} line${simultaneousLines > 1 ? 's' : ''}.`,
     });
     
-    // In a real implementation, this would start cycling through leads
-    // Here we just pick the first lead for demo purposes
-    if (filteredLeads.length > 0 && !activeLeadId) {
-      initiateCall(filteredLeads[0].id);
+    const newQueue = filteredLeads
+      .filter(lead => !callStatuses[lead.id] || 
+                     (callStatuses[lead.id] !== "in-progress" && 
+                      callStatuses[lead.id] !== "ready"))
+      .map(lead => lead.id);
+    
+    if (newQueue.length === 0) {
+      setIsDialerActive(false);
+      toast({
+        title: "No Leads Available",
+        description: "All leads have been contacted. Reset call statuses to try again.",
+      });
+      return;
+    }
+    
+    setDialQueue(newQueue);
+  };
+
+  const startDialerSession = () => {
+    if (dialingMode === "single") {
+      startSingleDialSession();
+    } else {
+      startPowerDialSession();
     }
   };
 
-  // Stop the power dialer session
   const stopDialerSession = () => {
     setIsDialerActive(false);
+    
+    setDialQueue([]);
+    
     if (activeLeadId) {
       endCall(activeLeadId);
     }
+    
     toast({
-      title: "Power Dialer Paused",
+      title: "Dialer Paused",
       description: "Dialing session has been paused.",
     });
   };
 
-  // Get the status badge for a lead
+  const resetCallStatuses = () => {
+    setCallStatuses({});
+    toast({
+      title: "Call Statuses Reset",
+      description: "All call statuses have been reset.",
+    });
+  };
+
   const getStatusBadge = (status: CallStatus | undefined) => {
     switch (status) {
       case "ready":
@@ -418,15 +540,25 @@ const PowerDialer = () => {
     }
   };
 
-  // Format timestamp for display
   const formatTimestamp = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  useEffect(() => {
+    return () => {
+      if (window.twilioClient && window.twilioClient.connection) {
+        window.twilioClient.hangupCall();
+      }
+      
+      if (dialerIntervalRef.current) {
+        clearInterval(dialerIntervalRef.current);
+      }
+    };
+  }, []);
+
   return (
     <MainLayout>
-      {/* Invisible TwilioClient component to handle calls */}
       <TwilioClient 
         onDeviceReady={handleDeviceReady}
         onCallConnect={handleCallConnect}
@@ -435,9 +567,7 @@ const PowerDialer = () => {
       />
       
       <div className="flex flex-col h-[calc(100vh-7rem)] space-y-4">
-        {/* Upper section - Dialer Controls and Activity Log */}
         <div className="h-1/2 grid grid-cols-1 md:grid-cols-5 gap-4">
-          {/* Dialer controls */}
           <Card className="md:col-span-2 flex flex-col">
             <CardHeader>
               <CardTitle className="flex items-center">
@@ -457,6 +587,7 @@ const PowerDialer = () => {
                       variant={dialingMode === "single" ? "default" : "outline"}
                       onClick={() => setDialingMode("single")}
                       className="flex-1"
+                      disabled={isDialerActive}
                     >
                       Single Dial
                     </Button>
@@ -464,6 +595,7 @@ const PowerDialer = () => {
                       variant={dialingMode === "power" ? "default" : "outline"}
                       onClick={() => setDialingMode("power")}
                       className="flex-1"
+                      disabled={isDialerActive}
                     >
                       Power Dial
                     </Button>
@@ -473,7 +605,12 @@ const PowerDialer = () => {
                 {dialingMode === "power" && (
                   <div>
                     <h3 className="text-sm font-medium mb-2">Simultaneous Lines</h3>
-                    <RadioGroup className="flex space-x-4" value={simultaneousLines.toString()} onValueChange={(val) => setSimultaneousLines(parseInt(val))}>
+                    <RadioGroup 
+                      className="flex space-x-4" 
+                      value={simultaneousLines.toString()} 
+                      onValueChange={(val) => setSimultaneousLines(parseInt(val))}
+                      disabled={isDialerActive}
+                    >
                       <div className="flex items-center space-x-2">
                         <RadioGroupItem value="1" id="lines-1" />
                         <label htmlFor="lines-1">1 Line</label>
@@ -490,11 +627,11 @@ const PowerDialer = () => {
                   </div>
                 )}
                 
-                <div className="flex items-center justify-center">
+                <div className="flex items-center justify-center space-x-2">
                   <Button 
                     variant={isDialerActive ? "destructive" : "default"}
                     size="lg"
-                    className="w-full"
+                    className="flex-1"
                     onClick={isDialerActive ? stopDialerSession : startDialerSession}
                     disabled={!isClientReady}
                   >
@@ -510,25 +647,36 @@ const PowerDialer = () => {
                       </>
                     )}
                   </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={resetCallStatuses}
+                    disabled={isDialerActive || Object.keys(callStatuses).length === 0}
+                    title="Reset all call statuses"
+                  >
+                    Reset
+                  </Button>
                 </div>
               </div>
               
-              {/* Status indicators */}
               <div className="mt-4 p-3 bg-slate-50 rounded-md flex items-center justify-between">
                 <div className="flex items-center">
                   <div className={`h-3 w-3 rounded-full mr-2 ${isClientReady ? 'bg-green-500' : 'bg-red-500'}`}></div>
                   <span className="text-sm">{isClientReady ? 'Phone Ready' : 'Phone Not Ready'}</span>
                 </div>
-                {activeLeadId && (
+                {activeLeadId ? (
                   <Badge variant="outline" className="bg-blue-100 text-blue-800">
                     Active Call
                   </Badge>
-                )}
+                ) : isDialerActive ? (
+                  <Badge variant="outline" className="bg-green-100 text-green-800">
+                    Dialer Active
+                  </Badge>
+                ) : null}
               </div>
             </CardContent>
           </Card>
           
-          {/* Activity log */}
           <Card className="md:col-span-3 flex flex-col">
             <CardHeader className="pb-2">
               <CardTitle>Activity Log</CardTitle>
@@ -576,10 +724,9 @@ const PowerDialer = () => {
           </Card>
         </div>
         
-        {/* Lower section - Lead List */}
         <div className="h-1/2 flex flex-col">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Leads</h2>
+            <h2 className="text-xl font-bold">Leads ({filteredLeads.length})</h2>
             <div className="relative w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -640,7 +787,9 @@ const PowerDialer = () => {
                             variant={activeLeadId === lead.id ? "default" : "outline"} 
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); initiateCall(lead.id); }}
-                            disabled={!isClientReady || callStatuses[lead.id] === "ready" || (activeLeadId !== null && activeLeadId !== lead.id)}
+                            disabled={!isClientReady || callStatuses[lead.id] === "ready" || 
+                                     (isDialerActive && dialingMode === "power") || 
+                                     (activeLeadId !== null && activeLeadId !== lead.id)}
                           >
                             <Phone className="h-4 w-4 mr-2" />
                             Call
