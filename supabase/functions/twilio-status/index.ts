@@ -15,35 +15,55 @@ serve(async (req) => {
   }
 
   try {
+    // Extract parameters from URL
     const url = new URL(req.url);
-    const agentIdentity = url.searchParams.get('agentIdentity');
+    const agentIdentity = url.searchParams.get('agentIdentity') || 'anonymous';
+    
+    // Process the form data from Twilio's callback
     const formData = await req.formData();
     
-    // Extract status data from form
-    const callSid = formData.get('CallSid');
-    const callStatus = formData.get('CallStatus');
-    const to = formData.get('To');
-    const from = formData.get('From');
+    // Extract important status data
+    const callSid = formData.get('CallSid') || '';
+    const callStatus = formData.get('CallStatus') || '';
+    const to = formData.get('To') || '';
+    const from = formData.get('From') || '';
+    const direction = formData.get('Direction') || '';
     
-    console.log(`Call Status Update: ${callStatus} for call ${callSid} from ${from} to ${to} (Agent: ${agentIdentity})`);
+    // Log the call status for debugging
+    console.log(`Call Status Update: ${callStatus} for call ${callSid}`);
+    console.log(`  Direction: ${direction}, From: ${from}, To: ${to}`);
+    console.log(`  Agent: ${agentIdentity}`);
     
-    // In a real app, you might want to store this in a database
-    // or push it to a real-time channel for the frontend to receive
+    // Create a more detailed response
+    const response = {
+      received: true,
+      processed: true,
+      callSid,
+      callStatus,
+      to,
+      from,
+      direction,
+      agentIdentity,
+      timestamp: new Date().toISOString()
+    };
 
     return new Response(
-      JSON.stringify({
-        received: true,
-        callSid,
-        callStatus,
-        agentIdentity
-      }),
+      JSON.stringify(response),
       { headers: { ...corsHeaders } }
     );
   } catch (error) {
     console.error("Error processing status callback:", error);
+    
+    // Create a meaningful error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to process callback" }),
+      JSON.stringify({ 
+        error: errorMessage,
+        message: "Failed to process callback",
+        stack: error instanceof Error ? error.stack : undefined
+      }),
       { status: 400, headers: corsHeaders }
     );
-  }
+  } 
 });

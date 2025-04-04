@@ -95,11 +95,16 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error initiating Twilio call:", error);
+    
+    // Create a meaningful error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || "Failed to initiate call",
-        stack: error.stack // Include stack trace for debugging
+        error: errorMessage,
+        message: "Failed to initiate call. Please check the phone number and try again.",
+        stack: error instanceof Error ? error.stack : undefined
       }),
       { status: 400, headers: corsHeaders }
     );

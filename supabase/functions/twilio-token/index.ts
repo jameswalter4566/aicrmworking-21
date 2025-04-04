@@ -47,7 +47,8 @@ serve(async (req) => {
     // Create a capability token with the correct account credentials
     const capability = new ClientCapability({
       accountSid: accountSid,
-      authToken: authToken
+      authToken: authToken,
+      ttl: 3600 // Token time-to-live in seconds (1 hour)
     });
     
     // Allow incoming calls - use the identity as the client name
@@ -57,7 +58,11 @@ serve(async (req) => {
     if (applicationSid) {
       capability.addScope(new ClientCapability.OutgoingClientScope({
         applicationSid: applicationSid,
-        clientName: identity
+        clientName: identity,
+        params: {
+          // Add any additional parameters needed for your TwiML application
+          identity: identity
+        }
       }));
     } else {
       console.warn("No TWILIO_TWIML_APP_SID provided. Outgoing calls will not work.");
@@ -85,10 +90,15 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Error generating Twilio token:", error);
+    
+    // Create a meaningful error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    
     return new Response(
       JSON.stringify({ 
-        error: error.message || "Failed to generate token",
-        stack: error.stack // Include stack trace for debugging
+        error: errorMessage,
+        message: "Failed to generate token. Check your Twilio credentials.",
+        stack: error instanceof Error ? error.stack : undefined
       }),
       { status: 400, headers: corsHeaders }
     );
