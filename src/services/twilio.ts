@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 // Audio context and processing nodes
@@ -78,14 +77,18 @@ const initializeTwilioDevice = async () => {
     
     console.log("Twilio script loaded successfully, now generating token");
     
-    // Generate token from our edge function
+    // Generate token from our edge function - ensuring we're using the correct URL format
+    console.log("Invoking twilio-voice function for token generation");
     const { data, error } = await supabase.functions.invoke('twilio-voice', {
       body: { action: 'generateToken' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
     if (error) {
       console.error("Error invoking twilio-voice function:", error);
-      throw new Error(error.message);
+      throw new Error(error.message || 'Failed to invoke function');
     }
     
     if (!data || !data.token) {
@@ -149,11 +152,15 @@ const makeCall = async (phoneNumber: string) => {
     }
 
     // Use our edge function to make the outbound call
+    console.log(`Invoking twilio-voice function to call ${phoneNumber}`);
     const { data, error } = await supabase.functions.invoke('twilio-voice', {
       body: {
         action: 'makeCall',
         phoneNumber,
-        callbackUrl: window.location.hostname,
+        callbackUrl: window.location.origin,
+      },
+      headers: {
+        'Content-Type': 'application/json',
       },
     });
 

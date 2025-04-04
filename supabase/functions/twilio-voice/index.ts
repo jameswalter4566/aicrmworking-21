@@ -1,26 +1,32 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'https://esm.sh/twilio@4.23.0'
 
-// CORS headers for browser requests - properly configured for preflight requests
+// Enhanced CORS headers with broader support
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-  'Access-Control-Max-Age': '86400', // 24 hours cache for preflight requests
+  'Access-Control-Allow-Headers': '*',
+  'Access-Control-Allow-Methods': 'OPTIONS, POST, GET',
+  'Access-Control-Max-Age': '86400',
 }
 
+console.log("Twilio Voice function loaded and ready")
+
 serve(async (req) => {
-  // Handle CORS preflight requests - this is critical for browser API calls to work
+  console.log(`Received ${req.method} request to ${req.url}`)
+  
+  // Handle preflight requests properly (critical for browser CORS)
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS preflight request")
     return new Response(null, { 
-      headers: corsHeaders,
-      status: 204 // No Content is the correct response for OPTIONS preflight
-    });
+      status: 204,
+      headers: corsHeaders
+    })
   }
 
   try {
+    console.log("Processing request body")
+    
     // Get Twilio credentials from environment variables
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
@@ -29,34 +35,15 @@ serve(async (req) => {
     const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET')
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
 
-    console.log("Environment variables loaded, checking for required credentials...")
-
-    // Validate credentials are present
-    const missingCredentials = []
-    if (!TWILIO_ACCOUNT_SID) missingCredentials.push('TWILIO_ACCOUNT_SID')
-    if (!TWILIO_AUTH_TOKEN) missingCredentials.push('TWILIO_AUTH_TOKEN')
-    if (!TWILIO_PHONE_NUMBER) missingCredentials.push('TWILIO_PHONE_NUMBER')
-
-    if (missingCredentials.length > 0) {
-      console.error(`Missing required Twilio credentials: ${missingCredentials.join(', ')}`)
-      return new Response(
-        JSON.stringify({ 
-          error: 'Missing required Twilio credentials', 
-          missingCredentials 
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
+    console.log("Environment variables loaded")
+    
     // Parse the request body
-    let requestData;
+    let requestData
     try {
-      requestData = await req.json();
+      requestData = await req.json()
+      console.log("Request data parsed:", JSON.stringify(requestData))
     } catch (e) {
-      console.error("Failed to parse request body:", e);
+      console.error("Failed to parse request body:", e)
       return new Response(
         JSON.stringify({ error: 'Invalid request body' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
