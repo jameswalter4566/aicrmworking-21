@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Phone } from "lucide-react";
@@ -72,14 +71,14 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       return data.token;
     } catch (error) {
       console.error("Failed to fetch token:", error);
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Token Error",
         description: "Failed to get required authentication token. Please try again.",
       });
       throw error;
     }
-  }, [toast]);
+  }, []);
 
   // Initialize the Audio Context
   const initializeAudioContext = useCallback(() => {
@@ -110,7 +109,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     if (!audioContextInitialized) {
       const success = initializeAudioContext();
       if (!success) {
-        toast.toast({
+        toast({
           variant: "destructive",
           title: "Audio Error",
           description: "Failed to initialize audio. Please check your browser permissions.",
@@ -149,7 +148,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         if (!deviceInitializedRef.current) {
           deviceInitializedRef.current = true;
           if (onDeviceReady) onDeviceReady(newDevice);
-          toast.toast({
+          toast({
             title: "Phone Ready",
             description: "Your phone is ready to make calls.",
           });
@@ -177,7 +176,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         if (!errorNotifiedRef.current) {
           errorNotifiedRef.current = true;
           
-          toast.toast({
+          toast({
             variant: "destructive",
             title: "Call Error",
             description: errorMessage,
@@ -194,7 +193,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         setConnection(null);
         setStatus("ready");
         if (onCallDisconnect) onCallDisconnect();
-        toast.toast({
+        toast({
           title: "Call Ended",
           description: "The call has ended.",
         });
@@ -228,7 +227,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       
       if (!errorNotifiedRef.current) {
         errorNotifiedRef.current = true;
-        toast.toast({
+        toast({
           variant: "destructive",
           title: "Setup Error",
           description: err?.message || "Failed to set up the phone",
@@ -240,7 +239,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
       return null;
     }
-  }, [device, status, isInitializing, audioContextInitialized, fetchToken, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
+  }, [device, status, isInitializing, audioContextInitialized, fetchToken, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError]);
 
   const makeCall = useCallback(
     async (phoneNumber: string) => {
@@ -267,7 +266,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
           throw new Error(data?.message || "Failed to initiate call");
         }
 
-        toast.toast({
+        toast({
           title: "Calling...",
           description: `Dialing ${phoneNumber}`,
         });
@@ -277,7 +276,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         
         if (!errorNotifiedRef.current) {
           errorNotifiedRef.current = true;
-          toast.toast({
+          toast({
             variant: "destructive",
             title: "Call Error",
             description: err?.message || "Failed to make the call",
@@ -289,7 +288,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         }
       }
     },
-    [device, status, setupDeviceAfterInteraction, onError, toast]
+    [device, status, setupDeviceAfterInteraction, onError]
   );
 
   const hangupCall = useCallback(() => {

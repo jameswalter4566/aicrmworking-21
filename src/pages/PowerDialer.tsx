@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +22,7 @@ import {
   PhoneCall,
   AlertCircle
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/use-toast";
 import TwilioClient from "@/components/TwilioClient";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Phone3 from "@/components/icons/Phone3";
@@ -222,7 +221,6 @@ const PowerDialer = () => {
   const [phoneSystemStatus, setPhoneSystemStatus] = useState<'initializing' | 'ready' | 'error'>('initializing');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const processingDialRef = useRef(false);
-  const { toast } = useToast();
   
   useEffect(() => {
     const filtered = leads.filter(lead => 
@@ -238,7 +236,7 @@ const PowerDialer = () => {
     setIsClientReady(true);
     setPhoneSystemStatus('ready');
     setStatusMessage(null);
-    toast.toast({
+    toast({
       title: "Dialer Ready",
       description: "You can now make calls to leads.",
     });
@@ -274,7 +272,7 @@ const PowerDialer = () => {
       }
     }
     
-    toast.toast({
+    toast({
       variant: "destructive",
       title: "Call Error",
       description: error.message || "There was an error with the call",
@@ -288,7 +286,7 @@ const PowerDialer = () => {
         type: 'call_attempt',
         message: 'Call connected',
       });
-      toast.toast({
+      toast({
         title: "Call Connected",
         description: "You are now connected to the lead.",
       });
@@ -313,7 +311,7 @@ const PowerDialer = () => {
       }
       
       setActiveLeadId(null);
-      toast.toast({
+      toast({
         title: "Call Ended",
         description: "The call has ended.",
       });
@@ -353,7 +351,7 @@ const PowerDialer = () => {
       
       if (newQueue.length === 0) {
         stopDialerSession();
-        toast.toast({
+        toast({
           title: "Dialing Complete",
           description: "All available leads have been called.",
         });
@@ -390,7 +388,7 @@ const PowerDialer = () => {
   const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) {
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Error",
         description: "Lead not found",
@@ -399,7 +397,7 @@ const PowerDialer = () => {
     }
 
     if (!window.twilioClient) {
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Phone Not Ready",
         description: "The phone system is not initialized. Please try again.",
@@ -417,7 +415,7 @@ const PowerDialer = () => {
           throw new Error("Phone system is not ready. Please try again.");
         }
       } catch (err) {
-        toast.toast({
+        toast({
           variant: "destructive",
           title: "Phone Not Ready",
           description: "The phone system is not ready. Please try again or check for the Initialize Phone System button.",
@@ -450,7 +448,7 @@ const PowerDialer = () => {
         type: 'system',
         message: `Call error: ${error.message || 'Failed to initiate call'}`,
       });
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Call Failed",
         description: error.message || "Failed to initiate call",
@@ -490,7 +488,7 @@ const PowerDialer = () => {
     if (!window.twilioClient) {
       setPhoneSystemStatus('error');
       setStatusMessage("Phone system not initialized. Check your browser's microphone permissions.");
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Phone Not Ready",
         description: "The phone system is not initialized. Please try again or check for the Initialize Phone System button.",
@@ -501,7 +499,7 @@ const PowerDialer = () => {
     // Check if it's ready, but don't block the operation completely
     // The initiateCall function will try to setup the device if needed
     setIsDialerActive(true);
-    toast.toast({
+    toast({
       title: "Single Dialer Active",
       description: "Starting to call leads one at a time.",
     });
@@ -514,7 +512,7 @@ const PowerDialer = () => {
     
     if (newQueue.length === 0) {
       setIsDialerActive(false);
-      toast.toast({
+      toast({
         title: "No Leads Available",
         description: "All leads have been contacted. Reset call statuses to try again.",
       });
@@ -531,7 +529,7 @@ const PowerDialer = () => {
     if (!window.twilioClient) {
       setPhoneSystemStatus('error');
       setStatusMessage("Phone system not initialized. Check your browser's microphone permissions.");
-      toast.toast({
+      toast({
         variant: "destructive",
         title: "Phone Not Ready",
         description: "The phone system is not initialized. Please try again or check for the Initialize Phone System button.",
@@ -542,7 +540,7 @@ const PowerDialer = () => {
     // Check if it's ready, but don't block the operation completely
     // The initiateCall function will try to setup the device if needed
     setIsDialerActive(true);
-    toast.toast({
+    toast({
       title: "Power Dialer Active",
       description: `Starting to call leads with ${simultaneousLines} line${simultaneousLines > 1 ? 's' : ''}.`,
     });
@@ -555,7 +553,7 @@ const PowerDialer = () => {
     
     if (newQueue.length === 0) {
       setIsDialerActive(false);
-      toast.toast({
+      toast({
         title: "No Leads Available",
         description: "All leads have been contacted. Reset call statuses to try again.",
       });
@@ -583,7 +581,7 @@ const PowerDialer = () => {
       endCall(activeLeadId);
     }
     
-    toast.toast({
+    toast({
       title: "Dialer Paused",
       description: "Dialing session has been paused.",
     });
@@ -591,7 +589,7 @@ const PowerDialer = () => {
 
   const resetCallStatuses = () => {
     setCallStatuses({});
-    toast.toast({
+    toast({
       title: "Call Statuses Reset",
       description: "All call statuses have been reset.",
     });
@@ -873,23 +871,4 @@ const PowerDialer = () => {
                             onClick={(e) => { e.stopPropagation(); initiateCall(lead.id); }}
                             disabled={callStatuses[lead.id] === "ready" || 
                                      (isDialerActive && dialingMode === "power") || 
-                                     (activeLeadId !== null && activeLeadId !== lead.id)}
-                          >
-                            <Phone className="h-4 w-4 mr-2" />
-                            Call
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </div>
-    </MainLayout>
-  );
-};
-
-export default PowerDialer;
+                                     (activeLeadId
