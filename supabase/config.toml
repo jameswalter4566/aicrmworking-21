@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.twilio-status]
 verify_jwt = false
+
+[functions.twilio-version-check]
+verify_jwt = false
