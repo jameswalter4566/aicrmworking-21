@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Device } from "@twilio/voice-sdk";
+import { Device, Codec } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -11,7 +10,6 @@ interface TwilioClientProps {
   onError?: (error: any) => void;
 }
 
-// Declare global window interface extension
 declare global {
   interface Window {
     twilioClient: {
@@ -26,11 +24,6 @@ declare global {
   }
 }
 
-/**
- * TwilioClient component for handling voice calls
- * This component doesn't render anything but provides the Twilio functionality
- * to the application through a global window object
- */
 const TwilioClient: React.FC<TwilioClientProps> = ({
   onCallConnect,
   onCallDisconnect,
@@ -43,27 +36,22 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const [isInitializing, setIsInitializing] = useState(false);
   const toast = useToast();
   
-  // Use refs to track if the device is already initialized and prevent duplicate toasts
   const deviceInitializedRef = useRef(false);
   const errorNotifiedRef = useRef(false);
   const setupAttemptsRef = useRef(0);
   const MAX_SETUP_ATTEMPTS = 3;
 
-  // Initialize the Twilio device
   const setupDevice = useCallback(async () => {
-    // Prevent multiple initializations or excessive retries
     if (isInitializing) {
       console.log("Device initialization already in progress, skipping");
       return null;
     }
     
-    // If device is already ready, return it
     if (device && status === "ready") {
       console.log("Device already initialized and ready");
       return device;
     }
 
-    // Check for too many retry attempts
     if (setupAttemptsRef.current >= MAX_SETUP_ATTEMPTS) {
       console.log(`Maximum setup attempts (${MAX_SETUP_ATTEMPTS}) reached, aborting`);
       if (!errorNotifiedRef.current) {
@@ -81,7 +69,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     setIsInitializing(true);
     
     try {
-      // Fetch a token from our Supabase function
       const { data, error } = await supabase.functions.invoke("twilio-token", {
         method: "POST",
       });
@@ -96,44 +83,34 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         throw new Error("No token received from server");
       }
 
-      // Clean up existing device if it exists
       if (device) {
         console.log("Destroying existing device before creating new one");
         try {
           device.destroy();
         } catch (e) {
           console.warn("Error destroying existing device:", e);
-          // Continue anyway
         }
       }
 
-      // Create a new device with the token
-      console.log("Creating new Twilio device with token");
+      const codecPreferences: Codec[] = ["opus", "pcmu"] as Codec[];
       const newDevice = new Device(data.token, {
-        // Use proper codec preferences format
-        codecPreferences: ["opus", "pcmu"],
+        codecPreferences,
         disableAudioContextSounds: false,
         maxAverageBitrate: 16000,
-        // Add additional debug options
         debug: true,
-        // Add ICE servers for better connection handling
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
         ]
       });
 
-      // Reset error notification flag for new device
       errorNotifiedRef.current = false;
 
-      // Setup event listeners
       newDevice.on("ready", () => {
         console.log("Twilio device is ready");
         setStatus("ready");
         setIsInitializing(false);
-        setupAttemptsRef.current = 0; // Reset attempts counter on success
-        
-        // Only notify and call handler once
+        setupAttemptsRef.current = 0;
         if (!deviceInitializedRef.current) {
           deviceInitializedRef.current = true;
           if (onDeviceReady) onDeviceReady(newDevice);
@@ -151,7 +128,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         
         if (onError && err) onError(err);
         
-        // Prevent duplicate error toasts
         if (!errorNotifiedRef.current) {
           errorNotifiedRef.current = true;
           toast.toast({
@@ -160,7 +136,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
             description: err?.message || "An error occurred with the phone",
           });
           
-          // Reset error notification flag after a delay
           setTimeout(() => {
             errorNotifiedRef.current = false;
           }, 5000);
@@ -204,7 +179,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       
       if (onError) onError(err);
       
-      // Prevent duplicate error toasts
       if (!errorNotifiedRef.current) {
         errorNotifiedRef.current = true;
         toast.toast({
@@ -213,7 +187,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
           description: err?.message || "Failed to set up the phone",
         });
         
-        // Reset error notification flag after a delay
         setTimeout(() => {
           errorNotifiedRef.current = false;
         }, 5000);
@@ -230,12 +203,10 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
           currentDevice = await setupDevice();
         }
 
-        // Check if device is ready
         if (!currentDevice) {
           throw new Error("Phone device is not ready. Try again.");
         }
 
-        // Call the Supabase function to initiate the call
         const { data, error } = await supabase.functions.invoke("twilio-dial", {
           method: "POST",
           body: { phoneNumber },
@@ -257,7 +228,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         console.error("Error making call:", err);
         if (onError) onError(err);
         
-        // Prevent duplicate error toasts
         if (!errorNotifiedRef.current) {
           errorNotifiedRef.current = true;
           toast.toast({
@@ -266,7 +236,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
             description: err?.message || "Failed to make the call",
           });
           
-          // Reset error notification flag after a delay
           setTimeout(() => {
             errorNotifiedRef.current = false;
           }, 3000);
@@ -292,13 +261,10 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     return device !== null && status === "ready";
   }, [device, status]);
 
-  // Fix return type mismatch by creating a wrapper function that doesn't return anything
   const setupDeviceWrapper = useCallback(async (): Promise<void> => {
     await setupDevice();
-    // No return value needed
   }, [setupDevice]);
 
-  // Set up global access to Twilio functionality
   useEffect(() => {
     window.twilioClient = {
       device,
@@ -310,10 +276,8 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       isReady,
     };
 
-    // Initial setup - only do this once when the component mounts
     if (!deviceInitializedRef.current && !device) {
       console.log("Performing initial Twilio device setup");
-      // Add small delay before initial setup to avoid browser issues
       const timer = setTimeout(() => {
         setupDevice().catch(err => {
           console.error("Failed to setup device in initial effect:", err);
@@ -323,7 +287,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       return () => clearTimeout(timer);
     }
 
-    // Cleanup on unmount
     return () => {
       if (device) {
         console.log("Cleaning up Twilio device on unmount");
@@ -341,7 +304,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     };
   }, [device, connection, status, makeCall, hangupCall, setupDevice, setupDeviceWrapper, isReady]);
 
-  // This component doesn't render anything visible
   return null;
 };
 
