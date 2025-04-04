@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ThoughtlyContact {
@@ -195,6 +194,50 @@ export const thoughtlyService = {
       };
     } catch (error) {
       console.error('Error syncing leads:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Retrieve all leads from all available sources using the retrieve-leads function
+   * This is used to consolidate leads from multiple sources automatically
+   * @param params Optional search parameters
+   * @returns Array of leads from all available sources
+   */
+  async retrieveAllLeads(params?: {
+    search?: string;
+    limit?: number;
+    page?: number;
+  }) {
+    try {
+      // Convert params to URLSearchParams if provided
+      const urlParams = new URLSearchParams();
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            urlParams.append(key, String(value));
+          }
+        });
+      }
+
+      // Build the querystring
+      const queryString = urlParams.toString() 
+        ? `?${urlParams.toString()}`
+        : '';
+
+      console.log("Retrieving all leads using retrieve-leads function");
+      const { data, error } = await supabase.functions.invoke(`retrieve-leads${queryString}`, {
+        method: 'GET'
+      });
+
+      if (error) {
+        console.error('Error fetching leads:', error);
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in retrieveAllLeads:', error);
       throw error;
     }
   }

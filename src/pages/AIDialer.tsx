@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -149,13 +150,15 @@ const AIDialer = () => {
   const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
   
   useEffect(() => {
-    fetchThoughtlyContacts();
+    fetchAllLeads();
   }, []);
 
-  const fetchThoughtlyContacts = async () => {
+  // Updated function that uses the new retrieveAllLeads method
+  const fetchAllLeads = async () => {
     setIsLoading(true);
     try {
-      const response = await thoughtlyService.getContacts({
+      // First try to use the new consolidated retrieval method
+      const response = await thoughtlyService.retrieveAllLeads({
         limit: 50
       });
       
@@ -163,12 +166,24 @@ const AIDialer = () => {
         const mappedLeads = response.data.map(mapThoughtlyContactToLead);
         setLeads(mappedLeads);
         setThoughtlyContacts(response.data);
-        console.log("Fetched leads from Thoughtly:", mappedLeads);
+        console.log("Fetched leads from all sources:", mappedLeads);
       } else {
-        setLeads(defaultLeads);
+        // Fallback to the original method if the new one fails
+        const fallbackResponse = await thoughtlyService.getContacts({
+          limit: 50
+        });
+        
+        if (fallbackResponse?.success && fallbackResponse?.data) {
+          const mappedLeads = fallbackResponse.data.map(mapThoughtlyContactToLead);
+          setLeads(mappedLeads);
+          setThoughtlyContacts(fallbackResponse.data);
+          console.log("Fetched leads from Thoughtly (fallback):", mappedLeads);
+        } else {
+          setLeads(defaultLeads);
+        }
       }
     } catch (error) {
-      console.error("Error fetching Thoughtly contacts:", error);
+      console.error("Error fetching leads:", error);
       toast({
         title: "Error",
         description: "Failed to retrieve contacts. Using sample data instead.",
