@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
@@ -30,6 +29,7 @@ import {
 } from "@/components/ui/toggle-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
+import { twilioService } from "@/services/twilio";
 
 const leadsData = [
   {
@@ -148,12 +148,53 @@ const PowerDialer = () => {
     "I see they're interested in property in the downtown area.",
     "I'll try to schedule a meeting with our agent.",
   ]);
+  const [callSids, setCallSids] = useState<Record<number, string>>({});
+  const [twilioInitialized, setTwilioInitialized] = useState(false);
+
+  useEffect(() => {
+    const initTwilio = async () => {
+      const micAccess = await twilioService.initializeAudioContext();
+      if (micAccess) {
+        const deviceInitialized = await twilioService.initializeTwilioDevice();
+        setTwilioInitialized(deviceInitialized);
+        
+        if (!deviceInitialized) {
+          toast({
+            title: "Error",
+            description: "Failed to initialize phone system. Please check your connection.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Microphone Access Denied",
+          description: "Please allow microphone access to use the dialer.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    initTwilio();
+
+    return () => {
+      twilioService.cleanup();
+    };
+  }, []);
 
   const startDialSession = () => {
     setIsDialogOpen(true);
   };
 
-  const startDialing = () => {
+  const startDialing = async () => {
+    if (!twilioInitialized) {
+      toast({
+        title: "Error",
+        description: "Phone system not initialized. Please refresh and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
       : leads.map(lead => lead.id);
@@ -168,45 +209,84 @@ const PowerDialer = () => {
     if (firstBatch.length > 0) {
       setActiveCallId(firstBatch[0]);
       
-      toast.success(`Starting ${dialingMode === "ai" ? "AI" : "power"} dialer with ${batchSize} line${batchSize > 1 ? 's' : ''}`);
+      toast({
+        title: `Starting ${dialingMode === "ai" ? "AI" : "power"} dialer`,
+        description: `Dialing with ${batchSize} line${batchSize > 1 ? 's' : ''}`,
+      });
       
       firstBatch.forEach((leadId, index) => {
         setTimeout(() => {
-          simulateCall(leadId);
+          initiateCall(leadId);
         }, index * 500);
       });
     }
   };
 
-  const simulateCall = (leadId: number) => {
+  const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) return;
     
-    toast(`Dialing ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`);
+    toast({
+      title: "Dialing",
+      description: `Calling ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`,
+    });
     
-    const callDuration = 5000 + Math.random() * 10000;
+    const { success, callSid, error } = await twilioService.makeCall(lead.phone1);
     
-    setTimeout(() => {
-      const callResults = ["completed", "no-answer", "voicemail", "busy"];
-      const result = callResults[Math.floor(Math.random() * callResults.length)];
+    if (success && callSid) {
+      setCallSids(prev => ({ ...prev, [leadId]: callSid }));
       
-      switch(result) {
-        case "completed":
-          toast.success(`Call with ${lead.firstName} completed`);
-          break;
-        case "no-answer":
-          toast.error(`No answer from ${lead.firstName}`);
-          break;
-        case "voicemail":
-          toast.info(`Left voicemail for ${lead.firstName}`);
-          break;
-        case "busy":
-          toast.warning(`${lead.firstName}'s line is busy`);
-          break;
-      }
+      monitorCallStatus(leadId, callSid);
+    } else {
+      toast({
+        title: "Call Failed",
+        description: error || "Could not connect the call",
+        variant: "destructive",
+      });
       
       moveToNextLead(leadId);
-    }, callDuration);
+    }
+  };
+
+  const monitorCallStatus = (leadId: number, callSid: string) => {
+    const intervalId = setInterval(async () => {
+      const status = await twilioService.checkCallStatus(callSid);
+      
+      if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
+        clearInterval(intervalId);
+        
+        switch(status) {
+          case "completed":
+            toast({
+              title: "Call Completed",
+              description: `Call with ${leads.find(l => l.id === leadId)?.firstName} has ended`,
+            });
+            break;
+          case "busy":
+            toast({
+              title: "Line Busy",
+              description: `${leads.find(l => l.id === leadId)?.firstName}'s line is busy`,
+              variant: "warning",
+            });
+            break;
+          case "no-answer":
+            toast({
+              title: "No Answer",
+              description: `${leads.find(l => l.id === leadId)?.firstName} did not answer`,
+              variant: "warning",
+            });
+            break;
+          default:
+            toast({
+              title: "Call Failed",
+              description: `Call to ${leads.find(l => l.id === leadId)?.firstName} could not be completed`,
+              variant: "destructive",
+            });
+        }
+        
+        moveToNextLead(leadId);
+      }
+    }, 3000);
   };
 
   const moveToNextLead = (currentLeadId: number) => {
@@ -216,7 +296,7 @@ const PowerDialer = () => {
     
     if (nextIndex < dialQueue.length) {
       const nextLeadId = dialQueue[nextIndex];
-      simulateCall(nextLeadId);
+      initiateCall(nextLeadId);
       
       if (activeCallId === currentLeadId) {
         setActiveCallId(nextLeadId);
@@ -225,16 +305,28 @@ const PowerDialer = () => {
       if (dialQueue.slice(Math.max(0, dialQueue.length - linesInUse)).includes(currentLeadId)) {
         setIsDialing(false);
         setActiveCallId(null);
-        toast.success("Dialing session completed!");
+        toast({
+          title: "Dialing Complete",
+          description: "All leads have been contacted",
+        });
       }
     }
   };
 
-  const endDialingSession = () => {
+  const endDialingSession = async () => {
+    Object.keys(callSids).forEach(async (leadId) => {
+      await twilioService.endCall();
+    });
+    
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
-    toast.info("Dialing session ended");
+    setCallSids({});
+    
+    toast({
+      title: "Session Ended",
+      description: "Dialing session has been terminated",
+    });
   };
 
   const handleSelectAllLeads = (checked: boolean) => {
