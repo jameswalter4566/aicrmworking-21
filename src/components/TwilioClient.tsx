@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Device } from "@twilio/voice-sdk";
+import { Device, Codec } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -133,7 +133,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       console.log("Creating new Twilio device with token");
       const newDevice = new Device(token, {
-        codecPreferences: ['PCMU', 'OPUS'],
+        codecPreferences: [Codec.PCMU, Codec.Opus],
         maxAverageBitrate: 16000,
         forceAggressiveIceNomination: true,
         enableIceRestart: true
