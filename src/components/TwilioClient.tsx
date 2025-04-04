@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Device, Codec } from "@twilio/voice-sdk";
+import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -92,12 +93,12 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         }
       }
 
-      const codecPreferences: Codec[] = ["opus", "pcmu"] as Codec[];
+      // Fixed: Use correct codec specification without the Codec type
       const newDevice = new Device(data.token, {
-        codecPreferences,
+        codecPreferences: ["opus", "pcmu"],
         disableAudioContextSounds: false,
         maxAverageBitrate: 16000,
-        debug: true,
+        // Removed the debug option which isn't supported
         iceServers: [
           { urls: 'stun:stun.l.google.com:19302' },
           { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
