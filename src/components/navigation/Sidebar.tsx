@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -42,12 +41,9 @@ const Sidebar = () => {
   const location = useLocation();
   
   const isActive = (path: string) => {
-    // For the root path, only match exactly
     if (path === "/") {
       return location.pathname === path;
     }
-    // For other paths, check if the current path starts with the item path
-    // This handles both exact matches and potential sub-routes
     return location.pathname === path || 
            (path !== "#" && location.pathname.startsWith(path));
   };
@@ -142,7 +138,7 @@ const Sidebar = () => {
                 className={cn(
                   "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                   active 
-                    ? `bg-white text-crm-blue ${itemColors[index]}` // Use the assigned color for active state
+                    ? `bg-white text-crm-blue ${itemColors[index]}`
                     : "text-white hover:text-white",
                   expanded ? "px-5" : "px-0 justify-center"
                 )}
@@ -156,7 +152,7 @@ const Sidebar = () => {
                 <item.icon
                   className={cn(
                     "h-6 w-6 flex-shrink-0",
-                    active ? "text-crm-blue" : "text-white group-hover:text-white",
+                    active ? "text-white" : "text-white group-hover:text-white",
                     expanded ? "mr-4" : "mr-0",
                     "relative z-10"
                   )}
@@ -169,7 +165,7 @@ const Sidebar = () => {
                     {item.name}
                   </span>
                 )}
-                {expanded && item.badge && (
+                {item.badge && (
                   <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full relative z-10">
                     {item.badge}
                   </span>
