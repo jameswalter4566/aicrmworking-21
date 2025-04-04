@@ -44,13 +44,13 @@ serve(async (req) => {
     // Create a capability token using Twilio's ClientCapability constructor
     const ClientCapability = twilio.jwt.ClientCapability;
     
-    // Create a capability token that only uses accountSid and authToken
+    // Create a capability token with the correct account credentials
     const capability = new ClientCapability({
       accountSid: accountSid,
       authToken: authToken
     });
     
-    // Allow incoming calls
+    // Allow incoming calls - use the identity as the client name
     capability.addScope(new ClientCapability.IncomingClientScope(identity));
     
     // Allow outgoing calls if we have an applicationSid
@@ -59,6 +59,8 @@ serve(async (req) => {
         applicationSid: applicationSid,
         clientName: identity
       }));
+    } else {
+      console.warn("No TWILIO_TWIML_APP_SID provided. Outgoing calls will not work.");
     }
 
     // Generate the token
@@ -69,10 +71,11 @@ serve(async (req) => {
       identity,
       accountSid: accountSid.substring(0, 8) + "...",
       hasOutgoingCapability: !!applicationSid,
-      hasIncomingCapability: true
+      hasIncomingCapability: true,
+      tokenLength: token.length
     });
 
-    // Generate the token and send it back
+    // Return the token and identity
     return new Response(
       JSON.stringify({
         token: token,

@@ -60,29 +60,23 @@ serve(async (req) => {
 
     const client = twilio(accountSid, authToken);
     
-    // TwiML URL for the call
-    // First check if we have a TwiML App SID configured, otherwise use a default URL
-    const twimlUrl = twimlAppSid 
-      ? null // When using twimlAppSid, we don't need a URL
-      : `https://handler.twilio.com/twiml/EH${accountSid.substring(0, 8)}`;
+    // TwiML for the call
+    const twiml = '<Response><Say>Hello. This is a test call from your application.</Say></Response>';
     
     // Call parameters
     const callParams: any = {
       to: to,
       from: from,
+      twiml: twiml,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-status?agentIdentity=${encodeURIComponent(agentIdentity)}`,
       statusCallbackMethod: 'POST'
     };
 
-    // Add either applicationSid or url based on what's available
+    // If TwiML App SID is available, use it instead of twiml
     if (twimlAppSid) {
+      delete callParams.twiml;
       callParams.applicationSid = twimlAppSid;
-    } else if (twimlUrl) {
-      callParams.url = twimlUrl;
-    } else {
-      // If neither is available, use a simple TwiML string
-      callParams.twiml = '<Response><Say>Hello. This is a test call from your application.</Say></Response>';
     }
 
     // Using Twilio's API to create a new call
