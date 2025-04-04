@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 const itemColors = [
   "bg-blue-600", // Dashboard
@@ -23,22 +23,34 @@ const itemColors = [
 ];
 
 const navItems = [
-  { name: "Dashboard", icon: Home, active: false, path: "/" },
-  { name: "Leads", icon: Users, active: true, path: "/people" },
-  { name: "Power Dialer", icon: PhoneOutgoing, active: false, path: "/power-dialer" },
-  { name: "AI Dialer", icon: Bot, active: false, path: "/ai-dialer" },
-  { name: "Inbox", icon: Inbox, active: false, badge: 5, path: "#" },
-  { name: "Tasks", icon: ListTodo, active: false, path: "#" },
-  { name: "Calendar", icon: Calendar, active: false, path: "#" },
-  { name: "Deals", icon: DollarSign, active: false, path: "/deals" },
-  { name: "Reporting", icon: BarChart2, active: false, path: "#" },
-  { name: "Admin", icon: Settings, active: false, path: "#" },
+  { name: "Dashboard", icon: Home, path: "/" },
+  { name: "Leads", icon: Users, path: "/people" },
+  { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
+  { name: "AI Dialer", icon: Bot, path: "/ai-dialer" },
+  { name: "Inbox", icon: Inbox, badge: 5, path: "#" },
+  { name: "Tasks", icon: ListTodo, path: "#" },
+  { name: "Calendar", icon: Calendar, path: "#" },
+  { name: "Deals", icon: DollarSign, path: "/deals" },
+  { name: "Reporting", icon: BarChart2, path: "#" },
+  { name: "Admin", icon: Settings, path: "#" },
 ];
 
 const Sidebar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobile();
+  const location = useLocation();
+  
+  const isActive = (path: string) => {
+    // For the root path, only match exactly
+    if (path === "/") {
+      return location.pathname === path;
+    }
+    // For other paths, check if the current path starts with the item path
+    // This handles both exact matches and potential sub-routes
+    return location.pathname === path || 
+           (path !== "#" && location.pathname.startsWith(path));
+  };
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(prev => !prev);
@@ -65,31 +77,36 @@ const Sidebar = () => {
         {mobileMenuOpen && (
           <div className="px-2 pb-3 pt-1">
             <div className="grid grid-cols-3 gap-2">
-              {navItems.map((item) => (
-                <Link
-                  key={item.name}
-                  to={item.path}
-                  className={cn(
-                    "flex flex-col items-center px-3 py-3 text-sm font-medium rounded-md",
-                    item.active 
-                      ? "bg-white text-crm-blue"
-                      : "text-white hover:bg-white/90 hover:text-crm-blue"
-                  )}
-                >
-                  <item.icon
+              {navItems.map((item, index) => {
+                const active = isActive(item.path);
+                return (
+                  <Link
+                    key={item.name}
+                    to={item.path}
                     className={cn(
-                      "h-6 w-6 mb-2",
-                      item.active ? "text-crm-blue" : "text-white group-hover:text-crm-blue"
+                      "flex flex-col items-center px-3 py-3 text-sm font-medium rounded-md",
+                      active 
+                        ? "bg-white text-crm-blue"
+                        : "text-white hover:bg-white/90 hover:text-crm-blue"
                     )}
-                  />
-                  <span className="truncate text-white text-base">{item.name}</span>
-                  {item.badge && (
-                    <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full absolute top-0 right-0">
-                      {item.badge}
+                  >
+                    <item.icon
+                      className={cn(
+                        "h-6 w-6 mb-2",
+                        active ? "text-crm-blue" : "text-white group-hover:text-crm-blue"
+                      )}
+                    />
+                    <span className={cn("truncate text-base", active ? "text-crm-blue" : "text-white")}>
+                      {item.name}
                     </span>
-                  )}
-                </Link>
-              ))}
+                    {item.badge && (
+                      <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full absolute top-0 right-0">
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         )}
@@ -116,47 +133,53 @@ const Sidebar = () => {
           </div>
         </div>
         <div className="space-y-2">
-          {navItems.map((item, index) => (
-            <Link
-              key={item.name}
-              to={item.path}
-              className={cn(
-                "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
-                item.active 
-                  ? "bg-white text-crm-blue"
-                  : "text-white hover:text-white",
-                expanded ? "px-5" : "px-0 justify-center"
-              )}
-            >
-              <div 
+          {navItems.map((item, index) => {
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.name}
+                to={item.path}
                 className={cn(
-                  "absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-md", 
-                  !item.active && itemColors[index]
+                  "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
+                  active 
+                    ? "bg-white text-crm-blue"
+                    : "text-white hover:text-white",
+                  expanded ? "px-5" : "px-0 justify-center"
                 )}
-              />
-              <item.icon
-                className={cn(
-                  "h-6 w-6 flex-shrink-0",
-                  item.active ? "text-crm-blue" : "text-white group-hover:text-white",
-                  expanded ? "mr-4" : "mr-0",
-                  "relative z-10"
+              >
+                <div 
+                  className={cn(
+                    "absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-md", 
+                    !active && itemColors[index]
+                  )}
+                />
+                <item.icon
+                  className={cn(
+                    "h-6 w-6 flex-shrink-0",
+                    active ? "text-crm-blue" : "text-white group-hover:text-white",
+                    expanded ? "mr-4" : "mr-0",
+                    "relative z-10"
+                  )}
+                />
+                {expanded && (
+                  <span className={cn(
+                    "relative z-10", 
+                    active ? "text-crm-blue" : "text-white"
+                  )}>
+                    {item.name}
+                  </span>
                 )}
-              />
-              {expanded && (
-                <span className="relative z-10 text-white text-base">
-                  {item.name}
-                </span>
-              )}
-              {expanded && item.badge && (
-                <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full relative z-10">
-                  {item.badge}
-                </span>
-              )}
-              {!expanded && item.badge && (
-                <span className="absolute top-0 right-0 bg-crm-red w-2.5 h-2.5 rounded-full relative z-10"></span>
-              )}
-            </Link>
-          ))}
+                {expanded && item.badge && (
+                  <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full relative z-10">
+                    {item.badge}
+                  </span>
+                )}
+                {!expanded && item.badge && (
+                  <span className="absolute top-0 right-0 bg-crm-red w-2.5 h-2.5 rounded-full relative z-10"></span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       </div>
     </div>
