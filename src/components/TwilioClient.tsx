@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Phone } from "lucide-react";
@@ -38,7 +38,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const [isInitializing, setIsInitializing] = useState(false);
   const [showSetupButton, setShowSetupButton] = useState(false);
   const [audioContextInitialized, setAudioContextInitialized] = useState(false);
-  const toast = useToast();
+  const { toast } = useToast();
   
   const deviceInitializedRef = useRef(false);
   const errorNotifiedRef = useRef(false);
@@ -46,7 +46,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const MAX_SETUP_ATTEMPTS = 3;
   const tokenRef = useRef<string | null>(null);
 
-  // Separate token fetching from device setup
   const fetchToken = useCallback(async () => {
     try {
       const { data, error } = await supabase.functions.invoke("twilio-token", {
@@ -80,7 +79,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     }
   }, []);
 
-  // Initialize the Audio Context
   const initializeAudioContext = useCallback(() => {
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -99,7 +97,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     return false;
   }, []);
 
-  // Setup device after user interaction
   const setupDeviceAfterInteraction = useCallback(async () => {
     if (isInitializing) {
       console.log("Device initialization already in progress, skipping");
@@ -121,7 +118,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     setIsInitializing(true);
     
     try {
-      // Use existing token or fetch a new one
       const token = tokenRef.current || await fetchToken();
       
       if (device) {
@@ -308,7 +304,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   }, [device, status]);
 
   const setupDeviceWrapper = useCallback(async (): Promise<void> => {
-    // Fetch token if we don't have one yet, but don't setup device automatically
     if (!tokenRef.current) {
       try {
         await fetchToken();
@@ -324,7 +319,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     }
   }, [fetchToken, audioContextInitialized, setupDeviceAfterInteraction]);
 
-  // Initial setup
   useEffect(() => {
     window.twilioClient = {
       device,

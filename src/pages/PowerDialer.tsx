@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +22,7 @@ import {
   PhoneCall,
   AlertCircle
 } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import TwilioClient from "@/components/TwilioClient";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Phone3 from "@/components/icons/Phone3";
@@ -206,6 +205,7 @@ type CallStatus = "ready" | "in-progress" | "completed" | "no-answer" | "error";
 type DialingMode = "single" | "power";
 
 const PowerDialer = () => {
+  const { toast } = useToast();
   const [leads, setLeads] = useState<Lead[]>(dummyLeads);
   const [filteredLeads, setFilteredLeads] = useState<Lead[]>(dummyLeads);
   const [searchTerm, setSearchTerm] = useState("");
