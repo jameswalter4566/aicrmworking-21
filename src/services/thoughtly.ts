@@ -22,6 +22,11 @@ export const thoughtlyService = {
    */
   async createContact(contact: ThoughtlyContact) {
     try {
+      // Ensure there are no duplicate tags
+      if (contact.tags) {
+        contact.tags = [...new Set(contact.tags)];
+      }
+
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
         body: {
           action: 'createContact',
@@ -48,10 +53,16 @@ export const thoughtlyService = {
    */
   async createBulkContacts(contacts: ThoughtlyContact[]) {
     try {
+      // Ensure there are no duplicate tags in each contact
+      const processedContacts = contacts.map(contact => ({
+        ...contact,
+        tags: contact.tags ? [...new Set(contact.tags)] : []
+      }));
+
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
         body: {
           action: 'createContact',
-          contacts
+          contacts: processedContacts
         }
       });
 

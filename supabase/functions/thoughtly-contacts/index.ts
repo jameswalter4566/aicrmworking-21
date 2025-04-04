@@ -147,18 +147,28 @@ async function createSingleContact(contactData, apiToken, teamId) {
       );
     }
     
+    // Ensure no duplicate tags and convert id to string in attributes
+    const tags = Array.isArray(contactData.tags) ? [...new Set(contactData.tags)] : [];
+    
+    const attributes = {
+      ...contactData.attributes || {},
+      source: "CRM Import",
+      disposition: contactData.disposition || "Not Contacted",
+      importDate: new Date().toISOString(),
+    };
+    
+    // Convert ID to string if it exists
+    if (contactData.id !== undefined) {
+      attributes.id = String(contactData.id);
+    }
+    
     const payload = {
       phone_number: phone,
       name: `${contactData.firstName || ""} ${contactData.lastName || ""}`.trim(),
       email: contactData.email || "",
       country_code: contactData.countryCode || "US",
-      tags: contactData.tags || [],
-      attributes: {
-        ...contactData.attributes || {},
-        source: "CRM Import",
-        disposition: contactData.disposition || "Not Contacted",
-        importDate: new Date().toISOString()
-      }
+      tags: tags,
+      attributes: attributes
     };
     
     console.log(`Sending payload to Thoughtly:`, payload);
@@ -232,19 +242,28 @@ async function createBulkContacts(contacts, apiToken, teamId) {
         continue;
       }
       
+      // Ensure no duplicate tags and convert id to string in attributes
+      const tags = Array.isArray(contact.tags) ? [...new Set(contact.tags)] : [];
+      
+      const attributes = {
+        ...contact.attributes || {},
+        source: "CRM Import",
+        disposition: contact.disposition || "Not Contacted",
+        importDate: new Date().toISOString()
+      };
+      
+      // Convert ID to string if it exists
+      if (contact.id !== undefined) {
+        attributes.id = String(contact.id);
+      }
+      
       const payload = {
         phone_number: phone,
         name: `${contact.firstName || ""} ${contact.lastName || ""}`.trim(),
         email: contact.email || "",
         country_code: contact.countryCode || "US",
-        tags: contact.tags || [],
-        attributes: {
-          ...contact.attributes || {},
-          source: "CRM Import",
-          disposition: contact.disposition || "Not Contacted",
-          importDate: new Date().toISOString(),
-          id: contact.id || null
-        }
+        tags: tags,
+        attributes: attributes
       };
       
       console.log(`Sending payload to Thoughtly for ${contact.firstName}:`, payload);
