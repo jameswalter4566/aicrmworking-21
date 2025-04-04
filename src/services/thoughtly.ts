@@ -12,6 +12,7 @@ export interface ThoughtlyContact {
   attributes?: Record<string, any>;
   tags?: string[];
   countryCode?: string;
+  avatar?: string;  // Adding the avatar property
 }
 
 // Utility function to strip phone number of all non-numeric characters
