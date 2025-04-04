@@ -51,10 +51,12 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       });
 
       if (error) {
+        console.error("Error from twilio-token function:", error);
         throw new Error(`Error fetching token: ${error.message}`);
       }
 
       if (!data || !data.token) {
+        console.error("Invalid response from twilio-token function:", data);
         throw new Error("No token received from server");
       }
 
@@ -107,10 +109,15 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         if (onCallConnect) onCallConnect(conn);
       });
 
-      await newDevice.register();
-      setDevice(newDevice);
-      setStatus("ready");
-      return newDevice;
+      try {
+        await newDevice.register();
+        setDevice(newDevice);
+        setStatus("ready");
+        return newDevice;
+      } catch (registerError) {
+        console.error("Error registering Twilio device:", registerError);
+        throw new Error(`Error registering device: ${registerError.message}`);
+      }
     } catch (err: any) {
       console.error("Error setting up Twilio device:", err);
       setStatus("error");
@@ -193,13 +200,15 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       status,
       makeCall,
       hangupCall,
-      setupDevice: setupDeviceWrapper, // Use the wrapper function here
+      setupDevice: setupDeviceWrapper,
       isReady,
     };
 
     // Initial setup
     if (!device) {
-      setupDevice();
+      setupDevice().catch(err => {
+        console.error("Failed to setup device in initial effect:", err);
+      });
     }
 
     // Cleanup on unmount
