@@ -1,10 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client
-const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imltcm1ib3ljemViamxibmtnam5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2Njg1MDQsImV4cCI6MjA1OTI0NDUwNH0.scafe8itFDyN5mFcCiyS1uugV5-7s9xhaKoqYuXGJwQ";
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '@/integrations/supabase/client';
 
 // Audio context and processing nodes
 let audioContext: AudioContext | null = null;
