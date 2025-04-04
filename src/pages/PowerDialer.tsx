@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -285,8 +286,8 @@ const PowerDialer = () => {
           </div>
 
           <div className="grid grid-cols-1 gap-6 h-full">
-            <Card className="shadow-sm rounded-2xl">
-              <CardHeader className="bg-crm-blue/5 border-b pb-3 rounded-t-2xl">
+            <Card className="shadow-sm">
+              <CardHeader className="bg-crm-blue/5 border-b pb-3">
                 <CardTitle className="text-lg font-medium flex items-center gap-2">
                   <Phone className="h-5 w-5 text-crm-blue" />
                   {isDialing ? 'Active Call' : (dialingMode === "ai" ? 'AI Call Dashboard' : 'Call Dashboard')}
@@ -304,14 +305,14 @@ const PowerDialer = () => {
                             : 'Initializing calls...'}
                         </span>
                       </div>
-                      <Badge className="bg-green-100 text-green-800 px-3 py-1 rounded-full">
+                      <Badge className="bg-green-100 text-green-800 px-3 py-1">
                         Lines in use: {lineCount}
                       </Badge>
                     </div>
                     
                     {dialingMode === "ai" && (
-                      <Card className="border rounded-2xl mb-4 bg-gray-50">
-                        <CardHeader className="pb-2 pt-3 px-4 border-b rounded-t-2xl">
+                      <Card className="border rounded-md mb-4 bg-gray-50">
+                        <CardHeader className="pb-2 pt-3 px-4 border-b">
                           <CardTitle className="text-sm font-medium flex items-center gap-2">
                             <Bot className="h-4 w-4 text-crm-blue" />
                             AI Assistant
@@ -338,11 +339,11 @@ const PowerDialer = () => {
                       </Card>
                     )}
                     
-                    <Card className="border rounded-2xl">
-                      <CardHeader className="pb-2 pt-3 px-4 rounded-t-2xl">
+                    <Card className="border rounded-md">
+                      <CardHeader className="pb-2 pt-3 px-4">
                         <CardTitle className="text-sm font-medium">Activity Log</CardTitle>
                       </CardHeader>
-                      <ScrollArea className="h-[300px] rounded-b-2xl">
+                      <ScrollArea className="h-[300px] rounded-md">
                         <div className="p-4">
                           {activeCallId && activityLogsData[activeCallId as keyof typeof activityLogsData] ? (
                             <div className="space-y-4">
@@ -404,18 +405,207 @@ const PowerDialer = () => {
                     </Card>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-3 gap-4 rounded-2xl bg-gray-50 p-4">
-                    <div className="bg-white p-4 rounded-xl shadow-sm">
-                      <h3 className="text-sm font-medium text-gray-600">Total Leads</h3>
-                      <p className="text-2xl font-bold mt-2">{leads.length}</p>
+                  <div className="flex flex-col items-center justify-center h-[300px] gap-4">
+                    <div className="w-20 h-20 rounded-full bg-crm-blue/10 flex items-center justify-center">
+                      {dialingMode === "ai" ? (
+                        <Bot className="h-10 w-10 text-crm-blue" />
+                      ) : (
+                        <Phone className="h-10 w-10 text-crm-blue" />
+                      )}
                     </div>
+                    <div className="text-center">
+                      <h3 className="text-lg font-medium mb-2">
+                        {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Power Dialing Session"}
+                      </h3>
+                      <p className="text-gray-500 max-w-md">
+                        {dialingMode === "ai"
+                          ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
+                          : "Call multiple leads in sequence with our power dialer. Select leads from the table below or dial all leads."
+                        }
+                      </p>
+                    </div>
+                    <Button 
+                      className="mt-4 bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+                      onClick={startDialSession}
+                    >
+                      Start Dialing
+                    </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
         </div>
+
+        <div className="border-t p-6 bg-white">
+          <div className="mb-4 flex justify-between items-center">
+            <h2 className="text-lg font-medium">Leads to Dial</h2>
+            <div className="text-sm text-gray-500">
+              {selectedLeads.length > 0 ? `${selectedLeads.length} leads selected` : 'All leads will be dialed'}
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <Table>
+              <TableHeader className="bg-crm-blue/10">
+                <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox 
+                      checked={isAllSelected}
+                      onCheckedChange={handleSelectAllLeads}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead>Disposition</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Primary Phone</TableHead>
+                  <TableHead>Secondary Phone</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {leads.map((lead) => (
+                  <TableRow 
+                    key={lead.id} 
+                    className={`
+                      hover:bg-gray-50 
+                      ${activeCallId === lead.id ? 'bg-blue-50' : ''}
+                    `}
+                  >
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedLeads.includes(lead.id)}
+                        onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
+                        aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getDispositionClass(lead.disposition)}>
+                        {lead.disposition}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="flex items-center gap-2">
+                      <Avatar className="h-8 w-8">
+                        {lead.avatar ? (
+                          <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                        ) : (
+                          <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
+                            {lead.firstName.charAt(0)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <span>{lead.firstName} {lead.lastName}</span>
+                    </TableCell>
+                    <TableCell>{lead.email}</TableCell>
+                    <TableCell>{lead.phone1}</TableCell>
+                    <TableCell>{lead.phone2 || "-"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Dialer Settings</DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4 space-y-4">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Dialing Mode</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <Button
+                  variant="outline"
+                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "power" ? "border-crm-blue bg-crm-blue/5" : ""}`}
+                  onClick={() => setDialingMode("power")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-5 w-5 text-crm-blue" />
+                    <div className="flex-1">
+                      <div className="font-medium">Power Dialer</div>
+                      <div className="text-xs text-gray-500">
+                        Manually call leads in sequence
+                      </div>
+                    </div>
+                  </div>
+                </Button>
+                <Button
+                  variant="outline"
+                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "ai" ? "border-crm-blue bg-crm-blue/5" : ""}`}
+                  onClick={() => setDialingMode("ai")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Bot className="h-5 w-5 text-crm-blue" />
+                    <div className="flex-1">
+                      <div className="font-medium">AI Dialer</div>
+                      <div className="text-xs text-gray-500">
+                        AI assistant handles calls
+                      </div>
+                    </div>
+                  </div>
+                </Button>
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium mb-2">Concurrent Lines</h3>
+              <ToggleGroup 
+                type="single" 
+                value={lineCount}
+                onValueChange={(value) => {
+                  if (value) setLineCount(value);
+                }}
+                className="justify-start border rounded-lg p-1"
+              >
+                <ToggleGroupItem value="1" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
+                  <Phone className="h-4 w-4" />
+                  <span>1 Line</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="2" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
+                  <Phone2 className="h-4 w-4" />
+                  <span>2 Lines</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="3" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
+                  <Phone3 className="h-4 w-4" />
+                  <span>3 Lines</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium mb-2">Leads to Dial</h3>
+              <div className="bg-gray-50 p-3 rounded-lg text-sm">
+                {selectedLeads.length > 0 ? (
+                  <span className="font-medium">{selectedLeads.length} leads selected</span>
+                ) : (
+                  <span>All leads will be dialed ({leads.length} total)</span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <DialogFooter className="flex sm:justify-between gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setIsDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+              onClick={startDialing}
+            >
+              Start Dialing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </MainLayout>
   );
 };
