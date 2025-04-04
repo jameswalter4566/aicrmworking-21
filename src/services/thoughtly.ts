@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ThoughtlyContact {
@@ -100,14 +99,14 @@ export const thoughtlyService = {
     limit?: number;
   }) {
     try {
-      // Send the request to the thoughtly-contacts edge function with 'getContacts' action
+      // Convert search params to a URLSearchParams object
       const searchParams = new URLSearchParams();
       
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
           if (value !== undefined) {
             if (Array.isArray(value)) {
-              value.forEach(item => searchParams.append(key, item));
+              value.forEach(item => searchParams.append(key, String(item)));
             } else {
               searchParams.append(key, String(value));
             }
@@ -115,11 +114,12 @@ export const thoughtlyService = {
         });
       }
       
+      // Modify the function invoke to pass search parameters in the body
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
         body: {
-          action: 'getContacts'
-        },
-        query: searchParams
+          action: 'getContacts',
+          searchParams: searchParams.toString()
+        }
       });
 
       if (error) {
