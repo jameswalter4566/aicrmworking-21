@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -149,26 +150,26 @@ const AIDialer = () => {
   const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
   
   useEffect(() => {
-    fetchThoughtlyContacts();
+    fetchLeads();
   }, []);
-
-  const fetchThoughtlyContacts = async () => {
+  
+  // Updated function to use the new edge function
+  const fetchLeads = async () => {
     setIsLoading(true);
     try {
-      const response = await thoughtlyService.getContacts({
-        limit: 50
-      });
+      // Use the new retrieveLeads method to get leads from all sources
+      const retrievedLeads = await thoughtlyService.retrieveLeads();
       
-      if (response?.success && response?.data) {
-        const mappedLeads = response.data.map(mapThoughtlyContactToLead);
-        setLeads(mappedLeads);
-        setThoughtlyContacts(response.data);
-        console.log("Fetched leads from Thoughtly:", mappedLeads);
+      if (retrievedLeads && Array.isArray(retrievedLeads) && retrievedLeads.length > 0) {
+        setLeads(retrievedLeads);
+        console.log("Loaded leads from retrieve-leads function:", retrievedLeads);
       } else {
+        // Fallback to default leads if needed
+        console.log("No leads retrieved, using default data");
         setLeads(defaultLeads);
       }
     } catch (error) {
-      console.error("Error fetching Thoughtly contacts:", error);
+      console.error("Error fetching leads:", error);
       toast({
         title: "Error",
         description: "Failed to retrieve contacts. Using sample data instead.",

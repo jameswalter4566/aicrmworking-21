@@ -12,7 +12,7 @@ export interface ThoughtlyContact {
   attributes?: Record<string, any>;
   tags?: string[];
   countryCode?: string;
-  avatar?: string;  // Adding the avatar property
+  avatar?: string;  // Avatar property is now included in the interface
 }
 
 // Utility function to strip phone number of all non-numeric characters
@@ -195,6 +195,62 @@ export const thoughtlyService = {
       };
     } catch (error) {
       console.error('Error syncing leads:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Retrieve leads from all available sources via the retrieve-leads edge function
+   * @returns Array of leads from all sources
+   */
+  async retrieveLeads() {
+    try {
+      console.log('Retrieving leads from all sources');
+      
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
+        body: { source: 'all' }
+      });
+
+      if (error) {
+        console.error('Error retrieving leads:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('Error retrieving leads:', data.error);
+        throw new Error(data.error || 'Failed to retrieve leads');
+      }
+      
+      // Map the retrieved leads to the expected format
+      const mappedLeads = Array.isArray(data.data) 
+        ? data.data.map((contact: any) => {
+            let firstName = '', lastName = '';
+            if (contact.name) {
+              const nameParts = contact.name.split(' ');
+              firstName = nameParts[0] || '';
+              lastName = nameParts.slice(1).join(' ') || '';
+            }
+
+            return {
+              id: contact.attributes?.id ? Number(contact.attributes.id) : Date.now(),
+              firstName: contact.attributes?.firstName || firstName,
+              lastName: contact.attributes?.lastName || lastName,
+              email: contact.email || '',
+              phone1: contact.phone_number || '',
+              phone2: contact.attributes?.phone2 || '',
+              disposition: contact.attributes?.disposition || 'Not Contacted',
+              avatar: contact.attributes?.avatar || '',
+              tags: contact.tags || [],
+              countryCode: contact.country_code || 'US'
+            } as ThoughtlyContact;
+          })
+        : [];
+      
+      console.log(`Retrieved and mapped ${mappedLeads.length} leads`);
+      
+      return mappedLeads;
+    } catch (error) {
+      console.error('Error in retrieveLeads:', error);
       throw error;
     }
   }

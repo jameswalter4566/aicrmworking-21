@@ -30,6 +30,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { twilioService } from "@/services/twilio";
+import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 
 const leadsData = [
   {
@@ -134,7 +135,7 @@ const getDispositionClass = (disposition: string) => {
 };
 
 const PowerDialer = () => {
-  const [leads, setLeads] = useState(leadsData);
+  const [leads, setLeads] = useState<ThoughtlyContact[]>([]);
   const [activeCallId, setActiveCallId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [lineCount, setLineCount] = useState("1");
@@ -150,6 +151,7 @@ const PowerDialer = () => {
   ]);
   const [callSids, setCallSids] = useState<Record<number, string>>({});
   const [twilioInitialized, setTwilioInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const initTwilio = async () => {
@@ -180,6 +182,32 @@ const PowerDialer = () => {
       twilioService.cleanup();
     };
   }, []);
+  
+  useEffect(() => {
+    fetchLeads();
+  }, []);
+  
+  const fetchLeads = async () => {
+    setIsLoading(true);
+    try {
+      const retrievedLeads = await thoughtlyService.retrieveLeads();
+      if (retrievedLeads && Array.isArray(retrievedLeads) && retrievedLeads.length > 0) {
+        setLeads(retrievedLeads);
+        console.log("Loaded leads from retrieve-leads function:", retrievedLeads);
+      } else {
+        console.log("No leads retrieved, using default data");
+      }
+    } catch (error) {
+      console.error("Error fetching leads:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load leads. Please refresh and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const startDialSession = () => {
     setIsDialogOpen(true);
@@ -196,8 +224,8 @@ const PowerDialer = () => {
     }
 
     const leadsToDial = selectedLeads.length > 0 
-      ? leads.filter(lead => selectedLeads.includes(lead.id)).map(lead => lead.id)
-      : leads.map(lead => lead.id);
+      ? leads.filter(lead => selectedLeads.includes(lead.id!)).map(lead => lead.id!)
+      : leads.map(lead => lead.id!);
     
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
@@ -231,7 +259,7 @@ const PowerDialer = () => {
       description: `Calling ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`,
     });
     
-    const { success, callSid, error } = await twilioService.makeCall(lead.phone1);
+    const { success, callSid, error } = await twilioService.makeCall(lead.phone1 || '');
     
     if (success && callSid) {
       setCallSids(prev => ({ ...prev, [leadId]: callSid }));
@@ -331,7 +359,7 @@ const PowerDialer = () => {
 
   const handleSelectAllLeads = (checked: boolean) => {
     if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id));
+      setSelectedLeads(leads.map(lead => lead.id!).filter(Boolean));
     } else {
       setSelectedLeads([]);
     }
@@ -346,7 +374,7 @@ const PowerDialer = () => {
   };
 
   const isAllSelected = leads.length > 0 && leads.every(lead => 
-    selectedLeads.includes(lead.id)
+    lead.id && selectedLeads.includes(lead.id)
   );
 
   return (
@@ -533,7 +561,11 @@ const PowerDialer = () => {
           <div className="mb-4 flex justify-between items-center">
             <h2 className="text-lg font-medium">Leads to Dial</h2>
             <div className="text-sm text-gray-500">
-              {selectedLeads.length > 0 ? `${selectedLeads.length} leads selected` : 'All leads will be dialed'}
+              {isLoading ? 'Loading leads...' : (
+                selectedLeads.length > 0 ? 
+                `${selectedLeads.length} leads selected` : 
+                `${leads.length} leads available`
+              )}
             </div>
           </div>
           
@@ -556,43 +588,57 @@ const PowerDialer = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {leads.map((lead) => (
-                  <TableRow 
-                    key={lead.id} 
-                    className={`
-                      hover:bg-gray-50 
-                      ${activeCallId === lead.id ? 'bg-blue-50' : ''}
-                    `}
-                  >
-                    <TableCell>
-                      <Checkbox 
-                        checked={selectedLeads.includes(lead.id)}
-                        onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
-                        aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                      />
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      Loading leads...
                     </TableCell>
-                    <TableCell>
-                      <Badge className={getDispositionClass(lead.disposition)}>
-                        {lead.disposition}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        {lead.avatar ? (
-                          <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                        ) : (
-                          <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                            {lead.firstName.charAt(0)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <span>{lead.firstName} {lead.lastName}</span>
-                    </TableCell>
-                    <TableCell>{lead.email}</TableCell>
-                    <TableCell>{lead.phone1}</TableCell>
-                    <TableCell>{lead.phone2 || "-"}</TableCell>
                   </TableRow>
-                ))}
+                ) : leads.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-8">
+                      No leads found. Import leads to get started.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  leads.map((lead) => (
+                    <TableRow 
+                      key={lead.id} 
+                      className={`
+                        hover:bg-gray-50 
+                        ${activeCallId === lead.id ? 'bg-blue-50' : ''}
+                      `}
+                    >
+                      <TableCell>
+                        <Checkbox 
+                          checked={lead.id ? selectedLeads.includes(lead.id) : false}
+                          onCheckedChange={(checked) => lead.id && handleSelectLead(lead.id, !!checked)}
+                          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
+                          {lead.disposition || 'Not Contacted'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          {lead.avatar ? (
+                            <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                          ) : (
+                            <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
+                              {lead.firstName ? lead.firstName.charAt(0) : '?'}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <span>{lead.firstName} {lead.lastName}</span>
+                      </TableCell>
+                      <TableCell>{lead.email}</TableCell>
+                      <TableCell>{lead.phone1}</TableCell>
+                      <TableCell>{lead.phone2 || "-"}</TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
