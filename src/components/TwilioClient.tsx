@@ -146,7 +146,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         edge: ['ashburn', 'tokyo', 'sydney'],
         enableImprovedSignalingErrorPrecision: true,
         closeProtection: true,
-        codecPreferences: ['opus', 'pcmu'] as Codec[],
+        codecPreferences: ['opus', 'pcmu'] as any,
         appName: "PowerDialer",
         appVersion: "1.0.0"
       });
