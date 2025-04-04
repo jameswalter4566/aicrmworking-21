@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device, Call } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -46,6 +47,19 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const MAX_SETUP_ATTEMPTS = 3;
   const tokenRef = useRef<string | null>(null);
   const deviceRef = useRef<Device | null>(null);
+
+  // Track call quality metrics
+  const [callQuality, setCallQuality] = useState<{
+    mos: number | null;
+    jitter: number | null;
+    packetsLost: number | null;
+    rtt: number | null;
+  }>({
+    mos: null,
+    jitter: null,
+    packetsLost: null,
+    rtt: null,
+  });
 
   const fetchToken = useCallback(async () => {
     try {
@@ -103,6 +117,56 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     }
     return false;
   }, []);
+
+  const handleCallSample = useCallback((sample: any) => {
+    // Update call quality metrics based on WebRTC sample data
+    setCallQuality({
+      mos: sample.mos || null,
+      jitter: sample.jitter || null,
+      packetsLost: sample.packetsLost || null,
+      rtt: sample.rtt || null,
+    });
+    
+    console.log("Call quality sample:", {
+      mos: sample.mos,
+      jitter: sample.jitter,
+      packetsLost: sample.packetsLost,
+      rtt: sample.rtt,
+    });
+  }, []);
+
+  const handleCallWarning = useCallback((warningName: string, warningData: any) => {
+    console.warn("Call quality warning:", warningName, warningData);
+    
+    if (warningName === 'low-mos') {
+      toast({
+        variant: "warning",
+        title: "Call Quality Issue",
+        description: "Poor call quality detected. You may experience degraded audio.",
+      });
+    } else if (warningName === 'high-jitter' || warningName === 'high-packet-loss') {
+      toast({
+        variant: "warning",
+        title: "Network Issue",
+        description: "Network instability detected. Call quality may be affected.",
+      });
+    } else if (warningName === 'high-rtt') {
+      toast({
+        variant: "warning",
+        title: "Connection Delay",
+        description: "High latency detected. There may be delays in the conversation.",
+      });
+    }
+  }, [toast]);
+
+  const handleWarningCleared = useCallback((warningName: string) => {
+    console.log("Call quality warning cleared:", warningName);
+    
+    toast({
+      title: "Call Quality Improved",
+      description: "The previously detected audio issue has been resolved.",
+    });
+  }, [toast]);
 
   const setupDeviceAfterInteraction = useCallback(async () => {
     if (isInitializing) {
@@ -215,6 +279,26 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       newDevice.on("connect", (conn) => {
         console.log("Twilio call connected");
+        
+        // Setup call quality monitoring
+        conn.on('sample', handleCallSample);
+        conn.on('warning', handleCallWarning);
+        conn.on('warning-cleared', handleWarningCleared);
+        
+        // When the call is accepted (media session set up)
+        conn.on('accept', () => {
+          console.log("Call accepted, media session established");
+          console.log("Call parameters:", conn.parameters);
+          console.log("Call direction:", conn.direction);
+          
+          if (conn.callerInfo && conn.callerInfo.isVerified === true) {
+            toast({
+              title: "Verified Caller",
+              description: "This call is from a verified source.",
+            });
+          }
+        });
+        
         setConnection(conn);
         setStatus("busy");
         if (onCallConnect) onCallConnect(conn);
@@ -269,7 +353,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     } finally {
       setIsInitializing(false);
     }
-  }, [device, status, isInitializing, audioContextInitialized, fetchToken, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
+  }, [device, status, isInitializing, audioContextInitialized, fetchToken, handleCallSample, handleCallWarning, handleWarningCleared, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
 
   const makeCall = useCallback(
     async (phoneNumber: string): Promise<Call | void> => {
@@ -295,6 +379,15 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         toast({
           title: "Calling...",
           description: `Dialing ${phoneNumber}`,
+        });
+        
+        // Add handling for ringing state
+        call.on('ringing', (hasEarlyMedia) => {
+          console.log("Call is ringing, early media available:", hasEarlyMedia);
+          toast({
+            title: "Ringing",
+            description: "Call is ringing...",
+          });
         });
         
         return call;
@@ -333,6 +426,66 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       setStatus("ready");
     }
   }, [connection]);
+
+  // New function to send DTMF tones
+  const sendDigits = useCallback((digits: string) => {
+    if (connection) {
+      try {
+        console.log("Sending DTMF digits:", digits);
+        connection.sendDigits(digits);
+        toast({
+          title: "Sent Digits",
+          description: `Sent DTMF tones: ${digits}`,
+        });
+      } catch (e) {
+        console.error("Error sending DTMF digits:", e);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to send DTMF tones",
+        });
+      }
+    } else {
+      toast({
+        variant: "destructive",
+        title: "No Active Call",
+        description: "Cannot send digits: no active call",
+      });
+    }
+  }, [connection, toast]);
+
+  // New function to toggle mute
+  const toggleMute = useCallback((shouldMute?: boolean) => {
+    if (connection) {
+      try {
+        const currentlyMuted = connection.isMuted();
+        const newMuteState = shouldMute !== undefined ? shouldMute : !currentlyMuted;
+        
+        connection.mute(newMuteState);
+        
+        toast({
+          title: newMuteState ? "Muted" : "Unmuted",
+          description: newMuteState ? "Your microphone is now muted" : "Your microphone is now unmuted",
+        });
+        
+        return newMuteState;
+      } catch (e) {
+        console.error("Error toggling mute:", e);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to change mute status",
+        });
+      }
+    } else {
+      toast({
+        variant: "destructive",
+        title: "No Active Call",
+        description: "Cannot toggle mute: no active call",
+      });
+    }
+    return false;
+  }, [connection, toast]);
 
   const isReady = useCallback(() => {
     return device !== null && status === "ready";
@@ -386,6 +539,11 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       isReady,
     };
 
+    // Add the new functions to the global twilioClient object
+    (window.twilioClient as any).sendDigits = sendDigits;
+    (window.twilioClient as any).toggleMute = toggleMute;
+    (window.twilioClient as any).callQuality = callQuality;
+
     if (!deviceInitializedRef.current && !device) {
       initializeAudioContext();
       
@@ -420,7 +578,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       
       deviceInitializedRef.current = false;
     };
-  }, [device, connection, status, makeCall, hangupCall, setupDeviceWrapper, isReady, initializeAudioContext]);
+  }, [device, connection, status, callQuality, makeCall, hangupCall, sendDigits, toggleMute, setupDeviceWrapper, isReady, initializeAudioContext]);
 
   if (showSetupButton) {
     return (
