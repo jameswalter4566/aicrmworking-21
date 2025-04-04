@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,10 +40,28 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const [device, setDevice] = useState<Device | null>(null);
   const [connection, setConnection] = useState<any>(null);
   const [status, setStatus] = useState<string>("offline");
+  const [isInitializing, setIsInitializing] = useState(false);
   const toast = useToast();
+  
+  // Use a ref to track if the device is already initialized
+  const deviceInitializedRef = useRef(false);
 
   // Initialize the Twilio device
   const setupDevice = useCallback(async () => {
+    // Prevent multiple initializations
+    if (isInitializing) {
+      console.log("Device initialization already in progress, skipping");
+      return null;
+    }
+    
+    // If device is already ready, return it
+    if (device && status === "ready") {
+      console.log("Device already initialized and ready");
+      return device;
+    }
+    
+    setIsInitializing(true);
+    
     try {
       // Fetch a token from our Supabase function
       const { data, error } = await supabase.functions.invoke("twilio-token", {
@@ -62,6 +80,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       // Clean up existing device if it exists
       if (device) {
+        console.log("Destroying existing device before creating new one");
         device.destroy();
       }
 
@@ -74,17 +93,25 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       // Setup event listeners
       newDevice.on("ready", () => {
+        console.log("Twilio device is ready");
         setStatus("ready");
-        if (onDeviceReady) onDeviceReady(newDevice);
-        toast.toast({
-          title: "Phone Ready",
-          description: "Your phone is ready to make calls.",
-        });
+        setIsInitializing(false);
+        
+        // Only notify and call handler once
+        if (!deviceInitializedRef.current) {
+          deviceInitializedRef.current = true;
+          if (onDeviceReady) onDeviceReady(newDevice);
+          toast.toast({
+            title: "Phone Ready",
+            description: "Your phone is ready to make calls.",
+          });
+        }
       });
 
       newDevice.on("error", (err) => {
         console.error("Twilio device error:", err);
         setStatus("error");
+        setIsInitializing(false);
         if (onError && err) onError(err);
         toast.toast({
           variant: "destructive",
@@ -94,6 +121,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       });
 
       newDevice.on("disconnect", () => {
+        console.log("Twilio call disconnected");
         setConnection(null);
         setStatus("ready");
         if (onCallDisconnect) onCallDisconnect();
@@ -104,23 +132,27 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       });
 
       newDevice.on("connect", (conn) => {
+        console.log("Twilio call connected");
         setConnection(conn);
         setStatus("busy");
         if (onCallConnect) onCallConnect(conn);
       });
 
       try {
+        console.log("Registering Twilio device");
         await newDevice.register();
         setDevice(newDevice);
         setStatus("ready");
         return newDevice;
       } catch (registerError) {
         console.error("Error registering Twilio device:", registerError);
+        setIsInitializing(false);
         throw new Error(`Error registering device: ${registerError.message}`);
       }
     } catch (err: any) {
       console.error("Error setting up Twilio device:", err);
       setStatus("error");
+      setIsInitializing(false);
       if (onError) onError(err);
       toast.toast({
         variant: "destructive",
@@ -129,12 +161,12 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       });
       return null;
     }
-  }, [device, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
+  }, [device, status, isInitializing, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
 
   const makeCall = useCallback(
     async (phoneNumber: string) => {
       try {
-        if (!device || !device.register) {
+        if (!device || status !== "ready") {
           await setupDevice();
         }
 
@@ -171,7 +203,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         });
       }
     },
-    [device, setupDevice, onError, toast]
+    [device, status, setupDevice, onError, toast]
   );
 
   const hangupCall = useCallback(() => {
@@ -204,8 +236,9 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       isReady,
     };
 
-    // Initial setup
-    if (!device) {
+    // Initial setup - only do this once when the component mounts
+    if (!deviceInitializedRef.current && !device) {
+      console.log("Performing initial Twilio device setup");
       setupDevice().catch(err => {
         console.error("Failed to setup device in initial effect:", err);
       });
@@ -214,12 +247,14 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     // Cleanup on unmount
     return () => {
       if (device) {
+        console.log("Cleaning up Twilio device on unmount");
         device.destroy();
       }
       if (window.twilioClient) {
         window.twilioClient.device = null;
         window.twilioClient.connection = null;
       }
+      deviceInitializedRef.current = false;
     };
   }, [device, connection, status, makeCall, hangupCall, setupDevice, setupDeviceWrapper, isReady]);
 
