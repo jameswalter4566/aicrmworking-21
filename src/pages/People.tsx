@@ -48,6 +48,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
+import { thoughtlyService } from "@/services/thoughtly";
 
 const leadsData = [
   {
