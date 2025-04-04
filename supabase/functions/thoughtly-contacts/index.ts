@@ -13,6 +13,7 @@ console.log("Thoughtly Contacts function loaded and ready")
 
 // Base Thoughtly API URL 
 const THOUGHTLY_API_URL = "https://api.thoughtly.com"
+const API_TOKEN = "8f6vq0cwvk59qwi63rcf1o" // Using the provided API token
 
 // Main serve function to handle requests
 serve(async (req) => {
@@ -28,17 +29,16 @@ serve(async (req) => {
   }
 
   try {
-    // Get Thoughtly credentials from environment variables
-    const THOUGHTLY_API_TOKEN = Deno.env.get('THOUGHTLY_API_TOKEN')
+    // Get Thoughtly Team ID from environment variables
     const THOUGHTLY_TEAM_ID = Deno.env.get('THOUGHTLY_TEAM_ID')
 
     // Check if required credentials are available
-    if (!THOUGHTLY_API_TOKEN || !THOUGHTLY_TEAM_ID) {
-      console.error("Missing Thoughtly API credentials")
+    if (!THOUGHTLY_TEAM_ID) {
+      console.error("Missing Thoughtly Team ID")
       return new Response(
         JSON.stringify({ 
-          error: 'Missing required Thoughtly API credentials',
-          missingCredentials: !THOUGHTLY_API_TOKEN ? 'API Token' : 'Team ID'
+          error: 'Missing required Thoughtly Team ID',
+          missingCredentials: 'Team ID'
         }),
         { 
           status: 500, 
@@ -62,7 +62,7 @@ serve(async (req) => {
         if (!Array.isArray(contacts)) {
           return await createSingleContact(
             contacts, 
-            THOUGHTLY_API_TOKEN, 
+            API_TOKEN, 
             THOUGHTLY_TEAM_ID
           )
         }
@@ -70,7 +70,7 @@ serve(async (req) => {
         // Handle bulk contact creation
         return await createBulkContacts(
           contacts, 
-          THOUGHTLY_API_TOKEN, 
+          API_TOKEN, 
           THOUGHTLY_TEAM_ID
         )
       }
@@ -79,7 +79,7 @@ serve(async (req) => {
         const searchParams = requestUrl.searchParams
         return await getContacts(
           searchParams,
-          THOUGHTLY_API_TOKEN,
+          API_TOKEN,
           THOUGHTLY_TEAM_ID
         )
       }
@@ -101,9 +101,12 @@ serve(async (req) => {
 
 // Function to create a single contact in Thoughtly
 async function createSingleContact(contactData, apiToken, teamId) {
-  console.log(`Creating single contact: ${contactData.name}`)
+  console.log(`Creating single contact: ${contactData.firstName} ${contactData.lastName}`)
   
   try {
+    console.log('API Token:', apiToken)
+    console.log('Team ID:', teamId)
+    
     const response = await fetch(`${THOUGHTLY_API_URL}/contact/create`, {
       method: 'POST',
       headers: {
@@ -127,13 +130,16 @@ async function createSingleContact(contactData, apiToken, teamId) {
     })
 
     const data = await response.json()
+    console.log('Response status:', response.status)
+    console.log('Response data:', JSON.stringify(data))
     
     if (!response.ok) {
       console.error(`Error creating contact: ${JSON.stringify(data)}`)
       return new Response(
         JSON.stringify({ 
           error: 'Failed to create contact in Thoughtly', 
-          details: data.error || 'Unknown error'
+          details: data.error || 'Unknown error',
+          status: response.status
         }),
         { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -162,6 +168,8 @@ async function createSingleContact(contactData, apiToken, teamId) {
 // Function to create multiple contacts in Thoughtly
 async function createBulkContacts(contacts, apiToken, teamId) {
   console.log(`Creating ${contacts.length} contacts in bulk`)
+  console.log('Using API Token:', apiToken)
+  console.log('Using Team ID:', teamId)
   
   const results = {
     success: [],
@@ -195,6 +203,7 @@ async function createBulkContacts(contacts, apiToken, teamId) {
       })
 
       const data = await response.json()
+      console.log(`Contact ${contact.firstName} ${contact.lastName} - status: ${response.status}`)
       
       if (!response.ok) {
         console.error(`Error creating contact: ${JSON.stringify(data)}`)
