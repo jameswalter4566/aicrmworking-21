@@ -38,43 +38,38 @@ serve(async (req) => {
     
     console.log("Creating token for identity:", identity);
 
-    // Use ClientCapability consistently (avoiding AccessToken approach)
-    const ClientCapability = twilio.jwt.ClientCapability;
-    
-    // Create a capability token with the correct account credentials
-    const capability = new ClientCapability({
-      accountSid: accountSid,
-      authToken: authToken,
-      ttl: 3600 // Token time-to-live in seconds (1 hour)
-    });
-    
-    // Allow incoming calls - use the identity as the client name
-    capability.addScope(new ClientCapability.IncomingClientScope(identity));
-    
-    // Allow outgoing calls if we have an applicationSid
-    if (applicationSid) {
-      capability.addScope(new ClientCapability.OutgoingClientScope({
-        applicationSid: applicationSid,
-        clientName: identity,
-        params: {
-          identity: identity
-        }
-      }));
-    } else {
-      console.warn("No TWILIO_TWIML_APP_SID provided. Outgoing calls will not work.");
-    }
+    // Use AccessToken (modern approach)
+    const AccessToken = twilio.jwt.AccessToken;
+    const VoiceGrant = AccessToken.VoiceGrant;
 
-    // Generate the token
-    const token = capability.toJwt();
+    // Create an access token with a TTL of 1 hour (3600 seconds)
+    const accessToken = new AccessToken(
+      accountSid,
+      applicationSid || 'AP00000000000000000000000000000000', // Fallback if no application SID
+      authToken,
+      { identity: identity, ttl: 3600 }
+    );
+
+    // Create a Voice grant for this token
+    const voiceGrant = new VoiceGrant({
+      outgoingApplicationSid: applicationSid,
+      incomingAllow: true
+    });
+
+    // Add the grant to the token
+    accessToken.addGrant(voiceGrant);
     
-    console.log("Created ClientCapability token for:", identity, "length:", token.length);
+    // Generate the token
+    const token = accessToken.toJwt();
+    
+    console.log("Created AccessToken for:", identity, "length:", token.length);
 
     // Return the token and identity
     return new Response(
       JSON.stringify({
         token: token,
         identity: identity,
-        tokenType: "ClientCapability"
+        tokenType: "AccessToken"
       }),
       { headers: { ...corsHeaders } }
     );
