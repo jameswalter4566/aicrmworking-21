@@ -31,6 +31,11 @@ export const useTwilio = () => {
             description: "Failed to initialize phone system.",
             variant: "destructive",
           });
+        } else {
+          toast({
+            title: "Success",
+            description: "Phone system initialized successfully.",
+          });
         }
       } catch (error) {
         console.error('Error initializing Twilio:', error);
@@ -72,6 +77,17 @@ export const useTwilio = () => {
           status: 'in-progress' 
         }
       }));
+      
+      toast({
+        title: "Call Connected",
+        description: `Call to ${phoneNumber} is now active.`,
+      });
+    } else {
+      toast({
+        title: "Call Failed",
+        description: result.error || "Could not connect call.",
+        variant: "destructive", 
+      });
     }
 
     return result;
@@ -86,6 +102,12 @@ export const useTwilio = () => {
         delete newCalls[leadIdStr];
         return newCalls;
       });
+      
+      toast({
+        title: "Call Ended",
+        description: `Call has been disconnected.`,
+      });
+      
       return true;
     }
     return false;
@@ -94,6 +116,11 @@ export const useTwilio = () => {
   const endAllCalls = async () => {
     await twilioService.endCall();
     setActiveCalls({});
+    
+    toast({
+      title: "All Calls Ended",
+      description: `All active calls have been disconnected.`,
+    });
   };
 
   return {

@@ -6,39 +6,11 @@ const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
 const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imltcm1ib3ljemViamxibmtnam5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2Njg1MDQsImV4cCI6MjA1OTI0NDUwNH0.scafe8itFDyN5mFcCiyS1uugV5-7s9xhaKoqYuXGJwQ";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Import twilio client using dynamic import to prevent prototype errors
-let Device: any = null;
-
 // Audio context and processing nodes
 let audioContext: AudioContext | null = null;
 let microphoneStream: MediaStream | null = null;
 let twilioDevice: any = null;
 let activeConnection: any = null;
-
-// Load the Twilio Device class dynamically
-const loadTwilioDevice = async () => {
-  try {
-    // Use dynamic import with a fallback to window.Twilio
-    const twilioModule = await import('twilio-client').catch(() => {
-      if ((window as any).Twilio && (window as any).Twilio.Device) {
-        return { Device: (window as any).Twilio.Device };
-      }
-      throw new Error('Twilio Device not found');
-    });
-    
-    Device = twilioModule.Device;
-    
-    // Ensure Device is a valid constructor
-    if (typeof Device !== 'function') {
-      throw new Error('Invalid Twilio Device constructor');
-    }
-    
-    return true;
-  } catch (error) {
-    console.error('Error loading Twilio client:', error);
-    return false;
-  }
-};
 
 // Initialize audio context for the browser
 const initializeAudioContext = async () => {
@@ -59,12 +31,6 @@ const initializeAudioContext = async () => {
 // Initialize Twilio device for making browser calls
 const initializeTwilioDevice = async () => {
   try {
-    // First ensure Device class is loaded
-    const deviceLoaded = await loadTwilioDevice();
-    if (!deviceLoaded) {
-      throw new Error('Failed to load Twilio Device class');
-    }
-    
     // Generate token from our edge function
     const { data, error } = await supabase.functions.invoke('twilio-voice', {
       body: { action: 'generateToken' },
@@ -73,37 +39,53 @@ const initializeTwilioDevice = async () => {
     if (error) throw new Error(error.message);
     if (!data.token) throw new Error('Failed to get token');
 
-    // Create Twilio device
-    if (Device) {
-      twilioDevice = new Device();
-      await twilioDevice.setup(data.token, {
-        debug: true,
-        codecPreferences: ['opus', 'pcmu'],
+    // Check for Twilio in window object (for browser-based script)
+    if (!(window as any).Twilio || !(window as any).Twilio.Device) {
+      // If not found, add script to the page
+      await new Promise<void>((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://sdk.twilio.com/js/client/releases/1.14.0/twilio.js';
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Failed to load Twilio script'));
+        document.body.appendChild(script);
       });
-
-      // Set up event listeners
-      twilioDevice.on('ready', () => {
-        console.log('Twilio device is ready for calls');
-      });
-
-      twilioDevice.on('error', (error: any) => {
-        console.error('Twilio device error:', error);
-      });
-
-      twilioDevice.on('connect', (conn: any) => {
-        console.log('Call established');
-        activeConnection = conn;
-      });
-
-      twilioDevice.on('disconnect', () => {
-        console.log('Call ended');
-        activeConnection = null;
-      });
-
-      return true;
-    } else {
-      throw new Error('Twilio Device class not loaded properly');
     }
+    
+    // Now we should have Twilio available in the window object
+    if (!(window as any).Twilio || !(window as any).Twilio.Device) {
+      throw new Error('Twilio not available after script loaded');
+    }
+    
+    // Create Twilio device
+    twilioDevice = new (window as any).Twilio.Device();
+    
+    // Set up the device with our token
+    await twilioDevice.setup(data.token, {
+      debug: true,
+      codecPreferences: ['opus', 'pcmu'],
+    });
+
+    // Set up event listeners
+    twilioDevice.on('ready', () => {
+      console.log('Twilio device is ready for calls');
+    });
+
+    twilioDevice.on('error', (error: any) => {
+      console.error('Twilio device error:', error);
+    });
+
+    twilioDevice.on('connect', (conn: any) => {
+      console.log('Call established');
+      activeConnection = conn;
+    });
+
+    twilioDevice.on('disconnect', () => {
+      console.log('Call ended');
+      activeConnection = null;
+    });
+
+    return true;
   } catch (error) {
     console.error('Error initializing Twilio device:', error);
     return false;

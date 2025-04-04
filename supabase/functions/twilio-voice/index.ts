@@ -24,14 +24,31 @@ serve(async (req) => {
     const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET')
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
 
+    // Log for debugging
+    console.log('Function invoked with Twilio credentials setup.');
+
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
+      console.error('Missing Twilio credentials:', {
+        accountSid: !!TWILIO_ACCOUNT_SID,
+        authToken: !!TWILIO_AUTH_TOKEN,
+        phoneNumber: !!TWILIO_PHONE_NUMBER,
+      });
+      
       return new Response(
-        JSON.stringify({ error: 'Missing Twilio credentials' }),
+        JSON.stringify({ 
+          error: 'Missing Twilio credentials',
+          missing: {
+            accountSid: !TWILIO_ACCOUNT_SID,
+            authToken: !TWILIO_AUTH_TOKEN,
+            phoneNumber: !TWILIO_PHONE_NUMBER,
+          }
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
     const { action, phoneNumber, callbackUrl, callSid } = await req.json()
+    console.log(`Processing action: ${action}`);
 
     switch (action) {
       case 'makeCall': {
@@ -64,6 +81,7 @@ serve(async (req) => {
         })
 
         const data = await response.json()
+        console.log('Call initiated with SID:', data.sid);
         
         return new Response(
           JSON.stringify({ success: true, callSid: data.sid }),
@@ -86,6 +104,7 @@ serve(async (req) => {
         })
 
         const data = await response.json()
+        console.log('Call status retrieved:', data.status);
         
         return new Response(
           JSON.stringify({ status: data.status }),
@@ -95,6 +114,12 @@ serve(async (req) => {
 
       case 'generateToken': {
         if (!TWILIO_API_KEY || !TWILIO_API_SECRET || !TWILIO_TWIML_APP_SID) {
+          console.error('Missing Twilio token generation credentials:', {
+            apiKey: !!TWILIO_API_KEY,
+            apiSecret: !!TWILIO_API_SECRET,
+            twimlAppSid: !!TWILIO_TWIML_APP_SID,
+          });
+          
           return new Response(
             JSON.stringify({ 
               error: 'Missing required Twilio credentials for token generation',
@@ -128,6 +153,7 @@ serve(async (req) => {
         })
 
         accessToken.addGrant(voiceGrant)
+        console.log('Token generated for identity:', identity);
         
         return new Response(
           JSON.stringify({ token: accessToken.toJwt() }),
