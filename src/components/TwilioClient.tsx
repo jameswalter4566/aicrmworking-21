@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -164,7 +165,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         if (onError && err) onError(err);
         
         let errorMessage = "An error occurred with the phone";
-        if (err && err.message) {
+        if (err && typeof err === 'object' && err.message) {
           if (err.message.includes("token")) {
             errorMessage = "Authentication error. Please refresh the page and try again.";
           } else if (err.message.includes("microphone") || err.message.includes("audio")) {
@@ -214,10 +215,16 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         setDevice(newDevice);
         setStatus("ready");
         return newDevice;
-      } catch (registerError) {
+      } catch (registerError: any) {
         console.error("Error registering Twilio device:", registerError);
         setIsInitializing(false);
-        throw new Error(`Error registering device: ${registerError.message}`);
+        
+        // Safe error message extraction
+        const errorMsg = registerError && typeof registerError === 'object' && registerError.message 
+          ? registerError.message 
+          : "Failed to register device";
+          
+        throw new Error(`Error registering device: ${errorMsg}`);
       }
     } catch (err: any) {
       console.error("Error setting up Twilio device:", err);
@@ -226,12 +233,17 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       
       if (onError) onError(err);
       
+      // Safe error message extraction
+      const errorMsg = err && typeof err === 'object' && err.message 
+        ? err.message 
+        : "Failed to set up the phone";
+      
       if (!errorNotifiedRef.current) {
         errorNotifiedRef.current = true;
         toast({
           variant: "destructive",
           title: "Setup Error",
-          description: err?.message || "Failed to set up the phone",
+          description: errorMsg,
         });
         
         setTimeout(() => {
@@ -275,12 +287,17 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         console.error("Error making call:", err);
         if (onError) onError(err);
         
+        // Safe error message extraction
+        const errorMsg = err && typeof err === 'object' && err.message 
+          ? err.message 
+          : "Failed to make the call";
+        
         if (!errorNotifiedRef.current) {
           errorNotifiedRef.current = true;
           toast({
             variant: "destructive",
             title: "Call Error",
-            description: err?.message || "Failed to make the call",
+            description: errorMsg,
           });
           
           setTimeout(() => {
