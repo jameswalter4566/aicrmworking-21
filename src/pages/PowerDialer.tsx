@@ -1,31 +1,28 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { 
   Phone, 
   PhoneOff, 
   User, 
-  Mail, 
-  Home, 
-  Clock, 
-  Calendar, 
-  MoreHorizontal, 
   Play, 
   Pause, 
   Search,
   PhoneCall,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TwilioClient from "@/components/TwilioClient";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Phone3 from "@/components/icons/Phone3";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface Lead {
   id: number;
@@ -203,6 +200,7 @@ dummyLeads.forEach(lead => {
 
 type CallStatus = "ready" | "in-progress" | "completed" | "no-answer" | "error";
 type DialingMode = "single" | "power";
+type PhoneSystemStatus = 'initializing' | 'ready' | 'error' | 'retrying';
 
 const PowerDialer = () => {
   const { toast } = useToast();
@@ -219,9 +217,12 @@ const PowerDialer = () => {
   const dialerIntervalRef = useRef<number | null>(null);
   const [dialQueue, setDialQueue] = useState<number[]>([]);
   const [activeCallsCount, setActiveCallsCount] = useState(0);
-  const [phoneSystemStatus, setPhoneSystemStatus] = useState<'initializing' | 'ready' | 'error'>('initializing');
+  const [phoneSystemStatus, setPhoneSystemStatus] = useState<PhoneSystemStatus>('initializing');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const processingDialRef = useRef(false);
+  const initializationAttemptsRef = useRef(0);
+  const maxInitializationAttempts = 3;
+  const [isInitializingPhone, setIsInitializingPhone] = useState(false);
   
   useEffect(() => {
     const filtered = leads.filter(lead => 
@@ -232,6 +233,48 @@ const PowerDialer = () => {
     );
     setFilteredLeads(filtered);
   }, [searchTerm, leads]);
+
+  const checkTwilioClientStatus = useCallback(() => {
+    return window.twilioClient && window.twilioClient.isReady && window.twilioClient.isReady();
+  }, []);
+
+  const manuallyInitializePhone = async () => {
+    setIsInitializingPhone(true);
+    setPhoneSystemStatus('retrying');
+    setStatusMessage("Attempting to initialize phone system...");
+    
+    try {
+      if (window.twilioClient && window.twilioClient.setupDevice) {
+        await window.twilioClient.setupDevice();
+        
+        // Check if the device is now ready
+        if (checkTwilioClientStatus()) {
+          setIsClientReady(true);
+          setPhoneSystemStatus('ready');
+          setStatusMessage(null);
+          toast({
+            title: "Phone System Ready",
+            description: "The phone system has been successfully initialized.",
+          });
+        } else {
+          throw new Error("Phone system initialization failed. Please check audio permissions.");
+        }
+      } else {
+        throw new Error("Twilio client not available.");
+      }
+    } catch (error: any) {
+      console.error("Manual phone initialization error:", error);
+      setPhoneSystemStatus('error');
+      setStatusMessage(`Initialization failed: ${error.message || "Unknown error"}`);
+      toast({
+        variant: "destructive",
+        title: "Initialization Failed",
+        description: "Could not initialize the phone system. Please check your browser permissions.",
+      });
+    } finally {
+      setIsInitializingPhone(false);
+    }
+  };
 
   const handleDeviceReady = () => {
     setIsClientReady(true);
@@ -639,6 +682,15 @@ const PowerDialer = () => {
         onError={handleCallError}
       />
       
+      {phoneSystemStatus === 'error' && (
+        <Alert className="mb-4" variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            {statusMessage || "Phone system error. Please check your browser's microphone permissions and try initializing the system."}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <div className="flex flex-col h-[calc(100vh-7rem)] space-y-4">
         <div className="h-1/2 grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card className="md:col-span-2 flex flex-col">
@@ -706,6 +758,7 @@ const PowerDialer = () => {
                     size="lg"
                     className="flex-1"
                     onClick={isDialerActive ? stopDialerSession : startDialerSession}
+                    disabled={phoneSystemStatus === 'error' || isInitializingPhone}
                   >
                     {isDialerActive ? (
                       <>
@@ -723,7 +776,7 @@ const PowerDialer = () => {
                   <Button
                     variant="outline"
                     onClick={resetCallStatuses}
-                    disabled={isDialerActive || Object.keys(callStatuses).length === 0}
+                    disabled={isDialerActive || Object.keys(callStatuses).length === 0 || isInitializingPhone}
                     title="Reset all call statuses"
                   >
                     Reset
@@ -733,7 +786,15 @@ const PowerDialer = () => {
               
               <div className="mt-4 p-3 bg-slate-50 rounded-md flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className={`h-3 w-3 rounded-full mr-2 ${phoneSystemStatus === 'ready' ? 'bg-green-500' : phoneSystemStatus === 'error' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                  <div className={`h-3 w-3 rounded-full mr-2 ${
+                    phoneSystemStatus === 'ready' 
+                      ? 'bg-green-500' 
+                      : phoneSystemStatus === 'error' 
+                        ? 'bg-red-500' 
+                        : phoneSystemStatus === 'retrying'
+                          ? 'bg-amber-500 animate-pulse' 
+                          : 'bg-yellow-500'
+                  }`}></div>
                   <span className="text-sm flex items-center">
                     {phoneSystemStatus === 'ready' 
                       ? 'Phone Ready' 
@@ -741,12 +802,38 @@ const PowerDialer = () => {
                         ? <div className="flex items-center text-red-700">
                             <AlertCircle className="h-3 w-3 mr-1" /> Phone Error
                           </div>
-                        : 'Initializing...'}
+                        : phoneSystemStatus === 'retrying'
+                          ? 'Retrying...'
+                          : 'Initializing...'}
                   </span>
                 </div>
+                
                 {statusMessage && (
                   <span className="text-xs text-orange-700">{statusMessage}</span>
                 )}
+                
+                {phoneSystemStatus === 'error' && (
+                  <Button
+                    variant="outline" 
+                    size="sm"
+                    onClick={manuallyInitializePhone}
+                    disabled={isInitializingPhone}
+                    className="text-xs"
+                  >
+                    {isInitializingPhone ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Initializing...
+                      </>
+                    ) : (
+                      <>
+                        <Phone className="h-3 w-3 mr-1" />
+                        Initialize Phone System
+                      </>
+                    )}
+                  </Button>
+                )}
+                
                 {activeLeadId ? (
                   <Badge variant="outline" className="bg-blue-100 text-blue-800">
                     Active Call
@@ -872,7 +959,9 @@ const PowerDialer = () => {
                             onClick={(e) => { e.stopPropagation(); initiateCall(lead.id); }}
                             disabled={callStatuses[lead.id] === "ready" || 
                                     (isDialerActive && dialingMode === "power") || 
-                                    (activeLeadId !== null && activeLeadId !== lead.id)}
+                                    (activeLeadId !== null && activeLeadId !== lead.id) ||
+                                    phoneSystemStatus === 'error' ||
+                                    isInitializingPhone}
                           >
                             <Phone className="h-4 w-4 mr-2" />
                             Call

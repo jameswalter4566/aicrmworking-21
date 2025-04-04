@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Phone } from "lucide-react";
+import { Phone, Loader2 } from "lucide-react";
 
 interface TwilioClientProps {
   onCallConnect?: (connection: any) => void;
@@ -77,15 +78,18 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       });
       throw error;
     }
-  }, []);
+  }, [toast]);
 
   const initializeAudioContext = useCallback(() => {
     try {
+      // Try to create and start the AudioContext right away
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContext) {
         const audioContext = new AudioContext();
         if (audioContext.state === 'suspended') {
-          audioContext.resume();
+          audioContext.resume().catch(err => {
+            console.warn("Failed to resume AudioContext:", err);
+          });
         }
         console.log("AudioContext initialized successfully:", audioContext.state);
         setAudioContextInitialized(true);
@@ -130,7 +134,13 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
 
       console.log("Creating new Twilio device with token");
-      const newDevice = new Device(token);
+      const newDevice = new Device(token, {
+        // Add more specific options to improve device initialization
+        codecPreferences: ['pcmu', 'opus'],
+        maxAverageBitrate: 16000,
+        forceAggressiveIceNomination: true,
+        enableIceRestart: true
+      });
 
       errorNotifiedRef.current = false;
 
@@ -235,7 +245,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
       return null;
     }
-  }, [device, status, isInitializing, audioContextInitialized, fetchToken, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError]);
+  }, [device, status, isInitializing, audioContextInitialized, fetchToken, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
 
   const makeCall = useCallback(
     async (phoneNumber: string) => {
@@ -284,7 +294,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         }
       }
     },
-    [device, status, setupDeviceAfterInteraction, onError]
+    [device, status, setupDeviceAfterInteraction, onError, toast]
   );
 
   const hangupCall = useCallback(() => {
@@ -332,6 +342,9 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
     if (!deviceInitializedRef.current && !device) {
       console.log("Performing initial Twilio device setup");
+      // First try to initialize audio context right away
+      initializeAudioContext();
+      
       const timer = setTimeout(() => {
         setupDeviceWrapper().catch(err => {
           console.error("Failed to setup device in initial effect:", err);
@@ -356,7 +369,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
       deviceInitializedRef.current = false;
     };
-  }, [device, connection, status, makeCall, hangupCall, setupDeviceWrapper, isReady]);
+  }, [device, connection, status, makeCall, hangupCall, setupDeviceWrapper, isReady, initializeAudioContext]);
 
   if (showSetupButton) {
     return (
