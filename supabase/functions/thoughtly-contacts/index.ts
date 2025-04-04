@@ -14,6 +14,7 @@ console.log("Thoughtly Contacts function loaded and ready")
 // Base Thoughtly API URL 
 const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 const API_TOKEN = "8f6vq0cwvk59qwi63rcf1o" // Using the provided API token
+const TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f" // Using the provided team ID
 
 // Main serve function to handle requests
 serve(async (req) => {
@@ -29,24 +30,6 @@ serve(async (req) => {
   }
 
   try {
-    // Get Thoughtly Team ID from environment variables
-    const THOUGHTLY_TEAM_ID = Deno.env.get('THOUGHTLY_TEAM_ID')
-
-    // Check if required credentials are available
-    if (!THOUGHTLY_TEAM_ID) {
-      console.error("Missing Thoughtly Team ID")
-      return new Response(
-        JSON.stringify({ 
-          error: 'Missing required Thoughtly Team ID',
-          missingCredentials: 'Team ID'
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
     // Process the request based on the action
     const requestUrl = new URL(req.url)
     const action = req.method === 'GET' 
@@ -63,7 +46,7 @@ serve(async (req) => {
           return await createSingleContact(
             contacts, 
             API_TOKEN, 
-            THOUGHTLY_TEAM_ID
+            TEAM_ID
           )
         }
         
@@ -71,7 +54,7 @@ serve(async (req) => {
         return await createBulkContacts(
           contacts, 
           API_TOKEN, 
-          THOUGHTLY_TEAM_ID
+          TEAM_ID
         )
       }
 
@@ -80,7 +63,7 @@ serve(async (req) => {
         return await getContacts(
           searchParams,
           API_TOKEN,
-          THOUGHTLY_TEAM_ID
+          TEAM_ID
         )
       }
 
@@ -99,6 +82,31 @@ serve(async (req) => {
   }
 })
 
+// Function to format phone number to E.164 format
+function formatPhoneNumber(phoneNumber, countryCode = "US") {
+  if (!phoneNumber) return "";
+  
+  // Strip all non-numeric characters
+  const digitsOnly = phoneNumber.replace(/\D/g, '');
+  
+  // For US numbers (default)
+  if (countryCode === "US") {
+    // If it's a 10-digit number, add +1
+    if (digitsOnly.length === 10) {
+      return digitsOnly;
+    }
+    // If it already has country code (11 digits starting with 1)
+    else if (digitsOnly.length === 11 && digitsOnly.startsWith('1')) {
+      return digitsOnly.substring(1); // Remove the 1 at the beginning
+    }
+    // Return whatever we have
+    return digitsOnly;
+  }
+  
+  // For other country codes, we would need to implement specific formatting
+  return digitsOnly;
+}
+
 // Function to create a single contact in Thoughtly
 async function createSingleContact(contactData, apiToken, teamId) {
   console.log(`Creating single contact: ${contactData.firstName} ${contactData.lastName}`)
@@ -106,6 +114,25 @@ async function createSingleContact(contactData, apiToken, teamId) {
   try {
     console.log('API Token:', apiToken)
     console.log('Team ID:', teamId)
+    
+    // Format the phone number
+    const formattedPhoneNumber = formatPhoneNumber(
+      contactData.phone1 || contactData.phone || "", 
+      contactData.countryCode || "US"
+    );
+    
+    console.log(`Formatted phone number: ${formattedPhoneNumber}`);
+    
+    if (!formattedPhoneNumber) {
+      console.error("Missing required phone number");
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing required phone number',
+          details: 'A valid phone number is required to create a contact'
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     const response = await fetch(`${THOUGHTLY_API_URL}/contact/create`, {
       method: 'POST',
@@ -115,7 +142,7 @@ async function createSingleContact(contactData, apiToken, teamId) {
         'team_id': teamId
       },
       body: JSON.stringify({
-        phone_number: contactData.phone1 || contactData.phone || "",
+        phone_number: formattedPhoneNumber,
         name: `${contactData.firstName || ""} ${contactData.lastName || ""}`.trim(),
         email: contactData.email || "",
         country_code: contactData.countryCode || "US",
@@ -179,6 +206,24 @@ async function createBulkContacts(contacts, apiToken, teamId) {
   // Process each contact sequentially to avoid rate limits
   for (const contact of contacts) {
     try {
+      // Format the phone number
+      const formattedPhoneNumber = formatPhoneNumber(
+        contact.phone1 || contact.phone || "", 
+        contact.countryCode || "US"
+      );
+      
+      console.log(`Contact ${contact.firstName} ${contact.lastName} - Phone: ${formattedPhoneNumber}`);
+      
+      if (!formattedPhoneNumber) {
+        console.error(`Missing phone number for contact ${contact.firstName} ${contact.lastName}`);
+        results.errors.push({
+          contact,
+          error: "Missing required phone number",
+          status: 400
+        });
+        continue;
+      }
+
       const response = await fetch(`${THOUGHTLY_API_URL}/contact/create`, {
         method: 'POST',
         headers: {
@@ -187,7 +232,7 @@ async function createBulkContacts(contacts, apiToken, teamId) {
           'team_id': teamId
         },
         body: JSON.stringify({
-          phone_number: contact.phone1 || contact.phone || "",
+          phone_number: formattedPhoneNumber,
           name: `${contact.firstName || ""} ${contact.lastName || ""}`.trim(),
           email: contact.email || "",
           country_code: contact.countryCode || "US",
