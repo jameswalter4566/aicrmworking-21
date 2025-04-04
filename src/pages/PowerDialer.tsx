@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -215,7 +214,6 @@ const PowerDialer = () => {
   const [dialingMode, setDialingMode] = useState<DialingMode>("single");
   const [simultaneousLines, setSimultaneousLines] = useState<number>(1);
   const [activityLogs, setActivityLogs] = useState<Record<number, ActivityLog[]>>(dummyActivityLogs);
-  // Fix: Change dialerIntervalRef from useState to useRef
   const dialerIntervalRef = useRef<number | null>(null);
   const [dialQueue, setDialQueue] = useState<number[]>([]);
   const [activeCallsCount, setActiveCallsCount] = useState(0);
@@ -365,7 +363,16 @@ const PowerDialer = () => {
       return;
     }
 
-    if (!window.twilioClient || !window.twilioClient.isReady()) {
+    if (!window.twilioClient) {
+      toast({
+        variant: "destructive",
+        title: "Phone Not Ready",
+        description: "The phone system is not initialized. Please try again.",
+      });
+      return;
+    }
+    
+    if (!window.twilioClient.isReady()) {
       toast({
         variant: "destructive",
         title: "Phone Not Ready",
@@ -426,7 +433,16 @@ const PowerDialer = () => {
   };
 
   const startSingleDialSession = () => {
-    if (!isClientReady) {
+    if (!window.twilioClient) {
+      toast({
+        variant: "destructive",
+        title: "Phone Not Ready",
+        description: "The phone system is not initialized. Please try again.",
+      });
+      return;
+    }
+    
+    if (!window.twilioClient.isReady()) {
       toast({
         variant: "destructive",
         title: "Phone Not Ready",
@@ -461,7 +477,16 @@ const PowerDialer = () => {
   };
 
   const startPowerDialSession = () => {
-    if (!isClientReady) {
+    if (!window.twilioClient) {
+      toast({
+        variant: "destructive",
+        title: "Phone Not Ready",
+        description: "The phone system is not initialized. Please try again.",
+      });
+      return;
+    }
+    
+    if (!window.twilioClient.isReady()) {
       toast({
         variant: "destructive",
         title: "Phone Not Ready",
@@ -553,7 +578,6 @@ const PowerDialer = () => {
         window.twilioClient.hangupCall();
       }
       
-      // Fix: Update the cleanup for the interval
       if (dialerIntervalRef.current) {
         clearInterval(dialerIntervalRef.current);
       }
@@ -636,7 +660,6 @@ const PowerDialer = () => {
                     size="lg"
                     className="flex-1"
                     onClick={isDialerActive ? stopDialerSession : startDialerSession}
-                    disabled={!isClientReady}
                   >
                     {isDialerActive ? (
                       <>
