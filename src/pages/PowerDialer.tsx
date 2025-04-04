@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -214,7 +215,8 @@ const PowerDialer = () => {
   const [dialingMode, setDialingMode] = useState<DialingMode>("single");
   const [simultaneousLines, setSimultaneousLines] = useState<number>(1);
   const [activityLogs, setActivityLogs] = useState<Record<number, ActivityLog[]>>(dummyActivityLogs);
-  const [dialerIntervalRef, setDialerIntervalRef] = useState<number | null>(null);
+  // Fix: Change dialerIntervalRef from useState to useRef
+  const dialerIntervalRef = useRef<number | null>(null);
   const [dialQueue, setDialQueue] = useState<number[]>([]);
   const [activeCallsCount, setActiveCallsCount] = useState(0);
   const { toast } = useToast();
@@ -551,6 +553,7 @@ const PowerDialer = () => {
         window.twilioClient.hangupCall();
       }
       
+      // Fix: Update the cleanup for the interval
       if (dialerIntervalRef.current) {
         clearInterval(dialerIntervalRef.current);
       }
