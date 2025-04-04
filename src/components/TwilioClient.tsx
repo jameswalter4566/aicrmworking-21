@@ -141,8 +141,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       const newDevice = new Device(token, {
         maxAverageBitrate: 16000,
         forceAggressiveIceNomination: true,
-        edge: 'tokyo',
-        enableIceRestart: true
+        edge: 'tokyo'
       });
 
       deviceRef.current = newDevice;
