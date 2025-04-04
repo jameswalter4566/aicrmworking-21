@@ -53,21 +53,76 @@ serve(async (req) => {
     
     console.log("Environment variables loaded")
     
-    // Parse the request body
-    let requestData
-    try {
-      requestData = await req.json()
-      console.log("Request data parsed:", JSON.stringify(requestData))
-    } catch (e) {
-      console.error("Failed to parse request body:", e)
-      return new Response(
-        JSON.stringify({ error: 'Invalid request body' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Enhanced request parsing logic from your working version
+    let requestData;
+    const contentType = req.headers.get('content-type');
+    console.log('Received content type:', contentType);
+
+    if (contentType?.includes('application/json')) {
+      console.log('Processing JSON data');
+      requestData = await req.json();
+    } else if (contentType?.includes('application/x-www-form-urlencoded')) {
+      console.log('Processing form data');
+      const text = await req.text();
+      requestData = Object.fromEntries(text.split('&').map((pair) => {
+        const [key, value] = pair.split('=');
+        return [
+          key,
+          decodeURIComponent(value.replace(/\+/g, ' '))
+        ];
+      }));
+      console.log('Parsed form data:', requestData);
+    } else {
+      console.log('Unexpected content type, treating as text');
+      const text = await req.text();
+      console.log('Raw request body:', text);
+      try {
+        requestData = JSON.parse(text);
+      } catch {
+        requestData = {};
+      }
     }
     
-    const { action, phoneNumber, callbackUrl, callSid } = requestData
-    console.log(`Processing action: ${action}`)
+    console.log('Processed request data:', requestData);
+    
+    // Handle Twilio webhook callbacks (from your working version)
+    const { 
+      action = 'makeCall', 
+      phoneNumber, 
+      callbackUrl, 
+      callSid, 
+      RecordingSid, 
+      RecordingUrl, 
+      CallSid, 
+      Duration, 
+      propertyDetails 
+    } = requestData;
+    
+    // Handle Twilio webhook callbacks
+    if (RecordingSid || RecordingUrl || CallSid) {
+      console.log("Processing webhook callback from Twilio:", {
+        callSid: CallSid || callSid,
+        RecordingUrl,
+        RecordingSid,
+        Duration
+      });
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          recordingSid: RecordingSid,
+          recordingUrl: RecordingUrl,
+          callSid: CallSid,
+          duration: Duration
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Create Twilio client
+    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
 
     switch (action) {
       case 'makeCall': {
@@ -79,8 +134,7 @@ serve(async (req) => {
         }
 
         console.log(`Initiating call to ${phoneNumber} from ${TWILIO_PHONE_NUMBER}`)
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
-
+        
         // Create TwiML to instruct Twilio how to handle the call
         const twimlResponse = `
           <Response>
@@ -93,40 +147,104 @@ serve(async (req) => {
           </Response>
         `
 
-        // Make API request to Twilio
-        const response = await fetch(twilioUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
-          },
-          body: new URLSearchParams({
-            From: TWILIO_PHONE_NUMBER,
-            To: phoneNumber,
-            Twiml: twimlResponse,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Twilio API error (${response.status}): ${errorText}`)
+        try {
+          const projectRef = req.url.split('/functions/')[0].split('//')[1].split('.')[0];
+          console.log(`Project ref determined as: ${projectRef}`);
+          
+          const baseUrl = `https://${projectRef}.functions.supabase.co`;
+          console.log(`Using base URL: ${baseUrl}`);
+          
+          const call = await client.calls.create({
+            twiml: twimlResponse,
+            to: phoneNumber,
+            from: TWILIO_PHONE_NUMBER,
+            record: true,
+            recordingStatusCallback: `${baseUrl}/twilio-voice`,
+            recordingStatusCallbackMethod: 'POST',
+            statusCallback: `${baseUrl}/twilio-voice`,
+            statusCallbackEvent: [
+              'initiated',
+              'ringing',
+              'answered',
+              'completed'
+            ],
+            statusCallbackMethod: 'POST'
+          });
+          
+          console.log(`Call initiated with SID: ${call.sid}`);
+          
           return new Response(
-            JSON.stringify({ 
-              error: 'Twilio API error', 
-              status: response.status, 
-              details: errorText 
-            }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+            JSON.stringify({ success: true, callSid: call.sid }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error('Error making call:', error);
+          return new Response(
+            JSON.stringify({ error: error.message || 'Call failed' }),
+            { 
+              status: 500, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+      }
+
+      case 'check_recording': {
+        if (!callSid) {
+          return new Response(
+            JSON.stringify({ error: 'Call SID is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
 
-        const data = await response.json()
-        console.log(`Call initiated with SID: ${data.sid}`)
+        console.log('Checking recordings for call:', callSid);
         
-        return new Response(
-          JSON.stringify({ success: true, callSid: data.sid }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        try {
+          const recordings = await client.recordings.list({ callSid });
+          
+          if (recordings && recordings.length > 0) {
+            const recording = recordings[0];
+            console.log('Found recording:', {
+              sid: recording.sid,
+              mediaUrl: recording.mediaUrl,
+              duration: recording.duration
+            });
+            
+            return new Response(
+              JSON.stringify({
+                success: true,
+                hasRecording: true,
+                recordingUrl: recording.mediaUrl,
+                recordingSid: recording.sid,
+                duration: recording.duration,
+                status: recording.status
+              }),
+              {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+          
+          return new Response(
+            JSON.stringify({
+              success: true,
+              hasRecording: false,
+              message: 'No recording found yet'
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            }
+          );
+        } catch (error) {
+          console.error('Error checking recording:', error);
+          return new Response(
+            JSON.stringify({ error: error.message || 'Failed to check recording' }),
+            { 
+              status: 500, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
       }
 
       case 'getCallStatus': {
@@ -134,39 +252,32 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({ error: 'Call SID is required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+          );
         }
 
-        console.log(`Getting status for call: ${callSid}`)
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls/${callSid}.json`
-
-        const response = await fetch(twilioUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
-          },
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Twilio API error (${response.status}): ${errorText}`)
+        console.log(`Getting status for call: ${callSid}`);
+        
+        try {
+          const call = await client.calls(callSid).fetch();
+          console.log(`Call status: ${call.status}`);
+          
+          return new Response(
+            JSON.stringify({ status: call.status }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error('Error fetching call status:', error);
           return new Response(
             JSON.stringify({ 
               error: 'Failed to retrieve call status', 
-              status: response.status, 
-              details: errorText 
+              details: error.message 
             }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+            { 
+              status: 500, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
         }
-
-        const data = await response.json()
-        console.log(`Call status: ${data.status}`)
-        
-        return new Response(
-          JSON.stringify({ status: data.status }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
       }
 
       default:
