@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -82,6 +83,10 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         console.error("Invalid response from twilio-token function:", data);
         throw new Error("No token received from server");
       }
+      
+      console.log("Successfully received Twilio token, length:", 
+                 data.token ? data.token.length : 0, 
+                 "identity:", data.identity || "unknown");
 
       if (device) {
         console.log("Destroying existing device before creating new one");
@@ -122,13 +127,31 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         
         if (onError && err) onError(err);
         
+        // Special handling for token issues
+        const isTokenError = err && (
+          err.message?.includes("AccessTokenInvalid") || 
+          err.message?.includes("token") || 
+          err.code === 20101
+        );
+        
         if (!errorNotifiedRef.current) {
           errorNotifiedRef.current = true;
-          toast.toast({
-            variant: "destructive",
-            title: "Call Error",
-            description: err?.message || "An error occurred with the phone",
-          });
+          
+          if (isTokenError) {
+            toast.toast({
+              variant: "destructive",
+              title: "Authentication Error",
+              description: "Your phone session has expired. Please refresh the page to reconnect.",
+            });
+            // Stop retry attempts on token errors
+            setupAttemptsRef.current = MAX_SETUP_ATTEMPTS;
+          } else {
+            toast.toast({
+              variant: "destructive",
+              title: "Call Error",
+              description: err?.message || "An error occurred with the phone",
+            });
+          }
           
           setTimeout(() => {
             errorNotifiedRef.current = false;

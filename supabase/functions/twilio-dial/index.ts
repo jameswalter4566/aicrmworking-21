@@ -20,6 +20,7 @@ serve(async (req) => {
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
+    const twimlAppSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
     if (!accountSid || !authToken || !twilioPhoneNumber) {
       console.error('Missing required Twilio credentials:', {
@@ -50,24 +51,51 @@ serve(async (req) => {
       throw new Error('Missing required parameter: phone number');
     }
 
+    // Ensure phone number is in E.164 format (add + if missing)
+    if (to && !to.startsWith('+')) {
+      to = '+' + to.replace(/\D/g, '');
+    }
+
     console.log(`Initiating call to ${to} from ${from}`);
 
     const client = twilio(accountSid, authToken);
     
-    // Using Twilio's API to create a new call
-    const call = await client.calls.create({
+    // TwiML URL for the call
+    // First check if we have a TwiML App SID configured, otherwise use a default URL
+    const twimlUrl = twimlAppSid 
+      ? null // When using twimlAppSid, we don't need a URL
+      : `https://handler.twilio.com/twiml/EH${accountSid.substring(0, 8)}`;
+    
+    // Call parameters
+    const callParams: any = {
       to: to,
       from: from,
-      url: `https://handler.twilio.com/twiml/EH${accountSid}`, // Default TwiML that allows the call
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-status?agentIdentity=${encodeURIComponent(agentIdentity)}`,
       statusCallbackMethod: 'POST'
-    });
+    };
+
+    // Add either applicationSid or url based on what's available
+    if (twimlAppSid) {
+      callParams.applicationSid = twimlAppSid;
+    } else if (twimlUrl) {
+      callParams.url = twimlUrl;
+    } else {
+      // If neither is available, use a simple TwiML string
+      callParams.twiml = '<Response><Say>Hello. This is a test call from your application.</Say></Response>';
+    }
+
+    // Using Twilio's API to create a new call
+    const call = await client.calls.create(callParams);
+
+    console.log("Call initiated with SID:", call.sid);
 
     return new Response(
       JSON.stringify({
         success: true,
-        callSid: call.sid
+        callSid: call.sid,
+        to: to,
+        from: from
       }),
       { headers: { ...corsHeaders } }
     );
@@ -76,7 +104,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || "Failed to initiate call" 
+        error: error.message || "Failed to initiate call",
+        stack: error.stack // Include stack trace for debugging
       }),
       { status: 400, headers: corsHeaders }
     );

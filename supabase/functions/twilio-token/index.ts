@@ -19,6 +19,9 @@ serve(async (req) => {
     // Get Twilio credentials from environment
     const accountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const authToken = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const apiKey = Deno.env.get('TWILIO_API_KEY'); // Optional, but recommended
+    const apiSecret = Deno.env.get('TWILIO_API_SECRET'); // Optional, but recommended
+    const applicationSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
     if (!accountSid || !authToken) {
       console.error('Missing required Twilio credentials:', {
@@ -40,19 +43,33 @@ serve(async (req) => {
     
     console.log("Creating token for identity:", identity);
 
-    // Create an access token using Twilio client
-    const client = twilio(accountSid, authToken);
+    // Create an access token using Twilio's AccessToken constructor
     const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
 
     // Create a Voice grant for this token
     const voiceGrant = new VoiceGrant({
       incomingAllow: true,
+      outgoingApplicationSid: applicationSid,
     });
 
-    // Create an access token which we will sign and return to the client
-    const token = new AccessToken(accountSid, accountSid, authToken, { identity });
+    // Create an access token with the correct parameters
+    // If API Key/Secret are available, use them. Otherwise, fall back to accountSid/authToken
+    const token = apiKey && apiSecret
+      ? new AccessToken(accountSid, apiKey, apiSecret, { identity, ttl: 3600 })
+      : new AccessToken(accountSid, accountSid, authToken, { identity, ttl: 3600 });
+    
+    // Add the voice grant to the token
     token.addGrant(voiceGrant);
+
+    // Log token details for debugging (not the actual token for security)
+    console.log("Token created for:", {
+      identity,
+      accountSid: accountSid.substring(0, 8) + "...",
+      hasApiKey: !!apiKey,
+      hasVoiceGrant: !!voiceGrant,
+      ttl: "3600 seconds (1 hour)"
+    });
 
     // Generate the token and send it back
     return new Response(
@@ -65,7 +82,10 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error generating Twilio token:", error);
     return new Response(
-      JSON.stringify({ error: error.message || "Failed to generate token" }),
+      JSON.stringify({ 
+        error: error.message || "Failed to generate token",
+        stack: error.stack // Include stack trace for debugging
+      }),
       { status: 400, headers: corsHeaders }
     );
   }
