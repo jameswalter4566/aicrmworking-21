@@ -5,6 +5,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Phone, Loader2 } from "lucide-react";
 
+type Codec = 'opus' | 'pcmu';
+
 interface TwilioClientProps {
   onCallConnect?: (connection: any) => void;
   onCallDisconnect?: () => void;
@@ -144,7 +146,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         edge: ['ashburn', 'tokyo', 'sydney'],
         enableImprovedSignalingErrorPrecision: true,
         closeProtection: true,
-        codecPreferences: ["opus", "pcmu"] as unknown as string[],
+        codecPreferences: ['opus', 'pcmu'] as Codec[],
         appName: "PowerDialer",
         appVersion: "1.0.0"
       });
