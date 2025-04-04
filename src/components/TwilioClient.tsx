@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Phone } from "lucide-react";
 
 interface TwilioClientProps {
   onCallConnect?: (connection: any) => void;
@@ -35,40 +37,18 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const [connection, setConnection] = useState<any>(null);
   const [status, setStatus] = useState<string>("offline");
   const [isInitializing, setIsInitializing] = useState(false);
+  const [showSetupButton, setShowSetupButton] = useState(false);
+  const [audioContextInitialized, setAudioContextInitialized] = useState(false);
   const toast = useToast();
   
   const deviceInitializedRef = useRef(false);
   const errorNotifiedRef = useRef(false);
   const setupAttemptsRef = useRef(0);
   const MAX_SETUP_ATTEMPTS = 3;
+  const tokenRef = useRef<string | null>(null);
 
-  const setupDevice = useCallback(async () => {
-    if (isInitializing) {
-      console.log("Device initialization already in progress, skipping");
-      return null;
-    }
-    
-    if (device && status === "ready") {
-      console.log("Device already initialized and ready");
-      return device;
-    }
-
-    if (setupAttemptsRef.current >= MAX_SETUP_ATTEMPTS) {
-      console.log(`Maximum setup attempts (${MAX_SETUP_ATTEMPTS}) reached, aborting`);
-      if (!errorNotifiedRef.current) {
-        errorNotifiedRef.current = true;
-        toast.toast({
-          variant: "destructive",
-          title: "Setup Error",
-          description: "Failed to set up the phone after multiple attempts. Please refresh the page and try again.",
-        });
-      }
-      return null;
-    }
-    
-    setupAttemptsRef.current += 1;
-    setIsInitializing(true);
-    
+  // Separate token fetching from device setup
+  const fetchToken = useCallback(async () => {
     try {
       const { data, error } = await supabase.functions.invoke("twilio-token", {
         method: "POST",
@@ -87,7 +67,64 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       console.log("Successfully received Twilio token, length:", 
                  data.token ? data.token.length : 0, 
                  "identity:", data.identity || "unknown");
+      
+      tokenRef.current = data.token;
+      return data.token;
+    } catch (error) {
+      console.error("Failed to fetch token:", error);
+      toast.toast({
+        variant: "destructive",
+        title: "Token Error",
+        description: "Failed to get required authentication token. Please try again.",
+      });
+      throw error;
+    }
+  }, [toast]);
 
+  // Initialize the Audio Context
+  const initializeAudioContext = useCallback(() => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContext) {
+        const audioContext = new AudioContext();
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+        console.log("AudioContext initialized successfully:", audioContext.state);
+        setAudioContextInitialized(true);
+        return true;
+      }
+    } catch (audioError) {
+      console.warn("Could not initialize AudioContext:", audioError);
+    }
+    return false;
+  }, []);
+
+  // Setup device after user interaction
+  const setupDeviceAfterInteraction = useCallback(async () => {
+    if (isInitializing) {
+      console.log("Device initialization already in progress, skipping");
+      return null;
+    }
+    
+    if (!audioContextInitialized) {
+      const success = initializeAudioContext();
+      if (!success) {
+        toast.toast({
+          variant: "destructive",
+          title: "Audio Error",
+          description: "Failed to initialize audio. Please check your browser permissions.",
+        });
+        return null;
+      }
+    }
+    
+    setIsInitializing(true);
+    
+    try {
+      // Use existing token or fetch a new one
+      const token = tokenRef.current || await fetchToken();
+      
       if (device) {
         console.log("Destroying existing device before creating new one");
         try {
@@ -97,23 +134,8 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         }
       }
 
-      // Try to initialize audio context first to address user gesture issues
-      try {
-        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioContext) {
-          const audioContext = new AudioContext();
-          if (audioContext.state === 'suspended') {
-            await audioContext.resume();
-          }
-          console.log("AudioContext initialized successfully:", audioContext.state);
-        }
-      } catch (audioError) {
-        console.warn("Could not initialize AudioContext:", audioError);
-        // Continue anyway, as Device will try to initialize it internally
-      }
-
       console.log("Creating new Twilio device with token");
-      const newDevice = new Device(data.token);
+      const newDevice = new Device(token);
 
       errorNotifiedRef.current = false;
 
@@ -122,6 +144,8 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         setStatus("ready");
         setIsInitializing(false);
         setupAttemptsRef.current = 0;
+        setShowSetupButton(false);
+        
         if (!deviceInitializedRef.current) {
           deviceInitializedRef.current = true;
           if (onDeviceReady) onDeviceReady(newDevice);
@@ -216,14 +240,14 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
       return null;
     }
-  }, [device, status, isInitializing, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
+  }, [device, status, isInitializing, audioContextInitialized, fetchToken, initializeAudioContext, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
 
   const makeCall = useCallback(
     async (phoneNumber: string) => {
       try {
         let currentDevice = device;
         if (!currentDevice || status !== "ready") {
-          currentDevice = await setupDevice();
+          currentDevice = await setupDeviceAfterInteraction();
         }
 
         if (!currentDevice) {
@@ -265,7 +289,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         }
       }
     },
-    [device, status, setupDevice, onError, toast]
+    [device, status, setupDeviceAfterInteraction, onError, toast]
   );
 
   const hangupCall = useCallback(() => {
@@ -285,9 +309,23 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   }, [device, status]);
 
   const setupDeviceWrapper = useCallback(async (): Promise<void> => {
-    await setupDevice();
-  }, [setupDevice]);
+    // Fetch token if we don't have one yet, but don't setup device automatically
+    if (!tokenRef.current) {
+      try {
+        await fetchToken();
+      } catch (err) {
+        console.error("Failed to fetch token in wrapper:", err);
+      }
+    }
+    
+    if (!audioContextInitialized) {
+      setShowSetupButton(true);
+    } else {
+      await setupDeviceAfterInteraction();
+    }
+  }, [fetchToken, audioContextInitialized, setupDeviceAfterInteraction]);
 
+  // Initial setup
   useEffect(() => {
     window.twilioClient = {
       device,
@@ -302,7 +340,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     if (!deviceInitializedRef.current && !device) {
       console.log("Performing initial Twilio device setup");
       const timer = setTimeout(() => {
-        setupDevice().catch(err => {
+        setupDeviceWrapper().catch(err => {
           console.error("Failed to setup device in initial effect:", err);
         });
       }, 1000);
@@ -325,7 +363,21 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
       deviceInitializedRef.current = false;
     };
-  }, [device, connection, status, makeCall, hangupCall, setupDevice, setupDeviceWrapper, isReady]);
+  }, [device, connection, status, makeCall, hangupCall, setupDeviceWrapper, isReady]);
+
+  if (showSetupButton) {
+    return (
+      <div className="fixed bottom-6 right-6 z-50">
+        <Button 
+          onClick={() => setupDeviceAfterInteraction()}
+          className="flex items-center bg-primary"
+        >
+          <Phone className="h-4 w-4 mr-2" />
+          Initialize Phone System
+        </Button>
+      </div>
+    );
+  }
 
   return null;
 };

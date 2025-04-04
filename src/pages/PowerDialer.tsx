@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +20,8 @@ import {
   Play, 
   Pause, 
   Search,
-  PhoneCall
+  PhoneCall,
+  AlertCircle
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TwilioClient from "@/components/TwilioClient";
@@ -217,6 +219,9 @@ const PowerDialer = () => {
   const dialerIntervalRef = useRef<number | null>(null);
   const [dialQueue, setDialQueue] = useState<number[]>([]);
   const [activeCallsCount, setActiveCallsCount] = useState(0);
+  const [phoneSystemStatus, setPhoneSystemStatus] = useState<'initializing' | 'ready' | 'error'>('initializing');
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const processingDialRef = useRef(false);
   const { toast } = useToast();
   
   useEffect(() => {
@@ -231,7 +236,9 @@ const PowerDialer = () => {
 
   const handleDeviceReady = () => {
     setIsClientReady(true);
-    toast({
+    setPhoneSystemStatus('ready');
+    setStatusMessage(null);
+    toast.toast({
       title: "Dialer Ready",
       description: "You can now make calls to leads.",
     });
@@ -239,6 +246,17 @@ const PowerDialer = () => {
 
   const handleCallError = (error: any) => {
     console.error("Call error:", error);
+    
+    // Check if this relates to audio permissions
+    if (error.message && (
+        error.message.includes("audio") || 
+        error.message.includes("permission") ||
+        error.message.includes("microphone")
+    )) {
+      setPhoneSystemStatus('error');
+      setStatusMessage("Audio permission issue. Click Initialize Phone System button if it appears.");
+    }
+    
     if (activeLeadId) {
       setCallStatuses(prev => ({ ...prev, [activeLeadId]: "error" }));
       addActivityLog(activeLeadId, {
@@ -248,11 +266,15 @@ const PowerDialer = () => {
       
       setActiveCallsCount(prev => Math.max(0, prev - 1));
       
+      // Process next lead in queue after a short delay
       if (isDialerActive && dialingMode === "power") {
-        processNextLeadInQueue();
+        setTimeout(() => {
+          processNextLeadInQueue();
+        }, 1000);
       }
     }
-    toast({
+    
+    toast.toast({
       variant: "destructive",
       title: "Call Error",
       description: error.message || "There was an error with the call",
@@ -266,7 +288,7 @@ const PowerDialer = () => {
         type: 'call_attempt',
         message: 'Call connected',
       });
-      toast({
+      toast.toast({
         title: "Call Connected",
         description: "You are now connected to the lead.",
       });
@@ -283,12 +305,15 @@ const PowerDialer = () => {
       
       setActiveCallsCount(prev => Math.max(0, prev - 1));
       
+      // Process next lead in queue after a short delay
       if (isDialerActive && dialingMode === "power") {
-        processNextLeadInQueue();
+        setTimeout(() => {
+          processNextLeadInQueue();
+        }, 1000);
       }
       
       setActiveLeadId(null);
-      toast({
+      toast.toast({
         title: "Call Ended",
         description: "The call has ended.",
       });
@@ -311,6 +336,10 @@ const PowerDialer = () => {
   };
 
   const processNextLeadInQueue = () => {
+    if (processingDialRef.current) {
+      return;
+    }
+    
     if (!isDialerActive || activeCallsCount >= simultaneousLines) {
       return;
     }
@@ -324,7 +353,7 @@ const PowerDialer = () => {
       
       if (newQueue.length === 0) {
         stopDialerSession();
-        toast({
+        toast.toast({
           title: "Dialing Complete",
           description: "All available leads have been called.",
         });
@@ -332,18 +361,24 @@ const PowerDialer = () => {
       }
       
       setDialQueue(newQueue);
+      // Trigger processing after state update
+      setTimeout(() => processNextLeadInQueue(), 100);
       return;
     }
+    
+    processingDialRef.current = true;
     
     const nextLeadId = dialQueue[0];
     const updatedQueue = dialQueue.slice(1);
     setDialQueue(updatedQueue);
     
-    initiateCall(nextLeadId);
+    initiateCall(nextLeadId).finally(() => {
+      processingDialRef.current = false;
+    });
   };
 
   useEffect(() => {
-    if (isDialerActive && activeCallsCount < simultaneousLines && dialQueue.length > 0) {
+    if (isDialerActive && activeCallsCount < simultaneousLines && dialQueue.length > 0 && !processingDialRef.current) {
       const timer = setTimeout(() => {
         processNextLeadInQueue();
       }, 500);
@@ -355,7 +390,7 @@ const PowerDialer = () => {
   const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
     if (!lead) {
-      toast({
+      toast.toast({
         variant: "destructive",
         title: "Error",
         description: "Lead not found",
@@ -364,7 +399,7 @@ const PowerDialer = () => {
     }
 
     if (!window.twilioClient) {
-      toast({
+      toast.toast({
         variant: "destructive",
         title: "Phone Not Ready",
         description: "The phone system is not initialized. Please try again.",
@@ -372,17 +407,30 @@ const PowerDialer = () => {
       return;
     }
     
+    // Even if window.twilioClient exists, check if it's ready
     if (!window.twilioClient.isReady()) {
-      toast({
-        variant: "destructive",
-        title: "Phone Not Ready",
-        description: "The phone system is not ready. Please try again.",
-      });
-      return;
+      // Try setting up the device first
+      try {
+        await window.twilioClient.setupDevice();
+        // Still not ready after setup
+        if (!window.twilioClient.isReady()) {
+          throw new Error("Phone system is not ready. Please try again.");
+        }
+      } catch (err) {
+        toast.toast({
+          variant: "destructive",
+          title: "Phone Not Ready",
+          description: "The phone system is not ready. Please try again or check for the Initialize Phone System button.",
+        });
+        
+        if (isDialerActive) {
+          stopDialerSession();
+        }
+        return;
+      }
     }
 
     setActiveCallsCount(prev => prev + 1);
-    
     setActiveLeadId(leadId);
     setCallStatuses(prev => ({ ...prev, [leadId]: "ready" }));
     
@@ -402,14 +450,17 @@ const PowerDialer = () => {
         type: 'system',
         message: `Call error: ${error.message || 'Failed to initiate call'}`,
       });
-      toast({
+      toast.toast({
         variant: "destructive",
         title: "Call Failed",
         description: error.message || "Failed to initiate call",
       });
       
       if (isDialerActive && dialingMode === "power") {
-        processNextLeadInQueue();
+        // Schedule next call after a short delay
+        setTimeout(() => {
+          processNextLeadInQueue();
+        }, 1000);
       }
     }
   };
@@ -427,32 +478,30 @@ const PowerDialer = () => {
       });
       
       if (isDialerActive && dialingMode === "power") {
-        processNextLeadInQueue();
+        setTimeout(() => {
+          processNextLeadInQueue();
+        }, 1000);
       }
     }
   };
 
   const startSingleDialSession = () => {
+    // Try to handle the case where window.twilioClient doesn't exist yet
     if (!window.twilioClient) {
-      toast({
+      setPhoneSystemStatus('error');
+      setStatusMessage("Phone system not initialized. Check your browser's microphone permissions.");
+      toast.toast({
         variant: "destructive",
         title: "Phone Not Ready",
-        description: "The phone system is not initialized. Please try again.",
+        description: "The phone system is not initialized. Please try again or check for the Initialize Phone System button.",
       });
       return;
     }
     
-    if (!window.twilioClient.isReady()) {
-      toast({
-        variant: "destructive",
-        title: "Phone Not Ready",
-        description: "The phone system is not ready. Please try again.",
-      });
-      return;
-    }
-    
+    // Check if it's ready, but don't block the operation completely
+    // The initiateCall function will try to setup the device if needed
     setIsDialerActive(true);
-    toast({
+    toast.toast({
       title: "Single Dialer Active",
       description: "Starting to call leads one at a time.",
     });
@@ -465,7 +514,7 @@ const PowerDialer = () => {
     
     if (newQueue.length === 0) {
       setIsDialerActive(false);
-      toast({
+      toast.toast({
         title: "No Leads Available",
         description: "All leads have been contacted. Reset call statuses to try again.",
       });
@@ -473,30 +522,27 @@ const PowerDialer = () => {
     }
     
     setDialQueue(newQueue);
-    processNextLeadInQueue();
+    // Trigger the first call
+    setTimeout(() => processNextLeadInQueue(), 100);
   };
 
   const startPowerDialSession = () => {
+    // Try to handle the case where window.twilioClient doesn't exist yet
     if (!window.twilioClient) {
-      toast({
+      setPhoneSystemStatus('error');
+      setStatusMessage("Phone system not initialized. Check your browser's microphone permissions.");
+      toast.toast({
         variant: "destructive",
         title: "Phone Not Ready",
-        description: "The phone system is not initialized. Please try again.",
+        description: "The phone system is not initialized. Please try again or check for the Initialize Phone System button.",
       });
       return;
     }
     
-    if (!window.twilioClient.isReady()) {
-      toast({
-        variant: "destructive",
-        title: "Phone Not Ready",
-        description: "The phone system is not ready. Please try again.",
-      });
-      return;
-    }
-    
+    // Check if it's ready, but don't block the operation completely
+    // The initiateCall function will try to setup the device if needed
     setIsDialerActive(true);
-    toast({
+    toast.toast({
       title: "Power Dialer Active",
       description: `Starting to call leads with ${simultaneousLines} line${simultaneousLines > 1 ? 's' : ''}.`,
     });
@@ -509,7 +555,7 @@ const PowerDialer = () => {
     
     if (newQueue.length === 0) {
       setIsDialerActive(false);
-      toast({
+      toast.toast({
         title: "No Leads Available",
         description: "All leads have been contacted. Reset call statuses to try again.",
       });
@@ -517,6 +563,8 @@ const PowerDialer = () => {
     }
     
     setDialQueue(newQueue);
+    // Trigger the first set of calls
+    setTimeout(() => processNextLeadInQueue(), 100);
   };
 
   const startDialerSession = () => {
@@ -529,14 +577,13 @@ const PowerDialer = () => {
 
   const stopDialerSession = () => {
     setIsDialerActive(false);
-    
     setDialQueue([]);
     
     if (activeLeadId) {
       endCall(activeLeadId);
     }
     
-    toast({
+    toast.toast({
       title: "Dialer Paused",
       description: "Dialing session has been paused.",
     });
@@ -544,7 +591,7 @@ const PowerDialer = () => {
 
   const resetCallStatuses = () => {
     setCallStatuses({});
-    toast({
+    toast.toast({
       title: "Call Statuses Reset",
       description: "All call statuses have been reset.",
     });
@@ -687,9 +734,20 @@ const PowerDialer = () => {
               
               <div className="mt-4 p-3 bg-slate-50 rounded-md flex items-center justify-between">
                 <div className="flex items-center">
-                  <div className={`h-3 w-3 rounded-full mr-2 ${isClientReady ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                  <span className="text-sm">{isClientReady ? 'Phone Ready' : 'Phone Not Ready'}</span>
+                  <div className={`h-3 w-3 rounded-full mr-2 ${phoneSystemStatus === 'ready' ? 'bg-green-500' : phoneSystemStatus === 'error' ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
+                  <span className="text-sm flex items-center">
+                    {phoneSystemStatus === 'ready' 
+                      ? 'Phone Ready' 
+                      : phoneSystemStatus === 'error' 
+                        ? <div className="flex items-center text-red-700">
+                            <AlertCircle className="h-3 w-3 mr-1" /> Phone Error
+                          </div>
+                        : 'Initializing...'}
+                  </span>
                 </div>
+                {statusMessage && (
+                  <span className="text-xs text-orange-700">{statusMessage}</span>
+                )}
                 {activeLeadId ? (
                   <Badge variant="outline" className="bg-blue-100 text-blue-800">
                     Active Call
@@ -813,7 +871,7 @@ const PowerDialer = () => {
                             variant={activeLeadId === lead.id ? "default" : "outline"} 
                             size="sm"
                             onClick={(e) => { e.stopPropagation(); initiateCall(lead.id); }}
-                            disabled={!isClientReady || callStatuses[lead.id] === "ready" || 
+                            disabled={callStatuses[lead.id] === "ready" || 
                                      (isDialerActive && dialingMode === "power") || 
                                      (activeLeadId !== null && activeLeadId !== lead.id)}
                           >
