@@ -23,14 +23,20 @@ serve(async (req) => {
     const apiSecret = Deno.env.get('TWILIO_API_SECRET');
     const applicationSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
-    if (!accountSid || (!authToken && (!apiKey || !apiSecret))) {
-      console.error('Missing required Twilio credentials');
-      throw new Error('Missing required Twilio credentials');
+    if (!accountSid) {
+      throw new Error('Missing TWILIO_ACCOUNT_SID');
     }
 
     if (!applicationSid) {
-      console.error('Missing Twilio TwiML Application SID');
-      throw new Error('Missing Twilio TwiML Application SID');
+      throw new Error('Missing TWILIO_TWIML_APP_SID');
+    }
+
+    // Check for either authToken OR apiKey+apiSecret
+    const hasAuthToken = !!authToken;
+    const hasApiCreds = !!apiKey && !!apiSecret;
+    
+    if (!hasAuthToken && !hasApiCreds) {
+      throw new Error('Missing credentials: either TWILIO_AUTH_TOKEN or TWILIO_API_KEY and TWILIO_API_SECRET must be provided');
     }
 
     // Get the identity from the request body or set a default
@@ -45,60 +51,75 @@ serve(async (req) => {
     
     console.log("Creating token for identity:", identity);
 
-    // Use AccessToken with API Key and Secret if available (preferred method)
-    const AccessToken = twilio.jwt.AccessToken;
-    const VoiceGrant = AccessToken.VoiceGrant;
-
-    // Create a Voice grant for this token
-    const voiceGrant = new VoiceGrant({
-      outgoingApplicationSid: applicationSid,
-      incomingAllow: true
-    });
-
-    // Create an access token with a TTL of 1 hour (3600 seconds)
+    // Create an Access Token
     let token;
-    
-    if (apiKey && apiSecret) {
+    if (hasApiCreds) {
       console.log("Using API Key/Secret for token generation");
-      const accessToken = new AccessToken(
+      
+      // Initialize the Twilio Access Token with API Key/Secret
+      const AccessToken = twilio.jwt.AccessToken;
+      token = new AccessToken(
         accountSid,
         apiKey,
         apiSecret,
         { identity: identity, ttl: 3600 }
       );
       
-      // Add the grant to the token
-      accessToken.addGrant(voiceGrant);
+      // Create a Voice grant for this token
+      const VoiceGrant = AccessToken.VoiceGrant;
+      const voiceGrant = new VoiceGrant({
+        outgoingApplicationSid: applicationSid,
+        incomingAllow: true
+      });
       
-      // Generate the token
-      token = accessToken.toJwt();
-    } else {
-      console.log("Using Auth Token for token generation (fallback)");
-      const accessToken = new AccessToken(
-        accountSid,
-        applicationSid, 
-        authToken,
-        { identity: identity, ttl: 3600 }
+      // Add the grant to the token
+      token.addGrant(voiceGrant);
+      
+      // Generate the token string
+      const tokenString = token.toJwt();
+      console.log("Created AccessToken for:", identity, "length:", tokenString.length);
+      
+      // Return the token and identity
+      return new Response(
+        JSON.stringify({
+          token: tokenString,
+          identity: identity
+        }),
+        { headers: corsHeaders }
       );
+    } else {
+      console.log("Using Auth Token for token generation");
       
-      // Add the grant to the token
-      accessToken.addGrant(voiceGrant);
+      // Create a simple capability token instead
+      const ClientCapability = twilio.jwt.ClientCapability;
+      const capability = new ClientCapability({
+        accountSid,
+        authToken,
+        ttl: 3600
+      });
       
-      // Generate the token
-      token = accessToken.toJwt();
+      // Allow outgoing calls to the TwiML application
+      capability.addScope(new ClientCapability.OutgoingClientScope({
+        applicationSid: applicationSid
+      }));
+      
+      // Allow incoming calls
+      capability.addScope(new ClientCapability.IncomingClientScope(identity));
+      
+      // Generate the token string
+      const tokenString = capability.toJwt();
+      console.log("Created CapabilityToken for:", identity, "length:", tokenString.length);
+      
+      // Return the token and identity
+      return new Response(
+        JSON.stringify({
+          token: tokenString,
+          identity: identity,
+          tokenType: "CapabilityToken"
+        }),
+        { headers: corsHeaders }
+      );
     }
-    
-    console.log("Created AccessToken for:", identity, "length:", token.length);
-
-    // Return the token and identity
-    return new Response(
-      JSON.stringify({
-        token: token,
-        identity: identity,
-        tokenType: "AccessToken"
-      }),
-      { headers: { ...corsHeaders } }
-    );
   } catch (error) {
     console.error("Error generating Twilio token:", error);
     

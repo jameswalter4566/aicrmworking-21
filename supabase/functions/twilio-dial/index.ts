@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import twilio from 'npm:twilio';
 
@@ -21,13 +22,14 @@ serve(async (req) => {
     const twilioPhoneNumber = Deno.env.get('TWILIO_PHONE_NUMBER');
     const twimlAppSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
-    if (!accountSid || !authToken || !twilioPhoneNumber) {
-      console.error('Missing required Twilio credentials:', {
-        accountSid: !!accountSid,
-        authToken: !!authToken,
-        twilioPhoneNumber: !!twilioPhoneNumber
-      });
+    if (!accountSid || !authToken) {
+      console.error('Missing required Twilio credentials');
       throw new Error('Missing required Twilio credentials');
+    }
+
+    if (!twilioPhoneNumber) {
+      console.error('Missing Twilio phone number');
+      throw new Error('Missing Twilio phone number');
     }
 
     // Initialize with default values in case request body is missing fields
@@ -59,21 +61,29 @@ serve(async (req) => {
 
     const client = twilio(accountSid, authToken);
     
+    // TwiML for a simple voice call
+    const twiml = `
+      <Response>
+        <Say>Hello. This is a call from your application.</Say>
+        <Pause length="1"/>
+        <Say>Press any key to continue.</Say>
+        <Gather action="https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-status?agentIdentity=${encodeURIComponent(agentIdentity)}" numDigits="1"/>
+      </Response>
+    `;
+    
     // Call parameters
     const callParams: any = {
       to: to,
       from: from,
+      twiml: twiml,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
       statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-status?agentIdentity=${encodeURIComponent(agentIdentity)}`,
       statusCallbackMethod: 'POST'
     };
 
-    // If TwiML App SID is available, use it
+    // Use TwiML App SID if available
     if (twimlAppSid) {
       callParams.applicationSid = twimlAppSid;
-    } else {
-      // Otherwise, use TwiML directly
-      callParams.twiml = '<Response><Say>Hello. This is a test call from your application.</Say></Response>';
     }
 
     // Using Twilio's API to create a new call

@@ -47,6 +47,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const MAX_SETUP_ATTEMPTS = 3;
   const tokenRef = useRef<string | null>(null);
   const deviceRef = useRef<Device | null>(null);
+  const tokenTypeRef = useRef<string>("AccessToken");
 
   // Track call quality metrics
   const [callQuality, setCallQuality] = useState<{
@@ -63,9 +64,14 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
   const fetchToken = useCallback(async () => {
     try {
+      // Add timestamp to prevent caching
+      const timestamp = new Date().getTime();
       const { data, error } = await supabase.functions.invoke("twilio-token", {
         method: "POST",
-        body: { identity: `user${Math.floor(Math.random() * 10000)}` },
+        body: { 
+          identity: `user${Math.floor(Math.random() * 10000)}`,
+          timestamp: timestamp 
+        },
       });
 
       if (error) {
@@ -81,9 +87,10 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       console.log("Successfully received Twilio token, length:", 
                  data.token ? data.token.length : 0, 
                  "identity:", data.identity || "unknown",
-                 "type:", data.tokenType || "unknown");
+                 "type:", data.tokenType || "AccessToken");
       
       tokenRef.current = data.token;
+      tokenTypeRef.current = data.tokenType || "AccessToken";
       return data.token;
     } catch (error: any) {
       console.error("Failed to fetch token:", error);
@@ -127,12 +134,15 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       rtt: sample.rtt || null,
     });
     
-    console.log("Call quality sample:", {
-      mos: sample.mos,
-      jitter: sample.jitter,
-      packetsLost: sample.packetsLost,
-      rtt: sample.rtt,
-    });
+    // Only log quality samples occasionally to avoid flooding the console
+    if (Math.random() < 0.1) {
+      console.log("Call quality sample:", {
+        mos: sample.mos,
+        jitter: sample.jitter,
+        packetsLost: sample.packetsLost,
+        rtt: sample.rtt,
+      });
+    }
   }, []);
 
   const handleCallWarning = useCallback((warningName: string, warningData: any) => {
@@ -189,7 +199,8 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     setIsInitializing(true);
     
     try {
-      const token = tokenRef.current || await fetchToken();
+      // Always fetch a fresh token
+      const token = await fetchToken();
       
       if (deviceRef.current) {
         console.log("Destroying existing device before creating new one");
@@ -202,16 +213,19 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
       console.log("Creating new Twilio device with token");
       
-      const newDevice = new Device(token, {
-        maxAverageBitrate: 16000,
-        forceAggressiveIceNomination: true,
-        edge: ['ashburn', 'tokyo', 'sydney'],
-        enableImprovedSignalingErrorPrecision: true,
+      // Device configuration
+      const deviceOptions: any = {
         closeProtection: true,
-        codecPreferences: ['opus', 'pcmu'] as any,
+        // Choose safe codecs that are widely supported
+        codecPreferences: ['opus', 'pcmu'],
         appName: "PowerDialer",
-        appVersion: "1.0.0"
-      });
+        appVersion: "1.0.0",
+        // Turn on logs for debugging
+        logLevel: 'debug'
+      };
+      
+      // Create the device with the token
+      const newDevice = new Device(token, deviceOptions);
 
       deviceRef.current = newDevice;
       errorNotifiedRef.current = false;
@@ -289,7 +303,10 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         conn.on('accept', () => {
           console.log("Call accepted, media session established");
           console.log("Call parameters:", conn.parameters);
-          console.log("Call direction:", conn.direction);
+          
+          if (conn.direction) {
+            console.log("Call direction:", conn.direction);
+          }
           
           if (conn.callerInfo && conn.callerInfo.isVerified === true) {
             toast({
@@ -492,18 +509,18 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   }, [device, status]);
 
   const setupDeviceWrapper = useCallback(async (): Promise<void> => {
-    if (!tokenRef.current) {
-      try {
-        await fetchToken();
-      } catch (err) {
-        console.error("Failed to fetch token in wrapper:", err);
+    try {
+      // Always fetch a fresh token when setting up device
+      await fetchToken();
+      
+      if (!audioContextInitialized) {
+        setShowSetupButton(true);
+      } else {
+        await setupDeviceAfterInteraction();
       }
-    }
-    
-    if (!audioContextInitialized) {
+    } catch (error) {
+      console.error("Device setup wrapper error:", error);
       setShowSetupButton(true);
-    } else {
-      await setupDeviceAfterInteraction();
     }
   }, [fetchToken, audioContextInitialized, setupDeviceAfterInteraction]);
 
