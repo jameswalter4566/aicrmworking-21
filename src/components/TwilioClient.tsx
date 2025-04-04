@@ -43,12 +43,15 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const [isInitializing, setIsInitializing] = useState(false);
   const toast = useToast();
   
-  // Use a ref to track if the device is already initialized
+  // Use refs to track if the device is already initialized and prevent duplicate toasts
   const deviceInitializedRef = useRef(false);
+  const errorNotifiedRef = useRef(false);
+  const setupAttemptsRef = useRef(0);
+  const MAX_SETUP_ATTEMPTS = 3;
 
   // Initialize the Twilio device
   const setupDevice = useCallback(async () => {
-    // Prevent multiple initializations
+    // Prevent multiple initializations or excessive retries
     if (isInitializing) {
       console.log("Device initialization already in progress, skipping");
       return null;
@@ -59,7 +62,22 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       console.log("Device already initialized and ready");
       return device;
     }
+
+    // Check for too many retry attempts
+    if (setupAttemptsRef.current >= MAX_SETUP_ATTEMPTS) {
+      console.log(`Maximum setup attempts (${MAX_SETUP_ATTEMPTS}) reached, aborting`);
+      if (!errorNotifiedRef.current) {
+        errorNotifiedRef.current = true;
+        toast.toast({
+          variant: "destructive",
+          title: "Setup Error",
+          description: "Failed to set up the phone after multiple attempts. Please refresh the page and try again.",
+        });
+      }
+      return null;
+    }
     
+    setupAttemptsRef.current += 1;
     setIsInitializing(true);
     
     try {
@@ -81,21 +99,39 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       // Clean up existing device if it exists
       if (device) {
         console.log("Destroying existing device before creating new one");
-        device.destroy();
+        try {
+          device.destroy();
+        } catch (e) {
+          console.warn("Error destroying existing device:", e);
+          // Continue anyway
+        }
       }
 
       // Create a new device with the token
-      // Fix for the codec types - use an array type assertion
+      console.log("Creating new Twilio device with token");
       const newDevice = new Device(data.token, {
-        codecPreferences: ["opus", "pcmu"] as any,
+        // Use proper codec preferences format
+        codecPreferences: ["opus", "pcmu"],
+        disableAudioContextSounds: false,
         maxAverageBitrate: 16000,
+        // Add additional debug options
+        debug: true,
+        // Add ICE servers for better connection handling
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
       });
+
+      // Reset error notification flag for new device
+      errorNotifiedRef.current = false;
 
       // Setup event listeners
       newDevice.on("ready", () => {
         console.log("Twilio device is ready");
         setStatus("ready");
         setIsInitializing(false);
+        setupAttemptsRef.current = 0; // Reset attempts counter on success
         
         // Only notify and call handler once
         if (!deviceInitializedRef.current) {
@@ -112,12 +148,23 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         console.error("Twilio device error:", err);
         setStatus("error");
         setIsInitializing(false);
+        
         if (onError && err) onError(err);
-        toast.toast({
-          variant: "destructive",
-          title: "Call Error",
-          description: err?.message || "An error occurred with the phone",
-        });
+        
+        // Prevent duplicate error toasts
+        if (!errorNotifiedRef.current) {
+          errorNotifiedRef.current = true;
+          toast.toast({
+            variant: "destructive",
+            title: "Call Error",
+            description: err?.message || "An error occurred with the phone",
+          });
+          
+          // Reset error notification flag after a delay
+          setTimeout(() => {
+            errorNotifiedRef.current = false;
+          }, 5000);
+        }
       });
 
       newDevice.on("disconnect", () => {
@@ -141,6 +188,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       try {
         console.log("Registering Twilio device");
         await newDevice.register();
+        console.log("Twilio device registered successfully");
         setDevice(newDevice);
         setStatus("ready");
         return newDevice;
@@ -153,12 +201,23 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       console.error("Error setting up Twilio device:", err);
       setStatus("error");
       setIsInitializing(false);
+      
       if (onError) onError(err);
-      toast.toast({
-        variant: "destructive",
-        title: "Setup Error",
-        description: err?.message || "Failed to set up the phone",
-      });
+      
+      // Prevent duplicate error toasts
+      if (!errorNotifiedRef.current) {
+        errorNotifiedRef.current = true;
+        toast.toast({
+          variant: "destructive",
+          title: "Setup Error",
+          description: err?.message || "Failed to set up the phone",
+        });
+        
+        // Reset error notification flag after a delay
+        setTimeout(() => {
+          errorNotifiedRef.current = false;
+        }, 5000);
+      }
       return null;
     }
   }, [device, status, isInitializing, onCallConnect, onCallDisconnect, onDeviceReady, onError, toast]);
@@ -166,12 +225,13 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   const makeCall = useCallback(
     async (phoneNumber: string) => {
       try {
-        if (!device || status !== "ready") {
-          await setupDevice();
+        let currentDevice = device;
+        if (!currentDevice || status !== "ready") {
+          currentDevice = await setupDevice();
         }
 
         // Check if device is ready
-        if (!device) {
+        if (!currentDevice) {
           throw new Error("Phone device is not ready. Try again.");
         }
 
@@ -196,11 +256,21 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       } catch (err: any) {
         console.error("Error making call:", err);
         if (onError) onError(err);
-        toast.toast({
-          variant: "destructive",
-          title: "Call Error",
-          description: err?.message || "Failed to make the call",
-        });
+        
+        // Prevent duplicate error toasts
+        if (!errorNotifiedRef.current) {
+          errorNotifiedRef.current = true;
+          toast.toast({
+            variant: "destructive",
+            title: "Call Error",
+            description: err?.message || "Failed to make the call",
+          });
+          
+          // Reset error notification flag after a delay
+          setTimeout(() => {
+            errorNotifiedRef.current = false;
+          }, 3000);
+        }
       }
     },
     [device, status, setupDevice, onError, toast]
@@ -208,7 +278,11 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
   const hangupCall = useCallback(() => {
     if (connection) {
-      connection.disconnect();
+      try {
+        connection.disconnect();
+      } catch (e) {
+        console.error("Error disconnecting call:", e);
+      }
       setConnection(null);
       setStatus("ready");
     }
@@ -239,16 +313,25 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     // Initial setup - only do this once when the component mounts
     if (!deviceInitializedRef.current && !device) {
       console.log("Performing initial Twilio device setup");
-      setupDevice().catch(err => {
-        console.error("Failed to setup device in initial effect:", err);
-      });
+      // Add small delay before initial setup to avoid browser issues
+      const timer = setTimeout(() => {
+        setupDevice().catch(err => {
+          console.error("Failed to setup device in initial effect:", err);
+        });
+      }, 1000);
+      
+      return () => clearTimeout(timer);
     }
 
     // Cleanup on unmount
     return () => {
       if (device) {
         console.log("Cleaning up Twilio device on unmount");
-        device.destroy();
+        try {
+          device.destroy();
+        } catch (e) {
+          console.error("Error cleaning up device:", e);
+        }
       }
       if (window.twilioClient) {
         window.twilioClient.device = null;
