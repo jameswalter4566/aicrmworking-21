@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Device, Call } from "@twilio/voice-sdk";
 import { useToast } from "@/hooks/use-toast";
@@ -62,7 +63,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
 
   const fetchToken = useCallback(async () => {
     try {
-      console.log("Fetching Twilio token...");
       const { data, error } = await supabase.functions.invoke("twilio-token", {
         method: "POST",
         body: { identity: `user${Math.floor(Math.random() * 10000)}` },
@@ -189,9 +189,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     setIsInitializing(true);
     
     try {
-      // Always fetch a fresh token to avoid any potential token expiration issues
-      const token = await fetchToken();
-      tokenRef.current = token;
+      const token = tokenRef.current || await fetchToken();
       
       if (deviceRef.current) {
         console.log("Destroying existing device before creating new one");
@@ -205,16 +203,14 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       console.log("Creating new Twilio device with token");
       
       const newDevice = new Device(token, {
-        enableIceGatheringTimeout: false, // Add this new option
         maxAverageBitrate: 16000,
         forceAggressiveIceNomination: true,
         edge: ['ashburn', 'tokyo', 'sydney'],
         enableImprovedSignalingErrorPrecision: true,
         closeProtection: true,
-        codecPreferences: ['opus', 'pcmu'],
+        codecPreferences: ['opus', 'pcmu'] as any,
         appName: "PowerDialer",
-        appVersion: "1.0.0",
-        debug: true // Enable debug mode to get more info in console
+        appVersion: "1.0.0"
       });
 
       deviceRef.current = newDevice;
@@ -431,6 +427,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     }
   }, [connection]);
 
+  // New function to send DTMF tones
   const sendDigits = useCallback((digits: string) => {
     if (connection) {
       try {
@@ -457,6 +454,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
     }
   }, [connection, toast]);
 
+  // New function to toggle mute
   const toggleMute = useCallback((shouldMute?: boolean) => {
     if (connection) {
       try {
@@ -494,11 +492,12 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
   }, [device, status]);
 
   const setupDeviceWrapper = useCallback(async (): Promise<void> => {
-    // Always fetch a fresh token
-    try {
-      await fetchToken();
-    } catch (err) {
-      console.error("Failed to fetch token in wrapper:", err);
+    if (!tokenRef.current) {
+      try {
+        await fetchToken();
+      } catch (err) {
+        console.error("Failed to fetch token in wrapper:", err);
+      }
     }
     
     if (!audioContextInitialized) {
@@ -540,6 +539,7 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       isReady,
     };
 
+    // Add the new functions to the global twilioClient object
     (window.twilioClient as any).sendDigits = sendDigits;
     (window.twilioClient as any).toggleMute = toggleMute;
     (window.twilioClient as any).callQuality = callQuality;

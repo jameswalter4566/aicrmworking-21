@@ -23,14 +23,9 @@ serve(async (req) => {
     const apiSecret = Deno.env.get('TWILIO_API_SECRET');
     const applicationSid = Deno.env.get('TWILIO_TWIML_APP_SID');
 
-    if (!accountSid) {
-      console.error('Missing Twilio Account SID');
-      throw new Error('Missing Twilio Account SID');
-    }
-
-    if (!apiKey || !apiSecret) {
-      console.error('Missing Twilio API Key/Secret');
-      throw new Error('Missing Twilio API Key/Secret');
+    if (!accountSid || (!authToken && (!apiKey || !apiSecret))) {
+      console.error('Missing required Twilio credentials');
+      throw new Error('Missing required Twilio credentials');
     }
 
     if (!applicationSid) {
@@ -50,7 +45,7 @@ serve(async (req) => {
     
     console.log("Creating token for identity:", identity);
 
-    // Create an access token with the API Key and Secret
+    // Use AccessToken with API Key and Secret if available (preferred method)
     const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
 
@@ -61,18 +56,37 @@ serve(async (req) => {
     });
 
     // Create an access token with a TTL of 1 hour (3600 seconds)
-    const accessToken = new AccessToken(
-      accountSid,
-      apiKey,
-      apiSecret,
-      { identity: identity, ttl: 3600 }
-    );
+    let token;
     
-    // Add the grant to the token
-    accessToken.addGrant(voiceGrant);
-    
-    // Generate the token
-    const token = accessToken.toJwt();
+    if (apiKey && apiSecret) {
+      console.log("Using API Key/Secret for token generation");
+      const accessToken = new AccessToken(
+        accountSid,
+        apiKey,
+        apiSecret,
+        { identity: identity, ttl: 3600 }
+      );
+      
+      // Add the grant to the token
+      accessToken.addGrant(voiceGrant);
+      
+      // Generate the token
+      token = accessToken.toJwt();
+    } else {
+      console.log("Using Auth Token for token generation (fallback)");
+      const accessToken = new AccessToken(
+        accountSid,
+        applicationSid, 
+        authToken,
+        { identity: identity, ttl: 3600 }
+      );
+      
+      // Add the grant to the token
+      accessToken.addGrant(voiceGrant);
+      
+      // Generate the token
+      token = accessToken.toJwt();
+    }
     
     console.log("Created AccessToken for:", identity, "length:", token.length);
 
