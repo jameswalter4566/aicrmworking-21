@@ -48,17 +48,10 @@ export const thoughtlyService = {
    */
   async createBulkContacts(contacts: ThoughtlyContact[]) {
     try {
-      // Add CRM Import tag to all contacts
-      const contactsWithTags = contacts.map(contact => ({
-        ...contact,
-        tags: [...(contact.tags || []), "CRM Import"],
-        countryCode: contact.countryCode || "US"
-      }));
-      
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
         body: {
           action: 'createContact',
-          contacts: contactsWithTags
+          contacts
         }
       });
 
