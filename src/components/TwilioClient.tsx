@@ -97,10 +97,13 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
       }
 
       const newDevice = new Device(data.token, {
-        codecPreferences: ['opus', 'pcmu'] as any[],
+        codecPreferences: ["opus", "pcmu"],
         disableAudioContextSounds: false,
         maxAverageBitrate: 16000,
-        debug: true // Enable debugging
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:global.stun.twilio.com:3478?transport=udp' }
+        ]
       });
 
       errorNotifiedRef.current = false;
@@ -127,7 +130,6 @@ const TwilioClient: React.FC<TwilioClientProps> = ({
         
         if (onError && err) onError(err);
         
-        // Create more specific error messages
         let errorMessage = "An error occurred with the phone";
         if (err && err.message) {
           if (err.message.includes("token")) {
