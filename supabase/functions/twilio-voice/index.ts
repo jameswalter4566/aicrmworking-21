@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -105,16 +104,12 @@ serve(async (req) => {
       console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`)
       
       try {
-        // Create a new call
+        // Create a new call with a VoiceUrl for handling the connection
         const call = await client.calls.create({
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          // Use the Twilio application instead of static TwiML
-          applicationSid: TWILIO_TWIML_APP_SID,
-          // This helps link the browser client with the outgoing call
-          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
-          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-          statusCallbackMethod: 'POST',
+          url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}`,
+          method: 'POST'
         })
         
         console.log("Call created successfully:", call.sid)
@@ -137,13 +132,13 @@ serve(async (req) => {
       // Process incoming voice requests from Twilio (for browser-phone connections)
       console.log("Handling Voice Request")
       const twimlResponse = new twilio.twiml.VoiceResponse()
-      const dial = twimlResponse.dial({
-        callerId: TWILIO_PHONE_NUMBER,
-      })
       
       // Get the phone number from the request parameters for outbound calls
       const to = (requestData as any).To || phoneNumber
       if (to) {
+        const dial = twimlResponse.dial({
+          callerId: TWILIO_PHONE_NUMBER,
+        })
         const formattedNumber = normalizePhoneNumber(to)
         dial.number(formattedNumber)
       }
