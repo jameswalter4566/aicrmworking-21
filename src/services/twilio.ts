@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -127,7 +126,6 @@ class TwilioService {
       
       // Create simplified device options
       const deviceOptions = {
-        codecPreferences: ['opus', 'pcmu'],
         debug: true,
         enableRingtone: true,
         incomingSoundVolume: 1.0,  // Maximum volume for incoming audio
@@ -183,7 +181,7 @@ class TwilioService {
         console.log('Incoming call detected');
       });
       
-      // Initialize the device with the token
+      // Initialize the device with the token - using as any to bypass type errors
       console.log("Setting up Twilio device with token");
       await this.device.setup(data.token, deviceOptions as any);
       
@@ -267,11 +265,13 @@ class TwilioService {
             }
           }
           
-          // Connect to Twilio with enhanced logging
-          console.log("Connecting with options:", { To: formattedPhoneNumber });
+          // Connect to Twilio with enhanced logging - Fixed connection parameters format
+          console.log("Connecting with phone number:", formattedPhoneNumber);
           
+          // Fix: Update the connect method call to match the expected API signature
+          // The device.connect() method expects a plain object or a function handler
           this.connection = await this.device.connect({
-            params: { To: formattedPhoneNumber }
+            To: formattedPhoneNumber  // This is sent as a parameter to your TwiML endpoint
           });
           
           console.log("Call connection established:", this.connection.parameters);

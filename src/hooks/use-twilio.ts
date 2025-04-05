@@ -50,7 +50,8 @@ export const useTwilio = () => {
           toast({
             title: "Audio Output Issue",
             description: "Unable to test your speakers. Please check your audio output settings.",
-            variant: "warning",
+            // Changed from "warning" to "default" to match allowed variants
+            variant: "default",
           });
         }
 
@@ -213,7 +214,8 @@ export const useTwilio = () => {
             toast({
               title: "Audio Check",
               description: "Your microphone appears to be inactive. Check browser permissions.",
-              variant: "warning",
+              // Changed from "warning" to "default" to match allowed variants
+              variant: "default",
             });
           }
         }
@@ -250,7 +252,8 @@ export const useTwilio = () => {
         toast({
           title: "Microphone Inactive",
           description: "Your microphone appears to be unavailable. Call will proceed but audio may not work.",
-          variant: "warning",
+          // Changed from "warning" to "default" to match allowed variants
+          variant: "default",
         });
       }
     }
