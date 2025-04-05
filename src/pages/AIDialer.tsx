@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -141,6 +140,7 @@ const AIDialer = () => {
   const [lineCount, setLineCount] = useState("1");
   const [isDialing, setIsDialing] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  // Fix for the type error - ensure dialQueue is typed as number[]
   const [dialQueue, setDialQueue] = useState<number[]>([]);
   const [aiResponses, setAiResponses] = useState<string[]>([
     "Hello, this is AI assistant calling on behalf of SalesPro CRM.",
@@ -295,8 +295,9 @@ const AIDialer = () => {
       ? contacts.filter(contact => contact.id && selectedLeads.includes(Number(contact.id)))
       : contacts;
     
-    // Create the dial queue
-    setDialQueue(contactsToCall.map(c => String(c.id)));
+    // Fix for the type error - ensure we're setting an array of numbers
+    setDialQueue(contactsToCall.map(c => Number(c.id)));
+    
     toast({
       title: "AI Dialing Started",
       description: `Preparing to call ${contactsToCall.length} leads`,
@@ -877,126 +878,4 @@ const AIDialer = () => {
                   <Phone className="h-4 w-4" />
                   <span>1 Line</span>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="2" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone2 className="h-4 w-4" />
-                  <span>2 Lines</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="3" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone3 className="h-4 w-4" />
-                  <span>3 Lines</span>
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Leads to Dial</h3>
-              <div className="bg-gray-50 p-3 rounded-lg text-sm">
-                {selectedLeads.length > 0 ? (
-                  <span className="font-medium">{selectedLeads.length} leads selected</span>
-                ) : (
-                  <span>All leads will be dialed ({leads.length} total)</span>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex sm:justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-lg"
-              onClick={() => setIsDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
-              onClick={startDialing}
-            >
-              Start Dialing
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Import Dialog */}
-      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Import Leads into AI Dialer</DialogTitle>
-            <DialogDescription>
-              Import all selected leads to the AI Dialer system to prepare them for automated calls.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4">
-            <div className="flex items-center gap-3 p-4 bg-blue-50 text-blue-800 rounded-lg">
-              <Upload className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="font-medium">Import {selectedLeads.length} leads to AI Dialer</p>
-                <p className="text-sm text-blue-700">
-                  This will make the leads available for AI calling campaigns
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex sm:justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-lg"
-              onClick={() => setIsImportDialogOpen(false)}
-              disabled={isImporting}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
-              onClick={importLeadsToThoughtly}
-              disabled={isImporting}
-            >
-              {isImporting ? (
-                <>
-                  <span className="animate-spin mr-2">⏳</span>
-                  Importing...
-                </>
-              ) : (
-                <>Import Leads</>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* File Upload Dialog */}
-      <Dialog open={isFileUploadOpen} onOpenChange={setIsFileUploadOpen}>
-        <DialogContent className="sm:max-w-[600px] rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Import Leads</DialogTitle>
-            <DialogDescription>
-              Upload a CSV file with your leads data. Our AI will analyze and map the columns automatically.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <IntelligentFileUpload onImportComplete={handleFileUploadComplete} />
-          
-          <DialogFooter className="flex sm:justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-lg"
-              onClick={() => setIsFileUploadOpen(false)}
-            >
-              Cancel
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </MainLayout>
-  );
-};
-
-export default AIDialer;
+                <ToggleGroupItem value="2" className="
