@@ -72,7 +72,7 @@ serve(async (req) => {
           ]
         }
       ],
-      from: { email: "no-reply@yourdomain.com", name: "SMS Campaign" },
+      from: { email: "jameswalter@goldenpathwayfinancial.com", name: "SMS Campaign" },
       subject: `SMS Campaign: ${campaignName || 'New Campaign'}`,
       content: [
         {
