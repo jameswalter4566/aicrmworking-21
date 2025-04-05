@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ThoughtlyContact {
@@ -149,12 +150,18 @@ export const thoughtlyService = {
         return contact;
       });
       
+      // Convert all metadata values to strings (API requirement)
+      const stringifiedMetadata = Object.entries(metadata || {}).reduce((acc, [key, value]) => {
+        acc[key] = String(value); // Convert all values to strings
+        return acc;
+      }, {} as Record<string, string>);
+      
       // Use the dedicated thoughtly-call-contacts edge function
       const { data, error } = await supabase.functions.invoke('thoughtly-call-contacts', {
         body: {
           contacts: formattedContacts,
           interview_id: interviewId,
-          metadata: metadata
+          metadata: stringifiedMetadata
         }
       });
 

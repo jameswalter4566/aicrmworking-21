@@ -99,10 +99,16 @@ serve(async (req) => {
         
         console.log(`Calling contact ${contact_id}`);
         
+        // Convert metadata values to strings to meet API requirements
+        const stringifiedMetadata = Object.entries(metadata || {}).reduce((acc, [key, value]) => {
+          acc[key] = String(value); // Convert all values to strings
+          return acc;
+        }, {} as Record<string, string>);
+        
         const callPayload = {
           contact_id,
           interview_id,
-          metadata
+          metadata: stringifiedMetadata
         };
         
         console.log("Call payload:", JSON.stringify(callPayload));
