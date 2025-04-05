@@ -34,6 +34,14 @@ import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
 
+type CallLog = {
+  contactId: string | number;
+  action: string;
+  status?: string;
+  timestamp?: string;
+  details?: string;
+};
+
 const defaultLeads: ThoughtlyContact[] = [
   {
     id: 1,
