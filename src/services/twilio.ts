@@ -2,8 +2,12 @@
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
-// Import the codec type directly from twilio-client instead of defining our own
-// This ensures we use the exact type expected by the library
+// Define an interface to match Twilio's expected Codec type
+// This avoids type conflicts with the Twilio library
+interface CodecOptions {
+  codecPreferences: Array<'opus' | 'pcmu' | 'pcma'>;
+}
+
 class TwilioService {
   private device: Device | null = null;
   private connection: any = null;
@@ -86,15 +90,11 @@ class TwilioService {
       // Set up the device with audio settings
       this.device = new Device();
       
-      // Create device options without explicitly typing codecPreferences
+      // Create device options with properly typed codecPreferences
       const deviceOptions = {
-        // Let TypeScript infer the correct type from the Device.setup method
-        codecPreferences: ['opus', 'pcmu'],
-        // Enable debugging if needed
+        codecPreferences: ['opus', 'pcmu'] as Array<'opus' | 'pcmu' | 'pcma'>,
         debug: true,
-        // Enable sounds
         enableRingtone: true,
-        // Set volume levels (0.0 to 1.0)
         incomingSoundVolume: 0.8,
         outgoingSoundVolume: 0.8,
       };
