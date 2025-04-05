@@ -14,9 +14,9 @@ console.log("Thoughtly Get Contacts function loaded and ready")
 // Base Thoughtly API URL 
 const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 
-// Retrieve API credentials from environment variables
-const THOUGHTLY_API_TOKEN = Deno.env.get("THOUGHTLY_API_TOKEN") || "8f6vq0cwvk59qwi63rcf1o";
-const THOUGHTLY_TEAM_ID = Deno.env.get("THOUGHTLY_TEAM_ID") || "aa7e6d5e-35b5-491a-9111-18790d37612f";
+// Retrieve API credentials 
+const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o";
+const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f";
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to ${req.url}`)
@@ -82,7 +82,7 @@ serve(async (req) => {
     console.log(`Using API token: ${THOUGHTLY_API_TOKEN}`);
     console.log(`Using team ID: ${THOUGHTLY_TEAM_ID}`);
 
-    // Call the Thoughtly API with exact header format from documentation example
+    // Call the Thoughtly API with EXACT header format according to the documentation
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -92,8 +92,28 @@ serve(async (req) => {
       }
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
     console.log(`Got Thoughtly API response with status: ${response.status}`);
+    console.log(`Response text: ${responseText}`);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Failed to parse response as JSON:", e);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Failed to parse response from Thoughtly API",
+          rawResponse: responseText,
+          status: response.status
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
     
     if (response.status !== 200) {
       console.error('Error from Thoughtly API:', data);
@@ -102,7 +122,14 @@ serve(async (req) => {
           success: false,
           error: data.error || 'Failed to get contacts from Thoughtly',
           details: data,
-          status: response.status
+          status: response.status,
+          requestDetails: {
+            url,
+            headers: {
+              'x-api-token': '***redacted***',
+              'team_id': THOUGHTLY_TEAM_ID
+            }
+          }
         }),
         { 
           status: response.status,
@@ -115,8 +142,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        data: data.data || [],
-        count: data.data?.length || 0
+        data: data.data?.contacts || [],
+        count: data.data?.count || 0
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
