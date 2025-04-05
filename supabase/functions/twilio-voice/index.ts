@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -138,6 +137,13 @@ serve(async (req) => {
           return new Response(
             JSON.stringify({ error: 'Phone number is required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        if (!TWILIO_PHONE_NUMBER) {
+          return new Response(
+            JSON.stringify({ error: 'Twilio phone number is not configured' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
