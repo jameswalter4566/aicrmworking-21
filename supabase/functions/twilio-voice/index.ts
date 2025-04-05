@@ -33,8 +33,11 @@ function normalizePhoneNumber(phoneNumber: string): string {
 }
 
 serve(async (req) => {
+  console.log(`Received ${req.method} request to Twilio Voice function`)
+  
   // Handle preflight requests properly
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS preflight request")
     return new Response(null, { 
       status: 204,
       headers: corsHeaders
@@ -47,22 +50,26 @@ serve(async (req) => {
     
     try {
       const contentType = req.headers.get('content-type') || '';
+      console.log(`Request content-type: ${contentType}`)
       
       if (contentType.includes('application/json')) {
         // Handle JSON data
         const text = await req.text();
+        console.log("Received JSON text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
         if (text && text.trim()) {
           requestData = JSON.parse(text);
         }
       } else if (contentType.includes('application/x-www-form-urlencoded')) {
         // Handle form data from Twilio
         const formData = await req.formData();
+        console.log("Received form data with fields:", Array.from(formData.keys()).join(', '))
         for (const [key, value] of formData.entries()) {
           requestData[key] = value;
         }
       } else {
         // Try to parse as text and then as JSON
         const text = await req.text();
+        console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
         if (text && text.trim()) {
           try {
             requestData = JSON.parse(text);
@@ -78,6 +85,7 @@ serve(async (req) => {
       
       // Always check URL query parameters and merge them
       const url = new URL(req.url);
+      console.log(`Request URL: ${req.url}`)
       for (const [key, value] of url.searchParams.entries()) {
         if (!requestData[key]) {
           requestData[key] = value;
@@ -98,6 +106,13 @@ serve(async (req) => {
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID');
+    
+    console.log("Twilio credentials loaded:", {
+      accountSidAvailable: !!TWILIO_ACCOUNT_SID,
+      authTokenAvailable: !!TWILIO_AUTH_TOKEN,
+      phoneNumberAvailable: !!TWILIO_PHONE_NUMBER,
+      twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID
+    });
     
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
       console.error("Missing required Twilio credentials");

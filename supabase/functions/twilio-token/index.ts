@@ -13,8 +13,11 @@ const corsHeaders = {
 console.log("Twilio Token function loaded and ready")
 
 serve(async (req) => {
+  console.log(`Received ${req.method} request to Twilio Token function`)
+  
   // Handle preflight requests properly
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS preflight request")
     return new Response(null, { 
       status: 204,
       headers: corsHeaders
@@ -26,6 +29,7 @@ serve(async (req) => {
     let requestData = {}
     try {
       const text = await req.text()
+      console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
       if (text && text.trim()) {
         requestData = JSON.parse(text)
       }
@@ -41,7 +45,14 @@ serve(async (req) => {
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
 
-    console.log("Environment variables loaded")
+    console.log("Environment variables loaded:", {
+      accountSidAvailable: !!TWILIO_ACCOUNT_SID,
+      authTokenAvailable: !!TWILIO_AUTH_TOKEN,
+      apiKeyAvailable: !!TWILIO_API_KEY,
+      apiSecretAvailable: !!TWILIO_API_SECRET,
+      twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID,
+      phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
+    })
 
     const { action } = requestData as { action?: string }
 
@@ -60,6 +71,11 @@ serve(async (req) => {
     // Check for required credentials for token generation
     console.log("Checking for required Twilio credentials...")
     if (!TWILIO_ACCOUNT_SID || !TWILIO_API_KEY || !TWILIO_API_SECRET) {
+      console.error("Missing required Twilio credentials:", {
+        accountSidMissing: !TWILIO_ACCOUNT_SID,
+        apiKeyMissing: !TWILIO_API_KEY,
+        apiSecretMissing: !TWILIO_API_SECRET
+      })
       return new Response(
         JSON.stringify({ error: 'Missing required Twilio credentials' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

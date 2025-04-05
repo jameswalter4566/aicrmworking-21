@@ -35,3 +35,9 @@ multisite = false
 [edge_functions]
 [edge_functions.store-leads]
 verify_jwt = false
+
+[edge_functions.twilio-voice]
+verify_jwt = false
+
+[edge_functions.twilio-token]
+verify_jwt = false
