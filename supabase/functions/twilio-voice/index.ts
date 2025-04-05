@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -33,8 +32,18 @@ function normalizePhoneNumber(phoneNumber: string): string {
 }
 
 serve(async (req) => {
-  // Handle preflight requests properly
+  // CRITICAL: Log every request in detail to diagnose auth issues
+  console.log(`======== NEW REQUEST ${new Date().toISOString()} ========`);
+  console.log(`Received ${req.method} request to Twilio Voice function`)
+  console.log(`Request URL: ${req.url}`)
+  
+  // Log all headers for debugging
+  const headerEntries = [...req.headers.entries()];
+  console.log(`Request headers (${headerEntries.length}):`, JSON.stringify(headerEntries));
+  
+  // CRITICAL: Always handle preflight requests properly first
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS preflight request")
     return new Response(null, { 
       status: 204,
       headers: corsHeaders
@@ -42,27 +51,31 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request data
+    // Parse request data - enhanced for more robust parsing
     let requestData: any = {}
     
     try {
       const contentType = req.headers.get('content-type') || '';
+      console.log(`Request content-type: ${contentType}`)
       
       if (contentType.includes('application/json')) {
         // Handle JSON data
         const text = await req.text();
+        console.log("Received JSON text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
         if (text && text.trim()) {
           requestData = JSON.parse(text);
         }
       } else if (contentType.includes('application/x-www-form-urlencoded')) {
         // Handle form data from Twilio
         const formData = await req.formData();
+        console.log("Received form data with fields:", Array.from(formData.keys()).join(', '))
         for (const [key, value] of formData.entries()) {
           requestData[key] = value;
         }
       } else {
         // Try to parse as text and then as JSON
         const text = await req.text();
+        console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
         if (text && text.trim()) {
           try {
             requestData = JSON.parse(text);
@@ -93,11 +106,20 @@ serve(async (req) => {
       );
     }
 
-    // Get Twilio credentials
+    // Get Twilio credentials - added extra logging to trace issues
+    console.log("Attempting to retrieve Twilio credentials from environment");
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID');
+    
+    // Log credential availability (not the values themselves)
+    console.log("Twilio credentials loaded:", {
+      accountSidAvailable: !!TWILIO_ACCOUNT_SID,
+      authTokenAvailable: !!TWILIO_AUTH_TOKEN,
+      phoneNumberAvailable: !!TWILIO_PHONE_NUMBER,
+      twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID
+    });
     
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
       console.error("Missing required Twilio credentials");
@@ -107,7 +129,17 @@ serve(async (req) => {
       );
     }
 
-    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    let client;
+    try {
+      client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+      console.log("Twilio client initialized successfully");
+    } catch (err) {
+      console.error("Error initializing Twilio client:", err);
+      return new Response(
+        JSON.stringify({ error: 'Failed to initialize Twilio client' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Get action from request data
     const action = requestData.action;
@@ -138,11 +170,14 @@ serve(async (req) => {
       console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`);
       
       try {
+        // Check if this is a browser-originated call or a direct REST API call
+        const isBrowserCall = requestData.browser === true;
+        
         // Create a new call with enhanced TwiML for better audio
         const call = await client.calls.create({
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}`,
+          url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}&browser=${isBrowserCall ? 'true' : 'false'}`,
           method: 'POST',
           // Add statusCallback to monitor call progress
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
@@ -173,10 +208,10 @@ serve(async (req) => {
       const twimlResponse = new twilio.twiml.VoiceResponse();
       
       if (requestData.Caller && requestData.Caller.startsWith('client:')) {
-        // This is a browser call to a phone
-        console.log("Browser to phone call - enhancing audio quality");
+        // This is a browser call to a phone - critical for audio in browser
+        console.log("Browser to phone call - enhancing audio quality and setting up stream");
         if (phoneNumber) {
-          // Set high quality audio settings
+          // Set high quality audio settings for browser calls
           twimlResponse.say({ 
             voice: 'alice',
             language: 'en-US' 
@@ -184,11 +219,7 @@ serve(async (req) => {
           
           const dial = twimlResponse.dial({
             callerId: TWILIO_PHONE_NUMBER,
-            // Enable audio monitoring - both sides
-            record: 'record-from-answer-dual',
-            // Add timeouts
-            timeout: 30,
-            // Enhanced audio quality
+            // Enhanced audio quality - crucial for browser audio
             answerOnBridge: true
           });
           
@@ -197,6 +228,12 @@ serve(async (req) => {
             statusCallbackEvent: ['answered', 'completed'],
             statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
           }, formattedNumber);
+          
+          // Set up media stream for browser audio after the call connects
+          twimlResponse.start().stream({
+            url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
+            track: 'both_tracks'
+          });
         } else {
           twimlResponse.say({ voice: 'alice' }, 'No phone number provided for the call.');
         }
@@ -207,8 +244,7 @@ serve(async (req) => {
         
         const dial = twimlResponse.dial({
           answerOnBridge: true,
-          callerId: TWILIO_PHONE_NUMBER,
-          record: 'record-from-answer-dual'
+          callerId: TWILIO_PHONE_NUMBER
         });
         
         dial.client({
@@ -216,19 +252,41 @@ serve(async (req) => {
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
         }, phoneNumber.replace('client:', ''));
       } else {
-        // Standard phone to phone call
-        console.log("Phone to phone call");
+        // Standard phone to phone call - modified to enable browser audio if requested
+        console.log("Processing call - checking if browser audio is requested");
+        const isBrowserRequested = requestData.browser === 'true';
+        
         if (phoneNumber) {
-          twimlResponse.say({ voice: 'alice' }, 'Connecting your call now.');
-          
-          const dial = twimlResponse.dial({
-            callerId: TWILIO_PHONE_NUMBER,
-            answerOnBridge: true,
-            record: 'record-from-answer-dual'
-          });
-          
-          const formattedNumber = normalizePhoneNumber(phoneNumber);
-          dial.number(formattedNumber);
+          if (isBrowserRequested) {
+            console.log("Setting up call with browser audio support and media streaming");
+            twimlResponse.say({ voice: 'alice' }, 'Connecting your call with browser audio.');
+            
+            // Special setup for browser audio feedback
+            const dial = twimlResponse.dial({
+              callerId: TWILIO_PHONE_NUMBER,
+              answerOnBridge: true
+            });
+            
+            const formattedNumber = normalizePhoneNumber(phoneNumber);
+            dial.number(formattedNumber);
+            
+            // Add media streaming after dialing
+            twimlResponse.start().stream({
+              url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
+              track: 'both_tracks'
+            });
+          } else {
+            console.log("Standard phone call without browser audio");
+            twimlResponse.say({ voice: 'alice' }, 'Connecting your call now.');
+            
+            const dial = twimlResponse.dial({
+              callerId: TWILIO_PHONE_NUMBER,
+              answerOnBridge: true
+            });
+            
+            const formattedNumber = normalizePhoneNumber(phoneNumber);
+            dial.number(formattedNumber);
+          }
         } else {
           twimlResponse.say({ voice: 'alice' }, 'Welcome to the phone system. No action specified.');
         }
