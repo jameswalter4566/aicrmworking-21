@@ -12,6 +12,26 @@ const corsHeaders = {
 
 console.log("Twilio Voice function loaded and ready")
 
+// Function to normalize phone numbers
+function normalizePhoneNumber(phoneNumber: string): string {
+  if (!phoneNumber) return '';
+  
+  // Remove all non-digit characters
+  const digitsOnly = phoneNumber.replace(/\D/g, '');
+  
+  // Ensure it has country code (assuming US/North America if none)
+  if (digitsOnly.length === 10) {
+    return `+1${digitsOnly}`;
+  } else if (digitsOnly.length > 10 && !digitsOnly.startsWith('1')) {
+    return `+${digitsOnly}`;
+  } else if (digitsOnly.length > 10 && digitsOnly.startsWith('1')) {
+    return `+${digitsOnly}`;
+  }
+  
+  // If we can't normalize it properly, at least add a plus
+  return digitsOnly ? `+${digitsOnly}` : '';
+}
+
 serve(async (req) => {
   // Handle preflight requests properly
   if (req.method === 'OPTIONS') {
@@ -70,8 +90,16 @@ serve(async (req) => {
         )
       }
 
-      // Format phone number if needed (ensure it starts with +)
-      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber.replace(/[\D]/g, '')}`
+      // Format the phone number properly
+      const formattedPhoneNumber = normalizePhoneNumber(phoneNumber)
+      
+      if (!formattedPhoneNumber) {
+        console.error("Invalid phone number format:", phoneNumber)
+        return new Response(
+          JSON.stringify({ error: 'Invalid phone number format' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
       
       console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`)
       

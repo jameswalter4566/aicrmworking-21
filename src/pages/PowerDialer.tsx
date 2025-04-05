@@ -200,12 +200,25 @@ const PowerDialer = () => {
       return;
     }
     
+    const normalizedPhone = normalizePhoneNumber(lead.phone1);
+    
+    if (!normalizedPhone) {
+      toast({
+        title: "Invalid Phone Number",
+        description: `The phone number for ${lead.firstName} ${lead.lastName} is invalid.`,
+        variant: "destructive",
+      });
+      
+      moveToNextLead(leadId);
+      return;
+    }
+    
     toast({
       title: "Dialing",
-      description: `Calling ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`,
+      description: `Calling ${lead.firstName} ${lead.lastName} at ${normalizedPhone}...`,
     });
     
-    console.log(`Making call to lead ${leadId} with phone number ${lead.phone1}`);
+    console.log(`Making call to lead ${leadId} with phone number ${normalizedPhone}`);
     
     try {
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
@@ -215,9 +228,14 @@ const PowerDialer = () => {
         },
         body: JSON.stringify({
           action: 'makeCall',
-          phoneNumber: lead.phone1
+          phoneNumber: normalizedPhone
         })
       });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Server returned ${response.status}: ${errorText}`);
+      }
       
       const result = await response.json();
       
@@ -391,6 +409,22 @@ const PowerDialer = () => {
   const isAllSelected = leads.length > 0 && leads.every(lead => 
     lead.id && selectedLeads.includes(lead.id)
   );
+
+  const normalizePhoneNumber = (phone: string): string => {
+    if (!phone) return '';
+    
+    const digitsOnly = phone.replace(/\D/g, '');
+    
+    if (digitsOnly.length === 10) {
+      return `+1${digitsOnly}`;
+    } else if (digitsOnly.length > 10 && !digitsOnly.startsWith('1')) {
+      return `+${digitsOnly}`;
+    } else if (digitsOnly.length > 10 && digitsOnly.startsWith('1')) {
+      return `+${digitsOnly}`;
+    }
+    
+    return digitsOnly ? `+${digitsOnly}` : '';
+  };
 
   return (
     <MainLayout>

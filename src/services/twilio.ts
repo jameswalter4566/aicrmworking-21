@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -86,6 +85,25 @@ class TwilioService {
     }
   }
   
+  private normalizePhoneNumber(phoneNumber: string): string {
+    if (!phoneNumber) return '';
+    
+    // Remove all non-digit characters
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    
+    // Ensure it has country code (assuming US/North America if none)
+    if (digitsOnly.length === 10) {
+      return `+1${digitsOnly}`;
+    } else if (digitsOnly.length > 10 && !digitsOnly.startsWith('1')) {
+      return `+${digitsOnly}`;
+    } else if (digitsOnly.length > 10 && digitsOnly.startsWith('1')) {
+      return `+${digitsOnly}`;
+    }
+    
+    // If we can't normalize it properly, at least add a plus
+    return digitsOnly ? `+${digitsOnly}` : '';
+  }
+  
   async makeCall(phoneNumber: string) {
     try {
       console.log(`Making Twilio call to ${phoneNumber}`);
@@ -95,8 +113,13 @@ class TwilioService {
         return { success: false, error: "Phone number is required" };
       }
       
-      // Format phone number to ensure it has +
-      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+      // Format phone number using our normalizer
+      const formattedPhoneNumber = this.normalizePhoneNumber(phoneNumber);
+      
+      if (!formattedPhoneNumber) {
+        console.error("Invalid phone number format");
+        return { success: false, error: "Invalid phone number format" };
+      }
       
       // Get the Twilio phone configuration
       const configResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-token`, {
@@ -125,6 +148,13 @@ class TwilioService {
           phoneNumber: formattedPhoneNumber
         })
       });
+      
+      // Check if response is OK before trying to parse JSON
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server error:", errorText);
+        return { success: false, error: `Server returned ${response.status}: ${errorText}` };
+      }
       
       const result = await response.json();
       
