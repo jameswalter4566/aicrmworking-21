@@ -64,7 +64,9 @@ const SMSSidebar = () => {
                     className="bg-pink-200 hover:bg-pink-300"
                   >
                     <Plus className="text-pink-600" />
-                    <span className={`ml-2 ${!isHovered ? 'opacity-0 w-0' : 'opacity-100 w-auto'} transition-all duration-200 overflow-hidden`}>New Campaign</span>
+                    {isHovered && (
+                      <span className="ml-2 transition-all duration-200 whitespace-nowrap">New Campaign</span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
@@ -74,7 +76,9 @@ const SMSSidebar = () => {
                     className="bg-purple-200 hover:bg-purple-300"
                   >
                     <Megaphone className="text-purple-600" />
-                    <span className={`ml-2 ${!isHovered ? 'opacity-0 w-0' : 'opacity-100 w-auto'} transition-all duration-200 overflow-hidden`}>Campaigns</span>
+                    {isHovered && (
+                      <span className="ml-2 transition-all duration-200 whitespace-nowrap">Campaigns</span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
@@ -84,7 +88,9 @@ const SMSSidebar = () => {
                     className="bg-blue-200 hover:bg-blue-300"
                   >
                     <Inbox className="text-blue-600" />
-                    <span className={`ml-2 ${!isHovered ? 'opacity-0 w-0' : 'opacity-100 w-auto'} transition-all duration-200 overflow-hidden`}>Inbox</span>
+                    {isHovered && (
+                      <span className="ml-2 transition-all duration-200 whitespace-nowrap">Inbox</span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
@@ -94,7 +100,9 @@ const SMSSidebar = () => {
                     className="bg-green-200 hover:bg-green-300"
                   >
                     <Smile className="text-green-600" />
-                    <span className={`ml-2 ${!isHovered ? 'opacity-0 w-0' : 'opacity-100 w-auto'} transition-all duration-200 overflow-hidden`}>Contacts</span>
+                    {isHovered && (
+                      <span className="ml-2 transition-all duration-200 whitespace-nowrap">Contacts</span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 
@@ -104,7 +112,9 @@ const SMSSidebar = () => {
                     className="bg-yellow-200 hover:bg-yellow-300"
                   >
                     <BarChart className="text-yellow-600" />
-                    <span className={`ml-2 ${!isHovered ? 'opacity-0 w-0' : 'opacity-100 w-auto'} transition-all duration-200 overflow-hidden`}>Analytics</span>
+                    {isHovered && (
+                      <span className="ml-2 transition-all duration-200 whitespace-nowrap">Analytics</span>
+                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -120,7 +130,9 @@ const SMSSidebar = () => {
                 className="bg-gray-200 hover:bg-gray-300"
               >
                 <Settings className="text-gray-600" />
-                <span className={`ml-2 ${!isHovered ? 'opacity-0 w-0' : 'opacity-100 w-auto'} transition-all duration-200 overflow-hidden`}>Settings</span>
+                {isHovered && (
+                  <span className="ml-2 transition-all duration-200 whitespace-nowrap">Settings</span>
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
