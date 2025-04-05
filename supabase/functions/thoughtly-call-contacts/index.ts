@@ -18,6 +18,9 @@ const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o";
 const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f";
 
+// Known working interview ID
+const DEFAULT_INTERVIEW_ID = "ctAaNCdh";
+
 serve(async (req) => {
   console.log(`Received ${req.method} request to ${req.url}`)
   
@@ -46,26 +49,13 @@ serve(async (req) => {
       )
     }
 
-    const { contacts, interview_id, metadata = {} } = await req.json();
+    const { contacts, interview_id = DEFAULT_INTERVIEW_ID, metadata = {} } = await req.json();
 
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: false,
           error: 'No contacts to call',
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    if (!interview_id) {
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Missing required parameter: interview_id',
         }),
         { 
           status: 400, 
@@ -107,7 +97,7 @@ serve(async (req) => {
         
         const callPayload = {
           contact_id,
-          interview_id,
+          interview_id: interview_id || DEFAULT_INTERVIEW_ID,
           metadata: stringifiedMetadata
         };
         

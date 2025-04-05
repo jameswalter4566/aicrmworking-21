@@ -126,7 +126,7 @@ export const thoughtlyService = {
    * @param metadata Additional metadata for the call
    * @returns Summary of call attempts
    */
-  async callContacts(contacts: string[] | any[], interviewId: string, metadata: Record<string, any> = {}) {
+  async callContacts(contacts: string[] | any[], interviewId: string = "ctAaNCdh", metadata: Record<string, any> = {}) {
     try {
       console.log(`Calling ${contacts.length} contacts with interview ID: ${interviewId}`);
       
