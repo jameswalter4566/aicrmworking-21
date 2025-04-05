@@ -124,7 +124,26 @@ serve(async (req) => {
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
       console.error("Missing required Twilio credentials");
       return new Response(
-        JSON.stringify({ error: 'Missing required Twilio credentials' }),
+        JSON.stringify({ 
+          error: 'Missing required Twilio credentials',
+          details: {
+            accountSidMissing: !TWILIO_ACCOUNT_SID,
+            authTokenMissing: !TWILIO_AUTH_TOKEN,
+            phoneNumberMissing: !TWILIO_PHONE_NUMBER
+          }
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Validate Twilio Account SID format (should start with 'AC')
+    if (!TWILIO_ACCOUNT_SID.startsWith('AC')) {
+      console.error("Invalid Twilio Account SID format - should start with 'AC'");
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid Twilio Account SID format', 
+          hint: 'Should start with AC'
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -133,10 +152,23 @@ serve(async (req) => {
     try {
       client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
       console.log("Twilio client initialized successfully");
+      
+      // Verify credentials with a small test API call
+      try {
+        const account = await client.api.accounts(TWILIO_ACCOUNT_SID).fetch();
+        console.log("Twilio credentials verified successfully:", account.friendlyName);
+      } catch (verifyError) {
+        console.error("Failed to verify Twilio credentials:", verifyError);
+        // Continue anyway - we'll catch actual API errors later
+      }
     } catch (err) {
       console.error("Error initializing Twilio client:", err);
       return new Response(
-        JSON.stringify({ error: 'Failed to initialize Twilio client' }),
+        JSON.stringify({ 
+          error: 'Failed to initialize Twilio client', 
+          twilioError: err.message || String(err),
+          suggestion: "Check your Twilio credentials in Supabase secrets"
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -193,11 +225,20 @@ serve(async (req) => {
         );
       } catch (error) {
         console.error("Error creating call:", error);
+        
+        // More detailed error logging
+        const errorResponse = {
+          success: false, 
+          error: error.message || 'Failed to create call'
+        };
+        
+        // Add Twilio specific error details if available
+        if (error.code) errorResponse.code = error.code;
+        if (error.status) errorResponse.status = error.status;
+        if (error.moreInfo) errorResponse.moreInfo = error.moreInfo;
+        
         return new Response(
-          JSON.stringify({ 
-            success: false, 
-            error: error.message || 'Failed to create call' 
-          }),
+          JSON.stringify(errorResponse),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }

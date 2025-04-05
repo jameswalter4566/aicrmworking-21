@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -303,7 +302,7 @@ class TwilioService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-          // NO Authorization headers
+          // IMPORTANT: NO Authorization headers - this causes 401 errors!
         },
         body: JSON.stringify({ action: 'getToken' })
       });
@@ -550,13 +549,13 @@ class TwilioService {
       // Fall back to Twilio REST API if browser Device fails
       console.log("Making call via REST API");
       
-      // CRITICAL FIX: Make request with NO AUTH HEADERS using full URL
+      // CRITICAL FIX: Make sure to use the full URL and NO AUTH HEADERS
       console.log("Sending request to Twilio Voice function with NO auth headers");
       const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-          // NO Authorization headers!
+          // IMPORTANT: NO Authorization headers - this causes 401 errors!
         },
         body: JSON.stringify({
           action: 'makeCall',
@@ -600,7 +599,7 @@ class TwilioService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-          // NO Authorization headers
+          // IMPORTANT: NO Authorization headers - this causes 401 errors!
         },
         body: JSON.stringify({
           action: 'checkStatus',
