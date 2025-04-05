@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -46,11 +45,9 @@ const SMSCampaign = () => {
   const importContacts = async () => {
     setIsImporting(true);
     try {
-      // Use the thoughtlyService to retrieve contacts
       const retrievedContacts = await thoughtlyService.getContacts();
       setContacts(retrievedContacts);
       
-      // Show success toast
       toast({
         title: "Contacts imported successfully",
         description: `Imported ${retrievedContacts.length} contacts for your campaign.`,
@@ -59,7 +56,6 @@ const SMSCampaign = () => {
     } catch (error) {
       console.error("Error importing contacts:", error);
       
-      // Show error toast
       toast({
         title: "Import failed",
         description: "Failed to import contacts. Please try again.",
@@ -71,7 +67,6 @@ const SMSCampaign = () => {
   };
 
   const handleSendMessage = async () => {
-    // Validate required fields
     if (!message) {
       toast({
         title: "Message required",
@@ -93,23 +88,19 @@ const SMSCampaign = () => {
     setIsSending(true);
     
     try {
-      // Call the edge function to generate the CSV
       const { data, error } = await supabase.functions.invoke('generate-sms-csv', {
-        body: {
+        body: JSON.stringify({
           contacts: contacts,
           message: message
-        },
-        responseType: 'arraybuffer'
+        })
       });
 
       if (error) {
         throw new Error(`Error generating CSV: ${error.message}`);
       }
 
-      // Create a blob from the array buffer
       const blob = new Blob([data], { type: 'text/csv' });
       
-      // Create a download link and trigger it
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -153,7 +144,6 @@ const SMSCampaign = () => {
               <h1 className="text-2xl font-bold">SMS Campaign</h1>
             </div>
 
-            {/* Preview Section (Top Half) */}
             <div className="mb-6">
               <Card className="p-5 bg-gray-50 min-h-[200px] flex flex-col">
                 <h2 className="text-lg font-semibold mb-2">Message Preview</h2>
@@ -165,7 +155,6 @@ const SMSCampaign = () => {
               </Card>
             </div>
 
-            {/* Campaign Builder Section (Bottom Half) */}
             <Card className="mb-6">
               <div className="p-6">
                 <h2 className="text-xl font-semibold mb-6">New Campaign 👋</h2>
@@ -176,7 +165,6 @@ const SMSCampaign = () => {
 
                 <Form {...form}>
                   <div className="grid gap-6">
-                    {/* Campaign Name */}
                     <FormItem>
                       <FormLabel>Campaign name</FormLabel>
                       <FormControl>
@@ -189,7 +177,6 @@ const SMSCampaign = () => {
                       <p className="text-muted-foreground text-xs">This is hidden to your customers</p>
                     </FormItem>
 
-                    {/* From and Message */}
                     <div className="space-y-6">
                       <FormItem>
                         <FormLabel>Send from</FormLabel>
@@ -215,7 +202,6 @@ const SMSCampaign = () => {
                       </FormItem>
                     </div>
                     
-                    {/* Audience Section */}
                     <div>
                       <div className="mb-4">
                         <h3 className="font-semibold text-base mb-1">Audience</h3>
@@ -243,7 +229,6 @@ const SMSCampaign = () => {
                         </RadioGroup>
                       </div>
 
-                      {/* Import Contacts Button */}
                       <div className="mb-6">
                         <Button 
                           onClick={importContacts} 
@@ -260,7 +245,6 @@ const SMSCampaign = () => {
                         )}
                       </div>
 
-                      {/* Filters Section */}
                       <div className="space-y-4">
                         <div>
                           <div className="flex items-center mb-2">
@@ -280,7 +264,6 @@ const SMSCampaign = () => {
                       </div>
                     </div>
                     
-                    {/* Frequency Section */}
                     <div>
                       <h3 className="font-semibold mb-3">Frequency</h3>
                       <RadioGroup 
@@ -299,7 +282,6 @@ const SMSCampaign = () => {
                       </RadioGroup>
                     </div>
                     
-                    {/* Send Timing Section */}
                     <div>
                       <h3 className="font-semibold mb-3">Send</h3>
                       <RadioGroup 
@@ -318,7 +300,6 @@ const SMSCampaign = () => {
                       </RadioGroup>
                     </div>
                     
-                    {/* Action Buttons */}
                     <div className="flex justify-end space-x-4 pt-4">
                       <Button variant="outline">Cancel</Button>
                       <Button 
