@@ -7,7 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 // Create a Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -22,6 +22,18 @@ Deno.serve(async (req) => {
   }
   
   try {
+    // Extract authorization header from the request
+    const authHeader = req.headers.get('Authorization');
+    
+    // Check if the request is coming from a browser or direct API call
+    // For browser requests, we'll allow them through without checking auth
+    // For API calls, we'll check the Authorization header
+    const isDirectApiCall = !req.headers.get('x-client-info')?.includes('supabase-js');
+    
+    if (isDirectApiCall && !authHeader) {
+      throw new Error('Missing authorization header');
+    }
+    
     const { leads, leadType } = await req.json();
     
     if (!leads || !Array.isArray(leads) || leads.length === 0) {
@@ -54,7 +66,7 @@ Deno.serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: error.message === 'Missing authorization header' ? 401 : 500,
       }
     );
   }

@@ -255,12 +255,16 @@ const People = () => {
     };
 
     try {
+      const { data: authData } = await supabase.auth.getSession();
+      const authToken = authData?.session?.access_token || '';
+
       const response = await fetch(
         "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${authToken}`,
           },
           body: JSON.stringify({
             leads: [newLead],
@@ -270,7 +274,8 @@ const People = () => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to store lead");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to store lead");
       }
       
       setLeads([...leads, newLead]);
