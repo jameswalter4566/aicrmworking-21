@@ -30,61 +30,7 @@ import {
 } from "@/components/ui/toggle-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { twilioService } from "@/services/twilio";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
-
-const leadsData = [
-  {
-    id: 1,
-    firstName: "Dan",
-    lastName: "Corkill",
-    email: "hi@followupboss.com",
-    phone1: "(218) 304-6145",
-    phone2: "",
-    disposition: "Not Contacted",
-    avatar: "",
-  },
-  {
-    id: 2,
-    firstName: "Sarah",
-    lastName: "Johnson",
-    email: "sarah.j@example.com",
-    phone1: "(555) 123-4567",
-    phone2: "(555) 987-6543",
-    disposition: "Contacted",
-    avatar: "",
-  },
-  {
-    id: 3,
-    firstName: "Robert",
-    lastName: "Smith",
-    email: "robert@example.com",
-    phone1: "(555) 987-6543",
-    phone2: "",
-    disposition: "Appointment Set",
-    avatar: "",
-  },
-  {
-    id: 4,
-    firstName: "Maria",
-    lastName: "Garcia",
-    email: "maria.g@example.com",
-    phone1: "(555) 222-3333",
-    phone2: "(555) 444-5555",
-    disposition: "Not Contacted",
-    avatar: "",
-  },
-  {
-    id: 5,
-    firstName: "James",
-    lastName: "Wilson",
-    email: "james.w@example.com",
-    phone1: "(555) 666-7777",
-    phone2: "",
-    disposition: "Not Contacted",
-    avatar: "",
-  },
-];
 
 const activityLogsData = {
   1: [
@@ -151,40 +97,9 @@ const PowerDialer = () => {
     "I'll try to schedule a meeting with our agent.",
   ]);
   const [callSids, setCallSids] = useState<Record<number, string>>({});
-  const [twilioInitialized, setTwilioInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [noLeadsSelectedError, setNoLeadsSelectedError] = useState(false);
 
-  useEffect(() => {
-    const initTwilio = async () => {
-      const micAccess = await twilioService.initializeAudioContext();
-      if (micAccess) {
-        const deviceInitialized = await twilioService.initializeTwilioDevice();
-        setTwilioInitialized(deviceInitialized);
-        
-        if (!deviceInitialized) {
-          toast({
-            title: "Error",
-            description: "Failed to initialize phone system. Please check your connection.",
-            variant: "destructive",
-          });
-        }
-      } else {
-        toast({
-          title: "Microphone Access Denied",
-          description: "Please allow microphone access to use the dialer.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    initTwilio();
-
-    return () => {
-      twilioService.cleanup();
-    };
-  }, []);
-  
   useEffect(() => {
     fetchLeads();
   }, []);
@@ -236,15 +151,6 @@ const PowerDialer = () => {
   };
 
   const startDialing = async () => {
-    if (!twilioInitialized) {
-      toast({
-        title: "Error",
-        description: "Phone system not initialized. Please refresh and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (selectedLeads.length === 0) {
       toast({
         title: "No Leads Selected",
@@ -300,16 +206,44 @@ const PowerDialer = () => {
     });
     
     console.log(`Making call to lead ${leadId} with phone number ${lead.phone1}`);
-    const { success, callSid, error } = await twilioService.makeCall(lead.phone1);
     
-    if (success && callSid) {
-      setCallSids(prev => ({ ...prev, [leadId]: callSid }));
+    try {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'makeCall',
+          phoneNumber: lead.phone1
+        })
+      });
       
-      monitorCallStatus(leadId, callSid);
-    } else {
+      const result = await response.json();
+      
+      if (result.success) {
+        setCallSids(prev => ({ ...prev, [leadId]: result.callSid }));
+        
+        toast({
+          title: "Call Connected",
+          description: `Call to ${lead.firstName} ${lead.lastName} is in progress`,
+        });
+        
+        monitorCallStatus(leadId, result.callSid);
+      } else {
+        toast({
+          title: "Call Failed",
+          description: result.error || "Could not connect the call",
+          variant: "destructive",
+        });
+        
+        moveToNextLead(leadId);
+      }
+    } catch (error) {
+      console.error(`Error making call to ${lead.phone1}:`, error);
       toast({
         title: "Call Failed",
-        description: error || "Could not connect the call",
+        description: "Network error or service unavailable",
         variant: "destructive",
       });
       
@@ -317,43 +251,69 @@ const PowerDialer = () => {
     }
   };
 
-  const monitorCallStatus = (leadId: number, callSid: string) => {
+  const monitorCallStatus = async (leadId: number, callSid: string) => {
     const intervalId = setInterval(async () => {
-      const status = await twilioService.checkCallStatus(callSid);
-      
-      if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
-        clearInterval(intervalId);
+      try {
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            action: 'checkStatus',
+            callSid: callSid
+          })
+        });
         
-        switch(status) {
-          case "completed":
-            toast({
-              title: "Call Completed",
-              description: `Call with ${leads.find(l => l.id === leadId)?.firstName} has ended`,
-            });
-            break;
-          case "busy":
-            toast({
-              title: "Line Busy",
-              description: `${leads.find(l => l.id === leadId)?.firstName}'s line is busy`,
-              variant: "destructive",
-            });
-            break;
-          case "no-answer":
-            toast({
-              title: "No Answer",
-              description: `${leads.find(l => l.id === leadId)?.firstName} did not answer`,
-              variant: "destructive",
-            });
-            break;
-          default:
-            toast({
-              title: "Call Failed",
-              description: `Call to ${leads.find(l => l.id === leadId)?.firstName} could not be completed`,
-              variant: "destructive",
-            });
+        const result = await response.json();
+        
+        if (!result.success) {
+          clearInterval(intervalId);
+          moveToNextLead(leadId);
+          return;
         }
         
-        moveToNextLead(leadId);
+        const status = result.status;
+        
+        if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
+          clearInterval(intervalId);
+          
+          const lead = leads.find(l => l.id === leadId);
+          const leadName = lead ? `${lead.firstName} ${lead.lastName}` : `Lead #${leadId}`;
+          
+          switch(status) {
+            case "completed":
+              toast({
+                title: "Call Completed",
+                description: `Call with ${leadName} has ended`,
+              });
+              break;
+            case "busy":
+              toast({
+                title: "Line Busy",
+                description: `${leadName}'s line is busy`,
+                variant: "destructive",
+              });
+              break;
+            case "no-answer":
+              toast({
+                title: "No Answer",
+                description: `${leadName} did not answer`,
+                variant: "destructive",
+              });
+              break;
+            default:
+              toast({
+                title: "Call Failed",
+                description: `Call to ${leadName} could not be completed`,
+                variant: "destructive",
+              });
+          }
+          
+          moveToNextLead(leadId);
+        }
+      } catch (error) {
+        console.error(`Error checking status for call ${callSid}:`, error);
       }
     }, 3000);
   };
@@ -383,9 +343,22 @@ const PowerDialer = () => {
   };
 
   const endDialingSession = async () => {
-    Object.keys(callSids).forEach(async (leadId) => {
-      await twilioService.endCall();
-    });
+    for (const [leadId, callSid] of Object.entries(callSids)) {
+      try {
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            action: 'endCall',
+            callSid
+          })
+        });
+      } catch (error) {
+        console.error(`Error ending call ${callSid}:`, error);
+      }
+    }
     
     setIsDialing(false);
     setActiveCallId(null);

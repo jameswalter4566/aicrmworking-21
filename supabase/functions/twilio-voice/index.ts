@@ -71,7 +71,7 @@ serve(async (req) => {
       }
 
       // Format phone number if needed (ensure it starts with +)
-      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`
+      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber.replace(/[\D]/g, '')}`
       
       console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`)
       
