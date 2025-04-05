@@ -65,6 +65,7 @@ serve(async (req) => {
     }
 
     console.log(`Initiating calls for ${contacts.length} contacts using interview_id: ${interview_id}`);
+    console.log(`Contact data sample:`, JSON.stringify(contacts[0]));
     console.log(`Using API token: ${THOUGHTLY_API_TOKEN}`);
     console.log(`Using team ID: ${THOUGHTLY_TEAM_ID}`);
 
@@ -76,7 +77,10 @@ serve(async (req) => {
     // Process each contact call sequentially to avoid rate limits
     for (const contact of contacts) {
       try {
-        const contact_id = contact.id || contact.contact_id;
+        // First, try to get the contact_id directly from the contact object
+        // Then fall back to id field
+        // This handles both formats from the Thoughtly API
+        const contact_id = contact.contact_id || contact.id || (typeof contact === 'string' ? contact : null);
         
         if (!contact_id) {
           console.error('Missing contact_id for contact:', contact);

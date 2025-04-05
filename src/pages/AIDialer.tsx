@@ -174,7 +174,7 @@ const AIDialer = () => {
       
       if (contacts && Array.isArray(contacts)) {
         const mappedContacts = contacts.map(mapThoughtlyContactToLead);
-        setThoughtlyContacts(contacts); 
+        setThoughtlyContacts(contacts); // Store original contacts from API
         setLeads(mappedContacts);
         
         addCallLog("system", "Contacts loaded", `Successfully loaded ${contacts.length} contacts from Thoughtly`);
@@ -252,8 +252,19 @@ const AIDialer = () => {
     setAiResponses(prev => [...prev, `Found ${contacts.length} contacts ready for calling.`]);
     
     const contactsToCall = selectedLeads.length > 0 
-      ? contacts.filter(contact => contact.id && selectedLeads.includes(Number(contact.id)))
-      : contacts;
+      ? thoughtlyContacts.filter(contact => {
+          const contactId = contact.id || '';
+          return selectedLeads.some(selectedId => String(selectedId) === String(contactId));
+        })
+      : contacts.slice(0, 10);
+    
+    console.log('Using these contacts for calling:', JSON.stringify(contactsToCall));
+    
+    if (contactsToCall.length === 0) {
+      setAiResponses(prev => [...prev, `No contacts found to call. Please check your selection.`]);
+      addCallLog("system", "No contacts", "No contacts were found to call", "error");
+      return;
+    }
     
     setDialQueue(contactsToCall.map(c => Number(c.id)));
     
@@ -275,8 +286,23 @@ const AIDialer = () => {
       const linesToUse = parseInt(lineCount);
       setAiResponses(prev => [...prev, `Using ${linesToUse} line${linesToUse > 1 ? 's' : ''} for concurrent calls`]);
       
+      const contactsToCall = selectedLeads.length > 0 
+        ? thoughtlyContacts.filter(contact => {
+            const contactId = contact.id || '';
+            return selectedLeads.some(selectedId => String(selectedId) === String(contactId));
+          })
+        : contacts.slice(0, 10);
+      
+      console.log('Using these contacts for calling:', JSON.stringify(contactsToCall));
+      
+      if (contactsToCall.length === 0) {
+        setAiResponses(prev => [...prev, `No contacts found to call. Please check your selection.`]);
+        addCallLog("system", "No contacts", "No contacts were found to call", "error");
+        return;
+      }
+      
       const result = await thoughtlyService.callContacts(
-        contacts.slice(0, 10),
+        contactsToCall,
         interviewId,
         {
           lines: linesToUse,
@@ -317,7 +343,7 @@ const AIDialer = () => {
           );
         });
         
-        trackCallProgress(contacts.slice(0, 10));
+        trackCallProgress(contactsToCall);
       } else {
         setAiResponses(prev => [...prev, `Failed to initiate calls: ${result.error || 'Unknown error'}`]);
         addCallLog("system", "Call initiation failed", result.error || "Unknown error", "error");

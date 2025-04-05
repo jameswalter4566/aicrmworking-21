@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ThoughtlyContact {
@@ -126,29 +125,16 @@ export const thoughtlyService = {
    * @param metadata Additional metadata for the call
    * @returns Summary of call attempts
    */
-  async callContacts(contacts: string[] | any[], interviewId: string = "ctAaNCdh", metadata: Record<string, any> = {}) {
+  async callContacts(contacts: any[], interviewId: string = "ctAaNCdh", metadata: Record<string, any> = {}) {
     try {
       console.log(`Calling ${contacts.length} contacts with interview ID: ${interviewId}`);
+      console.log('Contact data:', JSON.stringify(contacts));
       
-      // Ensure contacts have proper format with contact_id
-      const formattedContacts = contacts.map(contact => {
-        // If it's just a string ID, format it properly
-        if (typeof contact === 'string') {
-          return { id: contact };
-        }
-        
-        // If it's an object with an ID, ensure it has the expected format
-        if (typeof contact === 'object' && contact !== null) {
-          // If it doesn't have an id property but has a contact_id, use that
-          if (!contact.id && contact.contact_id) {
-            return contact;
-          }
-          // Otherwise, use the id property
-          return contact;
-        }
-        
-        return contact;
-      });
+      // No need to format contacts, just ensure we have a non-empty array
+      if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+        console.error('No contacts provided for calling');
+        throw new Error('No contacts to call');
+      }
       
       // Convert all metadata values to strings (API requirement)
       const stringifiedMetadata = Object.entries(metadata || {}).reduce((acc, [key, value]) => {
@@ -159,7 +145,7 @@ export const thoughtlyService = {
       // Use the dedicated thoughtly-call-contacts edge function
       const { data, error } = await supabase.functions.invoke('thoughtly-call-contacts', {
         body: {
-          contacts: formattedContacts,
+          contacts: contacts,
           interview_id: interviewId,
           metadata: stringifiedMetadata
         }
@@ -170,12 +156,13 @@ export const thoughtlyService = {
         throw error;
       }
 
+      console.log('Call results from Thoughtly:', data);
+      
       if (!data.success) {
         console.error('Error calling contacts through Thoughtly:', data.error);
         throw new Error(data.error || 'Failed to call contacts through Thoughtly');
       }
 
-      console.log('Call results from Thoughtly:', data);
       return data;
     } catch (error) {
       console.error('Error in callContacts:', error);
