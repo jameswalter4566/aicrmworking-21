@@ -13,6 +13,18 @@ class TwilioService {
   private supabaseUrl: string = "https://imrmboyczebjlbnkgjns.supabase.co";
   private audioStream: MediaStream | null = null;
   private audioElement: HTMLAudioElement | null = null;
+  private socket: WebSocket | null = null;
+  private audioQueue: AudioChunk[] = [];
+  private isProcessingAudio: boolean = false;
+  private audioBufferArray: Float32Array[] = [];
+  private callActive: boolean = false;
+  
+  // Structure for audio chunks in the queue
+  private interface AudioChunk {
+    track: string;
+    timestamp: number;
+    payload: string;
+  }
   
   constructor() {
     // Create audio element for output testing and call sounds
@@ -23,6 +35,7 @@ class TwilioService {
     // Add hidden audio elements for call sounds
     this.createHiddenAudio('ringtone', '/sounds/ringtone.mp3');
     this.createHiddenAudio('outgoing', '/sounds/outgoing.mp3');
+    this.createHiddenAudio('dialtone', '/sounds/dialtone.mp3');
   }
   
   private createHiddenAudio(id: string, src: string) {
@@ -38,6 +51,159 @@ class TwilioService {
     if (sound) {
       sound.currentTime = 0;
       sound.play().catch(err => console.warn(`Error playing ${soundId} sound:`, err));
+    }
+  }
+  
+  // Set up WebSocket for call audio streaming
+  private setupAudioWebSocket() {
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      console.log("WebSocket already connected");
+      return this.socket;
+    }
+
+    try {
+      // Connect to audio streaming WebSocket endpoint
+      const wsUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
+      console.log(`Connecting to WebSocket at ${wsUrl}`);
+      
+      this.socket = new WebSocket(wsUrl);
+      
+      this.socket.onopen = () => {
+        console.log("WebSocket connection opened for audio streaming");
+        // Identify as browser client
+        if (this.socket) {
+          this.socket.send(JSON.stringify({
+            event: 'browser_connect',
+            clientType: 'browser'
+          }));
+        }
+      };
+      
+      this.socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Handle different event types
+          if (data.event === 'audio') {
+            // Add audio chunk to processing queue
+            this.audioQueue.push({
+              track: data.track,
+              timestamp: data.timestamp,
+              payload: data.payload
+            });
+            
+            // Start processing queue if not already doing so
+            if (!this.isProcessingAudio) {
+              this.processAudioQueue();
+            }
+          } else if (data.event === 'streamStart') {
+            console.log("Call audio stream started", data);
+            // Play a dialtone when stream starts to provide audio feedback
+            this.playSound('dialtone');
+          } else if (data.event === 'streamStop') {
+            console.log("Call audio stream stopped", data);
+          } else if (data.event === 'browser_connected') {
+            console.log("Browser client connected to audio stream", data);
+          }
+        } catch (err) {
+          console.error("Error processing WebSocket message:", err);
+        }
+      };
+      
+      this.socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+      
+      this.socket.onclose = (event) => {
+        console.log(`WebSocket closed: ${event.code} ${event.reason}`);
+        this.socket = null;
+      };
+      
+      return this.socket;
+    } catch (err) {
+      console.error("Failed to set up WebSocket:", err);
+      return null;
+    }
+  }
+  
+  // Process audio chunks in the queue
+  private async processAudioQueue() {
+    if (!this.audioQueue.length || this.isProcessingAudio || !this.audioContext) {
+      return;
+    }
+    
+    this.isProcessingAudio = true;
+    
+    try {
+      // Take a chunk from the queue
+      const chunk = this.audioQueue.shift();
+      
+      if (chunk) {
+        // Convert base64 to array buffer
+        const audioData = this.base64ToArrayBuffer(chunk.payload);
+        
+        // Create audio buffer
+        const audioBuffer = await this.createAudioBufferFromPCM(audioData);
+        
+        if (audioBuffer) {
+          // Play the audio
+          const source = this.audioContext.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(this.audioContext.destination);
+          source.start();
+          
+          // Wait for audio to finish playing
+          await new Promise<void>((resolve) => {
+            source.onended = () => resolve();
+            // Failsafe timeout - if onended doesn't fire
+            setTimeout(() => resolve(), 500);
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Error processing audio queue:", err);
+    } finally {
+      this.isProcessingAudio = false;
+      
+      // If we have more chunks, continue processing
+      if (this.audioQueue.length > 0) {
+        this.processAudioQueue();
+      }
+    }
+  }
+  
+  // Convert base64 to array buffer
+  private base64ToArrayBuffer(base64: string): Uint8Array {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes;
+  }
+  
+  // Create audio buffer from PCM data
+  private async createAudioBufferFromPCM(pcmData: Uint8Array): Promise<AudioBuffer | null> {
+    if (!this.audioContext) {
+      console.error("AudioContext not initialized");
+      return null;
+    }
+    
+    try {
+      // Convert PCM data to 16-bit samples
+      const samples = new Int16Array(pcmData.buffer);
+      const audioBuffer = this.audioContext.createBuffer(1, samples.length, 8000);
+      const channelData = audioBuffer.getChannelData(0);
+      
+      // Convert Int16 to Float32 (WebAudio format)
+      for (let i = 0; i < samples.length; i++) {
+        channelData[i] = samples[i] / 32768;
+      }
+      
+      return audioBuffer;
+    } catch (err) {
+      console.error("Error creating audio buffer:", err);
+      return null;
     }
   }
   
@@ -70,6 +236,9 @@ class TwilioService {
       
       // Play a test tone to kickstart audio context
       await this.testAudioOutput();
+      
+      // Initialize WebSocket for audio streaming
+      this.setupAudioWebSocket();
       
       this.microphoneInitialized = true;
       console.log("Audio context initialized successfully with enhanced audio settings");
@@ -183,6 +352,7 @@ class TwilioService {
       this.device.on('connect', (conn) => {
         console.log('Call connected - audio channels established');
         this.connection = conn;
+        this.callActive = true;
         
         // Force unmute to ensure audio is flowing
         try {
@@ -206,11 +376,16 @@ class TwilioService {
             console.warn('Very low or no incoming audio detected');
           }
         });
+        
+        conn.on('warning', (warning) => {
+          console.warn('Connection warning:', warning.message);
+        });
       });
       
       this.device.on('disconnect', () => {
         console.log('Call disconnected - audio channels closed');
         this.connection = null;
+        this.callActive = false;
       });
       
       // Log additional debug information
@@ -223,8 +398,7 @@ class TwilioService {
         this.playSound('ringtone');
       });
       
-      // Initialize the device with the token - using as any to bypass type errors
-      console.log("Setting up Twilio device with token");
+      // Initialize the device with the token
       await this.device.setup(data.token, deviceOptions as any);
       
       // Play a startup sound to verify audio works
@@ -283,7 +457,7 @@ class TwilioService {
       }
       
       // Play a dialing sound to indicate call is starting
-      this.playSound('outgoing');
+      this.playSound('dialtone');
       
       // Try using browser audio first
       if (this.device) {
@@ -313,16 +487,22 @@ class TwilioService {
             }
           }
           
-          // Connect to Twilio with enhanced logging - Fixed connection parameters format
+          // Ensure WebSocket is ready for audio streaming
+          if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+            this.setupAudioWebSocket();
+          }
+          
+          // Connect to Twilio with enhanced logging
           console.log("Connecting with phone number:", formattedPhoneNumber);
           
-          // Fix: Update the connect method call to match the expected API signature
-          // The device.connect() method expects a plain object or a function handler
+          // Use the correct connection format expected by the Device API
           this.connection = await this.device.connect({
-            To: formattedPhoneNumber  // This is sent as a parameter to your TwiML endpoint
+            To: formattedPhoneNumber,
+            browser: true // Signal browser-based audio
           });
           
           console.log("Call connection established:", this.connection.parameters);
+          this.callActive = true;
           
           // Set up connection event listeners for audio monitoring
           this.connection.on('volume', (inputVol, outputVol) => {
@@ -343,6 +523,7 @@ class TwilioService {
           
           this.connection.on('disconnect', () => {
             this.connection = null;
+            this.callActive = false;
             console.log('Call ended');
           });
           
@@ -367,7 +548,8 @@ class TwilioService {
         },
         body: JSON.stringify({
           action: 'makeCall',
-          phoneNumber: formattedPhoneNumber
+          phoneNumber: formattedPhoneNumber,
+          browser: true // Signal that we want browser audio streaming
         })
       });
       
@@ -384,7 +566,7 @@ class TwilioService {
         return { success: false, error: result.error || "Failed to make call" };
       }
       
-      return { success: true, callSid: result.callSid, usingBrowser: false };
+      return { success: true, callSid: result.callSid, usingBrowser: true };
     } catch (error) {
       console.error('Error making call:', error);
       return { success: false, error: error.message || "An unknown error occurred" };
@@ -429,6 +611,7 @@ class TwilioService {
       if (this.connection) {
         this.connection.disconnect();
         this.connection = null;
+        this.callActive = false;
         return true;
       }
       
@@ -504,17 +687,26 @@ class TwilioService {
       this.audioStream = null;
     }
     
+    // Close WebSocket if open
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.close();
+      this.socket = null;
+    }
+    
     // Remove audio elements
     if (this.audioElement) {
       document.body.removeChild(this.audioElement);
       this.audioElement = null;
     }
     
-    const soundIds = ['ringtone', 'outgoing'];
+    const soundIds = ['ringtone', 'outgoing', 'dialtone'];
     soundIds.forEach(id => {
       const element = document.getElementById(id);
       if (element) document.body.removeChild(element);
     });
+    
+    this.callActive = false;
+    this.audioQueue = [];
   }
   
   // Improved audio test function to kickstart audio
