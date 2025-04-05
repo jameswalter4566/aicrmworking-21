@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, RefreshCw } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -207,6 +207,14 @@ const PowerDialer = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleRefreshLeads = () => {
+    toast({
+      title: "Refreshing Leads",
+      description: "Retrieving the latest leads data...",
+    });
+    fetchLeads();
   };
 
   const startDialSession = () => {
@@ -559,7 +567,19 @@ const PowerDialer = () => {
 
         <div className="border-t p-6 bg-white">
           <div className="mb-4 flex justify-between items-center">
-            <h2 className="text-lg font-medium">Leads to Dial</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-medium">Leads to Dial</h2>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-8 w-8" 
+                onClick={handleRefreshLeads}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <span className="sr-only">Refresh leads</span>
+              </Button>
+            </div>
             <div className="text-sm text-gray-500">
               {isLoading ? 'Loading leads...' : (
                 selectedLeads.length > 0 ? 

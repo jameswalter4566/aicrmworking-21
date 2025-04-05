@@ -21,6 +21,7 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
         disposition: "px-3 py-1 rounded-full text-xs font-semibold",
         dialer: "bg-crm-blue text-white hover:bg-crm-blue/90 transition-all duration-200",
+        refresh: "text-gray-500 hover:text-primary hover:bg-gray-100 p-1 rounded-full",
       },
       size: {
         default: "h-10 px-4 py-2",
