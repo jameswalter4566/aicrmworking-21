@@ -82,7 +82,7 @@ serve(async (req) => {
     console.log(`Using API token: ${THOUGHTLY_API_TOKEN}`);
     console.log(`Using team ID: ${THOUGHTLY_TEAM_ID}`);
 
-    // Call the Thoughtly API with appropriate headers
+    // Call the Thoughtly API with exact header format from documentation example
     const response = await fetch(url, {
       method: 'GET',
       headers: {
