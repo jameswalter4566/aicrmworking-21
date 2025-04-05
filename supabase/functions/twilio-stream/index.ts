@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 // CORS headers for initial requests
@@ -55,6 +54,18 @@ serve(async (req) => {
 
     socket.onopen = () => {
       console.log(`WebSocket connection opened: ${connId}`);
+      
+      // Send an initial message to confirm connection
+      try {
+        socket.send(JSON.stringify({
+          event: 'connection_established',
+          connId: connId,
+          timestamp: Date.now(),
+          message: 'WebSocket connection established and ready for audio streaming'
+        }));
+      } catch (e) {
+        console.error('Error sending initial message:', e);
+      }
     };
 
     socket.onmessage = (event) => {
@@ -71,7 +82,9 @@ serve(async (req) => {
           const streamStartEvent = {
             event: 'streamStart',
             streamSid: data.streamSid,
-            callSid: data.callSid
+            callSid: data.callSid,
+            timestamp: Date.now(),
+            message: 'Audio stream started and connected'
           };
           
           // Broadcast to all connected clients
@@ -110,7 +123,9 @@ serve(async (req) => {
           const streamStopEvent = {
             event: 'streamStop',
             streamSid: data.streamSid,
-            callSid: data.callSid
+            callSid: data.callSid,
+            timestamp: Date.now(),
+            message: 'Audio stream has ended'
           };
           
           // Broadcast to all connected clients
@@ -126,11 +141,30 @@ serve(async (req) => {
           socket.send(JSON.stringify({
             event: 'browser_connected',
             status: 'ready',
-            clientId: connId
+            clientId: connId,
+            timestamp: Date.now(),
+            message: 'Browser client registered for audio streaming'
+          }));
+        }
+        // Handle ping/keep alive messages
+        else if (data.event === 'ping') {
+          socket.send(JSON.stringify({
+            event: 'pong',
+            timestamp: Date.now(),
+            echo: data.timestamp || null
           }));
         }
       } catch (err) {
         console.error('Error processing message:', err);
+        try {
+          socket.send(JSON.stringify({
+            event: 'error',
+            error: 'Failed to process message',
+            timestamp: Date.now()
+          }));
+        } catch (e) {
+          console.error('Error sending error response:', e);
+        }
       }
     };
 

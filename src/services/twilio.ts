@@ -26,6 +26,10 @@ class TwilioService {
   private callActive: boolean = false;
   private dialToneSound: HTMLAudioElement | null = null;
   private ringingSound: HTMLAudioElement | null = null;
+  private streamingActive: boolean = false;
+  private keepAliveInterval: number | null = null;
+  private reconnectAttempts: number = 0;
+  private maxReconnectAttempts: number = 5;
   
   constructor() {
     // Create audio element for output testing and call sounds
@@ -41,6 +45,9 @@ class TwilioService {
     // Initialize dial tone for immediate feedback when calling
     this.dialToneSound = document.getElementById('dialtone') as HTMLAudioElement;
     this.ringingSound = document.getElementById('outgoing') as HTMLAudioElement;
+    
+    // Setup WebSocket connection for audio streaming
+    this.setupAudioWebSocket();
   }
   
   private createHiddenAudio(id: string, src: string) {
@@ -83,6 +90,11 @@ class TwilioService {
       
       this.socket.onopen = () => {
         console.log("WebSocket connection opened for audio streaming");
+        this.reconnectAttempts = 0; // Reset reconnect attempts
+        
+        // Start keep-alive pings
+        this.startKeepAlive();
+        
         // Identify as browser client
         if (this.socket) {
           this.socket.send(JSON.stringify({
@@ -98,6 +110,9 @@ class TwilioService {
           
           // Handle different event types
           if (data.event === 'audio') {
+            // Set streaming status to active
+            this.streamingActive = true;
+            
             // Add audio chunk to processing queue
             this.audioQueue.push({
               track: data.track,
@@ -115,10 +130,14 @@ class TwilioService {
             this.stopSound('ringtone');
             this.stopSound('outgoing');
             this.stopSound('dialtone');
+            this.streamingActive = true;
           } else if (data.event === 'streamStop') {
             console.log("Call audio stream stopped", data);
-          } else if (data.event === 'browser_connected') {
-            console.log("Browser client connected to audio stream", data);
+            this.streamingActive = false;
+          } else if (data.event === 'browser_connected' || data.event === 'connection_established') {
+            console.log("WebSocket connection confirmed: ", data);
+          } else if (data.event === 'pong') {
+            // Keep-alive pong received (silent)
           }
         } catch (err) {
           console.error("Error processing WebSocket message:", err);
@@ -127,17 +146,50 @@ class TwilioService {
       
       this.socket.onerror = (error) => {
         console.error("WebSocket error:", error);
+        this.streamingActive = false;
       };
       
       this.socket.onclose = (event) => {
         console.log(`WebSocket closed: ${event.code} ${event.reason}`);
+        this.streamingActive = false;
+        this.stopKeepAlive();
+        
+        // Attempt to reconnect if not closed intentionally
+        if (this.callActive && this.reconnectAttempts < this.maxReconnectAttempts) {
+          this.reconnectAttempts++;
+          console.log(`Attempting to reconnect WebSocket (attempt ${this.reconnectAttempts})`);
+          setTimeout(() => this.setupAudioWebSocket(), 2000);
+        }
+        
         this.socket = null;
       };
       
       return this.socket;
     } catch (err) {
       console.error("Failed to set up WebSocket:", err);
+      this.streamingActive = false;
       return null;
+    }
+  }
+  
+  // Keep the WebSocket connection alive with pings
+  private startKeepAlive() {
+    this.stopKeepAlive(); // Clear any existing interval
+    
+    this.keepAliveInterval = window.setInterval(() => {
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        this.socket.send(JSON.stringify({
+          event: 'ping',
+          timestamp: Date.now()
+        }));
+      }
+    }, 30000); // Send ping every 30 seconds
+  }
+  
+  private stopKeepAlive() {
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+      this.keepAliveInterval = null;
     }
   }
   
@@ -294,11 +346,11 @@ class TwilioService {
     // If any frequency is above threshold, microphone is active
     const hasAudioSignal = dataArray.some(value => value > 5); // Slightly higher threshold to avoid background noise
     
-    if (!hasAudioSignal) {
-      console.log("No audio signal detected from microphone");
-    }
-    
     return hasAudioSignal;
+  }
+  
+  isStreamingActive() {
+    return this.streamingActive;
   }
   
   async initializeTwilioDevice() {
@@ -494,6 +546,14 @@ class TwilioService {
       // Play a dialing sound to indicate call is starting
       this.playSound('dialtone');
       
+      // Ensure WebSocket is connected for audio streaming
+      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+        this.setupAudioWebSocket();
+      }
+      
+      // Clear any previous audio queue
+      this.audioQueue = [];
+      
       // CRITICAL CHANGE: Always use the Twilio Device in browser to make the call
       try {
         console.log("Using Twilio Device for browser-based calling");
@@ -521,11 +581,6 @@ class TwilioService {
           }
         }
         
-        // Ensure WebSocket is ready for audio streaming
-        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-          this.setupAudioWebSocket();
-        }
-        
         // Connect to Twilio with enhanced logging
         console.log("Connecting with phone number:", formattedPhoneNumber);
         
@@ -534,8 +589,25 @@ class TwilioService {
           To: formattedPhoneNumber
         });
         
-        console.log("Call connection established:", this.connection.parameters);
+        console.log("Call connection established:", this.connection?.parameters);
         this.callActive = true;
+        
+        // Start monitoring for streaming status
+        setTimeout(() => {
+          if (!this.streamingActive && this.callActive) {
+            console.log("No audio stream detected - making fallback API call to enable streaming");
+            
+            // Send fallback request to ensure media streaming is enabled
+            fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'enableStreaming',
+                callSid: this.connection?.parameters?.CallSid
+              })
+            }).catch(err => console.error("Error in fallback streaming request:", err));
+          }
+        }, 5000); // Check after 5 seconds
         
         // Set up connection event listeners for audio monitoring
         this.connection.on('volume', (inputVol: number, outputVol: number) => {
@@ -551,6 +623,7 @@ class TwilioService {
         this.connection.on('disconnect', () => {
           this.connection = null;
           this.callActive = false;
+          this.streamingActive = false;
           console.log('Call ended');
         });
         

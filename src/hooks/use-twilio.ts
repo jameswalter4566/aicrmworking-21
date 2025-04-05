@@ -12,6 +12,7 @@ export interface ActiveCall {
   speakerOn?: boolean;
   usingBrowser?: boolean;
   audioActive?: boolean;
+  audioStreaming?: boolean;
 }
 
 export const useTwilio = () => {
@@ -19,6 +20,7 @@ export const useTwilio = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeCalls, setActiveCalls] = useState<Record<string, ActiveCall>>({});
   const [microphoneActive, setMicrophoneActive] = useState(false);
+  const [audioStreaming, setAudioStreaming] = useState(false);
   const [audioTested, setAudioTested] = useState(false);
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
@@ -84,7 +86,22 @@ export const useTwilio = () => {
     audioCheckInterval.current = window.setInterval(() => {
       const isActive = twilioService.isMicrophoneActive();
       setMicrophoneActive(isActive);
-    }, 3000);
+      
+      // Check audio streaming status
+      const isStreaming = twilioService.isStreamingActive?.() || false;
+      setAudioStreaming(isStreaming);
+      
+      // Update any active calls with the streaming status
+      if (Object.keys(activeCalls).length > 0) {
+        setActiveCalls(prev => {
+          const updated = {...prev};
+          Object.keys(updated).forEach(leadId => {
+            updated[leadId].audioStreaming = isStreaming;
+          });
+          return updated;
+        });
+      }
+    }, 2000);
 
     return () => {
       if (audioCheckInterval.current) {
@@ -112,6 +129,7 @@ export const useTwilio = () => {
       try {
         if (usingBrowser) {
           const isAudioActive = twilioService.isMicrophoneActive();
+          const isStreaming = twilioService.isStreamingActive?.() || false;
           
           setActiveCalls(prev => {
             if (!prev[leadIdStr]) return prev;
@@ -120,13 +138,18 @@ export const useTwilio = () => {
               ...prev,
               [leadIdStr]: {
                 ...prev[leadIdStr],
-                audioActive: isAudioActive
+                audioActive: isAudioActive,
+                audioStreaming: isStreaming
               }
             };
           });
           
           if (!isAudioActive && activeCalls[leadIdStr]?.status === 'in-progress') {
             console.warn("Call is active but no audio detected - possible audio issues");
+          }
+          
+          if (!isStreaming && activeCalls[leadIdStr]?.status === 'in-progress') {
+            console.warn("Call is active but no audio streaming detected - possible streaming issues");
           }
         }
         
@@ -187,7 +210,7 @@ export const useTwilio = () => {
           
           toast({
             title: "Call Connected",
-            description: `Call is now in progress. You should hear audio${usingBrowser ? " through your browser" : ""}.`,
+            description: `Call is now in progress. ${usingBrowser ? "Audio should be streaming through your browser." : ""}`,
           });
           
           if (usingBrowser && !microphoneActive) {
@@ -249,13 +272,14 @@ export const useTwilio = () => {
           isMuted: false,
           speakerOn: false,
           usingBrowser: result.usingBrowser,
-          audioActive: microphoneActive
+          audioActive: microphoneActive,
+          audioStreaming: audioStreaming
         }
       }));
       
       toast({
         title: "Dialing",
-        description: `Calling ${phoneNumber}...${result.usingBrowser ? ' (using browser audio)' : ''}`,
+        description: `Calling ${phoneNumber}... Audio will stream through your browser when connected.`,
       });
       
       monitorCallStatus(leadId, result.callSid, result.usingBrowser);
@@ -268,7 +292,7 @@ export const useTwilio = () => {
     }
 
     return result;
-  }, [initialized, monitorCallStatus, microphoneActive]);
+  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming]);
 
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
@@ -376,6 +400,7 @@ export const useTwilio = () => {
     isLoading,
     activeCalls,
     microphoneActive,
+    audioStreaming,
     audioTested,
     makeCall,
     endCall,
