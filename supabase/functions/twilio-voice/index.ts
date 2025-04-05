@@ -37,10 +37,36 @@ serve(async (req) => {
 
     console.log("Environment variables loaded")
     
-    // Parse the request body
+    // Parse the request body based on content-type
     let requestData
+    const contentType = req.headers.get('content-type')
+    console.log('Received content type:', contentType)
+    
     try {
-      requestData = await req.json()
+      if (contentType?.includes('application/json')) {
+        console.log('Processing JSON data')
+        requestData = await req.json()
+      } else if (contentType?.includes('application/x-www-form-urlencoded')) {
+        console.log('Processing form data')
+        const text = await req.text()
+        requestData = Object.fromEntries(text.split('&').map((pair) => {
+          const [key, value] = pair.split('=')
+          return [
+            key,
+            decodeURIComponent(value?.replace(/\+/g, ' ') || '')
+          ]
+        }))
+        console.log('Parsed form data:', requestData)
+      } else {
+        console.log('Unexpected content type, treating as text')
+        const text = await req.text()
+        console.log('Raw request body:', text)
+        try {
+          requestData = JSON.parse(text)
+        } catch {
+          requestData = {}
+        }
+      }
       console.log("Request data parsed:", JSON.stringify(requestData))
     } catch (e) {
       console.error("Failed to parse request body:", e)
@@ -50,10 +76,35 @@ serve(async (req) => {
       )
     }
     
+    // Handle Twilio callback webhooks
+    if (requestData.RecordingSid || requestData.RecordingUrl || requestData.CallSid) {
+      console.log('📞 Received webhook callback from Twilio:', {
+        callSid: requestData.callSid || requestData.CallSid,
+        recordingSid: requestData.RecordingSid,
+        recordingUrl: requestData.RecordingUrl,
+        duration: requestData.Duration
+      })
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          recordingSid: requestData.RecordingSid,
+          recordingUrl: requestData.RecordingUrl,
+          callSid: requestData.CallSid,
+          duration: requestData.Duration
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    // Extract action and parameters from the request
     const { action, phoneNumber, callbackUrl, callSid } = requestData
-    console.log(`Processing action: ${action}`)
 
-    switch (action) {
+    // If no specific action is defined, fallback to makeCall
+    const actionToPerform = action || 'makeCall'
+    console.log(`Processing action: ${actionToPerform}`)
+
+    switch (actionToPerform) {
       case 'makeCall': {
         if (!phoneNumber) {
           return new Response(
@@ -63,6 +114,16 @@ serve(async (req) => {
         }
 
         console.log(`Initiating call to ${phoneNumber} from ${TWILIO_PHONE_NUMBER}`)
+
+        // Create Twilio client if we need to use the API directly
+        if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+          return new Response(
+            JSON.stringify({ error: 'Twilio credentials not configured' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        // Method 1: Use Twilio REST API directly
         const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
 
         // Create TwiML to instruct Twilio how to handle the call
@@ -151,6 +212,56 @@ serve(async (req) => {
           JSON.stringify({ status: data.status }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
+      }
+
+      case 'check_recording': {
+        if (!callSid) {
+          return new Response(
+            JSON.stringify({ error: 'Call SID is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        console.log('🎥 Checking recordings for call:', callSid)
+        
+        try {
+          const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+          const recordings = await client.recordings.list({ callSid })
+          
+          if (recordings && recordings.length > 0) {
+            const recording = recordings[0]
+            console.log('✅ Found recording:', {
+              sid: recording.sid,
+              mediaUrl: recording.mediaUrl,
+              duration: recording.duration
+            })
+            
+            return new Response(JSON.stringify({
+              success: true,
+              hasRecording: true,
+              recordingUrl: recording.mediaUrl,
+              recordingSid: recording.sid,
+              duration: recording.duration,
+              status: recording.status
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+          
+          return new Response(JSON.stringify({
+            success: true,
+            hasRecording: false,
+            message: 'No recording found yet'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        } catch (error) {
+          console.error('Error checking recordings:', error)
+          return new Response(
+            JSON.stringify({ error: 'Failed to check recordings', details: error.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
       }
 
       case 'generateToken': {
