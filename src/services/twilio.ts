@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 // Audio context and processing nodes
@@ -234,7 +235,6 @@ const makeCall = async (phoneNumber: string) => {
       body: {
         action: 'makeCall',
         phoneNumber: formattedPhone,
-        callbackUrl: window.location.origin,
       },
       headers: {
         'Content-Type': 'application/json',
