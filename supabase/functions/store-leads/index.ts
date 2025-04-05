@@ -22,11 +22,13 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // For now, we'll allow all requests from the browser app through without auth checks
-    // This simplifies development and testing while we fix the authentication issues
+    // Completely disable authentication requirements
+    // Log detailed request information for debugging
+    console.log('Request path:', req.url);
+    console.log('Request method:', req.method);
     
-    // Log headers for debugging
-    console.log('Request headers:', 
+    // Log all headers for debugging
+    console.log('All request headers:', 
       Object.fromEntries([...req.headers.entries()].map(([k, v]) => 
         [k, k.toLowerCase() === 'authorization' ? 'Bearer [REDACTED]' : v]
       ))

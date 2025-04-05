@@ -271,8 +271,12 @@ const People = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("API error response:", errorData);
         throw new Error(errorData.error || "Failed to store lead");
       }
+      
+      const responseData = await response.json();
+      console.log("API success response:", responseData);
       
       setLeads([...leads, newLead]);
       setIsAddLeadOpen(false);
