@@ -226,6 +226,8 @@ const makeCall = async (phoneNumber: string) => {
     const formattedPhone = phoneNumber.startsWith('+') 
       ? phoneNumber 
       : `+1${phoneNumber.replace(/\D/g, '')}`;
+    
+    console.log(`Formatted phone number for call: ${formattedPhone}`);
 
     // Use our edge function to make the outbound call
     console.log(`Invoking twilio-voice function to call ${formattedPhone}`);

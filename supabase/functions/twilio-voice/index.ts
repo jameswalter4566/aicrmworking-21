@@ -131,6 +131,9 @@ serve(async (req) => {
 
     switch (actionToPerform) {
       case 'makeCall': {
+        // Log the full request data for debugging
+        console.log(`Request data for makeCall:`, JSON.stringify(requestData, null, 2))
+        
         if (!phoneNumber) {
           return new Response(
             JSON.stringify({ error: 'Phone number is required' }),
