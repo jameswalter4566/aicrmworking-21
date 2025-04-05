@@ -33,6 +33,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { twilioService } from "@/services/twilio";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
+import { supabase } from "@/integrations/supabase/client";
 
 const defaultLeads = [
   {
@@ -147,6 +148,7 @@ const AIDialer = () => {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
+  const [callInProgress, setCallInProgress] = useState(false);
   
   useEffect(() => {
     fetchLeads();
@@ -203,44 +205,77 @@ const AIDialer = () => {
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
     setIsDialing(true);
+    setCallInProgress(true);
     
     toast({
-      title: "AI Dialing Started",
-      description: `Now dialing ${leadsToDial.length} leads`,
+      title: "Starting AI Dialing Session",
+      description: `Now initializing AI dialing with ${lineCount} line${Number(lineCount) > 1 ? 's' : ''}`,
     });
-  };
 
-  const handleSelectAllLeads = (checked: boolean) => {
-    if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id!));
-    } else {
-      setSelectedLeads([]);
-      setIsImportDialogOpen(false);
-    }
-  };
+    try {
+      const { data, error } = await supabase.functions.invoke('start-dialing', {
+        body: {
+          leadIds: leadsToDial,
+          interviewId: "interview_demo_123",
+          lineCount: parseInt(lineCount)
+        }
+      });
 
-  const handleSelectLead = (leadId: number, checked: boolean) => {
-    if (checked) {
-      const newSelectedLeads = [...selectedLeads, leadId];
-      setSelectedLeads(newSelectedLeads);
-      
-      if (newSelectedLeads.length === leads.length) {
-        setIsImportDialogOpen(true);
+      if (error) {
+        console.error("Error starting dialing session:", error);
+        toast({
+          title: "Error",
+          description: "Failed to start dialing session. Please try again.",
+          variant: "destructive"
+        });
+        setIsDialing(false);
+        setCallInProgress(false);
+        return;
       }
-    } else {
-      setSelectedLeads(prev => prev.filter(id => id !== leadId));
-      setIsImportDialogOpen(false);
+
+      console.log("Dialing session started successfully:", data);
+      
+      if (data.success) {
+        if (data.contacts && data.contacts.length > 0) {
+          const firstContact = data.contacts[0];
+          setActiveCallId(parseInt(firstContact.id));
+          
+          setAiResponses([
+            "AI Dialer initialized successfully",
+            `Calling ${firstContact.name || 'lead'} at ${firstContact.phone_number || ''}`,
+            "Analyzing lead information...",
+            "Conversation in progress..."
+          ]);
+          
+          toast({
+            title: "Call Initiated",
+            description: `AI is now calling ${firstContact.name || 'lead'}`,
+          });
+        }
+      } else {
+        toast({
+          title: "Warning",
+          description: data.error || "There was an issue starting some calls",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error("Exception during dialing:", err);
+      toast({
+        title: "Error",
+        description: "There was a problem connecting to the dialing service",
+        variant: "destructive"
+      });
+      setIsDialing(false);
+      setCallInProgress(false);
     }
   };
-
-  const isAllSelected = leads.length > 0 && leads.every(lead => 
-    lead.id && selectedLeads.includes(lead.id)
-  );
 
   const endDialingSession = () => {
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
+    setCallInProgress(false);
     
     toast({
       title: "Session Ended",
