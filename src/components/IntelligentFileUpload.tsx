@@ -191,9 +191,36 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
             setProgress(100);
             
             if (importedLeads.length > 0) {
-              setUploadStatus('success');
-              toast.success(`Successfully mapped ${importedLeads.length} leads with AI assistance`);
-              onImportComplete(importedLeads);
+              // Store leads directly using our store-leads function instead of thoughtly
+              try {
+                const response = await fetch(
+                  "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      leads: importedLeads,
+                      leadType: "csv-import"
+                    }),
+                  }
+                );
+                
+                const responseData = await response.json();
+                console.log("Store leads response:", responseData);
+                
+                if (!response.ok) {
+                  throw new Error(responseData.error || "Failed to store leads");
+                }
+                
+                setUploadStatus('success');
+                toast.success(`Successfully imported ${importedLeads.length} leads`);
+                onImportComplete(importedLeads);
+              } catch (storeError) {
+                console.error("Error storing leads:", storeError);
+                throw new Error(`Failed to store leads: ${storeError.message}`);
+              }
             } else {
               setUploadStatus('error');
               toast.error("No valid leads found in the file");
@@ -207,10 +234,37 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
             const importedLeads = processCSVData(content);
             
             if (importedLeads.length > 0) {
-              setProgress(100);
-              setUploadStatus('success');
-              toast.success(`Successfully mapped ${importedLeads.length} leads using standard mapping`);
-              onImportComplete(importedLeads);
+              // Store leads directly using our store-leads function instead of thoughtly
+              try {
+                const response = await fetch(
+                  "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      leads: importedLeads,
+                      leadType: "csv-import-fallback"
+                    }),
+                  }
+                );
+                
+                const responseData = await response.json();
+                console.log("Store leads response:", responseData);
+                
+                if (!response.ok) {
+                  throw new Error(responseData.error || "Failed to store leads");
+                }
+                
+                setProgress(100);
+                setUploadStatus('success');
+                toast.success(`Successfully imported ${importedLeads.length} leads using standard mapping`);
+                onImportComplete(importedLeads);
+              } catch (storeError) {
+                console.error("Error storing leads:", storeError);
+                throw new Error(`Failed to store leads: ${storeError.message}`);
+              }
             } else {
               setUploadStatus('error');
               toast.error("No valid leads found in the file");

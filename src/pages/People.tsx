@@ -297,8 +297,6 @@ const People = () => {
   const handleImportComplete = async (importedLeads: any[]) => {
     if (importedLeads.length > 0) {
       try {
-        await thoughtlyService.createBulkContacts(importedLeads);
-        
         setLeads(prevLeads => [...prevLeads, ...importedLeads]);
         toast.success(`Successfully imported ${importedLeads.length} leads`);
         setTimeout(() => {
