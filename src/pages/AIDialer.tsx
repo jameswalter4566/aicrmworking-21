@@ -34,6 +34,31 @@ import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
 
+const defaultLeads: ThoughtlyContact[] = [
+  {
+    id: 1,
+    firstName: "John",
+    lastName: "Smith",
+    email: "john.smith@example.com",
+    phone1: "+1234567890",
+    phone2: "",
+    disposition: "Not Contacted",
+    countryCode: "US",
+    tags: []
+  },
+  {
+    id: 2,
+    firstName: "Sarah",
+    lastName: "Johnson",
+    email: "sarah.j@example.com",
+    phone1: "+1987654321",
+    phone2: "+1876543210",
+    disposition: "Contacted",
+    countryCode: "US",
+    tags: []
+  }
+];
+
 const DEFAULT_INTERVIEW_ID = "ctAaNCdh";
 
 const mapThoughtlyContactToLead = (contact: any): ThoughtlyContact => {
@@ -100,6 +125,7 @@ const AIDialer = () => {
   const [interviewId, setInterviewId] = useState(DEFAULT_INTERVIEW_ID);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [isInitiatingCalls, setIsInitiatingCalls] = useState(false);
+  const [callLogs, setCallLogs] = useState<CallLog[]>([]);
   
   useEffect(() => {
     fetchLeads();
@@ -551,7 +577,7 @@ const AIDialer = () => {
                       </div>
                     )}
                     
-                    <Card className="border rounded-md mb-4 bg-gray-50">
+                    <Card className="border rounded-md bg-gray-50">
                       <CardHeader className="pb-2 pt-3 px-4 border-b">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
                           <Bot className="h-4 w-4 text-crm-blue" />
