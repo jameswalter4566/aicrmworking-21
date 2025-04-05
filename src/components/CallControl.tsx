@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,6 +23,19 @@ const CallControl: React.FC<CallControlProps> = ({
   audioStreaming = false,
   className
 }) => {
+  const [audioLevel, setAudioLevel] = useState<number>(0);
+  
+  // Simulate audio level visualization
+  useEffect(() => {
+    if (!audioStreaming) return;
+    
+    const interval = setInterval(() => {
+      setAudioLevel(Math.random() * 0.7 + 0.1); // Random value between 0.1 and 0.8
+    }, 200);
+    
+    return () => clearInterval(interval);
+  }, [audioStreaming]);
+  
   return (
     <div className={cn('flex flex-col items-center justify-center gap-4', className)}>
       <div className="flex items-center justify-center gap-4">
@@ -31,8 +44,9 @@ const CallControl: React.FC<CallControlProps> = ({
           size="icon"
           onClick={onMuteToggle}
           title={isMuted ? 'Unmute' : 'Mute'}
+          className="h-12 w-12 rounded-full"
         >
-          {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+          {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
         </Button>
 
         <Button
@@ -40,9 +54,9 @@ const CallControl: React.FC<CallControlProps> = ({
           size="icon"
           onClick={onEndCall}
           title="End Call"
-          className="rounded-full h-14 w-14 flex items-center justify-center"
+          className="rounded-full h-16 w-16 flex items-center justify-center"
         >
-          <PhoneOff className="h-6 w-6" />
+          <PhoneOff className="h-7 w-7" />
         </Button>
 
         <Button
@@ -50,24 +64,33 @@ const CallControl: React.FC<CallControlProps> = ({
           size="icon"
           onClick={onSpeakerToggle}
           title={speakerOn ? 'Speaker Off' : 'Speaker On'}
+          className="h-12 w-12 rounded-full"
         >
-          {speakerOn ? <Volume2 className="h-4 w-4" /> : <Volume1 className="h-4 w-4" />}
+          {speakerOn ? <Volume2 className="h-5 w-5" /> : <Volume1 className="h-5 w-5" />}
         </Button>
       </div>
       
-      <div className="flex items-center gap-2 text-sm text-gray-500">
-        {audioStreaming ? (
-          <>
-            <Wifi className="h-3 w-3 text-green-500 animate-pulse" />
+      {audioStreaming ? (
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex items-center gap-2 text-sm text-green-500">
+            <Wifi className="h-3.5 w-3.5 text-green-500 animate-pulse" />
             <span>Audio streaming active</span>
-          </>
-        ) : (
-          <>
-            <WifiOff className="h-3 w-3 text-gray-400" />
-            <span>Connecting to audio stream...</span>
-          </>
-        )}
-      </div>
+          </div>
+          
+          {/* Audio level visualization */}
+          <div className="w-40 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-green-500 transition-all duration-200 ease-in-out"
+              style={{ width: `${audioLevel * 100}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <WifiOff className="h-3.5 w-3.5 text-gray-400" />
+          <span>Connecting to audio stream...</span>
+        </div>
+      )}
     </div>
   );
 };
