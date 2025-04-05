@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 // Audio context and processing nodes
 let audioContext: AudioContext | null = null;
 let microphoneStream: MediaStream | null = null;
+let microphoneSource: MediaStreamAudioSourceNode | null = null;
 let twilioDevice: any = null;
 let activeConnection: any = null;
 
@@ -46,10 +47,24 @@ const initializeAudioContext = async () => {
   try {
     if (!audioContext) {
       audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      console.log("Audio context initialized");
     }
 
     // Request microphone access
-    microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    microphoneStream = await navigator.mediaDevices.getUserMedia({ 
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      } 
+    });
+    
+    // Create audio source from microphone stream
+    if (audioContext && microphoneStream) {
+      microphoneSource = audioContext.createMediaStreamSource(microphoneStream);
+      console.log("Microphone source created successfully");
+    }
+    
     console.log("Microphone access granted");
     return true;
   } catch (error) {
@@ -108,6 +123,10 @@ const initializeTwilioDevice = async () => {
       debug: true,
       codecPreferences: ['opus', 'pcmu'],
       enableIceRestart: true,
+      // Ensure audio is enabled
+      enableAudioContextSounds: true,
+      // Allow microphone access
+      allowIncomingWhileBusy: true,
     });
 
     // Set up event listeners
@@ -122,6 +141,30 @@ const initializeTwilioDevice = async () => {
     twilioDevice.on('connect', (conn: any) => {
       console.log('Call established');
       activeConnection = conn;
+      
+      // Enable input and output audio
+      conn.on('volume', (inputVolume: number, outputVolume: number) => {
+        console.log(`Input Volume: ${inputVolume}, Output Volume: ${outputVolume}`);
+      });
+
+      // Set up error handling for the connection
+      conn.on('error', (error: any) => {
+        console.error('Connection error:', error);
+      });
+      
+      // Ensure audio input is connected to the call
+      conn.on('warning', (warning: string) => {
+        console.warn('Connection warning:', warning);
+        
+        // If there's a warning about audio input, try to reconnect it
+        if (warning.includes('audio') || warning.includes('microphone')) {
+          console.log("Attempting to reconnect audio input...");
+          ensureAudioInputConnected(conn);
+        }
+      });
+      
+      // Make sure audio is connected
+      ensureAudioInputConnected(conn);
     });
 
     twilioDevice.on('disconnect', () => {
@@ -134,6 +177,33 @@ const initializeTwilioDevice = async () => {
   } catch (error) {
     console.error('Error initializing Twilio device:', error);
     return false;
+  }
+};
+
+// Ensure that the audio input from the microphone is connected to the Twilio call
+const ensureAudioInputConnected = (connection: any) => {
+  if (!connection) {
+    console.warn("No active connection to connect audio to");
+    return;
+  }
+  
+  try {
+    if (connection.mediaStream && microphoneStream) {
+      console.log("Ensuring microphone is connected to call");
+      
+      // Ensure microphone tracks are enabled
+      microphoneStream.getAudioTracks().forEach(track => {
+        track.enabled = true;
+        console.log(`Audio track enabled: ${track.label}, ${track.readyState}`);
+      });
+      
+      // Check if connection's input device is correctly set
+      if (connection.options && connection.options.audioConstraints) {
+        console.log("Call audio constraints:", connection.options.audioConstraints);
+      }
+    }
+  } catch (error) {
+    console.error("Error connecting microphone to call:", error);
   }
 };
 
@@ -246,6 +316,18 @@ const cleanup = () => {
       microphoneStream = null;
     }
 
+    if (microphoneSource) {
+      console.log("Cleaning up microphone source");
+      microphoneSource.disconnect();
+      microphoneSource = null;
+    }
+    
+    if (audioContext) {
+      console.log("Closing audio context");
+      audioContext.close().catch(e => console.error("Error closing audio context:", e));
+      audioContext = null;
+    }
+
     if (twilioDevice) {
       console.log("Destroying Twilio device");
       twilioDevice.destroy();
@@ -263,6 +345,40 @@ const isDeviceReady = () => {
   return !!twilioDevice && twilioDevice.ready;
 };
 
+// Get the active connection
+const getActiveConnection = () => {
+  return activeConnection;
+};
+
+// Check if microphone is connected and active
+const isMicrophoneActive = () => {
+  return !!microphoneStream && microphoneStream.getAudioTracks().some(track => track.enabled);
+};
+
+// Toggle microphone mute state
+const toggleMute = (mute: boolean) => {
+  if (!microphoneStream) {
+    console.warn("No microphone stream available to mute/unmute");
+    return false;
+  }
+  
+  try {
+    microphoneStream.getAudioTracks().forEach(track => {
+      track.enabled = !mute;
+      console.log(`Microphone ${mute ? 'muted' : 'unmuted'}: ${track.label}`);
+    });
+    
+    if (activeConnection) {
+      console.log(`Call ${mute ? 'muted' : 'unmuted'}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error toggling mute:", error);
+    return false;
+  }
+};
+
 export const twilioService = {
   initializeAudioContext,
   initializeTwilioDevice,
@@ -271,4 +387,7 @@ export const twilioService = {
   checkCallStatus,
   cleanup,
   isDeviceReady,
+  toggleMute,
+  isMicrophoneActive,
+  getActiveConnection,
 };

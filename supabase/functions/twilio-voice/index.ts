@@ -153,12 +153,13 @@ serve(async (req) => {
           const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
   
           // Create TwiML to instruct Twilio how to handle the call
+          // Update the TwiML to ensure proper audio connection to the browser client
           const twimlResponse = `
             <Response>
               <Say voice="alice">Hello, this is a call from the CRM system.</Say>
               <Pause length="1"/>
               <Say voice="alice">Please hold while we connect you with a representative.</Say>
-              <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30">
+              <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30" record="record-from-answer">
                 <Client>browser</Client>
               </Dial>
             </Response>
@@ -175,6 +176,11 @@ serve(async (req) => {
               From: TWILIO_PHONE_NUMBER,
               To: phoneNumber,
               Twiml: twimlResponse,
+              // Enable recording for this call
+              Record: 'true',
+              // Ensure these parameters for better reliability
+              MachineDetection: 'DetectMessageEnd',
+              AsyncAmd: 'true',
             }),
           })
   

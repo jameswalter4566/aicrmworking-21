@@ -8,12 +8,14 @@ export interface ActiveCall {
   phoneNumber: string;
   status: 'connecting' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   leadId: string | number;
+  isMuted?: boolean;
 }
 
 export const useTwilio = () => {
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeCalls, setActiveCalls] = useState<Record<string, ActiveCall>>({});
+  const [microphoneActive, setMicrophoneActive] = useState(false);
   const statusCheckIntervals = useRef<Record<string, number>>({});
 
   // Initialize Twilio on component mount
@@ -30,6 +32,8 @@ export const useTwilio = () => {
           });
           return;
         }
+        
+        setMicrophoneActive(true);
 
         const deviceInitialized = await twilioService.initializeTwilioDevice();
         setInitialized(deviceInitialized);
@@ -68,6 +72,15 @@ export const useTwilio = () => {
       
       twilioService.cleanup();
     };
+  }, []);
+
+  // Periodically check if microphone is active
+  useEffect(() => {
+    const checkMicInterval = setInterval(() => {
+      setMicrophoneActive(twilioService.isMicrophoneActive());
+    }, 5000);
+    
+    return () => clearInterval(checkMicInterval);
   }, []);
 
   // Function to start monitoring call status
@@ -163,6 +176,21 @@ export const useTwilio = () => {
       });
       return { success: false };
     }
+    
+    if (!microphoneActive) {
+      toast({
+        title: "Microphone Inactive",
+        description: "Your microphone appears to be unavailable. Please check permissions.",
+        variant: "destructive",
+      });
+      
+      // Try to reinitialize audio
+      await twilioService.initializeAudioContext();
+      
+      if (!twilioService.isMicrophoneActive()) {
+        return { success: false, error: "Microphone unavailable" };
+      }
+    }
 
     const result = await twilioService.makeCall(phoneNumber);
     
@@ -175,7 +203,8 @@ export const useTwilio = () => {
           callSid: result.callSid!,
           phoneNumber,
           status: 'connecting',
-          leadId
+          leadId,
+          isMuted: false
         }
       }));
       
@@ -195,7 +224,7 @@ export const useTwilio = () => {
     }
 
     return result;
-  }, [initialized, monitorCallStatus]);
+  }, [initialized, monitorCallStatus, microphoneActive]);
 
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
@@ -244,13 +273,45 @@ export const useTwilio = () => {
       description: `All active calls have been disconnected.`,
     });
   }, []);
+  
+  const toggleMute = useCallback((leadId: string | number, mute?: boolean) => {
+    const leadIdStr = String(leadId);
+    
+    if (!activeCalls[leadIdStr]) {
+      return false;
+    }
+    
+    // If mute is not provided, toggle the current state
+    const shouldMute = mute !== undefined ? mute : !activeCalls[leadIdStr].isMuted;
+    
+    const success = twilioService.toggleMute(shouldMute);
+    
+    if (success) {
+      setActiveCalls(prev => ({
+        ...prev,
+        [leadIdStr]: {
+          ...prev[leadIdStr],
+          isMuted: shouldMute
+        }
+      }));
+      
+      toast({
+        title: shouldMute ? "Muted" : "Unmuted",
+        description: shouldMute ? "Your microphone is now muted." : "Your microphone is now unmuted.",
+      });
+    }
+    
+    return success;
+  }, [activeCalls]);
 
   return {
     initialized,
     isLoading,
     activeCalls,
+    microphoneActive,
     makeCall,
     endCall,
     endAllCalls,
+    toggleMute,
   };
 };
