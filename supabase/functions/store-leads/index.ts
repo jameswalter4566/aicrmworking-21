@@ -7,7 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+}
 
 // Create a Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -22,18 +22,6 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Completely disable authentication requirements
-    // Log detailed request information for debugging
-    console.log('Request path:', req.url);
-    console.log('Request method:', req.method);
-    
-    // Log all headers for debugging
-    console.log('All request headers:', 
-      Object.fromEntries([...req.headers.entries()].map(([k, v]) => 
-        [k, k.toLowerCase() === 'authorization' ? 'Bearer [REDACTED]' : v]
-      ))
-    );
-    
     const { leads, leadType } = await req.json();
     
     if (!leads || !Array.isArray(leads) || leads.length === 0) {
@@ -58,11 +46,6 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error(`Error in store-leads function: ${error.message}`);
-    console.error(`Error stack: ${error.stack}`);
-    
-    // Determine appropriate status code based on error type
-    let statusCode = 500;
-    if (error.message === 'No valid leads data provided') statusCode = 400;
     
     return new Response(
       JSON.stringify({ 
@@ -71,7 +54,7 @@ Deno.serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: statusCode,
+        status: 500,
       }
     );
   }

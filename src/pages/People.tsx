@@ -270,13 +270,8 @@ const People = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error("API error response:", errorData);
-        throw new Error(errorData.error || "Failed to store lead");
+        throw new Error("Failed to store lead");
       }
-      
-      const responseData = await response.json();
-      console.log("API success response:", responseData);
       
       setLeads([...leads, newLead]);
       setIsAddLeadOpen(false);
@@ -297,6 +292,8 @@ const People = () => {
   const handleImportComplete = async (importedLeads: any[]) => {
     if (importedLeads.length > 0) {
       try {
+        await thoughtlyService.createBulkContacts(importedLeads);
+        
         setLeads(prevLeads => [...prevLeads, ...importedLeads]);
         toast.success(`Successfully imported ${importedLeads.length} leads`);
         setTimeout(() => {

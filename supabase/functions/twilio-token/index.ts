@@ -13,16 +13,8 @@ const corsHeaders = {
 console.log("Twilio Token function loaded and ready")
 
 serve(async (req) => {
-  console.log(`Received ${req.method} request to Twilio Token function`)
-  console.log(`Request URL: ${req.url}`)
-  
-  // Log all headers for debugging
-  const headerEntries = [...req.headers.entries()];
-  console.log(`Request headers (${headerEntries.length}):`, JSON.stringify(headerEntries));
-  
   // Handle preflight requests properly
   if (req.method === 'OPTIONS') {
-    console.log("Handling OPTIONS preflight request")
     return new Response(null, { 
       status: 204,
       headers: corsHeaders
@@ -34,7 +26,6 @@ serve(async (req) => {
     let requestData = {}
     try {
       const text = await req.text()
-      console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
       if (text && text.trim()) {
         requestData = JSON.parse(text)
       }
@@ -43,7 +34,6 @@ serve(async (req) => {
     }
 
     // Get Twilio credentials
-    console.log("Attempting to retrieve Twilio credentials from environment");
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
     const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY')
@@ -51,14 +41,7 @@ serve(async (req) => {
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
 
-    console.log("Environment variables loaded:", {
-      accountSidAvailable: !!TWILIO_ACCOUNT_SID,
-      authTokenAvailable: !!TWILIO_AUTH_TOKEN,
-      apiKeyAvailable: !!TWILIO_API_KEY,
-      apiSecretAvailable: !!TWILIO_API_SECRET,
-      twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID,
-      phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
-    })
+    console.log("Environment variables loaded")
 
     const { action } = requestData as { action?: string }
 
@@ -77,11 +60,6 @@ serve(async (req) => {
     // Check for required credentials for token generation
     console.log("Checking for required Twilio credentials...")
     if (!TWILIO_ACCOUNT_SID || !TWILIO_API_KEY || !TWILIO_API_SECRET) {
-      console.error("Missing required Twilio credentials:", {
-        accountSidMissing: !TWILIO_ACCOUNT_SID,
-        apiKeyMissing: !TWILIO_API_KEY,
-        apiSecretMissing: !TWILIO_API_SECRET
-      })
       return new Response(
         JSON.stringify({ error: 'Missing required Twilio credentials' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -92,59 +70,48 @@ serve(async (req) => {
     const identity = `browser-${crypto.randomUUID()}`
     console.log(`Generating token for identity: ${identity}`)
 
-    try {
-      // Create JWT token for Twilio Client with enhanced permissions
-      const AccessToken = twilio.jwt.AccessToken
-      const VoiceGrant = AccessToken.VoiceGrant
+    // Create JWT token for Twilio Client with enhanced permissions
+    const AccessToken = twilio.jwt.AccessToken
+    const VoiceGrant = AccessToken.VoiceGrant
 
-      // Create Access Token with longer TTL (24 hours instead of default 1 hour)
-      const accessToken = new AccessToken(
-        TWILIO_ACCOUNT_SID,
-        TWILIO_API_KEY,
-        TWILIO_API_SECRET,
-        { 
-          identity,
-          ttl: 86400 // 24 hours in seconds
-        }
-      )
+    // Create Access Token with longer TTL (24 hours instead of default 1 hour)
+    const accessToken = new AccessToken(
+      TWILIO_ACCOUNT_SID,
+      TWILIO_API_KEY,
+      TWILIO_API_SECRET,
+      { 
+        identity,
+        ttl: 86400 // 24 hours in seconds
+      }
+    )
 
-      // Create Voice Grant with explicit permissions
-      const voiceGrant = new VoiceGrant({
-        outgoingApplicationSid: TWILIO_TWIML_APP_SID,
-        incomingAllow: true, // Allow incoming calls
-        pushCredentialSid: null // No push credentials needed for browser
-      })
+    // Create Voice Grant with explicit permissions
+    const voiceGrant = new VoiceGrant({
+      outgoingApplicationSid: TWILIO_TWIML_APP_SID,
+      incomingAllow: true, // Allow incoming calls
+      pushCredentialSid: null // No push credentials needed for browser
+    })
 
-      accessToken.addGrant(voiceGrant)
-      const token = accessToken.toJwt()
-      console.log("Token generated successfully with 24-hour TTL")
+    accessToken.addGrant(voiceGrant)
+    const token = accessToken.toJwt()
+    console.log("Token generated successfully with 24-hour TTL")
 
-      // Return additional debug information to help with troubleshooting
-      return new Response(
-        JSON.stringify({ 
-          token, 
-          identity,
-          twilioAppSid: TWILIO_TWIML_APP_SID,
-          twilioPhoneNumber: TWILIO_PHONE_NUMBER,
-          accountSid: TWILIO_ACCOUNT_SID, // Safe to share the account SID (not a secret)
-          success: true,
-          ttl: 86400,
-          timestamp: new Date().toISOString()
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    } catch (tokenError) {
-      console.error('Error generating token:', tokenError)
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to generate token', 
-          details: tokenError.message 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    // Return additional debug information to help with troubleshooting
+    return new Response(
+      JSON.stringify({ 
+        token, 
+        identity,
+        twilioAppSid: TWILIO_TWIML_APP_SID,
+        twilioPhoneNumber: TWILIO_PHONE_NUMBER,
+        accountSid: TWILIO_ACCOUNT_SID, // Safe to share the account SID (not a secret)
+        success: true,
+        ttl: 86400,
+        timestamp: new Date().toISOString()
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   } catch (error) {
-    console.error('Error in function:', error)
+    console.error('Error generating token:', error)
     return new Response(
       JSON.stringify({ error: 'Failed to generate token' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
