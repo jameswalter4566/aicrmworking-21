@@ -123,7 +123,13 @@ serve(async (req) => {
     }
     
     // Extract action and parameters from the request
-    const { action, phoneNumber, callbackUrl, callSid } = requestData
+    const { action, phoneNumber, callbackUrl, callSid, from } = requestData as {
+      action?: string;
+      phoneNumber?: string;
+      callbackUrl?: string;
+      callSid?: string;
+      from?: string;
+    }
 
     // If no specific action is defined, fallback to makeCall
     const actionToPerform = action || 'makeCall'
@@ -135,20 +141,25 @@ serve(async (req) => {
         console.log(`Request data for makeCall:`, JSON.stringify(requestData, null, 2))
         
         if (!phoneNumber) {
+          console.error("Missing required parameter: phoneNumber")
           return new Response(
             JSON.stringify({ error: 'Phone number is required' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
-        if (!TWILIO_PHONE_NUMBER) {
+        // Use from parameter if provided, otherwise fall back to env variable
+        const fromPhone = from || TWILIO_PHONE_NUMBER;
+        
+        if (!fromPhone) {
+          console.error("Missing required parameter: from phone number")
           return new Response(
-            JSON.stringify({ error: 'Twilio phone number is not configured' }),
+            JSON.stringify({ error: 'From phone number is not configured' }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
 
-        console.log(`Initiating call to ${phoneNumber} from ${TWILIO_PHONE_NUMBER}`)
+        console.log(`Initiating call to ${phoneNumber} from ${fromPhone}`)
 
         // Create Twilio client if we need to use the API directly
         if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
@@ -169,7 +180,7 @@ serve(async (req) => {
               <Say voice="alice">Hello, this is a call from the CRM system.</Say>
               <Pause length="1"/>
               <Say voice="alice">Please hold while we connect you with a representative.</Say>
-              <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30" record="record-from-answer">
+              <Dial callerId="${fromPhone}" timeout="30" record="record-from-answer">
                 <Client>browser</Client>
               </Dial>
             </Response>
@@ -183,7 +194,7 @@ serve(async (req) => {
               'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
             },
             body: new URLSearchParams({
-              From: TWILIO_PHONE_NUMBER,
+              From: fromPhone,
               To: phoneNumber,
               Twiml: twimlResponse,
               // Enable recording for this call

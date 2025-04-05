@@ -229,12 +229,27 @@ const makeCall = async (phoneNumber: string) => {
     
     console.log(`Formatted phone number for call: ${formattedPhone}`);
 
+    // Get the Twilio phone number from environment
+    const { data: configData, error: configError } = await supabase.functions.invoke('twilio-token', {
+      body: { action: 'getConfig' },
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (configError || !configData.twilioPhoneNumber) {
+      console.error("Error getting Twilio phone number:", configError || "No phone number returned");
+      throw new Error('Failed to get Twilio phone number configuration');
+    }
+
+    const twilioPhoneNumber = configData.twilioPhoneNumber;
+    console.log(`Using Twilio phone number for outbound call: ${twilioPhoneNumber}`);
+
     // Use our edge function to make the outbound call
     console.log(`Invoking twilio-voice function to call ${formattedPhone}`);
     const { data, error } = await supabase.functions.invoke('twilio-voice', {
       body: {
         action: 'makeCall',
         phoneNumber: formattedPhone,
+        from: twilioPhoneNumber, // Include the from parameter explicitly
       },
       headers: {
         'Content-Type': 'application/json',
