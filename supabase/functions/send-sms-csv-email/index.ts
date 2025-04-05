@@ -67,7 +67,7 @@ serve(async (req) => {
     // Send email with CSV attachment using Resend
     const emailResponse = await resend.emails.send({
       from: 'SMSCampaign <onboarding@resend.dev>',
-      to: ['zoomcallcoin@gmail.com'],
+      to: ['jameswalter@goldenpathwayfinancial.com'],
       cc: ['daniel@pacificcreditsolutions.com'],
       subject: `SMS Campaign: ${campaignName || 'New Campaign'}`,
       html: `
