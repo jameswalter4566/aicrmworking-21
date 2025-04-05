@@ -10,12 +10,6 @@ verify_jwt = false
 [functions.thoughtly-contacts]
 verify_jwt = false
 
-[functions.thoughtly-get-contacts]
-verify_jwt = false
-
-[functions.thoughtly-call-contact]
-verify_jwt = false
-
 [functions.retrieve-leads]
 verify_jwt = false
 
