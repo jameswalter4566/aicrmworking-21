@@ -221,7 +221,8 @@ const PowerDialer = () => {
     console.log(`Making call to lead ${leadId} with phone number ${normalizedPhone}`);
     
     try {
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+      const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
+      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -272,7 +273,8 @@ const PowerDialer = () => {
   const monitorCallStatus = async (leadId: number, callSid: string) => {
     const intervalId = setInterval(async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+        const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
+        const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
@@ -363,7 +365,8 @@ const PowerDialer = () => {
   const endDialingSession = async () => {
     for (const [leadId, callSid] of Object.entries(callSids)) {
       try {
-        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+        const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
+        await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

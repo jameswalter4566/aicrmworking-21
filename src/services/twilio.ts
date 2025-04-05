@@ -1,3 +1,4 @@
+
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -122,7 +123,8 @@ class TwilioService {
       }
       
       // Get the Twilio phone configuration
-      const configResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-token`, {
+      const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
+      const configResponse = await fetch(`${supabaseUrl}/functions/v1/twilio-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -138,7 +140,7 @@ class TwilioService {
       }
       
       // Call the twilio-voice function to make the call
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -191,7 +193,8 @@ class TwilioService {
   async checkCallStatus(callSid: string) {
     try {
       // Check the status of an existing call
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+      const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
+      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
