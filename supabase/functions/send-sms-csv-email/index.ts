@@ -1,6 +1,7 @@
 
 // Supabase Edge Function to generate SMS campaign CSV and send as email
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { SmtpClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -55,45 +56,52 @@ Deno.serve(async (req) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `sms_campaign_${campaignName ? campaignName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' : ''}${timestamp}.csv`
 
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing Supabase credentials')
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey)
+    // Create SMTP client using environment variables
+    const client = new SmtpClient({
+      connection: {
+        hostname: "smtp.gmail.com",
+        port: 465,
+        tls: true,
+        auth: {
+          username: Deno.env.get("SMTP_USERNAME") || "",
+          password: Deno.env.get("SMTP_PASSWORD") || "",
+        },
+      },
+    });
 
-    // Send email with CSV attachment
-    const { data, error } = await supabase.auth.admin.sendEmailWithAttachment({
-      to: 'zoomcallcoin@gmail.com',
+    // Connect to SMTP server
+    await client.connect();
+
+    // Send email with attachment
+    await client.send({
+      from: Deno.env.get("SMTP_USERNAME") || "",
+      to: "zoomcallcoin@gmail.com",
       subject: `SMS Campaign: ${campaignName || 'New Campaign'}`,
-      body: `
+      content: `
         <h2>SMS Campaign Details</h2>
         <p><strong>Campaign Name:</strong> ${campaignName || 'Unnamed Campaign'}</p>
         <p><strong>Contacts:</strong> ${contacts.length}</p>
         <p><strong>Message:</strong> ${message}</p>
         <p>Please find attached the CSV file with all contact details for this SMS campaign.</p>
       `,
-      template: 'sms-campaign',
-      template_data: {
-        campaign: campaignName || 'New Campaign',
-        contacts_count: contacts.length,
-        message: message
-      },
+      html: `
+        <h2>SMS Campaign Details</h2>
+        <p><strong>Campaign Name:</strong> ${campaignName || 'Unnamed Campaign'}</p>
+        <p><strong>Contacts:</strong> ${contacts.length}</p>
+        <p><strong>Message:</strong> ${message}</p>
+        <p>Please find attached the CSV file with all contact details for this SMS campaign.</p>
+      `,
       attachments: [
         {
-          content: btoa(csvContent),
+          contentType: "text/csv",
           filename: filename,
-          type: 'text/csv',
-        }
-      ]
-    })
+          content: csvContent,
+        },
+      ],
+    });
 
-    if (error) {
-      throw new Error(`Error sending email: ${error.message}`)
-    }
+    // Disconnect from SMTP server
+    await client.close();
 
     // Return success response
     return new Response(
