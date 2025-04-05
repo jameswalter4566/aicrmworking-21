@@ -26,10 +26,14 @@ const SMSSidebar = () => {
   const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div className="h-full"
+    <div 
+      className="h-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}>
-      <Sidebar variant="floating" className="bg-pink-50 visible">
+      <Sidebar 
+        variant="floating" 
+        className="bg-pink-50 visible" 
+        collapsible="icon"> {/* Changed to icon instead of offcanvas */}
         <SidebarRail />
         <SidebarHeader className="border-b border-pink-100">
           <div className="flex items-center justify-between px-4 pt-1">
