@@ -70,34 +70,43 @@ serve(async (req) => {
     const identity = `browser-${crypto.randomUUID()}`
     console.log(`Generating token for identity: ${identity}`)
 
-    // Create JWT token for Twilio Client
+    // Create JWT token for Twilio Client with enhanced permissions
     const AccessToken = twilio.jwt.AccessToken
     const VoiceGrant = AccessToken.VoiceGrant
 
+    // Create Access Token with longer TTL (24 hours instead of default 1 hour)
     const accessToken = new AccessToken(
       TWILIO_ACCOUNT_SID,
       TWILIO_API_KEY,
       TWILIO_API_SECRET,
-      { identity }
+      { 
+        identity,
+        ttl: 86400 // 24 hours in seconds
+      }
     )
 
+    // Create Voice Grant with explicit permissions
     const voiceGrant = new VoiceGrant({
       outgoingApplicationSid: TWILIO_TWIML_APP_SID,
-      incomingAllow: true // Allow incoming calls
+      incomingAllow: true, // Allow incoming calls
+      pushCredentialSid: null // No push credentials needed for browser
     })
 
     accessToken.addGrant(voiceGrant)
     const token = accessToken.toJwt()
-    console.log("Token generated successfully")
+    console.log("Token generated successfully with 24-hour TTL")
 
-    // Also return the Twilio TwiML Application SID to help with call setup
+    // Return additional debug information to help with troubleshooting
     return new Response(
       JSON.stringify({ 
         token, 
         identity,
         twilioAppSid: TWILIO_TWIML_APP_SID,
         twilioPhoneNumber: TWILIO_PHONE_NUMBER,
-        success: true 
+        accountSid: TWILIO_ACCOUNT_SID, // Safe to share the account SID (not a secret)
+        success: true,
+        ttl: 86400,
+        timestamp: new Date().toISOString()
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

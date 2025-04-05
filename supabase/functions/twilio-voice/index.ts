@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body - Twilio sends form data, not JSON
+    // Parse request data
     let requestData: any = {}
     
     try {
@@ -109,7 +109,7 @@ serve(async (req) => {
 
     const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
     
-    // Get action from request data - could be in body or URL
+    // Get action from request data
     const action = requestData.action;
     const phoneNumber = requestData.phoneNumber || requestData.To;
 
@@ -138,7 +138,7 @@ serve(async (req) => {
       console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`);
       
       try {
-        // Create a new call with a VoiceUrl for handling the connection
+        // Create a new call with enhanced TwiML for better audio
         const call = await client.calls.create({
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
@@ -167,7 +167,6 @@ serve(async (req) => {
         );
       }
     } else if (action === 'handleVoice' || !action) {
-      // If no action is specified but we have CallSid, treat as handleVoice
       // Process incoming voice requests from Twilio
       console.log("Handling Voice Request", JSON.stringify(requestData));
       
@@ -175,37 +174,47 @@ serve(async (req) => {
       
       if (requestData.Caller && requestData.Caller.startsWith('client:')) {
         // This is a browser call to a phone
-        console.log("Browser to phone call");
+        console.log("Browser to phone call - enhancing audio quality");
         if (phoneNumber) {
-          // Set high quality audio and allow browser audio output
-          twimlResponse.say({ voice: 'alice' }, 'Connecting your call now.');
+          // Set high quality audio settings
+          twimlResponse.say({ 
+            voice: 'alice',
+            language: 'en-US' 
+          }, 'Connecting your call now.');
           
           const dial = twimlResponse.dial({
             callerId: TWILIO_PHONE_NUMBER,
-            // Enable audio monitoring
-            record: 'record-from-answer',
+            // Enable audio monitoring - both sides
+            record: 'record-from-answer-dual',
             // Add timeouts
-            timeout: 20,
-            // Set audio quality
+            timeout: 30,
+            // Enhanced audio quality
             answerOnBridge: true
           });
           
           const formattedNumber = normalizePhoneNumber(phoneNumber);
-          dial.number(formattedNumber);
+          dial.number({
+            statusCallbackEvent: ['answered', 'completed'],
+            statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
+          }, formattedNumber);
         } else {
           twimlResponse.say({ voice: 'alice' }, 'No phone number provided for the call.');
         }
       } else if (phoneNumber && phoneNumber.startsWith('client:')) {
         // This is a phone call to a browser client
-        console.log("Phone to browser call");
+        console.log("Phone to browser call - enhancing audio quality");
         twimlResponse.say({ voice: 'alice' }, 'Connecting you to our representative.');
         
         const dial = twimlResponse.dial({
           answerOnBridge: true,
-          callerId: TWILIO_PHONE_NUMBER
+          callerId: TWILIO_PHONE_NUMBER,
+          record: 'record-from-answer-dual'
         });
         
-        dial.client(phoneNumber.replace('client:', ''));
+        dial.client({
+          statusCallbackEvent: ['answered', 'completed'],
+          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
+        }, phoneNumber.replace('client:', ''));
       } else {
         // Standard phone to phone call
         console.log("Phone to phone call");
@@ -215,7 +224,7 @@ serve(async (req) => {
           const dial = twimlResponse.dial({
             callerId: TWILIO_PHONE_NUMBER,
             answerOnBridge: true,
-            record: 'record-from-answer'
+            record: 'record-from-answer-dual'
           });
           
           const formattedNumber = normalizePhoneNumber(phoneNumber);
@@ -292,10 +301,21 @@ serve(async (req) => {
         );
       }
     } else if (action === 'statusCallback') {
-      // Handle status callbacks from Twilio
-      console.log("Status callback received:", requestData);
+      // Enhanced status callbacks from Twilio with detailed logging
+      console.log("Status callback received:", JSON.stringify(requestData));
+      
+      // Extract key call information
+      const callSid = requestData.CallSid;
+      const callStatus = requestData.CallStatus;
+      const duration = requestData.CallDuration || '0';
+      
+      console.log(`Call ${callSid} status updated to: ${callStatus} (duration: ${duration}s)`);
+      
       return new Response(
-        JSON.stringify({ success: true }),
+        JSON.stringify({ 
+          success: true,
+          message: `Call status recorded: ${callStatus}`
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {

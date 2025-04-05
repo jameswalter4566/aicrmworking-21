@@ -11,6 +11,7 @@ export interface ActiveCall {
   isMuted?: boolean;
   speakerOn?: boolean;
   usingBrowser?: boolean;
+  audioActive?: boolean;
 }
 
 export const useTwilio = () => {
@@ -18,27 +19,43 @@ export const useTwilio = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeCalls, setActiveCalls] = useState<Record<string, ActiveCall>>({});
   const [microphoneActive, setMicrophoneActive] = useState(false);
+  const [audioTested, setAudioTested] = useState(false);
   const statusCheckIntervals = useRef<Record<string, number>>({});
+  const audioCheckInterval = useRef<number | null>(null);
 
   // Initialize Twilio on component mount
   useEffect(() => {
     const initializeTwilio = async () => {
       setIsLoading(true);
       try {
+        console.log("Initializing Twilio service...");
         // First, try to initialize the audio context
         const micAccess = await twilioService.initializeAudioContext();
         if (!micAccess) {
           toast({
             title: "Microphone Access Denied",
-            description: "Please allow microphone access to use the dialer.",
+            description: "Please allow microphone access to use the dialer. Check your browser settings and try again.",
             variant: "destructive",
           });
           return;
         }
         
         setMicrophoneActive(true);
+        
+        // Test audio output to ensure speakers are working
+        const audioTest = await twilioService.testAudioOutput();
+        setAudioTested(audioTest);
+        
+        if (!audioTest) {
+          toast({
+            title: "Audio Output Issue",
+            description: "Unable to test your speakers. Please check your audio output settings.",
+            variant: "warning",
+          });
+        }
 
         // Then, initialize the Twilio device
+        console.log("Initializing Twilio device...");
         const deviceInitialized = await twilioService.initializeTwilioDevice();
         setInitialized(deviceInitialized);
         
@@ -68,8 +85,18 @@ export const useTwilio = () => {
 
     initializeTwilio();
 
+    // Set up audio monitoring interval
+    audioCheckInterval.current = window.setInterval(() => {
+      const isActive = twilioService.isMicrophoneActive();
+      setMicrophoneActive(isActive);
+    }, 3000);
+
     return () => {
-      // Cleanup all status check intervals
+      // Cleanup all intervals
+      if (audioCheckInterval.current) {
+        clearInterval(audioCheckInterval.current);
+      }
+      
       Object.values(statusCheckIntervals.current).forEach(intervalId => {
         clearInterval(intervalId);
       });
@@ -78,16 +105,7 @@ export const useTwilio = () => {
     };
   }, []);
 
-  // Periodically check if microphone is active
-  useEffect(() => {
-    const checkMicInterval = setInterval(() => {
-      setMicrophoneActive(twilioService.isMicrophoneActive());
-    }, 5000);
-    
-    return () => clearInterval(checkMicInterval);
-  }, []);
-
-  // Function to start monitoring call status
+  // Function to start monitoring call status with enhanced audio detection
   const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = false) => {
     const leadIdStr = String(leadId);
     
@@ -96,15 +114,36 @@ export const useTwilio = () => {
       clearInterval(statusCheckIntervals.current[leadIdStr]);
     }
     
-    // For browser-based calls, we'll get events directly from the device
-    if (usingBrowser) {
-      console.log("Using browser events for call monitoring");
-      return;
-    }
+    // For browser-based calls, we use connection events but still poll for status
+    console.log(`Setting up call monitoring for ${usingBrowser ? 'browser' : 'REST API'} call: ${callSid}`);
     
-    // Set up a new interval to check call status every 3 seconds
+    // Set up a new interval to check call status
     const intervalId = window.setInterval(async () => {
       try {
+        // Check for active audio for browser-based calls
+        if (usingBrowser) {
+          const isAudioActive = twilioService.isMicrophoneActive();
+          
+          // Update audio active status
+          setActiveCalls(prev => {
+            if (!prev[leadIdStr]) return prev;
+            
+            return {
+              ...prev,
+              [leadIdStr]: {
+                ...prev[leadIdStr],
+                audioActive: isAudioActive
+              }
+            };
+          });
+          
+          // If we're using browser audio but there's been no audio for a while, warn the user
+          if (!isAudioActive && activeCalls[leadIdStr]?.status === 'in-progress') {
+            console.warn("Call is active but no audio detected - possible audio issues");
+          }
+        }
+        
+        // Always check status from the server to ensure consistency
         const status = await twilioService.checkCallStatus(callSid);
         
         if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
@@ -166,16 +205,25 @@ export const useTwilio = () => {
           
           toast({
             title: "Call Connected",
-            description: `Call is now in progress. You should hear audio.`,
+            description: `Call is now in progress. You should hear audio${usingBrowser ? " through your browser" : ""}.`,
           });
+          
+          // For browser calls, remind about audio permissions if needed
+          if (usingBrowser && !microphoneActive) {
+            toast({
+              title: "Audio Check",
+              description: "Your microphone appears to be inactive. Check browser permissions.",
+              variant: "warning",
+            });
+          }
         }
       } catch (error) {
         console.error(`Error monitoring call ${callSid}:`, error);
       }
-    }, 3000);
+    }, 2000); // Check more frequently for better user experience
     
     statusCheckIntervals.current[leadIdStr] = intervalId;
-  }, [activeCalls]);
+  }, [activeCalls, microphoneActive]);
 
   const makeCall = useCallback(async (phoneNumber: string, leadId: string | number) => {
     if (!initialized) {
@@ -187,21 +235,28 @@ export const useTwilio = () => {
       return { success: false };
     }
     
-    if (!microphoneActive) {
+    // Re-check microphone just before making call
+    if (!twilioService.isMicrophoneActive()) {
       toast({
-        title: "Microphone Inactive",
-        description: "Your microphone appears to be unavailable. Please check permissions.",
-        variant: "destructive",
+        title: "Microphone Check",
+        description: "Checking microphone access before placing call...",
       });
       
       // Try to reinitialize audio
       await twilioService.initializeAudioContext();
       
+      // Check again after initialization attempt
       if (!twilioService.isMicrophoneActive()) {
-        return { success: false, error: "Microphone unavailable" };
+        toast({
+          title: "Microphone Inactive",
+          description: "Your microphone appears to be unavailable. Call will proceed but audio may not work.",
+          variant: "warning",
+        });
       }
     }
 
+    // Make the actual call
+    console.log(`Placing call to ${phoneNumber}`);
     const result = await twilioService.makeCall(phoneNumber);
     
     if (result.success && result.callSid) {
@@ -216,7 +271,8 @@ export const useTwilio = () => {
           leadId,
           isMuted: false,
           speakerOn: false,
-          usingBrowser: result.usingBrowser
+          usingBrowser: result.usingBrowser,
+          audioActive: microphoneActive
         }
       }));
       
@@ -351,10 +407,12 @@ export const useTwilio = () => {
     isLoading,
     activeCalls,
     microphoneActive,
+    audioTested,
     makeCall,
     endCall,
     endAllCalls,
     toggleMute,
     toggleSpeaker,
+    testAudio: twilioService.testAudioOutput
   };
 };
