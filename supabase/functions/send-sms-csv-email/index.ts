@@ -1,7 +1,9 @@
 
 // Supabase Edge Function to generate SMS campaign CSV and send as email
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { SmtpClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "npm:resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,7 +11,7 @@ const corsHeaders = {
 }
 
 // Handle CORS preflight requests
-Deno.serve(async (req) => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -56,34 +58,11 @@ Deno.serve(async (req) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `sms_campaign_${campaignName ? campaignName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' : ''}${timestamp}.csv`
 
-    // Create SMTP client using environment variables
-    const client = new SmtpClient({
-      connection: {
-        hostname: "smtp.gmail.com",
-        port: 465,
-        tls: true,
-        auth: {
-          username: Deno.env.get("SMTP_USERNAME") || "",
-          password: Deno.env.get("SMTP_PASSWORD") || "",
-        },
-      },
-    });
-
-    // Connect to SMTP server
-    await client.connect();
-
-    // Send email with attachment
-    await client.send({
-      from: Deno.env.get("SMTP_USERNAME") || "",
-      to: "zoomcallcoin@gmail.com",
+    // Send email with CSV attachment using Resend
+    const emailResponse = await resend.emails.send({
+      from: 'SMSCampaign <onboarding@resend.dev>',
+      to: ['zoomcallcoin@gmail.com'],
       subject: `SMS Campaign: ${campaignName || 'New Campaign'}`,
-      content: `
-        <h2>SMS Campaign Details</h2>
-        <p><strong>Campaign Name:</strong> ${campaignName || 'Unnamed Campaign'}</p>
-        <p><strong>Contacts:</strong> ${contacts.length}</p>
-        <p><strong>Message:</strong> ${message}</p>
-        <p>Please find attached the CSV file with all contact details for this SMS campaign.</p>
-      `,
       html: `
         <h2>SMS Campaign Details</h2>
         <p><strong>Campaign Name:</strong> ${campaignName || 'Unnamed Campaign'}</p>
@@ -93,15 +72,14 @@ Deno.serve(async (req) => {
       `,
       attachments: [
         {
-          contentType: "text/csv",
           filename: filename,
-          content: csvContent,
+          content: Buffer.from(csvContent).toString('base64'),
+          type: 'text/csv',
         },
       ],
     });
 
-    // Disconnect from SMTP server
-    await client.close();
+    console.log('Email sent successfully:', emailResponse);
 
     // Return success response
     return new Response(
