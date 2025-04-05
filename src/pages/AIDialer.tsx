@@ -150,6 +150,24 @@ const AIDialer = () => {
   const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
   const [callInProgress, setCallInProgress] = useState(false);
   
+  const isAllSelected = leads.length > 0 && selectedLeads.length === leads.length;
+  
+  const handleSelectAllLeads = (checked: boolean) => {
+    if (checked) {
+      setSelectedLeads(leads.map(lead => lead.id!).filter(Boolean));
+    } else {
+      setSelectedLeads([]);
+    }
+  };
+  
+  const handleSelectLead = (leadId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedLeads(prev => [...prev, leadId]);
+    } else {
+      setSelectedLeads(prev => prev.filter(id => id !== leadId));
+    }
+  };
+  
   useEffect(() => {
     fetchLeads();
   }, []);
