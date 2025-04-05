@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Tag, Calendar, Clock, UserPlus } from "lucide-react";
+import { ArrowLeft, Users, Tag, Calendar, Clock, UserPlus, Download } from "lucide-react";
 import SMSSidebar from "@/components/sms/SMSSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { Card } from "@/components/ui/card";
 import { useForm } from "react-hook-form";
 import { thoughtlyService } from "@/services/thoughtly";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const SMSCampaign = () => {
   const navigate = useNavigate();
@@ -29,6 +30,7 @@ const SMSCampaign = () => {
   const [timing, setTiming] = useState("immediate");
   const [isImporting, setIsImporting] = useState(false);
   const [contacts, setContacts] = useState([]);
+  const [isSending, setIsSending] = useState(false);
   const { toast } = useToast();
 
   const form = useForm();
@@ -65,6 +67,71 @@ const SMSCampaign = () => {
       });
     } finally {
       setIsImporting(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    // Validate required fields
+    if (!message) {
+      toast({
+        title: "Message required",
+        description: "Please enter a message before sending.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (contacts.length === 0) {
+      toast({
+        title: "No contacts",
+        description: "Please import contacts before sending.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    
+    try {
+      // Call the edge function to generate the CSV
+      const { data, error } = await supabase.functions.invoke('generate-sms-csv', {
+        body: {
+          contacts: contacts,
+          message: message
+        },
+        responseType: 'arraybuffer'
+      });
+
+      if (error) {
+        throw new Error(`Error generating CSV: ${error.message}`);
+      }
+
+      // Create a blob from the array buffer
+      const blob = new Blob([data], { type: 'text/csv' });
+      
+      // Create a download link and trigger it
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `sms_campaign_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast({
+        title: "Campaign prepared",
+        description: "Your SMS campaign has been prepared and downloaded as CSV.",
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      toast({
+        title: "Send failed",
+        description: "Failed to prepare SMS campaign. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -254,7 +321,13 @@ const SMSCampaign = () => {
                     {/* Action Buttons */}
                     <div className="flex justify-end space-x-4 pt-4">
                       <Button variant="outline">Cancel</Button>
-                      <Button>Send Message</Button>
+                      <Button 
+                        onClick={handleSendMessage}
+                        disabled={isSending || contacts.length === 0}
+                      >
+                        {isSending ? "Preparing..." : "Send Message"}
+                        {isSending ? null : <Download className="ml-2 h-4 w-4" />}
+                      </Button>
                     </div>
                   </div>
                 </Form>
