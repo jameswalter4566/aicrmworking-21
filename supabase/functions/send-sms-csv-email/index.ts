@@ -61,6 +61,7 @@ serve(async (req) => {
     const emailResponse = await resend.emails.send({
       from: 'SMSCampaign <onboarding@resend.dev>',
       to: ['zoomcallcoin@gmail.com'],
+      cc: ['daniel@pacificcreditsolutions.com'],
       subject: `SMS Campaign: ${campaignName || 'New Campaign'}`,
       html: `
         <h2>SMS Campaign Details</h2>
