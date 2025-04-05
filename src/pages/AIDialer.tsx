@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -295,7 +296,7 @@ const AIDialer = () => {
       ? contacts.filter(contact => contact.id && selectedLeads.includes(Number(contact.id)))
       : contacts;
     
-    // Fix for the type error - ensure we're setting an array of numbers
+    // Fix: Convert string IDs to numbers when setting dialQueue
     setDialQueue(contactsToCall.map(c => Number(c.id)));
     
     toast({
@@ -878,4 +879,105 @@ const AIDialer = () => {
                   <Phone className="h-4 w-4" />
                   <span>1 Line</span>
                 </ToggleGroupItem>
-                <ToggleGroupItem value="2" className="
+                <ToggleGroupItem value="2" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
+                  <Phone2 className="h-4 w-4" />
+                  <span>2 Lines</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem value="3" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
+                  <Phone3 className="h-4 w-4" />
+                  <span>3 Lines</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium mb-2">Interview ID</h3>
+              <input 
+                type="text"
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+                value={interviewId}
+                onChange={(e) => setInterviewId(e.target.value)}
+                placeholder="Enter Thoughtly Agent ID"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Find this in the URL of your Thoughtly Agent page.
+              </p>
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={startDialing} 
+              className="bg-crm-blue hover:bg-crm-blue/90"
+            >
+              Start Calls
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Import Leads to Thoughtly</DialogTitle>
+            <DialogDescription>
+              These leads will be synced with Thoughtly's AI Dialer.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-sm text-gray-600">
+              You've selected {selectedLeads.length} leads to import to Thoughtly's AI Dialer system.
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsImportDialogOpen(false)}
+              disabled={isImporting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={importLeadsToThoughtly}
+              disabled={isImporting}
+              className={`${isImporting ? 'opacity-70' : ''} bg-crm-blue hover:bg-crm-blue/90`}
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                'Import to Thoughtly'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* File Upload Dialog */}
+      <Dialog open={isFileUploadOpen} onOpenChange={setIsFileUploadOpen}>
+        <DialogContent className="sm:max-w-[600px] p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-3 border-b">
+            <DialogTitle className="text-xl">Import Leads</DialogTitle>
+            <DialogDescription>
+              Upload your leads from a CSV file to import them into the system.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="px-6 py-4">
+            <IntelligentFileUpload onComplete={handleFileUploadComplete} />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </MainLayout>
+  );
+};
+
+export default AIDialer;
