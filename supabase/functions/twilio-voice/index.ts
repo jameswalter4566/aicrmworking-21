@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -199,14 +200,13 @@ serve(async (req) => {
         );
       }
       
-      console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`);
+      // Check if this is a browser-originated call or a direct REST API call
+      const isBrowserCall = requestData.browser === true || requestData.browser === 'true';
+      console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}, browser mode: ${isBrowserCall}`);
       
       try {
-        // Check if this is a browser-originated call or a direct REST API call
-        const isBrowserCall = requestData.browser === true;
-        
         // Create a new call with enhanced TwiML for better audio
-        const call = await client.calls.create({
+        const callOptions: any = {
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
           url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}&browser=${isBrowserCall ? 'true' : 'false'}`,
@@ -215,12 +215,24 @@ serve(async (req) => {
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST'
-        });
+        };
+        
+        // For browser calls, we need to set up specific settings
+        if (isBrowserCall) {
+          // This is very important - we're telling Twilio to enable media streams for browser audio
+          callOptions.twiml = `<Response><Dial><Number>${formattedPhoneNumber}</Number></Dial><Start><Stream url="wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream" track="both_tracks"/></Start></Response>`;
+        }
+        
+        const call = await client.calls.create(callOptions);
         
         console.log("Call created successfully:", call.sid);
         
         return new Response(
-          JSON.stringify({ success: true, callSid: call.sid }),
+          JSON.stringify({ 
+            success: true, 
+            callSid: call.sid,
+            usingBrowser: isBrowserCall
+          }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } catch (error) {
