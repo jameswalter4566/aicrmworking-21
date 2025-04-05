@@ -1,409 +1,249 @@
 
-import { supabase } from '@/integrations/supabase/client';
+// Importing any necessary dependencies
+import { Device } from 'twilio-client';
 
-// Audio context and processing nodes
-let audioContext: AudioContext | null = null;
-let microphoneStream: MediaStream | null = null;
-let microphoneSource: MediaStreamAudioSourceNode | null = null;
-let twilioDevice: any = null;
-let activeConnection: any = null;
-
-// Load Twilio script dynamically
-const loadTwilioScript = async () => {
-  if ((window as any).Twilio) {
-    console.log("Twilio already loaded");
-    return (window as any).Twilio;
-  }
-
-  console.log("Loading Twilio script...");
-  return new Promise<any>((resolve, reject) => {
+class TwilioService {
+  private device: Device | null = null;
+  private connection: any = null;
+  private audioContext: AudioContext | null = null;
+  private analyser: AnalyserNode | null = null;
+  private microphone: MediaStreamAudioSourceNode | null = null;
+  private microphoneInitialized: boolean = false;
+  
+  async initializeAudioContext() {
     try {
-      const script = document.createElement('script');
-      script.src = 'https://sdk.twilio.com/js/client/v1.14/twilio.min.js';
-      script.async = true;
-      script.onload = () => {
-        console.log("Twilio script loaded successfully");
-        if (!(window as any).Twilio) {
-          console.error("Twilio not found in window even after script load");
-          reject(new Error('Twilio not found in window after script load'));
-          return;
-        }
-        resolve((window as any).Twilio);
-      };
-      script.onerror = (e) => {
-        console.error("Failed to load Twilio script", e);
-        reject(new Error('Failed to load Twilio script'));
-      };
-      document.body.appendChild(script);
+      // Create audio context for microphone access
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      this.audioContext = new AudioContext();
+      
+      // Request microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Create analyzer to detect if microphone is active
+      this.analyser = this.audioContext.createAnalyser();
+      this.analyser.fftSize = 256;
+      
+      // Connect microphone to analyzer
+      this.microphone = this.audioContext.createMediaStreamSource(stream);
+      this.microphone.connect(this.analyser);
+      
+      this.microphoneInitialized = true;
+      return true;
     } catch (error) {
-      console.error("Error during Twilio script loading:", error);
-      reject(error);
+      console.error('Error initializing audio context:', error);
+      this.microphoneInitialized = false;
+      return false;
     }
-  });
-};
-
-// Initialize audio context for the browser
-const initializeAudioContext = async () => {
-  try {
-    if (!audioContext) {
-      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      console.log("Audio context initialized");
-    }
-
-    // Request microphone access
-    microphoneStream = await navigator.mediaDevices.getUserMedia({ 
-      audio: {
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true
-      } 
-    });
-    
-    // Create audio source from microphone stream
-    if (audioContext && microphoneStream) {
-      microphoneSource = audioContext.createMediaStreamSource(microphoneStream);
-      console.log("Microphone source created successfully");
-    }
-    
-    console.log("Microphone access granted");
-    return true;
-  } catch (error) {
-    console.error('Error accessing microphone:', error);
-    return false;
-  }
-};
-
-// Initialize Twilio device for making browser calls
-const initializeTwilioDevice = async () => {
-  try {
-    console.log("Starting Twilio device initialization...");
-    
-    // Load Twilio script first - this needs to happen before anything else
-    const Twilio = await loadTwilioScript();
-    
-    if (!Twilio) {
-      console.error("Failed to load Twilio script");
-      throw new Error('Failed to load Twilio script');
-    }
-    
-    if (!Twilio.Device) {
-      console.error("Twilio.Device is not available");
-      throw new Error('Twilio Device not available');
-    }
-    
-    console.log("Twilio script loaded successfully, now generating token");
-    
-    // Generate token from our edge function - using the dedicated twilio-token function
-    console.log("Invoking twilio-token function for token generation");
-    const { data, error } = await supabase.functions.invoke('twilio-token', {
-      body: {},
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (error) {
-      console.error("Error invoking twilio-token function:", error);
-      throw new Error(error.message || 'Failed to invoke function');
-    }
-    
-    if (!data || !data.token) {
-      console.error("No token returned from twilio-token function:", data);
-      throw new Error('Failed to get token');
-    }
-
-    console.log("Successfully obtained Twilio token");
-    
-    // Create Twilio device
-    twilioDevice = new Twilio.Device();
-    
-    // Set up the device with our token
-    console.log("Setting up Twilio device with token");
-    await twilioDevice.setup(data.token, {
-      debug: true,
-      codecPreferences: ['opus', 'pcmu'],
-      enableIceRestart: true,
-      // Ensure audio is enabled
-      enableAudioContextSounds: true,
-      // Allow microphone access
-      allowIncomingWhileBusy: true,
-    });
-
-    // Set up event listeners
-    twilioDevice.on('ready', () => {
-      console.log('Twilio device is ready for calls');
-    });
-
-    twilioDevice.on('error', (error: any) => {
-      console.error('Twilio device error:', error);
-    });
-
-    twilioDevice.on('connect', (conn: any) => {
-      console.log('Call established');
-      activeConnection = conn;
-      
-      // Enable input and output audio
-      conn.on('volume', (inputVolume: number, outputVolume: number) => {
-        console.log(`Input Volume: ${inputVolume}, Output Volume: ${outputVolume}`);
-      });
-
-      // Set up error handling for the connection
-      conn.on('error', (error: any) => {
-        console.error('Connection error:', error);
-      });
-      
-      // Ensure audio input is connected to the call
-      conn.on('warning', (warning: string) => {
-        console.warn('Connection warning:', warning);
-        
-        // If there's a warning about audio input, try to reconnect it
-        if (warning.includes('audio') || warning.includes('microphone')) {
-          console.log("Attempting to reconnect audio input...");
-          ensureAudioInputConnected(conn);
-        }
-      });
-      
-      // Make sure audio is connected
-      ensureAudioInputConnected(conn);
-    });
-
-    twilioDevice.on('disconnect', () => {
-      console.log('Call ended');
-      activeConnection = null;
-    });
-
-    console.log("Twilio device initialized successfully");
-    return true;
-  } catch (error) {
-    console.error('Error initializing Twilio device:', error);
-    return false;
-  }
-};
-
-// Ensure that the audio input from the microphone is connected to the Twilio call
-const ensureAudioInputConnected = (connection: any) => {
-  if (!connection) {
-    console.warn("No active connection to connect audio to");
-    return;
   }
   
-  try {
-    if (connection.mediaStream && microphoneStream) {
-      console.log("Ensuring microphone is connected to call");
-      
-      // Ensure microphone tracks are enabled
-      microphoneStream.getAudioTracks().forEach(track => {
-        track.enabled = true;
-        console.log(`Audio track enabled: ${track.label}, ${track.readyState}`);
+  isMicrophoneActive() {
+    if (!this.analyser || !this.microphoneInitialized) return false;
+    
+    // Check if microphone is actually capturing audio
+    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+    this.analyser.getByteFrequencyData(dataArray);
+    
+    // If any frequency is above threshold, microphone is active
+    return dataArray.some(value => value > 0);
+  }
+  
+  async initializeTwilioDevice() {
+    try {
+      // Fetch token from your backend
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'getToken' })
       });
       
-      // Check if connection's input device is correctly set
-      if (connection.options && connection.options.audioConstraints) {
-        console.log("Call audio constraints:", connection.options.audioConstraints);
+      const data = await response.json();
+      
+      if (!data.token) {
+        throw new Error('Failed to get Twilio token');
       }
-    }
-  } catch (error) {
-    console.error("Error connecting microphone to call:", error);
-  }
-};
-
-// Make a call to a phone number using Twilio
-const makeCall = async (phoneNumber: string) => {
-  try {
-    console.log(`Attempting to call ${phoneNumber}...`);
-    
-    if (!twilioDevice) {
-      console.error("Twilio device not initialized");
-      throw new Error('Twilio device not initialized');
-    }
-    
-    if (!twilioDevice.ready) {
-      console.error("Twilio device not ready");
-      throw new Error('Twilio device not ready');
-    }
-
-    // Format phone number correctly if needed
-    const formattedPhone = phoneNumber.startsWith('+') 
-      ? phoneNumber 
-      : `+1${phoneNumber.replace(/\D/g, '')}`;
-    
-    console.log(`Formatted phone number for call: ${formattedPhone}`);
-
-    // Get the Twilio phone number from environment
-    const { data: configData, error: configError } = await supabase.functions.invoke('twilio-token', {
-      body: { action: 'getConfig' },
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    if (configError || !configData.twilioPhoneNumber) {
-      console.error("Error getting Twilio phone number:", configError || "No phone number returned");
-      throw new Error('Failed to get Twilio phone number configuration');
-    }
-
-    const twilioPhoneNumber = configData.twilioPhoneNumber;
-    console.log(`Using Twilio phone number for outbound call: ${twilioPhoneNumber}`);
-
-    // Use our edge function to make the outbound call
-    console.log(`Invoking twilio-voice function to call ${formattedPhone}`);
-    const { data, error } = await supabase.functions.invoke('twilio-voice', {
-      body: {
-        action: 'makeCall',
-        phoneNumber: formattedPhone,
-        from: twilioPhoneNumber, // Include the from parameter explicitly
-      },
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    console.log("Response from twilio-voice:", data, error);
-
-    if (error) {
-      console.error("Error invoking makeCall:", error);
-      throw error;
-    }
-    
-    if (!data || !data.callSid) {
-      console.error("No callSid returned:", data);
-      throw new Error(data?.error || 'Call failed to connect');
-    }
-    
-    console.log(`Call initialized with SID: ${data.callSid}`);
-    return { success: true, callSid: data.callSid };
-  } catch (error) {
-    console.error('Error making call:', error);
-    return { success: false, error: (error as Error).message };
-  }
-};
-
-// End the current call
-const endCall = async () => {
-  try {
-    if (activeConnection) {
-      console.log("Disconnecting active call");
-      activeConnection.disconnect();
-      activeConnection = null;
+      
+      // Set up the device
+      this.device = new Device();
+      
+      // Set up event listeners
+      this.device.on('ready', () => {
+        console.log('Twilio device is ready');
+      });
+      
+      this.device.on('error', (error) => {
+        console.error('Twilio device error:', error);
+      });
+      
+      // Initialize the device with the token
+      await this.device.setup(data.token);
+      
       return true;
-    } else if (twilioDevice) {
-      console.log("No active connection found, disconnecting device");
-      twilioDevice.disconnectAll();
-      return true;
+    } catch (error) {
+      console.error('Error initializing Twilio device:', error);
+      return false;
     }
-    return false;
-  } catch (error) {
-    console.error("Error ending call:", error);
-    return false;
-  }
-};
-
-// Check the status of a call
-const checkCallStatus = async (callSid: string) => {
-  try {
-    console.log(`Checking status for call: ${callSid}`);
-    const { data, error } = await supabase.functions.invoke('twilio-voice', {
-      body: {
-        action: 'getCallStatus',
-        callSid,
-      },
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (error) {
-      console.error("Error checking call status:", error);
-      throw error;
-    }
-    
-    console.log(`Call status: ${data?.status || 'unknown'}`);
-    return data?.status || 'unknown';
-  } catch (error) {
-    console.error('Error checking call status:', error);
-    return 'unknown';
-  }
-};
-
-// Clean up resources
-const cleanup = () => {
-  try {
-    if (microphoneStream) {
-      console.log("Cleaning up microphone stream");
-      microphoneStream.getTracks().forEach(track => track.stop());
-      microphoneStream = null;
-    }
-
-    if (microphoneSource) {
-      console.log("Cleaning up microphone source");
-      microphoneSource.disconnect();
-      microphoneSource = null;
-    }
-    
-    if (audioContext) {
-      console.log("Closing audio context");
-      audioContext.close().catch(e => console.error("Error closing audio context:", e));
-      audioContext = null;
-    }
-
-    if (twilioDevice) {
-      console.log("Destroying Twilio device");
-      twilioDevice.destroy();
-      twilioDevice = null;
-    }
-
-    activeConnection = null;
-  } catch (error) {
-    console.error("Error during cleanup:", error);
-  }
-};
-
-// Check if device is ready
-const isDeviceReady = () => {
-  return !!twilioDevice && twilioDevice.ready;
-};
-
-// Get the active connection
-const getActiveConnection = () => {
-  return activeConnection;
-};
-
-// Check if microphone is connected and active
-const isMicrophoneActive = () => {
-  return !!microphoneStream && microphoneStream.getAudioTracks().some(track => track.enabled);
-};
-
-// Toggle microphone mute state
-const toggleMute = (mute: boolean) => {
-  if (!microphoneStream) {
-    console.warn("No microphone stream available to mute/unmute");
-    return false;
   }
   
-  try {
-    microphoneStream.getAudioTracks().forEach(track => {
-      track.enabled = !mute;
-      console.log(`Microphone ${mute ? 'muted' : 'unmuted'}: ${track.label}`);
-    });
-    
-    if (activeConnection) {
-      console.log(`Call ${mute ? 'muted' : 'unmuted'}`);
+  async makeCall(phoneNumber: string) {
+    try {
+      console.log(`Making Twilio call to ${phoneNumber}`);
+      
+      if (!phoneNumber) {
+        console.error("Phone number is required");
+        return { success: false, error: "Phone number is required" };
+      }
+      
+      // Format phone number to ensure it has +
+      const formattedPhoneNumber = phoneNumber.startsWith('+') ? phoneNumber : `+${phoneNumber}`;
+      
+      // Get the Twilio phone configuration
+      const configResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'getConfig' })
+      });
+      
+      const config = await configResponse.json();
+      
+      if (!config.success || !config.twilioPhoneNumber) {
+        console.error("Failed to get Twilio configuration");
+        return { success: false, error: "Failed to get Twilio configuration" };
+      }
+      
+      // Call the twilio-voice function to make the call
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'makeCall',
+          phoneNumber: formattedPhoneNumber
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        console.error("Failed to make call:", result.error);
+        return { success: false, error: result.error || "Failed to make call" };
+      }
+      
+      // If we're using the browser client, connect
+      if (this.device && this.device.status() === 'ready') {
+        try {
+          this.connection = await this.device.connect({
+            To: formattedPhoneNumber
+          });
+          
+          // Set up connection event listeners
+          this.connection.on('disconnect', () => {
+            this.connection = null;
+            console.log('Call ended');
+          });
+        } catch (deviceError) {
+          console.warn("Device connection failed, but REST API call was successful", deviceError);
+          // Even if the device connection fails, the call might still be active via REST API
+        }
+      }
+      
+      return { success: true, callSid: result.callSid };
+    } catch (error) {
+      console.error('Error making call:', error);
+      return { success: false, error: error.message || "An unknown error occurred" };
+    }
+  }
+  
+  async checkCallStatus(callSid: string) {
+    try {
+      // Check the status of an existing call
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-voice`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action: 'checkStatus',
+          callSid: callSid
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (!result.success) {
+        return 'unknown';
+      }
+      
+      return result.status;
+    } catch (error) {
+      console.error('Error checking call status:', error);
+      return 'unknown';
+    }
+  }
+  
+  async endCall() {
+    try {
+      // End the current call (if any)
+      if (this.connection) {
+        this.connection.disconnect();
+        this.connection = null;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error ending call:', error);
+      return false;
+    }
+  }
+  
+  toggleMute(mute: boolean) {
+    try {
+      if (this.connection) {
+        if (mute) {
+          this.connection.mute();
+        } else {
+          this.connection.unmute();
+        }
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error toggling mute:', error);
+      return false;
+    }
+  }
+  
+  cleanup() {
+    // Clean up resources when component unmounts
+    if (this.connection) {
+      this.connection.disconnect();
+      this.connection = null;
     }
     
-    return true;
-  } catch (error) {
-    console.error("Error toggling mute:", error);
-    return false;
+    if (this.device) {
+      this.device.destroy();
+      this.device = null;
+    }
+    
+    if (this.microphone) {
+      this.microphone.disconnect();
+      this.microphone = null;
+    }
+    
+    if (this.analyser) {
+      this.analyser.disconnect();
+      this.analyser = null;
+    }
+    
+    if (this.audioContext && this.audioContext.state !== 'closed') {
+      this.audioContext.close();
+      this.audioContext = null;
+    }
   }
-};
+}
 
-export const twilioService = {
-  initializeAudioContext,
-  initializeTwilioDevice,
-  makeCall,
-  endCall,
-  checkCallStatus,
-  cleanup,
-  isDeviceReady,
-  toggleMute,
-  isMicrophoneActive,
-  getActiveConnection,
-};
+export const twilioService = new TwilioService();

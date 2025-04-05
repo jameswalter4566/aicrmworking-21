@@ -15,12 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, RefreshCw } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, RefreshCw, AlertCircle } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -152,6 +153,7 @@ const PowerDialer = () => {
   const [callSids, setCallSids] = useState<Record<number, string>>({});
   const [twilioInitialized, setTwilioInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [noLeadsSelectedError, setNoLeadsSelectedError] = useState(false);
 
   useEffect(() => {
     const initTwilio = async () => {
@@ -218,6 +220,18 @@ const PowerDialer = () => {
   };
 
   const startDialSession = () => {
+    setNoLeadsSelectedError(false);
+    
+    if (selectedLeads.length === 0) {
+      toast({
+        title: "No Leads Selected",
+        description: "Please select at least one lead to dial.",
+        variant: "destructive",
+      });
+      setNoLeadsSelectedError(true);
+      return;
+    }
+    
     setIsDialogOpen(true);
   };
 
@@ -231,9 +245,18 @@ const PowerDialer = () => {
       return;
     }
 
-    const leadsToDial = selectedLeads.length > 0 
-      ? leads.filter(lead => selectedLeads.includes(lead.id!)).map(lead => lead.id!)
-      : leads.map(lead => lead.id!);
+    if (selectedLeads.length === 0) {
+      toast({
+        title: "No Leads Selected",
+        description: "Please select at least one lead to dial.",
+        variant: "destructive",
+      });
+      setNoLeadsSelectedError(true);
+      setIsDialogOpen(false);
+      return;
+    }
+
+    const leadsToDial = selectedLeads;
     
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
@@ -260,14 +283,24 @@ const PowerDialer = () => {
 
   const initiateCall = async (leadId: number) => {
     const lead = leads.find(l => l.id === leadId);
-    if (!lead) return;
+    if (!lead || !lead.phone1) {
+      toast({
+        title: "Invalid Lead",
+        description: `Lead #${leadId} has no phone number.`,
+        variant: "destructive",
+      });
+      
+      moveToNextLead(leadId);
+      return;
+    }
     
     toast({
       title: "Dialing",
       description: `Calling ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`,
     });
     
-    const { success, callSid, error } = await twilioService.makeCall(lead.phone1 || '');
+    console.log(`Making call to lead ${leadId} with phone number ${lead.phone1}`);
+    const { success, callSid, error } = await twilioService.makeCall(lead.phone1);
     
     if (success && callSid) {
       setCallSids(prev => ({ ...prev, [leadId]: callSid }));
@@ -376,6 +409,7 @@ const PowerDialer = () => {
   const handleSelectLead = (leadId: number, checked: boolean) => {
     if (checked) {
       setSelectedLeads(prev => [...prev, leadId]);
+      setNoLeadsSelectedError(false);
     } else {
       setSelectedLeads(prev => prev.filter(id => id !== leadId));
     }
@@ -394,13 +428,21 @@ const PowerDialer = () => {
               {dialingMode === "ai" ? "AI Dialer" : "Power Dialer"}
             </h1>
             {!isDialing ? (
-              <Button 
-                className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
-                onClick={startDialSession}
-              >
-                <Phone className="h-4 w-4" />
-                Start Dialing Session
-              </Button>
+              <div className="flex items-center gap-2">
+                {noLeadsSelectedError && (
+                  <div className="text-red-500 flex items-center gap-1 text-sm">
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Please select leads to dial</span>
+                  </div>
+                )}
+                <Button 
+                  className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
+                  onClick={startDialSession}
+                >
+                  <Phone className="h-4 w-4" />
+                  Start Dialing Session
+                </Button>
+              </div>
             ) : (
               <Button 
                 variant="destructive"
@@ -548,15 +590,18 @@ const PowerDialer = () => {
                       <p className="text-gray-500 max-w-md">
                         {dialingMode === "ai"
                           ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
-                          : "Call multiple leads in sequence with our power dialer. Select leads from the table below or dial all leads."
+                          : "Call multiple leads in sequence with our power dialer. First select leads from the table below, then start dialing."
                         }
                       </p>
                     </div>
                     <Button 
-                      className="mt-4 bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+                      className={`mt-4 rounded-lg ${selectedLeads.length > 0 ? 'bg-crm-blue hover:bg-crm-blue/90' : 'bg-gray-300'}`}
                       onClick={startDialSession}
+                      disabled={selectedLeads.length === 0}
                     >
-                      Start Dialing
+                      {selectedLeads.length > 0 
+                        ? `Start Dialing (${selectedLeads.length} selected)` 
+                        : "Select Leads First"}
                     </Button>
                   </div>
                 )}
@@ -580,12 +625,20 @@ const PowerDialer = () => {
                 <span className="sr-only">Refresh leads</span>
               </Button>
             </div>
-            <div className="text-sm text-gray-500">
-              {isLoading ? 'Loading leads...' : (
-                selectedLeads.length > 0 ? 
-                `${selectedLeads.length} leads selected` : 
-                `${leads.length} leads available`
+            <div className="text-sm flex items-center gap-2">
+              {noLeadsSelectedError && (
+                <div className="text-red-500 flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  <span>Please select leads to dial</span>
+                </div>
               )}
+              <div className="text-gray-500">
+                {isLoading ? 'Loading leads...' : (
+                  selectedLeads.length > 0 ? 
+                  `${selectedLeads.length} leads selected` : 
+                  `${leads.length} leads available`
+                )}
+              </div>
             </div>
           </div>
           
@@ -627,6 +680,7 @@ const PowerDialer = () => {
                       className={`
                         hover:bg-gray-50 
                         ${activeCallId === lead.id ? 'bg-blue-50' : ''}
+                        ${selectedLeads.includes(lead.id!) ? 'bg-blue-50/50' : ''}
                       `}
                     >
                       <TableCell>
@@ -669,6 +723,9 @@ const PowerDialer = () => {
         <DialogContent className="sm:max-w-[425px] rounded-xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Dialer Settings</DialogTitle>
+            <DialogDescription>
+              You've selected {selectedLeads.length} leads to dial
+            </DialogDescription>
           </DialogHeader>
           
           <div className="py-4 space-y-4">
@@ -732,17 +789,6 @@ const PowerDialer = () => {
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Leads to Dial</h3>
-              <div className="bg-gray-50 p-3 rounded-lg text-sm">
-                {selectedLeads.length > 0 ? (
-                  <span className="font-medium">{selectedLeads.length} leads selected</span>
-                ) : (
-                  <span>All leads will be dialed ({leads.length} total)</span>
-                )}
-              </div>
-            </div>
           </div>
           
           <DialogFooter className="flex sm:justify-between gap-2">
@@ -759,7 +805,7 @@ const PowerDialer = () => {
               className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
               onClick={startDialing}
             >
-              Start Dialing
+              Start Dialing {selectedLeads.length > 0 && `(${selectedLeads.length} leads)`}
             </Button>
           </DialogFooter>
         </DialogContent>
