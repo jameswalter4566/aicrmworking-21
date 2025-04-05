@@ -1,8 +1,15 @@
 
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff } from 'lucide-react';
+import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface CallControlProps {
   isMuted: boolean;
@@ -12,6 +19,7 @@ interface CallControlProps {
   onEndCall: () => void;
   audioStreaming?: boolean;
   className?: string;
+  onAudioDeviceChange?: (deviceId: string) => void;
 }
 
 const CallControl: React.FC<CallControlProps> = ({
@@ -21,9 +29,52 @@ const CallControl: React.FC<CallControlProps> = ({
   onSpeakerToggle,
   onEndCall,
   audioStreaming = false,
-  className
+  className,
+  onAudioDeviceChange
 }) => {
   const [audioLevel, setAudioLevel] = useState<number>(0);
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  
+  // Load available audio output devices
+  useEffect(() => {
+    const loadAudioDevices = async () => {
+      try {
+        // Check if the browser supports enumerateDevices
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          console.warn("This browser doesn't support device enumeration");
+          return;
+        }
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+        
+        setAudioDevices(audioOutputs);
+        
+        // Set default device if available and none is selected
+        if (audioOutputs.length > 0 && !selectedDeviceId) {
+          const defaultDevice = audioOutputs.find(d => d.deviceId === 'default') || audioOutputs[0];
+          setSelectedDeviceId(defaultDevice.deviceId);
+          if (onAudioDeviceChange) onAudioDeviceChange(defaultDevice.deviceId);
+        }
+        
+        console.log("Available audio output devices:", audioOutputs.map(d => ({ 
+          label: d.label || 'Unknown Device', 
+          deviceId: d.deviceId
+        })));
+      } catch (err) {
+        console.error("Error loading audio devices:", err);
+      }
+    };
+    
+    loadAudioDevices();
+  }, [onAudioDeviceChange]);
+  
+  // Handle device selection change
+  const handleDeviceChange = (deviceId: string) => {
+    setSelectedDeviceId(deviceId);
+    if (onAudioDeviceChange) onAudioDeviceChange(deviceId);
+  };
   
   // Simulate audio level visualization
   useEffect(() => {
@@ -68,6 +119,30 @@ const CallControl: React.FC<CallControlProps> = ({
         >
           {speakerOn ? <Volume2 className="h-5 w-5" /> : <Volume1 className="h-5 w-5" />}
         </Button>
+      </div>
+      
+      {/* Audio device selection */}
+      <div className="flex flex-col items-center gap-2 mt-2 w-full max-w-xs">
+        <label className="text-sm text-muted-foreground flex items-center gap-1">
+          <Headphones className="h-3.5 w-3.5" />
+          <span>Audio output</span>
+        </label>
+        <Select value={selectedDeviceId} onValueChange={handleDeviceChange}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select audio device" />
+          </SelectTrigger>
+          <SelectContent>
+            {audioDevices.length === 0 ? (
+              <SelectItem value="no-devices" disabled>No audio devices found</SelectItem>
+            ) : (
+              audioDevices.map(device => (
+                <SelectItem key={device.deviceId} value={device.deviceId}>
+                  {device.label || `Audio device (${device.deviceId.slice(0, 5)}...)`}
+                </SelectItem>
+              ))
+            )}
+          </SelectContent>
+        </Select>
       </div>
       
       {audioStreaming ? (

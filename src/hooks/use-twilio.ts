@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -22,6 +21,8 @@ export const useTwilio = () => {
   const [microphoneActive, setMicrophoneActive] = useState(false);
   const [audioStreaming, setAudioStreaming] = useState(false);
   const [audioTested, setAudioTested] = useState(false);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([]);
+  const [currentAudioDevice, setCurrentAudioDevice] = useState<string>('');
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
 
@@ -41,6 +42,14 @@ export const useTwilio = () => {
         }
         
         setMicrophoneActive(true);
+        
+        // Load available audio devices
+        const devices = await twilioService.getAudioOutputDevices();
+        setAudioOutputDevices(devices);
+        
+        // Set the current device
+        const currentDevice = twilioService.getCurrentAudioDevice();
+        setCurrentAudioDevice(currentDevice);
         
         const audioTest = await twilioService.testAudioOutput();
         setAudioTested(audioTest);
@@ -395,6 +404,41 @@ export const useTwilio = () => {
     return success;
   }, [activeCalls]);
 
+  const setAudioOutputDevice = useCallback(async (deviceId: string) => {
+    const success = await twilioService.setAudioOutputDevice(deviceId);
+    
+    if (success) {
+      setCurrentAudioDevice(deviceId);
+      
+      // Play a test tone through the new device
+      await twilioService.testAudioOutput(deviceId);
+      
+      toast({
+        title: "Audio Device Changed",
+        description: "Audio output device has been updated.",
+      });
+    } else {
+      toast({
+        title: "Audio Device Error",
+        description: "Could not change the audio output device. This browser might not support this feature.",
+        variant: "destructive",
+      });
+    }
+    
+    return success;
+  }, []);
+
+  const refreshAudioDevices = useCallback(async () => {
+    try {
+      const devices = await twilioService.getAudioOutputDevices();
+      setAudioOutputDevices(devices);
+      return devices;
+    } catch (err) {
+      console.error("Error refreshing audio devices:", err);
+      return [];
+    }
+  }, []);
+
   return {
     initialized,
     isLoading,
@@ -402,11 +446,15 @@ export const useTwilio = () => {
     microphoneActive,
     audioStreaming,
     audioTested,
+    audioOutputDevices,
+    currentAudioDevice,
     makeCall,
     endCall,
     endAllCalls,
     toggleMute,
     toggleSpeaker,
+    setAudioOutputDevice,
+    refreshAudioDevices,
     testAudio: twilioService.testAudioOutput
   };
 };

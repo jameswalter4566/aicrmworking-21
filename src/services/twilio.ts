@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -31,6 +30,7 @@ class TwilioService {
   private keepAliveInterval: number | null = null;
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
+  private currentAudioOutputDevice: string = 'default';
   
   constructor() {
     // Create audio element for output testing and call sounds
@@ -833,7 +833,7 @@ class TwilioService {
   }
   
   // Improved audio test function to kickstart audio
-  async testAudioOutput() {
+  async testAudioOutput(deviceId?: string) {
     try {
       if (!this.audioContext) {
         await this.initializeAudioContext();
@@ -850,6 +850,11 @@ class TwilioService {
         
         oscillator.connect(gainNode);
         gainNode.connect(this.audioContext.destination);
+        
+        // If a specific device is specified, try to use it
+        if (deviceId) {
+          await this.setAudioOutputDevice(deviceId);
+        }
         
         oscillator.start();
         console.log("Playing test tone...");
@@ -869,6 +874,69 @@ class TwilioService {
       console.error("Error testing audio output:", error);
       return false;
     }
+  }
+  
+  async setAudioOutputDevice(deviceId: string): Promise<boolean> {
+    try {
+      if (!deviceId) return false;
+      
+      this.currentAudioOutputDevice = deviceId;
+      console.log(`Setting audio output device to: ${deviceId}`);
+      
+      // Set the device for all audio elements
+      const audioElements = [
+        this.audioElement,
+        document.getElementById('ringtone') as HTMLAudioElement,
+        document.getElementById('outgoing') as HTMLAudioElement,
+        document.getElementById('dialtone') as HTMLAudioElement
+      ];
+      
+      // For each audio element, try to set the sink ID if supported
+      for (const element of audioElements) {
+        if (element && element.setSinkId) {
+          try {
+            await element.setSinkId(deviceId);
+            console.log(`Set sink ID for audio element: ${element.id || 'main'}`);
+          } catch (err) {
+            console.warn(`Could not set sink ID for audio element: ${element.id || 'main'}`, err);
+          }
+        }
+      }
+      
+      // If there's an active connection, set its sink ID if supported
+      if (this.connection && typeof this.connection.setSinkId === 'function') {
+        try {
+          await this.connection.setSinkId(deviceId);
+          console.log("Set sink ID for active connection");
+        } catch (err) {
+          console.warn("Could not set sink ID for active connection:", err);
+        }
+      }
+      
+      return true;
+    } catch (err) {
+      console.error("Error setting audio output device:", err);
+      return false;
+    }
+  }
+  
+  async getAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        console.error("This browser doesn't support device enumeration");
+        return [];
+      }
+      
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(device => device.kind === 'audiooutput');
+    } catch (err) {
+      console.error("Error enumerating audio devices:", err);
+      return [];
+    }
+  }
+  
+  getCurrentAudioDevice(): string {
+    return this.currentAudioOutputDevice;
   }
 }
 
