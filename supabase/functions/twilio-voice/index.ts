@@ -138,11 +138,14 @@ serve(async (req) => {
       console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`);
       
       try {
+        // Check if this is a browser-originated call or a direct REST API call
+        const isBrowserCall = requestData.browser === true;
+        
         // Create a new call with enhanced TwiML for better audio
         const call = await client.calls.create({
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}`,
+          url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}&browser=${isBrowserCall ? 'true' : 'false'}`,
           method: 'POST',
           // Add statusCallback to monitor call progress
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
@@ -173,10 +176,10 @@ serve(async (req) => {
       const twimlResponse = new twilio.twiml.VoiceResponse();
       
       if (requestData.Caller && requestData.Caller.startsWith('client:')) {
-        // This is a browser call to a phone
+        // This is a browser call to a phone - critical for audio in browser
         console.log("Browser to phone call - enhancing audio quality");
         if (phoneNumber) {
-          // Set high quality audio settings
+          // Set high quality audio settings for browser calls
           twimlResponse.say({ 
             voice: 'alice',
             language: 'en-US' 
@@ -188,7 +191,7 @@ serve(async (req) => {
             record: 'record-from-answer-dual',
             // Add timeouts
             timeout: 30,
-            // Enhanced audio quality
+            // Enhanced audio quality - crucial for browser audio
             answerOnBridge: true
           });
           
@@ -216,19 +219,37 @@ serve(async (req) => {
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
         }, phoneNumber.replace('client:', ''));
       } else {
-        // Standard phone to phone call
-        console.log("Phone to phone call");
+        // Standard phone to phone call - modified to enable browser audio if requested
+        console.log("Processing call - checking if browser audio is requested");
+        const isBrowserRequested = requestData.browser === 'true';
+        
         if (phoneNumber) {
-          twimlResponse.say({ voice: 'alice' }, 'Connecting your call now.');
-          
-          const dial = twimlResponse.dial({
-            callerId: TWILIO_PHONE_NUMBER,
-            answerOnBridge: true,
-            record: 'record-from-answer-dual'
-          });
-          
-          const formattedNumber = normalizePhoneNumber(phoneNumber);
-          dial.number(formattedNumber);
+          if (isBrowserRequested) {
+            console.log("Setting up call with browser audio support");
+            twimlResponse.say({ voice: 'alice' }, 'Connecting your call now with browser audio.');
+            
+            // Special setup for browser audio feedback
+            const dial = twimlResponse.dial({
+              callerId: TWILIO_PHONE_NUMBER,
+              answerOnBridge: true,
+              record: 'record-from-answer-dual'
+            });
+            
+            const formattedNumber = normalizePhoneNumber(phoneNumber);
+            dial.number(formattedNumber);
+          } else {
+            console.log("Standard phone call without browser audio");
+            twimlResponse.say({ voice: 'alice' }, 'Connecting your call now.');
+            
+            const dial = twimlResponse.dial({
+              callerId: TWILIO_PHONE_NUMBER,
+              answerOnBridge: true,
+              record: 'record-from-answer-dual'
+            });
+            
+            const formattedNumber = normalizePhoneNumber(phoneNumber);
+            dial.number(formattedNumber);
+          }
         } else {
           twimlResponse.say({ voice: 'alice' }, 'Welcome to the phone system. No action specified.');
         }

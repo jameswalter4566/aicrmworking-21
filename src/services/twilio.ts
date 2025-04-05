@@ -1,3 +1,4 @@
+
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -11,6 +12,34 @@ class TwilioService {
   private audioOutputInitialized: boolean = false;
   private supabaseUrl: string = "https://imrmboyczebjlbnkgjns.supabase.co";
   private audioStream: MediaStream | null = null;
+  private audioElement: HTMLAudioElement | null = null;
+  
+  constructor() {
+    // Create audio element for output testing and call sounds
+    this.audioElement = document.createElement('audio');
+    this.audioElement.autoplay = true;
+    document.body.appendChild(this.audioElement);
+    
+    // Add hidden audio elements for call sounds
+    this.createHiddenAudio('ringtone', '/sounds/ringtone.mp3');
+    this.createHiddenAudio('outgoing', '/sounds/outgoing.mp3');
+  }
+  
+  private createHiddenAudio(id: string, src: string) {
+    const audio = document.createElement('audio');
+    audio.id = id;
+    audio.src = src;
+    audio.preload = 'auto';
+    document.body.appendChild(audio);
+  }
+  
+  private playSound(soundId: string) {
+    const sound = document.getElementById(soundId) as HTMLAudioElement;
+    if (sound) {
+      sound.currentTime = 0;
+      sound.play().catch(err => console.warn(`Error playing ${soundId} sound:`, err));
+    }
+  }
   
   async initializeAudioContext() {
     try {
@@ -38,6 +67,9 @@ class TwilioService {
       // Connect microphone to analyzer
       this.microphone = this.audioContext.createMediaStreamSource(stream);
       this.microphone.connect(this.analyser);
+      
+      // Play a test tone to kickstart audio context
+      await this.testAudioOutput();
       
       this.microphoneInitialized = true;
       console.log("Audio context initialized successfully with enhanced audio settings");
@@ -124,7 +156,7 @@ class TwilioService {
       // Set up the device with audio settings
       this.device = new Device();
       
-      // Create simplified device options
+      // Create simplified device options with focus on audio
       const deviceOptions = {
         debug: true,
         enableRingtone: true,
@@ -140,6 +172,8 @@ class TwilioService {
       // Set up event listeners
       this.device.on('ready', () => {
         console.log('Twilio device is ready for audio I/O');
+        // Play a short confirmation sound when device is ready
+        this.playSound('outgoing');
       });
       
       this.device.on('error', (error) => {
@@ -149,6 +183,13 @@ class TwilioService {
       this.device.on('connect', (conn) => {
         console.log('Call connected - audio channels established');
         this.connection = conn;
+        
+        // Force unmute to ensure audio is flowing
+        try {
+          conn.mute(false);
+        } catch (e) {
+          console.warn('Could not unmute connection:', e);
+        }
         
         // Ensure audio input and output are working
         if (this.audioContext && this.audioContext.state === 'suspended') {
@@ -179,11 +220,15 @@ class TwilioService {
       
       this.device.on('incoming', (conn) => {
         console.log('Incoming call detected');
+        this.playSound('ringtone');
       });
       
       // Initialize the device with the token - using as any to bypass type errors
       console.log("Setting up Twilio device with token");
       await this.device.setup(data.token, deviceOptions as any);
+      
+      // Play a startup sound to verify audio works
+      await this.testAudioOutput();
       
       return true;
     } catch (error) {
@@ -236,6 +281,9 @@ class TwilioService {
           return { success: false, error: "Failed to initialize Twilio device" };
         }
       }
+      
+      // Play a dialing sound to indicate call is starting
+      this.playSound('outgoing');
       
       // Try using browser audio first
       if (this.device) {
@@ -455,9 +503,21 @@ class TwilioService {
       this.audioStream.getTracks().forEach(track => track.stop());
       this.audioStream = null;
     }
+    
+    // Remove audio elements
+    if (this.audioElement) {
+      document.body.removeChild(this.audioElement);
+      this.audioElement = null;
+    }
+    
+    const soundIds = ['ringtone', 'outgoing'];
+    soundIds.forEach(id => {
+      const element = document.getElementById(id);
+      if (element) document.body.removeChild(element);
+    });
   }
   
-  // New method to test audio output
+  // Improved audio test function to kickstart audio
   async testAudioOutput() {
     try {
       if (!this.audioContext) {
@@ -479,13 +539,13 @@ class TwilioService {
         oscillator.start();
         console.log("Playing test tone...");
         
-        // Stop after 1 second
+        // Stop after 500ms - just enough to test but not disruptive
         setTimeout(() => {
           oscillator.stop();
           oscillator.disconnect();
           gainNode.disconnect();
           console.log("Test tone complete");
-        }, 1000);
+        }, 500);
         
         return true;
       }
