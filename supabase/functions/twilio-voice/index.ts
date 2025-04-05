@@ -202,6 +202,7 @@ serve(async (req) => {
       
       // Check if this is a browser-originated call or a direct REST API call
       const isBrowserCall = requestData.browser === true || requestData.browser === 'true';
+      
       console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}, browser mode: ${isBrowserCall}`);
       
       try {

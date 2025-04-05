@@ -24,6 +24,8 @@ class TwilioService {
   private isProcessingAudio: boolean = false;
   private audioBufferArray: Float32Array[] = [];
   private callActive: boolean = false;
+  private dialToneSound: HTMLAudioElement | null = null;
+  private ringingSound: HTMLAudioElement | null = null;
   
   constructor() {
     // Create audio element for output testing and call sounds
@@ -35,6 +37,10 @@ class TwilioService {
     this.createHiddenAudio('ringtone', '/sounds/ringtone.mp3');
     this.createHiddenAudio('outgoing', '/sounds/outgoing.mp3');
     this.createHiddenAudio('dialtone', '/sounds/dialtone.mp3');
+    
+    // Initialize dial tone for immediate feedback when calling
+    this.dialToneSound = document.getElementById('dialtone') as HTMLAudioElement;
+    this.ringingSound = document.getElementById('outgoing') as HTMLAudioElement;
   }
   
   private createHiddenAudio(id: string, src: string) {
@@ -50,6 +56,14 @@ class TwilioService {
     if (sound) {
       sound.currentTime = 0;
       sound.play().catch(err => console.warn(`Error playing ${soundId} sound:`, err));
+    }
+  }
+  
+  private stopSound(soundId: string) {
+    const sound = document.getElementById(soundId) as HTMLAudioElement;
+    if (sound && !sound.paused) {
+      sound.pause();
+      sound.currentTime = 0;
     }
   }
   
@@ -97,8 +111,10 @@ class TwilioService {
             }
           } else if (data.event === 'streamStart') {
             console.log("Call audio stream started", data);
-            // Play a dialtone when stream starts to provide audio feedback
-            this.playSound('dialtone');
+            // Stop ringing/dialtone when stream starts
+            this.stopSound('ringtone');
+            this.stopSound('outgoing');
+            this.stopSound('dialtone');
           } else if (data.event === 'streamStop') {
             console.log("Call audio stream stopped", data);
           } else if (data.event === 'browser_connected') {
@@ -377,6 +393,11 @@ class TwilioService {
           });
         }
         
+        // Stop all feedback sounds when call connects
+        this.stopSound('ringtone');
+        this.stopSound('outgoing');
+        this.stopSound('dialtone');
+        
         // Monitor incoming and outgoing audio
         conn.volume((inputVolume: number, outputVolume: number) => {
           console.log(`Audio levels - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
@@ -395,6 +416,11 @@ class TwilioService {
         console.log('Call disconnected - audio channels closed');
         this.connection = null;
         this.callActive = false;
+        
+        // Stop all feedback sounds when call disconnects
+        this.stopSound('ringtone');
+        this.stopSound('outgoing');
+        this.stopSound('dialtone');
       });
       
       // Log additional debug information
