@@ -22,16 +22,37 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Extract authorization header from the request
+    // Extract the request headers and information
     const authHeader = req.headers.get('Authorization');
     
-    // Check if the request is coming from a browser or direct API call
-    // For browser requests, we'll allow them through without checking auth
-    // For API calls, we'll check the Authorization header
-    const isDirectApiCall = !req.headers.get('x-client-info')?.includes('supabase-js');
+    // Check if the request is coming from the browser app
+    const clientInfo = req.headers.get('x-client-info');
+    const isBrowserRequest = clientInfo?.includes('supabase-js');
     
-    if (isDirectApiCall && !authHeader) {
+    // Allow requests from the browser app without authentication
+    // This simplifies development and testing
+    if (!isBrowserRequest && !authHeader) {
       throw new Error('Missing authorization header');
+    }
+    
+    // For non-browser requests that have an auth header, we'll validate it
+    let userId = null;
+    if (!isBrowserRequest && authHeader) {
+      try {
+        // Extract the JWT token from the Authorization header
+        const token = authHeader.replace('Bearer ', '');
+        
+        // Verify the JWT token with Supabase
+        const { data, error } = await supabase.auth.getUser(token);
+        
+        if (error) throw new Error('Invalid JWT token');
+        
+        userId = data.user.id;
+        console.log(`Request authenticated as user: ${userId}`);
+      } catch (authError) {
+        console.error('JWT validation error:', authError.message);
+        throw new Error('Invalid JWT');
+      }
     }
     
     const { leads, leadType } = await req.json();
@@ -59,6 +80,12 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error(`Error in store-leads function: ${error.message}`);
     
+    // Determine appropriate status code based on error type
+    let statusCode = 500;
+    if (error.message === 'Missing authorization header') statusCode = 401;
+    if (error.message === 'Invalid JWT') statusCode = 401;
+    if (error.message === 'No valid leads data provided') statusCode = 400;
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -66,7 +93,7 @@ Deno.serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: error.message === 'Missing authorization header' ? 401 : 500,
+        status: statusCode,
       }
     );
   }
