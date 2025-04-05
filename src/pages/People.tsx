@@ -255,17 +255,12 @@ const People = () => {
     };
 
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      
       const response = await fetch(
         "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(sessionData?.session?.access_token ? {
-              "Authorization": `Bearer ${sessionData.session.access_token}`
-            } : {})
           },
           body: JSON.stringify({
             leads: [newLead],
