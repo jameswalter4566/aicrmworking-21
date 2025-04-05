@@ -57,6 +57,13 @@ serve(async (req) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `sms_campaign_${campaignName ? campaignName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' : ''}${timestamp}.csv`
 
+    // Use TextEncoder to convert string to Uint8Array for the attachment
+    const encoder = new TextEncoder()
+    const csvData = encoder.encode(csvContent)
+    
+    // Base64 encode the Uint8Array
+    const base64CSV = btoa(String.fromCharCode(...csvData))
+
     // Send email with CSV attachment using Resend
     const emailResponse = await resend.emails.send({
       from: 'SMSCampaign <onboarding@resend.dev>',
@@ -73,7 +80,7 @@ serve(async (req) => {
       attachments: [
         {
           filename: filename,
-          content: Buffer.from(csvContent).toString('base64'),
+          content: base64CSV,
           type: 'text/csv',
         },
       ],
