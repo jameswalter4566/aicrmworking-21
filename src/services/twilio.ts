@@ -212,6 +212,9 @@ const checkCallStatus = async (callSid: string) => {
         action: 'getCallStatus',
         callSid,
       },
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
     if (error) {
