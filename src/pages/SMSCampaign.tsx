@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Tag, Calendar, Clock } from "lucide-react";
+import { ArrowLeft, Users, Tag, Calendar, Clock, UserPlus } from "lucide-react";
 import SMSSidebar from "@/components/sms/SMSSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,8 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card } from "@/components/ui/card";
 import { useForm } from "react-hook-form";
+import { thoughtlyService } from "@/services/thoughtly";
+import { useToast } from "@/components/ui/use-toast";
 
 const SMSCampaign = () => {
   const navigate = useNavigate();
@@ -25,6 +27,9 @@ const SMSCampaign = () => {
   const [selectedAudience, setSelectedAudience] = useState("all");
   const [frequency, setFrequency] = useState("one-time");
   const [timing, setTiming] = useState("immediate");
+  const [isImporting, setIsImporting] = useState(false);
+  const [contacts, setContacts] = useState([]);
+  const { toast } = useToast();
 
   const form = useForm();
 
@@ -34,6 +39,33 @@ const SMSCampaign = () => {
 
   const handleCampaignNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCampaignName(e.target.value);
+  };
+
+  const importContacts = async () => {
+    setIsImporting(true);
+    try {
+      // Use the thoughtlyService to retrieve contacts
+      const retrievedContacts = await thoughtlyService.getContacts();
+      setContacts(retrievedContacts);
+      
+      // Show success toast
+      toast({
+        title: "Contacts imported successfully",
+        description: `Imported ${retrievedContacts.length} contacts for your campaign.`,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error importing contacts:", error);
+      
+      // Show error toast
+      toast({
+        title: "Import failed",
+        description: "Failed to import contacts. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -142,6 +174,23 @@ const SMSCampaign = () => {
                             <label htmlFor="keywords" className="font-medium cursor-pointer">Keywords (people who subscribed with keyword)</label>
                           </div>
                         </RadioGroup>
+                      </div>
+
+                      {/* Import Contacts Button */}
+                      <div className="mb-6">
+                        <Button 
+                          onClick={importContacts} 
+                          disabled={isImporting}
+                          className="mb-4 bg-green-500 hover:bg-green-600"
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          {isImporting ? "Importing..." : "Import Contacts"}
+                        </Button>
+                        {contacts.length > 0 && (
+                          <p className="text-sm text-green-600">
+                            {contacts.length} contacts imported successfully
+                          </p>
+                        )}
                       </div>
 
                       {/* Filters Section */}
