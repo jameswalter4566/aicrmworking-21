@@ -17,12 +17,6 @@ export interface ThoughtlyContact {
   propertyAddress?: string;
 }
 
-// Utility function to strip phone number of all non-numeric characters
-function stripPhoneNumber(phoneNumber?: string): string {
-  if (!phoneNumber) return "";
-  return phoneNumber.replace(/\D/g, '');
-}
-
 export const thoughtlyService = {
   /**
    * Create a single contact in Thoughtly
@@ -33,17 +27,11 @@ export const thoughtlyService = {
     try {
       console.log('Creating contact in Thoughtly:', contact);
       
-      // Ensure phone number is properly formatted
-      const formattedContact = {
-        ...contact,
-        phone1: stripPhoneNumber(contact.phone1)
-      };
-      
       // Send the contact directly to the thoughtly-contacts edge function
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
         body: {
           action: 'createContact',
-          contacts: formattedContact
+          contacts: contact
         }
       });
 
@@ -69,17 +57,11 @@ export const thoughtlyService = {
     try {
       console.log(`Creating ${contacts.length} contacts in Thoughtly`);
       
-      // Ensure all phone numbers are properly formatted
-      const formattedContacts = contacts.map(contact => ({
-        ...contact,
-        phone1: stripPhoneNumber(contact.phone1)
-      }));
-      
       // Send the contacts directly to the thoughtly-contacts edge function
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
         body: {
           action: 'createContact',
-          contacts: formattedContacts
+          contacts: contacts
         }
       });
 
