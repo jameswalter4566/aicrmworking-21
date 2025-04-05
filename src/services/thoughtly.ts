@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ThoughtlyContact {
@@ -130,10 +129,30 @@ export const thoughtlyService = {
     try {
       console.log(`Calling ${contacts.length} contacts with interview ID: ${interviewId}`);
       
+      // Ensure contacts have proper format with contact_id
+      const formattedContacts = contacts.map(contact => {
+        // If it's just a string ID, format it properly
+        if (typeof contact === 'string') {
+          return { id: contact };
+        }
+        
+        // If it's an object with an ID, ensure it has the expected format
+        if (typeof contact === 'object' && contact !== null) {
+          // If it doesn't have an id property but has a contact_id, use that
+          if (!contact.id && contact.contact_id) {
+            return contact;
+          }
+          // Otherwise, use the id property
+          return contact;
+        }
+        
+        return contact;
+      });
+      
       // Use the dedicated thoughtly-call-contacts edge function
       const { data, error } = await supabase.functions.invoke('thoughtly-call-contacts', {
         body: {
-          contacts: contacts,
+          contacts: formattedContacts,
           interview_id: interviewId,
           metadata: metadata
         }

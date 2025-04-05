@@ -14,9 +14,9 @@ console.log("Thoughtly Call Contacts function loaded and ready")
 // Base Thoughtly API URL 
 const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 
-// Retrieve API credentials from environment variables
-const THOUGHTLY_API_TOKEN = Deno.env.get("THOUGHTLY_API_TOKEN") || "8f6vq0cwvk59qwi63rcf1o";
-const THOUGHTLY_TEAM_ID = Deno.env.get("THOUGHTLY_TEAM_ID") || "aa7e6d5e-35b5-491a-9111-18790d37612f";
+// Retrieve API credentials 
+const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o";
+const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f";
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to ${req.url}`)
@@ -107,7 +107,7 @@ serve(async (req) => {
         
         console.log("Call payload:", JSON.stringify(callPayload));
         
-        // Use the exact header structure from the example
+        // Use the exact header structure from the documentation
         const options = {
           method: 'POST',
           headers: {
@@ -120,10 +120,22 @@ serve(async (req) => {
         
         // Make the request to Thoughtly API
         const response = await fetch(`${THOUGHTLY_API_URL}/contact/call`, options);
-        const data = await response.json();
-        
+        const responseText = await response.text();
         console.log(`Call API response status: ${response.status}`);
-        console.log(`Call API response data:`, data);
+        console.log(`Call API response text:`, responseText);
+        
+        let data;
+        try {
+          data = JSON.parse(responseText);
+        } catch (e) {
+          console.error("Failed to parse response as JSON:", e);
+          results.errors.push({
+            contact_id,
+            error: "Failed to parse API response",
+            responseText
+          });
+          continue;
+        }
         
         if (response.status !== 200) {
           console.error(`Error calling contact ${contact_id}:`, data);
