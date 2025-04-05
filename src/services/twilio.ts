@@ -1,3 +1,4 @@
+
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -548,12 +549,13 @@ class TwilioService {
       // Fall back to Twilio REST API if browser Device fails
       console.log("Making call via REST API");
       
-      // IMPORTANT: REMOVE any authorization headers, explicitly set to null content-type only
-      console.log("Sending fetch request to Twilio Voice function with NO authorization headers");
-      const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
+      // CRITICAL FIX: Make request with NO AUTH HEADERS
+      console.log("Sending request to Twilio Voice function with NO auth headers");
+      const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
+          // NO Authorization headers!
         },
         body: JSON.stringify({
           action: 'makeCall',
@@ -578,7 +580,7 @@ class TwilioService {
         return { success: false, error: result.error || "Failed to make call" };
       }
       
-      return { success: true, callSid: result.callSid, usingBrowser: true };
+      return { success: true, callSid: result.callSid, usingBrowser: false };
     } catch (error: any) {
       console.error('Error making call:', error);
       return { success: false, error: error.message || "An unknown error occurred" };

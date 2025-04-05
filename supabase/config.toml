@@ -38,7 +38,8 @@ verify_jwt = false
 
 [edge_functions.twilio-voice]
 verify_jwt = false
+invoker_roles = ["anon", "service_role"]
 
 [edge_functions.twilio-token]
 verify_jwt = false
-
+invoker_roles = ["anon", "service_role"]

@@ -39,7 +39,7 @@ serve(async (req) => {
   const headerEntries = [...req.headers.entries()];
   console.log(`Request headers (${headerEntries.length}):`, JSON.stringify(headerEntries));
   
-  // Handle preflight requests properly
+  // CRITICAL: Always handle preflight requests properly first
   if (req.method === 'OPTIONS') {
     console.log("Handling OPTIONS preflight request")
     return new Response(null, { 
@@ -49,7 +49,7 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request data
+    // Parse request data - enhanced for more robust parsing
     let requestData: any = {}
     
     try {
