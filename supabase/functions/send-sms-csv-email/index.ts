@@ -1,13 +1,13 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
-
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+const SENDGRID_API_KEY = Deno.env.get("SENDGRID_API_KEY");
+const SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send";
 
 // Handle CORS preflight requests
 serve(async (req) => {
@@ -57,41 +57,68 @@ serve(async (req) => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
     const filename = `sms_campaign_${campaignName ? campaignName.replace(/[^a-z0-9]/gi, '_').toLowerCase() + '_' : ''}${timestamp}.csv`
 
-    // Use TextEncoder to convert string to Uint8Array for the attachment
+    // Encode the CSV content to base64
     const encoder = new TextEncoder()
     const csvData = encoder.encode(csvContent)
-    
-    // Base64 encode the Uint8Array
     const base64CSV = btoa(String.fromCharCode(...csvData))
 
-    // Send email with CSV attachment using Resend
-    const emailResponse = await resend.emails.send({
-      from: 'SMSCampaign <onboarding@resend.dev>',
-      to: ['jameswalter@goldenpathwayfinancial.com', 'daniel@pacificcreditsolutions.com'],
+    // Prepare email content for SendGrid
+    const emailData = {
+      personalizations: [
+        {
+          to: [
+            { email: "jameswalter@goldenpathwayfinancial.com" },
+            { email: "daniel@pacificcreditsolutions.com" }
+          ]
+        }
+      ],
+      from: { email: "no-reply@yourdomain.com", name: "SMS Campaign" },
       subject: `SMS Campaign: ${campaignName || 'New Campaign'}`,
-      html: `
-        <h2>SMS Campaign Details</h2>
-        <p><strong>Campaign Name:</strong> ${campaignName || 'Unnamed Campaign'}</p>
-        <p><strong>Contacts:</strong> ${contacts.length}</p>
-        <p><strong>Message:</strong> ${message}</p>
-        <p>Please find attached the CSV file with all contact details for this SMS campaign.</p>
-      `,
+      content: [
+        {
+          type: "text/html",
+          value: `
+            <h2>SMS Campaign Details</h2>
+            <p><strong>Campaign Name:</strong> ${campaignName || 'Unnamed Campaign'}</p>
+            <p><strong>Contacts:</strong> ${contacts.length}</p>
+            <p><strong>Message:</strong> ${message}</p>
+            <p>Please find attached the CSV file with all contact details for this SMS campaign.</p>
+          `
+        }
+      ],
       attachments: [
         {
-          filename: filename,
           content: base64CSV,
-          type: 'text/csv',
-        },
-      ],
+          filename: filename,
+          type: "text/csv",
+          disposition: "attachment"
+        }
+      ]
+    };
+
+    // Send email using SendGrid API
+    const response = await fetch(SENDGRID_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${SENDGRID_API_KEY}`
+      },
+      body: JSON.stringify(emailData)
     });
 
-    console.log('Email sent successfully:', emailResponse);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('SendGrid API error:', response.status, errorText);
+      throw new Error(`SendGrid API error: ${response.status} ${errorText}`);
+    }
+
+    console.log('Email sent successfully with SendGrid');
 
     // Return success response
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Email sent successfully',
+        message: 'Email sent successfully with SendGrid',
       }),
       {
         status: 200,
