@@ -1,9 +1,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-// Retrieve Thoughtly API credentials from environment variables
-const THOUGHTLY_API_TOKEN = Deno.env.get('THOUGHTLY_API_TOKEN');
-const THOUGHTLY_TEAM_ID = Deno.env.get('THOUGHTLY_TEAM_ID');
+// Hard-coded Thoughtly API credentials since environment variables aren't working
+// These should match what was provided in the API documentation
+const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o";
+const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,13 +19,9 @@ serve(async (req) => {
   }
 
   try {
-    // Log the environment variables to help debug
+    // Log the API credentials to confirm they're being used
     console.log(`Using Thoughtly API Token: ${THOUGHTLY_API_TOKEN ? '✓ Present' : '✗ Missing'}`);
     console.log(`Using Thoughtly Team ID: ${THOUGHTLY_TEAM_ID ? '✓ Present' : '✗ Missing'}`);
-
-    if (!THOUGHTLY_API_TOKEN || !THOUGHTLY_TEAM_ID) {
-      throw new Error('Thoughtly API credentials not configured. Please add THOUGHTLY_API_TOKEN and THOUGHTLY_TEAM_ID to your Edge Function secrets.');
-    }
 
     const { leadIds, interviewId, lineCount = 1 } = await req.json();
     console.log(`Starting AI dialing session for leads: ${leadIds}, interview: ${interviewId}, lines: ${lineCount}`);
@@ -127,13 +124,13 @@ async function getThoughtlyContacts(params: {
     
     const url = `https://api.thoughtly.com/contact${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     console.log(`Fetching contacts from: ${url}`);
-    console.log(`Using Thoughtly headers: x-api-token: ${THOUGHTLY_API_TOKEN ? '✓ Present' : '✗ Missing'}, team_id: ${THOUGHTLY_TEAM_ID ? '✓ Present' : '✗ Missing'}`);
     
+    // Use the hard-coded API credentials
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'x-api-token': THOUGHTLY_API_TOKEN!,
-        'team_id': THOUGHTLY_TEAM_ID!,
+        'x-api-token': THOUGHTLY_API_TOKEN,
+        'team_id': THOUGHTLY_TEAM_ID,
         'Content-Type': 'application/json'
       }
     });
@@ -157,13 +154,13 @@ async function getThoughtlyContacts(params: {
 async function callThoughtlyContact(contactId: string, interviewId: string, metadata?: Record<string, any>) {
   try {
     console.log(`Calling contact ${contactId} with interview ${interviewId}`);
-    console.log(`Using Thoughtly headers for call: x-api-token: ${THOUGHTLY_API_TOKEN ? '✓ Present' : '✗ Missing'}, team_id: ${THOUGHTLY_TEAM_ID ? '✓ Present' : '✗ Missing'}`);
     
+    // Use the hard-coded API credentials
     const response = await fetch('https://api.thoughtly.com/contact/call', {
       method: 'POST',
       headers: {
-        'x-api-token': THOUGHTLY_API_TOKEN!,
-        'team_id': THOUGHTLY_TEAM_ID!,
+        'x-api-token': THOUGHTLY_API_TOKEN,
+        'team_id': THOUGHTLY_TEAM_ID,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
