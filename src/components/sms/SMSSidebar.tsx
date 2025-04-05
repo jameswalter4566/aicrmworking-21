@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { 
   Plus, 
   Megaphone, 
@@ -14,7 +14,6 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -25,9 +24,13 @@ import {
 } from "@/components/ui/sidebar";
 
 const SMSSidebar = () => {
+  const [isHovered, setIsHovered] = useState(false);
+
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full">
+    <SidebarProvider defaultOpen={false}>
+      <div className="min-h-screen flex w-full"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}>
         <Sidebar variant="floating" className="bg-pink-50">
           <SidebarRail />
           <SidebarHeader className="border-b border-pink-100">
@@ -39,58 +42,55 @@ const SMSSidebar = () => {
 
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel className="text-pink-500">Messaging</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="New Campaign"
+                      className="bg-pink-200 hover:bg-pink-300"
                     >
                       <Plus className="text-pink-600" />
-                      <span>New Campaign</span>
+                      {isHovered && <span>New Campaign</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="Campaigns"
+                      className="bg-purple-200 hover:bg-purple-300"
                     >
-                      <Megaphone className="text-pink-600" />
-                      <span>Campaigns</span>
+                      <Megaphone className="text-purple-600" />
+                      {isHovered && <span>Campaigns</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
 
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="Inbox"
+                      className="bg-blue-200 hover:bg-blue-300"
                     >
-                      <Inbox className="text-pink-600" />
-                      <span>Inbox</span>
+                      <Inbox className="text-blue-600" />
+                      {isHovered && <span>Inbox</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
 
-            <SidebarGroup>
-              <SidebarGroupLabel className="text-pink-500">Audience</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="Contacts"
+                      className="bg-green-200 hover:bg-green-300"
                     >
-                      <Smile className="text-pink-600" />
-                      <span>Contacts</span>
+                      <Smile className="text-green-600" />
+                      {isHovered && <span>Contacts</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                   
                   <SidebarMenuItem>
                     <SidebarMenuButton
                       tooltip="Analytics"
+                      className="bg-yellow-200 hover:bg-yellow-300"
                     >
-                      <BarChart className="text-pink-600" />
-                      <span>Analytics</span>
+                      <BarChart className="text-yellow-600" />
+                      {isHovered && <span>Analytics</span>}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 </SidebarMenu>
@@ -103,9 +103,10 @@ const SMSSidebar = () => {
               <SidebarMenuItem>
                 <SidebarMenuButton
                   tooltip="Settings"
+                  className="bg-gray-200 hover:bg-gray-300"
                 >
-                  <Settings className="text-pink-600" />
-                  <span>Settings</span>
+                  <Settings className="text-gray-600" />
+                  {isHovered && <span>Settings</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
