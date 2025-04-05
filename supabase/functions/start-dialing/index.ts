@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
+// Retrieve Thoughtly API credentials from environment variables
 const THOUGHTLY_API_TOKEN = Deno.env.get('THOUGHTLY_API_TOKEN');
 const THOUGHTLY_TEAM_ID = Deno.env.get('THOUGHTLY_TEAM_ID');
 
@@ -17,12 +18,16 @@ serve(async (req) => {
   }
 
   try {
-    const { leadIds, interviewId, lineCount = 1 } = await req.json();
-    console.log(`Starting AI dialing session for leads: ${leadIds}, interview: ${interviewId}, lines: ${lineCount}`);
+    // Log the environment variables to help debug
+    console.log(`Using Thoughtly API Token: ${THOUGHTLY_API_TOKEN ? '✓ Present' : '✗ Missing'}`);
+    console.log(`Using Thoughtly Team ID: ${THOUGHTLY_TEAM_ID ? '✓ Present' : '✗ Missing'}`);
 
     if (!THOUGHTLY_API_TOKEN || !THOUGHTLY_TEAM_ID) {
-      throw new Error('Thoughtly API credentials not configured');
+      throw new Error('Thoughtly API credentials not configured. Please add THOUGHTLY_API_TOKEN and THOUGHTLY_TEAM_ID to your Edge Function secrets.');
     }
+
+    const { leadIds, interviewId, lineCount = 1 } = await req.json();
+    console.log(`Starting AI dialing session for leads: ${leadIds}, interview: ${interviewId}, lines: ${lineCount}`);
 
     // Step 1: Get all contacts from Thoughtly
     const contacts = await getThoughtlyContacts({
@@ -122,12 +127,14 @@ async function getThoughtlyContacts(params: {
     
     const url = `https://api.thoughtly.com/contact${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
     console.log(`Fetching contacts from: ${url}`);
+    console.log(`Using Thoughtly headers: x-api-token: ${THOUGHTLY_API_TOKEN ? '✓ Present' : '✗ Missing'}, team_id: ${THOUGHTLY_TEAM_ID ? '✓ Present' : '✗ Missing'}`);
     
     const response = await fetch(url, {
       method: 'GET',
       headers: {
         'x-api-token': THOUGHTLY_API_TOKEN!,
-        'team_id': THOUGHTLY_TEAM_ID!
+        'team_id': THOUGHTLY_TEAM_ID!,
+        'Content-Type': 'application/json'
       }
     });
 
@@ -150,6 +157,7 @@ async function getThoughtlyContacts(params: {
 async function callThoughtlyContact(contactId: string, interviewId: string, metadata?: Record<string, any>) {
   try {
     console.log(`Calling contact ${contactId} with interview ${interviewId}`);
+    console.log(`Using Thoughtly headers for call: x-api-token: ${THOUGHTLY_API_TOKEN ? '✓ Present' : '✗ Missing'}, team_id: ${THOUGHTLY_TEAM_ID ? '✓ Present' : '✗ Missing'}`);
     
     const response = await fetch('https://api.thoughtly.com/contact/call', {
       method: 'POST',
