@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { PlusCircle, Search, Filter, Plus, Upload, ChevronDown, Check } from "lucide-react";
+import { PlusCircle, Search, Filter, Plus, Upload, ChevronDown, Check, RefreshCw } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -49,6 +49,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
 import { thoughtlyService } from "@/services/thoughtly";
+import { supabase } from "@/integrations/supabase/client";
 
 const leadsData = [
   {
@@ -254,11 +255,28 @@ const People = () => {
     };
 
     try {
-      await thoughtlyService.createContact(newLead);
+      const response = await fetch(
+        "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            leads: [newLead],
+            leadType: "custom"
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to store lead");
+      }
       
       setLeads([...leads, newLead]);
       setIsAddLeadOpen(false);
       form.reset();
+      toast.success("Lead added successfully");
     } catch (error) {
       console.error("Failed to add lead:", error);
       toast.error("Failed to add lead. Please try again.");
