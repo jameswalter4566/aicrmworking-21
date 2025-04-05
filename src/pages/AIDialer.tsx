@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload, RefreshCw, Loader2 } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload, RefreshCw } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -33,7 +33,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { twilioService } from "@/services/twilio";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
-import { supabase } from "@/integrations/supabase/client";
 
 const defaultLeads = [
   {
@@ -129,16 +128,6 @@ const getDispositionClass = (disposition: string) => {
   }
 };
 
-type CallStatus = 'not-started' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
-
-interface CallProgress {
-  leadId: number;
-  status: CallStatus;
-  startTime: Date;
-  endTime?: Date;
-  notes?: string;
-}
-
 const AIDialer = () => {
   const [leads, setLeads] = useState<ThoughtlyContact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -149,32 +138,15 @@ const AIDialer = () => {
   const [isDialing, setIsDialing] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [dialQueue, setDialQueue] = useState<number[]>([]);
-  const [aiResponses, setAiResponses] = useState<string[]>([]);
+  const [aiResponses, setAiResponses] = useState<string[]>([
+    "Hello, this is AI assistant calling on behalf of SalesPro CRM.",
+    "I'm analyzing the lead's information...",
+    "I see they're interested in property in the downtown area.",
+    "I'll try to schedule a meeting with our agent.",
+  ]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
-  const [callInProgress, setCallInProgress] = useState(false);
-  
-  const [activeCalls, setActiveCalls] = useState<CallProgress[]>([]);
-  const [callLogs, setCallLogs] = useState<string[]>([]);
-  
-  const isAllSelected = leads.length > 0 && selectedLeads.length === leads.length;
-  
-  const handleSelectAllLeads = (checked: boolean) => {
-    if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id!).filter(Boolean));
-    } else {
-      setSelectedLeads([]);
-    }
-  };
-  
-  const handleSelectLead = (leadId: number, checked: boolean) => {
-    if (checked) {
-      setSelectedLeads(prev => [...prev, leadId]);
-    } else {
-      setSelectedLeads(prev => prev.filter(id => id !== leadId));
-    }
-  };
   
   useEffect(() => {
     fetchLeads();
@@ -223,16 +195,6 @@ const AIDialer = () => {
     setIsDialogOpen(true);
   };
 
-  const getLeadNameById = (leadId: number): string => {
-    const lead = leads.find(l => l.id === leadId);
-    return lead ? `${lead.firstName} ${lead.lastName}` : `Lead #${leadId}`;
-  };
-
-  const addLogEntry = (message: string) => {
-    const timestamp = new Date().toLocaleTimeString();
-    setCallLogs(prev => [`[${timestamp}] ${message}`, ...prev]);
-  };
-
   const startDialing = async () => {
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id!)).map(lead => lead.id!)
@@ -241,113 +203,44 @@ const AIDialer = () => {
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
     setIsDialing(true);
-    setCallInProgress(true);
-    setActiveCalls([]);
-    setCallLogs([]);
-    setAiResponses(["Initializing AI Dialer...", "Preparing to make calls..."]);
-    
-    addLogEntry(`Starting AI dialing session with ${lineCount} line(s)`);
     
     toast({
-      title: "Starting AI Dialing Session",
-      description: `Now initializing AI dialing with ${lineCount} line${Number(lineCount) > 1 ? 's' : ''}`,
+      title: "AI Dialing Started",
+      description: `Now dialing ${leadsToDial.length} leads`,
     });
+  };
 
-    try {
-      const { data, error } = await supabase.functions.invoke('start-dialing', {
-        body: {
-          leadIds: leadsToDial,
-          interviewId: "interview_demo_123",
-          lineCount: parseInt(lineCount)
-        }
-      });
-
-      if (error) {
-        console.error("Error starting dialing session:", error);
-        addLogEntry(`Error: ${error.message}`);
-        toast({
-          title: "Error",
-          description: "Failed to start dialing session. Please try again.",
-          variant: "destructive"
-        });
-        setIsDialing(false);
-        setCallInProgress(false);
-        return;
-      }
-
-      console.log("Dialing session started successfully:", data);
-      addLogEntry(`Dialing session started successfully`);
-      
-      if (data.success) {
-        if (data.contacts && data.contacts.length > 0) {
-          const initialBatch = data.callResults.map((result: any) => {
-            const contact = data.contacts.find((c: any) => c.id === result.contactId);
-            return {
-              leadId: Number(result.contactId),
-              status: result.status as CallStatus,
-              startTime: new Date(),
-              notes: contact?.name ? `Calling ${contact.name}` : `Calling lead #${result.contactId}`
-            };
-          });
-          
-          setActiveCalls(initialBatch);
-          
-          if (initialBatch.length > 0) {
-            setActiveCallId(initialBatch[0].leadId);
-            
-            initialBatch.forEach(call => {
-              addLogEntry(`Started call to ${getLeadNameById(call.leadId)}`);
-            });
-            
-            setAiResponses(prev => [
-              ...prev,
-              `AI Dialer initialized successfully`,
-              `Starting calls to ${initialBatch.length} lead(s)`,
-              `Primary call to ${getLeadNameById(initialBatch[0].leadId)} in progress...`,
-              "Analyzing lead information..."
-            ]);
-          }
-          
-          if (data.queuedContacts && data.queuedContacts.length > 0) {
-            addLogEntry(`${data.queuedContacts.length} lead(s) queued for calling`);
-          }
-        } else {
-          addLogEntry("No contacts available to call");
-          toast({
-            title: "Warning",
-            description: "No contacts available to call",
-            variant: "destructive"
-          });
-        }
-      } else {
-        addLogEntry(`Error: ${data.error || "Unknown error starting calls"}`);
-        toast({
-          title: "Warning",
-          description: data.error || "There was an issue starting some calls",
-          variant: "destructive"
-        });
-      }
-    } catch (err) {
-      console.error("Exception during dialing:", err);
-      addLogEntry(`Exception: ${err instanceof Error ? err.message : String(err)}`);
-      toast({
-        title: "Error",
-        description: "There was a problem connecting to the dialing service",
-        variant: "destructive"
-      });
-      setIsDialing(false);
-      setCallInProgress(false);
+  const handleSelectAllLeads = (checked: boolean) => {
+    if (checked) {
+      setSelectedLeads(leads.map(lead => lead.id!));
+    } else {
+      setSelectedLeads([]);
+      setIsImportDialogOpen(false);
     }
   };
+
+  const handleSelectLead = (leadId: number, checked: boolean) => {
+    if (checked) {
+      const newSelectedLeads = [...selectedLeads, leadId];
+      setSelectedLeads(newSelectedLeads);
+      
+      if (newSelectedLeads.length === leads.length) {
+        setIsImportDialogOpen(true);
+      }
+    } else {
+      setSelectedLeads(prev => prev.filter(id => id !== leadId));
+      setIsImportDialogOpen(false);
+    }
+  };
+
+  const isAllSelected = leads.length > 0 && leads.every(lead => 
+    lead.id && selectedLeads.includes(lead.id)
+  );
 
   const endDialingSession = () => {
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
-    setCallInProgress(false);
-    setActiveCalls([]);
-    
-    addLogEntry("Dialing session manually ended by user");
     
     toast({
       title: "Session Ended",
@@ -416,23 +309,6 @@ const AIDialer = () => {
     }
   };
 
-  const getCallStatusBadge = (status: CallStatus) => {
-    switch (status) {
-      case 'in-progress':
-        return <Badge className="bg-green-100 text-green-800">In Progress</Badge>;
-      case 'completed':
-        return <Badge className="bg-blue-100 text-blue-800">Completed</Badge>;
-      case 'failed':
-        return <Badge className="bg-red-100 text-red-800">Failed</Badge>;
-      case 'busy':
-        return <Badge className="bg-yellow-100 text-yellow-800">Busy</Badge>;
-      case 'no-answer':
-        return <Badge className="bg-gray-100 text-gray-800">No Answer</Badge>;
-      default:
-        return <Badge className="bg-purple-100 text-purple-800">Initializing</Badge>;
-    }
-  };
-
   return (
     <MainLayout>
       <div className="flex flex-col h-[calc(100vh-64px)]">
@@ -493,64 +369,6 @@ const AIDialer = () => {
                       </Badge>
                     </div>
                     
-                    <Card className="border rounded-md mb-4">
-                      <CardHeader className="pb-2 pt-3 px-4 border-b">
-                        <CardTitle className="text-sm font-medium flex items-center gap-2">
-                          <PhoneCall className="h-4 w-4 text-crm-blue" />
-                          Active Calls
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-4">
-                        {activeCalls.length > 0 ? (
-                          <div className="space-y-3">
-                            {activeCalls.map((call) => {
-                              const lead = leads.find(l => l.id === call.leadId);
-                              return (
-                                <div 
-                                  key={call.leadId}
-                                  className={`flex items-center justify-between p-3 rounded-md border ${
-                                    activeCallId === call.leadId ? 'bg-blue-50 border-blue-200' : ''
-                                  }`}
-                                  onClick={() => setActiveCallId(call.leadId)}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <Avatar className="h-8 w-8">
-                                      {lead?.avatar ? (
-                                        <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                                      ) : (
-                                        <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                                          {lead?.firstName ? lead.firstName.charAt(0) : '?'}
-                                        </AvatarFallback>
-                                      )}
-                                    </Avatar>
-                                    <div>
-                                      <div className="font-medium">
-                                        {lead ? `${lead.firstName} ${lead.lastName}` : `Lead #${call.leadId}`}
-                                      </div>
-                                      <div className="text-xs text-gray-500">
-                                        {lead?.phone1 || 'No phone number'}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {call.status === 'in-progress' && (
-                                      <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                                    )}
-                                    {getCallStatusBadge(call.status)}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-center text-gray-500 p-4">
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Initializing calls...
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                    
                     <Card className="border rounded-md mb-4 bg-gray-50">
                       <CardHeader className="pb-2 pt-3 px-4 border-b">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -582,21 +400,9 @@ const AIDialer = () => {
                       <CardHeader className="pb-2 pt-3 px-4">
                         <CardTitle className="text-sm font-medium">Activity Log</CardTitle>
                       </CardHeader>
-                      <ScrollArea className="h-[220px] rounded-md">
-                        <div className="p-4">
-                          {callLogs.length > 0 ? (
-                            <div className="space-y-2 text-sm">
-                              {callLogs.map((log, index) => (
-                                <div key={index} className="text-gray-700">
-                                  {log}
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center text-gray-500">
-                              No activity logged yet
-                            </div>
-                          )}
+                      <ScrollArea className="h-[300px] rounded-md">
+                        <div className="p-4 text-center text-gray-500">
+                          No active calls yet
                         </div>
                       </ScrollArea>
                     </Card>
@@ -683,56 +489,43 @@ const AIDialer = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  leads.map((lead) => {
-                    const isActive = activeCallId === lead.id;
-                    const callInfo = activeCalls.find(c => c.leadId === lead.id);
-                    
-                    return (
-                      <TableRow 
-                        key={lead.id} 
-                        className={`
-                          hover:bg-gray-50 
-                          ${isActive ? 'bg-blue-50' : ''}
-                          ${callInfo && callInfo.status === 'in-progress' ? 'animate-pulse' : ''}
-                        `}
-                      >
-                        <TableCell>
-                          <Checkbox 
-                            checked={lead.id ? selectedLeads.includes(lead.id) : false}
-                            onCheckedChange={(checked) => lead.id && handleSelectLead(lead.id, !!checked)}
-                            aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
-                              {lead.disposition || 'Not Contacted'}
-                            </Badge>
-                            {callInfo && (
-                              <span className="ml-2">
-                                {getCallStatusBadge(callInfo.status)}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            {lead.avatar ? (
-                              <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                            ) : (
-                              <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                                {lead.firstName ? lead.firstName.charAt(0) : '?'}
-                              </AvatarFallback>
-                            )}
-                          </Avatar>
-                          <span>{lead.firstName} {lead.lastName}</span>
-                        </TableCell>
-                        <TableCell>{lead.email}</TableCell>
-                        <TableCell>{lead.phone1}</TableCell>
-                        <TableCell>{lead.phone2 || "-"}</TableCell>
-                      </TableRow>
-                    );
-                  })
+                  leads.map((lead) => (
+                    <TableRow 
+                      key={lead.id} 
+                      className={`
+                        hover:bg-gray-50 
+                        ${activeCallId === lead.id ? 'bg-blue-50' : ''}
+                      `}
+                    >
+                      <TableCell>
+                        <Checkbox 
+                          checked={lead.id ? selectedLeads.includes(lead.id) : false}
+                          onCheckedChange={(checked) => lead.id && handleSelectLead(lead.id, !!checked)}
+                          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
+                          {lead.disposition || 'Not Contacted'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                          {lead.avatar ? (
+                            <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                          ) : (
+                            <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
+                              {lead.firstName ? lead.firstName.charAt(0) : '?'}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <span>{lead.firstName} {lead.lastName}</span>
+                      </TableCell>
+                      <TableCell>{lead.email}</TableCell>
+                      <TableCell>{lead.phone1}</TableCell>
+                      <TableCell>{lead.phone2 || "-"}</TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
