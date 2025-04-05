@@ -85,8 +85,6 @@ serve(async (req) => {
         else if (data.event === 'media') {
           // Process incoming audio tracks
           if (data.track === 'inbound' || data.track === 'outbound') {
-            // console.log(`Received media chunk: track=${data.track}, chunk=${data.chunk.length} bytes`);
-            
             // Convert audio data and broadcast to all browser clients
             const audioEvent = {
               event: 'audio',

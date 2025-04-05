@@ -1,6 +1,13 @@
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
+// Define interface for audio chunks in the queue
+interface AudioChunk {
+  track: string;
+  timestamp: number;
+  payload: string;
+}
+
 class TwilioService {
   private device: Device | null = null;
   private connection: any = null;
@@ -17,13 +24,6 @@ class TwilioService {
   private isProcessingAudio: boolean = false;
   private audioBufferArray: Float32Array[] = [];
   private callActive: boolean = false;
-  
-  // Define interface for audio chunks in the queue
-  private interface AudioChunk {
-    track: string;
-    timestamp: number;
-    payload: string;
-  }
   
   constructor() {
     // Create audio element for output testing and call sounds
@@ -368,7 +368,7 @@ class TwilioService {
         }
         
         // Monitor incoming and outgoing audio
-        conn.volume((inputVolume, outputVolume) => {
+        conn.volume((inputVolume: number, outputVolume: number) => {
           console.log(`Audio levels - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
           
           if (outputVolume < 0.01) {
@@ -376,7 +376,7 @@ class TwilioService {
           }
         });
         
-        conn.on('warning', (warning) => {
+        conn.on('warning', (warning: any) => {
           console.warn('Connection warning:', warning.message);
         });
       });
@@ -392,7 +392,7 @@ class TwilioService {
         console.log('Twilio device is offline');
       });
       
-      this.device.on('incoming', (conn) => {
+      this.device.on('incoming', (conn: any) => {
         console.log('Incoming call detected');
         this.playSound('ringtone');
       });
@@ -503,13 +503,13 @@ class TwilioService {
           this.callActive = true;
           
           // Set up connection event listeners for audio monitoring
-          this.connection.on('volume', (inputVol, outputVol) => {
+          this.connection.on('volume', (inputVol: number, outputVol: number) => {
             if (outputVol > 0.01) {
               console.log(`AUDIO ACTIVE - Input: ${inputVol.toFixed(2)}, Output: ${outputVol.toFixed(2)}`);
             }
           });
           
-          this.connection.on('warning', (warning) => {
+          this.connection.on('warning', (warning: any) => {
             console.warn('Connection warning:', warning.message);
             // Try to recover from warnings when possible
             if (warning.message.includes('audio input')) {
@@ -565,7 +565,7 @@ class TwilioService {
       }
       
       return { success: true, callSid: result.callSid, usingBrowser: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error making call:', error);
       return { success: false, error: error.message || "An unknown error occurred" };
     }
@@ -745,13 +745,6 @@ class TwilioService {
       return false;
     }
   }
-}
-
-// Define the AudioChunk interface properly outside the class
-interface AudioChunk {
-  track: string;
-  timestamp: number;
-  payload: string;
 }
 
 export const twilioService = new TwilioService();
