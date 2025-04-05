@@ -18,7 +18,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
   SidebarRail,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
@@ -30,7 +29,7 @@ const SMSSidebar = () => {
     <div className="h-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}>
-      <Sidebar variant="floating" className="bg-pink-50">
+      <Sidebar variant="floating" className="bg-pink-50 visible">
         <SidebarRail />
         <SidebarHeader className="border-b border-pink-100">
           <div className="flex items-center justify-between px-4 pt-1">
