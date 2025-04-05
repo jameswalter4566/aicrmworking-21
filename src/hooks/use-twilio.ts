@@ -9,6 +9,7 @@ export interface ActiveCall {
   status: 'connecting' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   leadId: string | number;
   isMuted?: boolean;
+  usingBrowser?: boolean;
 }
 
 export const useTwilio = () => {
@@ -84,12 +85,18 @@ export const useTwilio = () => {
   }, []);
 
   // Function to start monitoring call status
-  const monitorCallStatus = useCallback((leadId: string | number, callSid: string) => {
+  const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = false) => {
     const leadIdStr = String(leadId);
     
     // Clear any existing interval for this lead
     if (statusCheckIntervals.current[leadIdStr]) {
       clearInterval(statusCheckIntervals.current[leadIdStr]);
+    }
+    
+    // For browser-based calls, we'll get events directly from the device
+    if (usingBrowser) {
+      console.log("Using browser events for call monitoring");
+      return;
     }
     
     // Set up a new interval to check call status every 3 seconds
@@ -204,17 +211,18 @@ export const useTwilio = () => {
           phoneNumber,
           status: 'connecting',
           leadId,
-          isMuted: false
+          isMuted: false,
+          usingBrowser: result.usingBrowser
         }
       }));
       
       toast({
         title: "Dialing",
-        description: `Calling ${phoneNumber}...`,
+        description: `Calling ${phoneNumber}...${result.usingBrowser ? ' (using browser audio)' : ''}`,
       });
       
       // Start monitoring the call status
-      monitorCallStatus(leadId, result.callSid);
+      monitorCallStatus(leadId, result.callSid, result.usingBrowser);
     } else {
       toast({
         title: "Call Failed",

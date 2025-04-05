@@ -83,15 +83,22 @@ serve(async (req) => {
 
     const voiceGrant = new VoiceGrant({
       outgoingApplicationSid: TWILIO_TWIML_APP_SID,
-      incomingAllow: true
+      incomingAllow: true // Allow incoming calls
     })
 
     accessToken.addGrant(voiceGrant)
     const token = accessToken.toJwt()
     console.log("Token generated successfully")
 
+    // Also return the Twilio TwiML Application SID to help with call setup
     return new Response(
-      JSON.stringify({ token, success: true }),
+      JSON.stringify({ 
+        token, 
+        identity,
+        twilioAppSid: TWILIO_TWIML_APP_SID,
+        twilioPhoneNumber: TWILIO_PHONE_NUMBER,
+        success: true 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error) {

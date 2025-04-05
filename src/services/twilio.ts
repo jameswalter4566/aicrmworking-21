@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -9,6 +8,7 @@ class TwilioService {
   private analyser: AnalyserNode | null = null;
   private microphone: MediaStreamAudioSourceNode | null = null;
   private microphoneInitialized: boolean = false;
+  private supabaseUrl: string = "https://imrmboyczebjlbnkgjns.supabase.co";
   
   async initializeAudioContext() {
     try {
@@ -28,6 +28,7 @@ class TwilioService {
       this.microphone.connect(this.analyser);
       
       this.microphoneInitialized = true;
+      console.log("Audio context initialized successfully");
       return true;
     } catch (error) {
       console.error('Error initializing audio context:', error);
@@ -50,7 +51,7 @@ class TwilioService {
   async initializeTwilioDevice() {
     try {
       // Fetch token from your backend
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/twilio-token`, {
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -74,6 +75,16 @@ class TwilioService {
       
       this.device.on('error', (error) => {
         console.error('Twilio device error:', error);
+      });
+      
+      this.device.on('connect', (conn) => {
+        console.log('Call connected');
+        this.connection = conn;
+      });
+      
+      this.device.on('disconnect', () => {
+        console.log('Call disconnected');
+        this.connection = null;
       });
       
       // Initialize the device with the token
@@ -122,25 +133,35 @@ class TwilioService {
         return { success: false, error: "Invalid phone number format" };
       }
       
-      // Get the Twilio phone configuration
-      const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-      const configResponse = await fetch(`${supabaseUrl}/functions/v1/twilio-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ action: 'getConfig' })
-      });
-      
-      const config = await configResponse.json();
-      
-      if (!config.success || !config.twilioPhoneNumber) {
-        console.error("Failed to get Twilio configuration");
-        return { success: false, error: "Failed to get Twilio configuration" };
+      // Method 1: Use Twilio Device in the browser if available
+      if (this.device && this.device.status() === 'ready') {
+        try {
+          console.log("Using Twilio Device for browser-based calling");
+          this.connection = await this.device.connect({
+            To: formattedPhoneNumber
+          });
+          
+          // Set up connection event listeners
+          this.connection.on('disconnect', () => {
+            this.connection = null;
+            console.log('Call ended');
+          });
+          
+          return { 
+            success: true, 
+            callSid: this.connection.parameters.CallSid,
+            usingBrowser: true 
+          };
+        } catch (deviceError) {
+          console.warn("Device connection failed, falling back to REST API call", deviceError);
+        }
       }
       
+      // Method 2: Fall back to Twilio REST API if browser Device is not available or fails
+      console.log("Falling back to REST API for calling");
+      
       // Call the twilio-voice function to make the call
-      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -165,25 +186,7 @@ class TwilioService {
         return { success: false, error: result.error || "Failed to make call" };
       }
       
-      // If we're using the browser client, connect
-      if (this.device && this.device.status() === 'ready') {
-        try {
-          this.connection = await this.device.connect({
-            To: formattedPhoneNumber
-          });
-          
-          // Set up connection event listeners
-          this.connection.on('disconnect', () => {
-            this.connection = null;
-            console.log('Call ended');
-          });
-        } catch (deviceError) {
-          console.warn("Device connection failed, but REST API call was successful", deviceError);
-          // Even if the device connection fails, the call might still be active via REST API
-        }
-      }
-      
-      return { success: true, callSid: result.callSid };
+      return { success: true, callSid: result.callSid, usingBrowser: false };
     } catch (error) {
       console.error('Error making call:', error);
       return { success: false, error: error.message || "An unknown error occurred" };
@@ -192,9 +195,13 @@ class TwilioService {
   
   async checkCallStatus(callSid: string) {
     try {
-      // Check the status of an existing call
-      const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
+      // If we have an active browser connection, use that status
+      if (this.connection && this.connection.parameters.CallSid === callSid) {
+        return this.connection.status();
+      }
+      
+      // Otherwise check the status via the API
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -220,10 +227,11 @@ class TwilioService {
   
   async endCall() {
     try {
-      // End the current call (if any)
+      // End the browser-based call if active
       if (this.connection) {
         this.connection.disconnect();
         this.connection = null;
+        return true;
       }
       
       return true;

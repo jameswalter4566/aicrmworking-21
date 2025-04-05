@@ -62,6 +62,7 @@ serve(async (req) => {
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID')
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN')
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER')
+    const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID')
     
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
       console.error("Missing required Twilio credentials")
@@ -108,7 +109,12 @@ serve(async (req) => {
         const call = await client.calls.create({
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          twiml: '<Response><Say>Hello, this is a call from SalesPro CRM. We are calling to check in with you. One of our representatives will be with you shortly.</Say></Response>'
+          // Use the Twilio application instead of static TwiML
+          applicationSid: TWILIO_TWIML_APP_SID,
+          // This helps link the browser client with the outgoing call
+          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
+          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+          statusCallbackMethod: 'POST',
         })
         
         console.log("Call created successfully:", call.sid)
@@ -127,6 +133,25 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+    } else if (action === 'handleVoice') {
+      // Process incoming voice requests from Twilio (for browser-phone connections)
+      console.log("Handling Voice Request")
+      const twimlResponse = new twilio.twiml.VoiceResponse()
+      const dial = twimlResponse.dial({
+        callerId: TWILIO_PHONE_NUMBER,
+      })
+      
+      // Get the phone number from the request parameters for outbound calls
+      const to = (requestData as any).To || phoneNumber
+      if (to) {
+        const formattedNumber = normalizePhoneNumber(to)
+        dial.number(formattedNumber)
+      }
+      
+      return new Response(
+        twimlResponse.toString(),
+        { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+      )
     } else if (action === 'checkStatus') {
       const { callSid } = requestData as { callSid?: string }
       
@@ -187,6 +212,13 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
+    } else if (action === 'statusCallback') {
+      // Handle status callbacks from Twilio
+      console.log("Status callback received:", requestData)
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     } else {
       return new Response(
         JSON.stringify({ error: 'Invalid action' }),
