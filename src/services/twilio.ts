@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -19,7 +18,7 @@ class TwilioService {
   private audioBufferArray: Float32Array[] = [];
   private callActive: boolean = false;
   
-  // Structure for audio chunks in the queue
+  // Define interface for audio chunks in the queue
   private interface AudioChunk {
     track: string;
     timestamp: number;
@@ -497,8 +496,7 @@ class TwilioService {
           
           // Use the correct connection format expected by the Device API
           this.connection = await this.device.connect({
-            To: formattedPhoneNumber,
-            browser: true // Signal browser-based audio
+            To: formattedPhoneNumber
           });
           
           console.log("Call connection established:", this.connection.parameters);
@@ -747,6 +745,13 @@ class TwilioService {
       return false;
     }
   }
+}
+
+// Define the AudioChunk interface properly outside the class
+interface AudioChunk {
+  track: string;
+  timestamp: number;
+  payload: string;
 }
 
 export const twilioService = new TwilioService();

@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -23,13 +22,11 @@ export const useTwilio = () => {
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
 
-  // Initialize Twilio on component mount
   useEffect(() => {
     const initializeTwilio = async () => {
       setIsLoading(true);
       try {
         console.log("Initializing Twilio service...");
-        // First, try to initialize the audio context
         const micAccess = await twilioService.initializeAudioContext();
         if (!micAccess) {
           toast({
@@ -42,7 +39,6 @@ export const useTwilio = () => {
         
         setMicrophoneActive(true);
         
-        // Test audio output to ensure speakers are working
         const audioTest = await twilioService.testAudioOutput();
         setAudioTested(audioTest);
         
@@ -54,7 +50,6 @@ export const useTwilio = () => {
           });
         }
 
-        // Then, initialize the Twilio device
         console.log("Initializing Twilio device...");
         const deviceInitialized = await twilioService.initializeTwilioDevice();
         setInitialized(deviceInitialized);
@@ -85,14 +80,12 @@ export const useTwilio = () => {
 
     initializeTwilio();
 
-    // Set up audio monitoring interval
     audioCheckInterval.current = window.setInterval(() => {
       const isActive = twilioService.isMicrophoneActive();
       setMicrophoneActive(isActive);
     }, 3000);
 
     return () => {
-      // Cleanup all intervals
       if (audioCheckInterval.current) {
         clearInterval(audioCheckInterval.current);
       }
@@ -105,26 +98,20 @@ export const useTwilio = () => {
     };
   }, []);
 
-  // Function to start monitoring call status with enhanced audio detection
   const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = false) => {
     const leadIdStr = String(leadId);
     
-    // Clear any existing interval for this lead
     if (statusCheckIntervals.current[leadIdStr]) {
       clearInterval(statusCheckIntervals.current[leadIdStr]);
     }
     
-    // For browser-based calls, we use connection events but still poll for status
     console.log(`Setting up call monitoring for ${usingBrowser ? 'browser' : 'REST API'} call: ${callSid}`);
     
-    // Set up a new interval to check call status
     const intervalId = window.setInterval(async () => {
       try {
-        // Check for active audio for browser-based calls
         if (usingBrowser) {
           const isAudioActive = twilioService.isMicrophoneActive();
           
-          // Update audio active status
           setActiveCalls(prev => {
             if (!prev[leadIdStr]) return prev;
             
@@ -137,21 +124,17 @@ export const useTwilio = () => {
             };
           });
           
-          // If we're using browser audio but there's been no audio for a while, warn the user
           if (!isAudioActive && activeCalls[leadIdStr]?.status === 'in-progress') {
             console.warn("Call is active but no audio detected - possible audio issues");
           }
         }
         
-        // Always check status from the server to ensure consistency
         const status = await twilioService.checkCallStatus(callSid);
         
         if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
-          // Call has ended, clear the interval
           clearInterval(statusCheckIntervals.current[leadIdStr]);
           delete statusCheckIntervals.current[leadIdStr];
           
-          // Update the call status
           setActiveCalls(prev => {
             if (!prev[leadIdStr]) return prev;
             
@@ -164,7 +147,6 @@ export const useTwilio = () => {
             };
           });
           
-          // Show toast based on the status
           switch(status) {
             case "completed":
               toast({
@@ -194,7 +176,6 @@ export const useTwilio = () => {
               });
           }
         } else if (status === "in-progress" && activeCalls[leadIdStr]?.status !== "in-progress") {
-          // Update to in-progress if it wasn't already
           setActiveCalls(prev => ({
             ...prev,
             [leadIdStr]: {
@@ -208,7 +189,6 @@ export const useTwilio = () => {
             description: `Call is now in progress. You should hear audio${usingBrowser ? " through your browser" : ""}.`,
           });
           
-          // For browser calls, remind about audio permissions if needed
           if (usingBrowser && !microphoneActive) {
             toast({
               title: "Audio Check",
@@ -220,7 +200,7 @@ export const useTwilio = () => {
       } catch (error) {
         console.error(`Error monitoring call ${callSid}:`, error);
       }
-    }, 2000); // Check more frequently for better user experience
+    }, 2000);
     
     statusCheckIntervals.current[leadIdStr] = intervalId;
   }, [activeCalls, microphoneActive]);
@@ -235,17 +215,14 @@ export const useTwilio = () => {
       return { success: false };
     }
     
-    // Re-check microphone just before making call
     if (!twilioService.isMicrophoneActive()) {
       toast({
         title: "Microphone Check",
         description: "Checking microphone access before placing call...",
       });
       
-      // Try to reinitialize audio
       await twilioService.initializeAudioContext();
       
-      // Check again after initialization attempt
       if (!twilioService.isMicrophoneActive()) {
         toast({
           title: "Microphone Inactive",
@@ -255,7 +232,6 @@ export const useTwilio = () => {
       }
     }
 
-    // Make the actual call
     console.log(`Placing call to ${phoneNumber}`);
     const result = await twilioService.makeCall(phoneNumber);
     
@@ -281,7 +257,6 @@ export const useTwilio = () => {
         description: `Calling ${phoneNumber}...${result.usingBrowser ? ' (using browser audio)' : ''}`,
       });
       
-      // Start monitoring the call status
       monitorCallStatus(leadId, result.callSid, result.usingBrowser);
     } else {
       toast({
@@ -298,16 +273,13 @@ export const useTwilio = () => {
     const leadIdStr = String(leadId);
     
     if (activeCalls[leadIdStr]) {
-      // Stop monitoring this call
       if (statusCheckIntervals.current[leadIdStr]) {
         clearInterval(statusCheckIntervals.current[leadIdStr]);
         delete statusCheckIntervals.current[leadIdStr];
       }
       
-      // End the call
       await twilioService.endCall();
       
-      // Remove from active calls
       setActiveCalls(prev => {
         const newCalls = {...prev};
         delete newCalls[leadIdStr];
@@ -326,13 +298,11 @@ export const useTwilio = () => {
   }, [activeCalls]);
 
   const endAllCalls = useCallback(async () => {
-    // Stop all monitoring
     Object.values(statusCheckIntervals.current).forEach(intervalId => {
       clearInterval(intervalId);
     });
     statusCheckIntervals.current = {};
     
-    // End all calls
     await twilioService.endCall();
     setActiveCalls({});
     
@@ -341,7 +311,7 @@ export const useTwilio = () => {
       description: `All active calls have been disconnected.`,
     });
   }, []);
-  
+
   const toggleMute = useCallback((leadId: string | number, mute?: boolean) => {
     const leadIdStr = String(leadId);
     
@@ -349,7 +319,6 @@ export const useTwilio = () => {
       return false;
     }
     
-    // If mute is not provided, toggle the current state
     const shouldMute = mute !== undefined ? mute : !activeCalls[leadIdStr].isMuted;
     
     const success = twilioService.toggleMute(shouldMute);
@@ -371,7 +340,7 @@ export const useTwilio = () => {
     
     return success;
   }, [activeCalls]);
-  
+
   const toggleSpeaker = useCallback((leadId: string | number, speakerOn?: boolean) => {
     const leadIdStr = String(leadId);
     
@@ -379,7 +348,6 @@ export const useTwilio = () => {
       return false;
     }
     
-    // If speakerOn is not provided, toggle the current state
     const shouldUseSpeaker = speakerOn !== undefined ? speakerOn : !activeCalls[leadIdStr].speakerOn;
     
     const success = twilioService.toggleSpeaker(shouldUseSpeaker);
