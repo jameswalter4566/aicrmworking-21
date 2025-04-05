@@ -94,27 +94,11 @@ export const thoughtlyService = {
     limit?: number;
   }) {
     try {
-      // Convert search params to a URLSearchParams object
-      const searchParams = new URLSearchParams();
+      console.log('Getting contacts from Thoughtly with params:', params);
       
-      if (params) {
-        Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined) {
-            if (Array.isArray(value)) {
-              value.forEach(item => searchParams.append(key, String(item)));
-            } else {
-              searchParams.append(key, String(value));
-            }
-          }
-        });
-      }
-      
-      // Modify the function invoke to pass search parameters in the body
-      const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
-        body: {
-          action: 'getContacts',
-          searchParams: searchParams.toString()
-        }
+      // Use the dedicated thoughtly-get-contacts edge function
+      const { data, error } = await supabase.functions.invoke('thoughtly-get-contacts', {
+        body: params || {}
       });
 
       if (error) {
@@ -122,10 +106,53 @@ export const thoughtlyService = {
         throw error;
       }
 
+      if (!data.success) {
+        console.error('Error getting contacts from Thoughtly:', data.error);
+        throw new Error(data.error || 'Failed to get contacts from Thoughtly');
+      }
+
       console.log('Retrieved contacts from Thoughtly:', data);
       return data.data || [];
     } catch (error) {
       console.error('Error in getContacts:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Call contacts using Thoughtly AI
+   * @param contacts Array of contact IDs to call
+   * @param interviewId ID of the interview/agent to use
+   * @param metadata Additional metadata for the call
+   * @returns Summary of call attempts
+   */
+  async callContacts(contacts: string[] | any[], interviewId: string, metadata: Record<string, any> = {}) {
+    try {
+      console.log(`Calling ${contacts.length} contacts with interview ID: ${interviewId}`);
+      
+      // Use the dedicated thoughtly-call-contacts edge function
+      const { data, error } = await supabase.functions.invoke('thoughtly-call-contacts', {
+        body: {
+          contacts: contacts,
+          interview_id: interviewId,
+          metadata: metadata
+        }
+      });
+
+      if (error) {
+        console.error('Error calling contacts through Thoughtly:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('Error calling contacts through Thoughtly:', data.error);
+        throw new Error(data.error || 'Failed to call contacts through Thoughtly');
+      }
+
+      console.log('Call results from Thoughtly:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in callContacts:', error);
       throw error;
     }
   },

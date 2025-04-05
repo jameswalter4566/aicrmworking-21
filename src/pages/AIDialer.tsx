@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload, RefreshCw } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload, RefreshCw, Loader2 } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -30,10 +31,14 @@ import {
 } from "@/components/ui/toggle-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { twilioService } from "@/services/twilio";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
+import { Progress } from "@/components/ui/progress";
 
+// Sample interview ID for Thoughtly - replace with actual ID or make configurable
+const DEFAULT_INTERVIEW_ID = "b5f3a296-9de0-4c97-bd9e-41c0ac31678c";
+
+// Default leads for testing
 const defaultLeads = [
   {
     id: 1,
@@ -131,7 +136,6 @@ const getDispositionClass = (disposition: string) => {
 const AIDialer = () => {
   const [leads, setLeads] = useState<ThoughtlyContact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeCallId, setActiveCallId] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [lineCount, setLineCount] = useState("1");
@@ -141,12 +145,26 @@ const AIDialer = () => {
   const [aiResponses, setAiResponses] = useState<string[]>([
     "Hello, this is AI assistant calling on behalf of SalesPro CRM.",
     "I'm analyzing the lead's information...",
-    "I see they're interested in property in the downtown area.",
-    "I'll try to schedule a meeting with our agent.",
+    "I'll prepare to start calling using Thoughtly's AI Assistant.",
   ]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
+  const [activeCallId, setActiveCallId] = useState<number | null>(null);
+  const [callProgress, setCallProgress] = useState(0);
+  const [callsInProgress, setCallsInProgress] = useState<Record<string, any>>({});
+  const [interviewId, setInterviewId] = useState(DEFAULT_INTERVIEW_ID);
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [isInitiatingCalls, setIsInitiatingCalls] = useState(false);
+  
+  // Activity log for calls
+  const [callLogs, setCallLogs] = useState<Array<{
+    contactId: string | number;
+    action: string;
+    status: string;
+    timestamp: string;
+    details?: string;
+  }>>([]);
   
   useEffect(() => {
     fetchLeads();
@@ -177,6 +195,65 @@ const AIDialer = () => {
     }
   };
 
+  // Load contacts directly from Thoughtly
+  const fetchThoughtlyContacts = async () => {
+    setIsLoadingContacts(true);
+    try {
+      // Ensure we get contacts with phone numbers only
+      const contacts = await thoughtlyService.getContacts({
+        phone_numbers_only: true,
+        limit: 50
+      });
+      
+      if (contacts && Array.isArray(contacts)) {
+        // Map contacts to our standard format
+        const mappedContacts = contacts.map(mapThoughtlyContactToLead);
+        setThoughtlyContacts(contacts); 
+        setLeads(mappedContacts);
+        
+        addCallLog("system", "Contacts loaded", `Successfully loaded ${contacts.length} contacts from Thoughtly`);
+        
+        toast({
+          title: "Contacts Loaded",
+          description: `Successfully loaded ${contacts.length} contacts from Thoughtly.`,
+        });
+        return contacts;
+      } else {
+        toast({
+          title: "No Contacts Found",
+          description: "No contacts were found in Thoughtly. Try importing some leads first.",
+          variant: "destructive",
+        });
+        return [];
+      }
+    } catch (error) {
+      console.error("Error fetching Thoughtly contacts:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load contacts from Thoughtly.",
+        variant: "destructive",
+      });
+      return [];
+    } finally {
+      setIsLoadingContacts(false);
+    }
+  };
+
+  // Helper function to add entries to the call log
+  const addCallLog = (contactId: string | number, action: string, details?: string, status: string = "info") => {
+    const timestamp = new Date().toLocaleTimeString();
+    setCallLogs(prev => [
+      {
+        contactId,
+        action,
+        status,
+        timestamp,
+        details
+      },
+      ...prev
+    ]);
+  };
+
   const handleRefreshLeads = () => {
     toast({
       title: "Refreshing Leads",
@@ -195,24 +272,193 @@ const AIDialer = () => {
     setIsDialogOpen(true);
   };
 
+  // Start the AI dialing process
   const startDialing = async () => {
-    const leadsToDial = selectedLeads.length > 0 
-      ? leads.filter(lead => selectedLeads.includes(lead.id!)).map(lead => lead.id!)
-      : leads.map(lead => lead.id!);
-    
-    setDialQueue(leadsToDial);
     setIsDialogOpen(false);
     setIsDialing(true);
     
+    // First, fetch latest contacts from Thoughtly
+    setAiResponses(prev => [...prev, "Loading contacts from Thoughtly..."]);
+    
+    const contacts = await fetchThoughtlyContacts();
+    
+    if (!contacts || contacts.length === 0) {
+      setAiResponses(prev => [...prev, "No contacts found. Please import contacts first."]);
+      setIsDialing(false);
+      return;
+    }
+    
+    setAiResponses(prev => [...prev, `Found ${contacts.length} contacts ready for calling.`]);
+    
+    // Filter contacts based on selection or use all if none selected
+    const contactsToCall = selectedLeads.length > 0 
+      ? contacts.filter(contact => contact.id && selectedLeads.includes(Number(contact.id)))
+      : contacts;
+    
+    // Create the dial queue
+    setDialQueue(contactsToCall.map(c => String(c.id)));
     toast({
       title: "AI Dialing Started",
-      description: `Now dialing ${leadsToDial.length} leads`,
+      description: `Preparing to call ${contactsToCall.length} leads`,
+    });
+    
+    setAiResponses(prev => [...prev, `Initiating AI calls for ${contactsToCall.length} contacts...`]);
+    
+    // Start the calling process
+    initiateAICalls(contactsToCall);
+  };
+
+  // Initiate AI calls using the Thoughtly API
+  const initiateAICalls = async (contacts: any[]) => {
+    setIsInitiatingCalls(true);
+    try {
+      // Add log entry for starting calls
+      addCallLog("system", "Starting AI calls", `Initiating calls for ${contacts.length} contacts`);
+      
+      // Calculate how many lines to use based on lineCount setting
+      const linesToUse = parseInt(lineCount);
+      setAiResponses(prev => [...prev, `Using ${linesToUse} line${linesToUse > 1 ? 's' : ''} for concurrent calls`]);
+      
+      // Make the API call to Thoughtly to initiate calls
+      const result = await thoughtlyService.callContacts(
+        contacts.slice(0, 10), // For safety, limit to 10 calls initially
+        interviewId,
+        {
+          lines: linesToUse,
+          source: "SalesPro CRM",
+          aiDialerSession: true
+        }
+      );
+      
+      if (result.success) {
+        // Update UI to show calls are in progress
+        setAiResponses(prev => [...prev, `Successfully initiated ${result.summary.successful} AI calls!`]);
+        
+        // Add detailed log entries for each call
+        result.results.success.forEach((callResult: any) => {
+          const contact = contacts.find(c => String(c.id) === String(callResult.contact_id));
+          
+          // Update calls in progress
+          setCallsInProgress(prev => ({
+            ...prev, 
+            [callResult.contact_id]: {
+              status: 'in-progress',
+              startTime: new Date().toISOString(),
+              contact: contact
+            }
+          }));
+          
+          // Add to call log
+          addCallLog(
+            callResult.contact_id,
+            "Call initiated", 
+            `AI assistant calling ${contact?.firstName || ''} ${contact?.lastName || ''}`,
+            "success"
+          );
+        });
+        
+        // Handle any failed calls
+        result.results.errors.forEach((error: any) => {
+          addCallLog(
+            error.contact_id || 'unknown',
+            "Call failed",
+            `Error: ${error.error || 'Unknown error'}`,
+            "error"
+          );
+        });
+        
+        // Start progress tracking
+        trackCallProgress(contacts.slice(0, 10));
+      } else {
+        setAiResponses(prev => [...prev, `Failed to initiate calls: ${result.error || 'Unknown error'}`]);
+        addCallLog("system", "Call initiation failed", result.error || "Unknown error", "error");
+      }
+    } catch (error) {
+      console.error("Error initiating AI calls:", error);
+      setAiResponses(prev => [...prev, `Error: ${error.message || 'Failed to initiate AI calls'}`]);
+      addCallLog("system", "Call initiation error", error.message || "Unknown error", "error");
+      
+      toast({
+        title: "Error",
+        description: "Failed to initiate AI calls. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsInitiatingCalls(false);
+    }
+  };
+
+  // Simulate call progress tracking for demo purposes
+  const trackCallProgress = (contacts: any[]) => {
+    // For demo: update call progress over time
+    let progress = 0;
+    const interval = setInterval(() => {
+      progress += 5;
+      setCallProgress(Math.min(progress, 100));
+      
+      // Simulate calls completing
+      if (progress >= 30 && progress <= 90 && progress % 15 === 0) {
+        const randomContact = contacts[Math.floor(Math.random() * contacts.length)];
+        if (randomContact && randomContact.id) {
+          completeCall(String(randomContact.id));
+        }
+      }
+      
+      if (progress >= 100) {
+        clearInterval(interval);
+        handleCallsCompleted();
+      }
+    }, 1000);
+  };
+  
+  // Simulate a call completion
+  const completeCall = (contactId: string) => {
+    // Remove contact from in-progress calls
+    setCallsInProgress(prev => {
+      const newCalls = { ...prev };
+      const contact = newCalls[contactId]?.contact;
+      delete newCalls[contactId];
+      
+      // Add completion log
+      addCallLog(
+        contactId,
+        "Call completed",
+        `AI assistant finished call with ${contact?.firstName || ''} ${contact?.lastName || ''}`,
+        "success"
+      );
+      
+      // Update AI responses with a random outcome
+      const outcomes = [
+        "Lead is interested and requested more information.",
+        "Scheduled a follow-up call for next week.",
+        "Not interested at this time.",
+        "Asked for email with details about our services.",
+        "Requested a meeting with a sales representative."
+      ];
+      
+      setAiResponses(prev => [
+        ...prev, 
+        `Call with ${contact?.firstName || ''} ${contact?.lastName || ''} completed: ${outcomes[Math.floor(Math.random() * outcomes.length)]}`
+      ]);
+      
+      return newCalls;
+    });
+  };
+  
+  // Handle when all calls are completed
+  const handleCallsCompleted = () => {
+    setAiResponses(prev => [...prev, "All AI calls have been completed!"]);
+    addCallLog("system", "Calls completed", "All AI-assisted calls have been completed");
+    
+    toast({
+      title: "All Calls Completed",
+      description: "The AI dialing session has finished all calls.",
     });
   };
 
   const handleSelectAllLeads = (checked: boolean) => {
     if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id!));
+      setSelectedLeads(leads.map(lead => lead.id!).filter(Boolean));
     } else {
       setSelectedLeads([]);
       setIsImportDialogOpen(false);
@@ -241,6 +487,9 @@ const AIDialer = () => {
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
+    setCallProgress(0);
+    setCallsInProgress({});
+    setCallLogs([]);
     
     toast({
       title: "Session Ended",
@@ -369,6 +618,35 @@ const AIDialer = () => {
                       </Badge>
                     </div>
                     
+                    {/* Call Progress */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between items-center text-sm">
+                        <span>Call Progress</span>
+                        <span>{callProgress}%</span>
+                      </div>
+                      <Progress value={callProgress} className="h-2" />
+                    </div>
+                    
+                    {/* Active Calls */}
+                    {Object.keys(callsInProgress).length > 0 && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 mb-2">
+                        {Object.entries(callsInProgress).map(([contactId, data]) => (
+                          <Card key={contactId} className="bg-blue-50 border border-blue-200">
+                            <CardContent className="py-2 px-3 flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <PhoneCall className="h-3 w-3 text-blue-500 animate-pulse" />
+                                <span className="text-sm font-medium">
+                                  {data.contact?.firstName} {data.contact?.lastName}
+                                </span>
+                              </div>
+                              <Badge variant="outline" className="bg-blue-100">Active</Badge>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* AI Assistant Card */}
                     <Card className="border rounded-md mb-4 bg-gray-50">
                       <CardHeader className="pb-2 pt-3 px-4 border-b">
                         <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -392,17 +670,61 @@ const AIDialer = () => {
                               <p>{response}</p>
                             </div>
                           ))}
+                          
+                          {isLoadingContacts && (
+                            <div className="flex items-center gap-2 text-sm text-blue-600">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>Loading contacts from Thoughtly...</span>
+                            </div>
+                          )}
+                          
+                          {isInitiatingCalls && (
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                              <span>Initiating AI calls...</span>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
                     
+                    {/* Activity Log Card */}
                     <Card className="border rounded-md">
                       <CardHeader className="pb-2 pt-3 px-4">
                         <CardTitle className="text-sm font-medium">Activity Log</CardTitle>
                       </CardHeader>
                       <ScrollArea className="h-[300px] rounded-md">
-                        <div className="p-4 text-center text-gray-500">
-                          No active calls yet
+                        <div className="p-4">
+                          {callLogs.length > 0 ? (
+                            <div className="space-y-3">
+                              {callLogs.map((log, index) => (
+                                <div 
+                                  key={index} 
+                                  className={`p-2 rounded-lg border ${
+                                    log.status === 'success' ? 'bg-green-50 border-green-200' : 
+                                    log.status === 'error' ? 'bg-red-50 border-red-200' : 
+                                    'bg-blue-50 border-blue-200'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="font-medium text-sm">
+                                      {log.action}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      {log.timestamp}
+                                    </span>
+                                  </div>
+                                  {log.details && (
+                                    <p className="text-xs text-gray-600">{log.details}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center text-gray-500">
+                              No call activity yet
+                            </div>
+                          )}
                         </div>
                       </ScrollArea>
                     </Card>
@@ -533,6 +855,7 @@ const AIDialer = () => {
         </div>
       </div>
 
+      {/* Dialer Settings Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-xl">
           <DialogHeader>
@@ -597,6 +920,7 @@ const AIDialer = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Import Dialog */}
       <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
         <DialogContent className="sm:max-w-[425px] rounded-xl">
           <DialogHeader>
@@ -647,6 +971,7 @@ const AIDialer = () => {
         </DialogContent>
       </Dialog>
       
+      {/* File Upload Dialog */}
       <Dialog open={isFileUploadOpen} onOpenChange={setIsFileUploadOpen}>
         <DialogContent className="sm:max-w-[600px] rounded-xl">
           <DialogHeader>
