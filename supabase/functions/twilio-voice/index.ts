@@ -34,6 +34,8 @@ function normalizePhoneNumber(phoneNumber: string): string {
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Voice function`)
+  console.log(`Request URL: ${req.url}`)
+  console.log(`Headers: ${JSON.stringify([...req.headers.entries()])}`)
   
   // Handle preflight requests properly
   if (req.method === 'OPTIONS') {
@@ -85,7 +87,6 @@ serve(async (req) => {
       
       // Always check URL query parameters and merge them
       const url = new URL(req.url);
-      console.log(`Request URL: ${req.url}`)
       for (const [key, value] of url.searchParams.entries()) {
         if (!requestData[key]) {
           requestData[key] = value;
@@ -101,7 +102,8 @@ serve(async (req) => {
       );
     }
 
-    // Get Twilio credentials
+    // Get Twilio credentials - added extra logging to trace issues
+    console.log("Attempting to retrieve Twilio credentials from environment");
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
@@ -122,7 +124,17 @@ serve(async (req) => {
       );
     }
 
-    const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+    let client;
+    try {
+      client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+      console.log("Twilio client initialized successfully");
+    } catch (err) {
+      console.error("Error initializing Twilio client:", err);
+      return new Response(
+        JSON.stringify({ error: 'Failed to initialize Twilio client' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Get action from request data
     const action = requestData.action;

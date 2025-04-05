@@ -1,3 +1,4 @@
+
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -297,7 +298,7 @@ class TwilioService {
       }
       
       console.log("Fetching Twilio token...");
-      // Fetch token from your backend
+      // Fetch token from your backend - IMPORTANT: no auth headers
       const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-token`, {
         method: 'POST',
         headers: {
@@ -306,9 +307,18 @@ class TwilioService {
         body: JSON.stringify({ action: 'getToken' })
       });
       
+      // Check response
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Error fetching token: ${response.status} - ${errorText}`);
+        return false;
+      }
+      
       const data = await response.json();
+      console.log("Token response:", data);
       
       if (!data.token) {
+        console.error('Failed to get Twilio token - no token in response');
         throw new Error('Failed to get Twilio token');
       }
       
@@ -539,6 +549,7 @@ class TwilioService {
       // Fall back to Twilio REST API if browser Device fails
       console.log("Making call via REST API");
       
+      // IMPORTANT: No authorization header here
       const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
         method: 'POST',
         headers: {
