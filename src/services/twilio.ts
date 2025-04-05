@@ -1,6 +1,8 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
+
+// Define the Codec type to match Twilio's expected type
+type Codec = 'opus' | 'pcmu' | 'pcma';
 
 class TwilioService {
   private device: Device | null = null;
@@ -33,18 +35,16 @@ class TwilioService {
       console.log("Audio context initialized successfully");
       
       // Check if audio output is available
-      if (typeof navigator.mediaDevices.selectAudioOutput === 'function') {
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const hasAudioOutput = devices.some(device => device.kind === 'audiooutput');
-          
-          if (hasAudioOutput) {
-            console.log("Audio output devices available");
-            this.audioOutputInitialized = true;
-          }
-        } catch (outputError) {
-          console.warn("Could not enumerate audio output devices:", outputError);
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const hasAudioOutput = devices.some(device => device.kind === 'audiooutput');
+        
+        if (hasAudioOutput) {
+          console.log("Audio output devices available");
+          this.audioOutputInitialized = true;
         }
+      } catch (outputError) {
+        console.warn("Could not enumerate audio output devices:", outputError);
       }
       
       return true;
@@ -86,10 +86,10 @@ class TwilioService {
       // Set up the device with audio settings
       this.device = new Device();
       
-      // Enable volume indicators to help monitor audio levels
+      // Fix the codec preferences type
       const deviceOptions = {
-        // Set codec preferences (optional)
-        codecPreferences: ['opus', 'pcmu'],
+        // Fix codec type - using proper type annotation
+        codecPreferences: ['opus', 'pcmu'] as Codec[],
         // Enable debugging if needed
         debug: true,
         // Enable sounds
@@ -190,11 +190,9 @@ class TwilioService {
             console.log("Audio context resumed before call");
           }
           
-          // Connect with audio parameters specifically set
+          // Fix the connection parameters - use Record<string, string> for params
           this.connection = await this.device.connect({
             To: formattedPhoneNumber,
-            // Ensure audio output is enabled
-            enableAudioOutput: true
           });
           
           // Set up connection event listeners for audio monitoring
