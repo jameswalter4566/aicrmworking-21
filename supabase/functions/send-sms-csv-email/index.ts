@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 
@@ -67,8 +66,7 @@ serve(async (req) => {
     // Send email with CSV attachment using Resend
     const emailResponse = await resend.emails.send({
       from: 'SMSCampaign <onboarding@resend.dev>',
-      to: ['jameswalter@goldenpathwayfinancial.com'],
-      cc: ['daniel@pacificcreditsolutions.com'],
+      to: ['jameswalter@goldenpathwayfinancial.com', 'daniel@pacificcreditsolutions.com'],
       subject: `SMS Campaign: ${campaignName || 'New Campaign'}`,
       html: `
         <h2>SMS Campaign Details</h2>
