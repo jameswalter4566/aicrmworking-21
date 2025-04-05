@@ -10,7 +10,7 @@ const SMSCampaign = () => {
   const navigate = useNavigate();
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={false}>
       <div className="flex h-screen overflow-hidden w-full">
         <SMSSidebar />
         <div className="flex-1 overflow-auto">
