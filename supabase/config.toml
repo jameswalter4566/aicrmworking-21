@@ -1,17 +1,43 @@
 
 project_id = "imrmboyczebjlbnkgjns"
 
-[functions.twilio-voice]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[analytics]
+enabled = false
+
+[experimental]
+preserveDefaultRoles = true
+
+[ai]
+enabled = true
+
+[[functions]]
+name = "start-dialing"
 verify_jwt = false
 
-[functions.twilio-token]
-verify_jwt = false
-
-[functions.thoughtly-contacts]
-verify_jwt = false
-
-[functions.retrieve-leads]
-verify_jwt = false
-
-[functions.store-leads]
+[[functions]]
+name = "call-contact"
 verify_jwt = false
