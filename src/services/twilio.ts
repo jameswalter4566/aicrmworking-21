@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -90,9 +89,9 @@ class TwilioService {
       // Set up the device with audio settings
       this.device = new Device();
       
-      // Create device options with properly typed codecPreferences
+      // Create device options - using proper typing for codecPreferences
       const deviceOptions = {
-        codecPreferences: ['opus', 'pcmu'] as Array<'opus' | 'pcmu' | 'pcma'>,
+        codecPreferences: ['opus', 'pcmu'],
         debug: true,
         enableRingtone: true,
         incomingSoundVolume: 0.8,
@@ -134,7 +133,7 @@ class TwilioService {
       });
       
       // Initialize the device with the token
-      await this.device.setup(data.token, deviceOptions);
+      await this.device.setup(data.token, deviceOptions as any);
       
       return true;
     } catch (error) {
