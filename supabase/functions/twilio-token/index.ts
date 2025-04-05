@@ -1,6 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts"
-import twilio from "https://esm.sh/twilio@4.23.0"
+import twilio from "npm:twilio@4.23.0"
 
 // Enhanced CORS headers with broader support
 const corsHeaders = {
