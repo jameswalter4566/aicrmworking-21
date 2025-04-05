@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -35,7 +34,10 @@ function normalizePhoneNumber(phoneNumber: string): string {
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Voice function`)
   console.log(`Request URL: ${req.url}`)
-  console.log(`Headers: ${JSON.stringify([...req.headers.entries()])}`)
+  
+  // Log all headers for debugging
+  const headerEntries = [...req.headers.entries()];
+  console.log(`Request headers (${headerEntries.length}):`, JSON.stringify(headerEntries));
   
   // Handle preflight requests properly
   if (req.method === 'OPTIONS') {

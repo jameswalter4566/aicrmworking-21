@@ -1,4 +1,3 @@
-
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -549,7 +548,8 @@ class TwilioService {
       // Fall back to Twilio REST API if browser Device fails
       console.log("Making call via REST API");
       
-      // IMPORTANT: No authorization header here
+      // IMPORTANT: REMOVE any authorization headers, explicitly set to null content-type only
+      console.log("Sending fetch request to Twilio Voice function with NO authorization headers");
       const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
         method: 'POST',
         headers: {
@@ -562,6 +562,8 @@ class TwilioService {
         })
       });
       
+      console.log("Twilio Voice response status:", response.status);
+      
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Server error:", errorText);
@@ -569,6 +571,7 @@ class TwilioService {
       }
       
       const result = await response.json();
+      console.log("Twilio Voice response:", result);
       
       if (!result.success) {
         console.error("Failed to make call:", result.error);
