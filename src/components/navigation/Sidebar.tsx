@@ -1,8 +1,9 @@
+
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
   BarChart2, Settings, Home, DollarSign, 
-  PhoneOutgoing, Menu, Bot
+  PhoneOutgoing, Menu, Bot, MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,6 +20,7 @@ const itemColors = [
   "bg-indigo-600", // Reporting
   "bg-gray-600", // Admin
   "bg-violet-600", // AI Dialer
+  "bg-emerald-600", // SMS Campaign
 ];
 
 const navItems = [
@@ -26,6 +28,7 @@ const navItems = [
   { name: "Leads", icon: Users, path: "/people" },
   { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
   { name: "AI Dialer", icon: Bot, path: "/ai-dialer" },
+  { name: "SMS Campaign", icon: MessageSquare, path: "/sms-campaign" },
   { name: "Inbox", icon: Inbox, badge: 5, path: "#" },
   { name: "Tasks", icon: ListTodo, path: "#" },
   { name: "Calendar", icon: Calendar, path: "#" },
@@ -57,8 +60,8 @@ const Sidebar = () => {
       <div className="w-full bg-crm-blue">
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center">
-            <div className="h-8 w-8 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold">CRM</span>
+            <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
+              <span className="font-bold text-lg">CRM</span>
             </div>
             <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>
           </div>
@@ -122,8 +125,8 @@ const Sidebar = () => {
       <div className="py-6">
         <div className={cn("px-4 py-3 mb-6", expanded ? "" : "flex justify-center")}>
           <div className="flex items-center">
-            <div className="h-8 w-8 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold">CRM</span>
+            <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
+              <span className="font-bold text-lg">CRM</span>
             </div>
             {expanded && <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>}
           </div>

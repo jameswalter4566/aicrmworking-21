@@ -9,6 +9,7 @@ import People from "./pages/People";
 import Deals from "./pages/Deals";
 import PowerDialer from "./pages/PowerDialer";
 import AIDialer from "./pages/AIDialer";
+import SMSCampaign from "./pages/SMSCampaign";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="/deals" element={<Deals />} />
           <Route path="/power-dialer" element={<PowerDialer />} />
           <Route path="/ai-dialer" element={<AIDialer />} />
+          <Route path="/sms-campaign" element={<SMSCampaign />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
