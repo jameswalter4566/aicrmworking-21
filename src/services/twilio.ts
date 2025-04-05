@@ -1,3 +1,4 @@
+
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -48,6 +49,11 @@ class TwilioService {
     
     // Setup WebSocket connection for audio streaming
     this.setupAudioWebSocket();
+    
+    // Initialize AudioContext for better browser compatibility
+    this.initializeAudioContext().catch(err => {
+      console.warn("Initial audio context setup failed:", err);
+    });
   }
   
   private createHiddenAudio(id: string, src: string) {
@@ -112,6 +118,8 @@ class TwilioService {
           if (data.event === 'audio') {
             // Set streaming status to active
             this.streamingActive = true;
+            
+            console.log(`Audio data received: ${data.track} track, payload length: ${data.payload.length}`);
             
             // Add audio chunk to processing queue
             this.audioQueue.push({
@@ -195,7 +203,8 @@ class TwilioService {
   
   // Process audio chunks in the queue
   private async processAudioQueue() {
-    if (!this.audioQueue.length || this.isProcessingAudio || !this.audioContext) {
+    if (!this.audioQueue.length) {
+      this.isProcessingAudio = false;
       return;
     }
     
@@ -205,36 +214,51 @@ class TwilioService {
       // Take a chunk from the queue
       const chunk = this.audioQueue.shift();
       
-      if (chunk) {
+      if (chunk && this.audioContext) {
         // Convert base64 to array buffer
         const audioData = this.base64ToArrayBuffer(chunk.payload);
         
-        // Create audio buffer
+        // Create audio buffer - CRITICAL FIX HERE
         const audioBuffer = await this.createAudioBufferFromPCM(audioData);
         
         if (audioBuffer) {
-          // Play the audio
+          console.log(`Playing audio buffer - Duration: ${audioBuffer.duration.toFixed(2)}s`);
+          
+          // Play the audio through the audio context
           const source = this.audioContext.createBufferSource();
           source.buffer = audioBuffer;
-          source.connect(this.audioContext.destination);
+          
+          // Create a gain node to control volume
+          const gainNode = this.audioContext.createGain();
+          gainNode.gain.value = 1.0; // Full volume
+          
+          // Connect the nodes: source -> gain -> destination
+          source.connect(gainNode);
+          gainNode.connect(this.audioContext.destination);
+          
+          // Start playback immediately
           source.start();
           
           // Wait for audio to finish playing
           await new Promise<void>((resolve) => {
             source.onended = () => resolve();
-            // Failsafe timeout - if onended doesn't fire
-            setTimeout(() => resolve(), 500);
+            // Failsafe timeout in case onended doesn't fire
+            setTimeout(() => resolve(), audioBuffer.duration * 1000 + 100);
           });
+          
+          console.log("Audio chunk finished playing");
+        } else {
+          console.error("Failed to create audio buffer");
         }
       }
     } catch (err) {
       console.error("Error processing audio queue:", err);
     } finally {
-      this.isProcessingAudio = false;
-      
-      // If we have more chunks, continue processing
+      // Process next chunk or end
       if (this.audioQueue.length > 0) {
         this.processAudioQueue();
+      } else {
+        this.isProcessingAudio = false;
       }
     }
   }
@@ -242,31 +266,40 @@ class TwilioService {
   // Convert base64 to array buffer
   private base64ToArrayBuffer(base64: string): Uint8Array {
     const binary = atob(base64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
       bytes[i] = binary.charCodeAt(i);
     }
     return bytes;
   }
   
-  // Create audio buffer from PCM data
+  // Create audio buffer from PCM data - CRITICAL FUNCTION FOR AUDIO PLAYBACK
   private async createAudioBufferFromPCM(pcmData: Uint8Array): Promise<AudioBuffer | null> {
     if (!this.audioContext) {
       console.error("AudioContext not initialized");
-      return null;
+      await this.initializeAudioContext();
+      if (!this.audioContext) {
+        return null;
+      }
     }
     
     try {
-      // Convert PCM data to 16-bit samples
+      // Convert PCM data to 16-bit samples (mulaw format from Twilio)
       const samples = new Int16Array(pcmData.buffer);
-      const audioBuffer = this.audioContext.createBuffer(1, samples.length, 8000);
+      
+      // Create an audio buffer - CRITICAL: Set correct sample rate for Twilio (8000Hz)
+      const sampleRate = 8000; // Twilio uses 8kHz sample rate for voice
+      const audioBuffer = this.audioContext.createBuffer(1, samples.length, sampleRate);
       const channelData = audioBuffer.getChannelData(0);
       
       // Convert Int16 to Float32 (WebAudio format)
       for (let i = 0; i < samples.length; i++) {
+        // Normalize from 16-bit int to -1.0 to 1.0 float
         channelData[i] = samples[i] / 32768;
       }
       
+      console.log(`Created audio buffer: ${samples.length} samples, ${sampleRate}Hz`);
       return audioBuffer;
     } catch (err) {
       console.error("Error creating audio buffer:", err);
@@ -276,9 +309,30 @@ class TwilioService {
   
   async initializeAudioContext() {
     try {
-      // Create audio context for microphone access
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      this.audioContext = new AudioContext();
+      // Use AudioContext with fallback for older browsers
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      
+      if (!AudioContextClass) {
+        console.error("AudioContext not supported in this browser");
+        return false;
+      }
+      
+      // Create audio context if not already initialized
+      if (!this.audioContext) {
+        this.audioContext = new AudioContextClass({
+          // Use a higher sample rate for better quality
+          sampleRate: 48000
+        });
+        
+        console.log("AudioContext created successfully:", this.audioContext);
+        console.log("AudioContext state:", this.audioContext.state);
+        
+        // If context is suspended (common in browsers), try to resume it
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+          console.log("AudioContext resumed:", this.audioContext.state);
+        }
+      }
       
       console.log("Requesting microphone access...");
       // Request microphone access with specific constraints for better audio quality
@@ -304,7 +358,7 @@ class TwilioService {
       // Play a test tone to kickstart audio context
       await this.testAudioOutput();
       
-      // Initialize WebSocket for audio streaming
+      // Initialize WebSocket for audio streaming - make sure it's connected
       this.setupAudioWebSocket();
       
       this.microphoneInitialized = true;
