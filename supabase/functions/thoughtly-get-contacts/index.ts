@@ -4,7 +4,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 // Enhanced CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-token, team_id',
   'Access-Control-Allow-Methods': 'OPTIONS, POST, GET',
   'Access-Control-Max-Age': '86400',
 }
@@ -79,6 +79,8 @@ serve(async (req) => {
     const url = `${THOUGHTLY_API_URL}/contact${queryString}`;
 
     console.log(`Fetching contacts from Thoughtly API: ${url}`);
+    console.log(`Using API token: ${THOUGHTLY_API_TOKEN}`);
+    console.log(`Using team ID: ${THOUGHTLY_TEAM_ID}`);
 
     // Call the Thoughtly API with appropriate headers
     const response = await fetch(url, {

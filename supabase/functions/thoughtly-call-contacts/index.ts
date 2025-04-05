@@ -4,7 +4,7 @@ import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 // Enhanced CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-token, team_id',
   'Access-Control-Allow-Methods': 'OPTIONS, POST, GET',
   'Access-Control-Max-Age': '86400',
 }
@@ -75,6 +75,8 @@ serve(async (req) => {
     }
 
     console.log(`Initiating calls for ${contacts.length} contacts using interview_id: ${interview_id}`);
+    console.log(`Using API token: ${THOUGHTLY_API_TOKEN}`);
+    console.log(`Using team ID: ${THOUGHTLY_TEAM_ID}`);
 
     const results = {
       success: [],
@@ -103,6 +105,8 @@ serve(async (req) => {
           metadata
         };
         
+        console.log("Call payload:", JSON.stringify(callPayload));
+        
         // Use the exact header structure from the example
         const options = {
           method: 'POST',
@@ -117,6 +121,9 @@ serve(async (req) => {
         // Make the request to Thoughtly API
         const response = await fetch(`${THOUGHTLY_API_URL}/contact/call`, options);
         const data = await response.json();
+        
+        console.log(`Call API response status: ${response.status}`);
+        console.log(`Call API response data:`, data);
         
         if (response.status !== 200) {
           console.error(`Error calling contact ${contact_id}:`, data);
