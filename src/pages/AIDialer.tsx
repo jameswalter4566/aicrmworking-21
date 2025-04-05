@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload, RefreshCw } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload, RefreshCw, Loader2 } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -33,6 +34,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { twilioService } from "@/services/twilio";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
+import { useTwilio } from "@/hooks/use-twilio";
 
 const defaultLeads = [
   {
@@ -87,28 +89,6 @@ const defaultLeads = [
   },
 ];
 
-const mapThoughtlyContactToLead = (contact: any): ThoughtlyContact => {
-  let firstName = '', lastName = '';
-  if (contact.name) {
-    const nameParts = contact.name.split(' ');
-    firstName = nameParts[0] || '';
-    lastName = nameParts.slice(1).join(' ') || '';
-  }
-
-  return {
-    id: contact.attributes?.id ? Number(contact.attributes.id) : Date.now(),
-    firstName: contact.attributes?.firstName || firstName,
-    lastName: contact.attributes?.lastName || lastName,
-    email: contact.email || '',
-    phone1: contact.phone_number || '',
-    phone2: contact.attributes?.phone2 || '',
-    disposition: contact.attributes?.disposition || 'Not Contacted',
-    avatar: contact.attributes?.avatar || '',
-    tags: contact.tags || [],
-    countryCode: contact.country_code || 'US'
-  };
-};
-
 const getDispositionClass = (disposition: string) => {
   switch(disposition) {
     case "Not Contacted":
@@ -128,50 +108,113 @@ const getDispositionClass = (disposition: string) => {
   }
 };
 
+// Temporary interview ID - this would normally come from configuration or an API call
+const DEFAULT_INTERVIEW_ID = "some-interview-id";
+
 const AIDialer = () => {
   const [leads, setLeads] = useState<ThoughtlyContact[]>([]);
+  const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeCallId, setActiveCallId] = useState<number | null>(null);
+  const [isLoadingThoughtlyContacts, setIsLoadingThoughtlyContacts] = useState(false);
+  const [activeCallId, setActiveCallId] = useState<number | string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [lineCount, setLineCount] = useState("1");
   const [isDialing, setIsDialing] = useState(false);
-  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
-  const [dialQueue, setDialQueue] = useState<number[]>([]);
+  const [selectedLeads, setSelectedLeads] = useState<(number | string)[]>([]);
+  const [dialQueue, setDialQueue] = useState<(number | string)[]>([]);
+  const [currentDialIndex, setCurrentDialIndex] = useState(0);
+  const [processingLeadIds, setProcessingLeadIds] = useState<(number | string)[]>([]);
   const [aiResponses, setAiResponses] = useState<string[]>([
     "Hello, this is AI assistant calling on behalf of SalesPro CRM.",
     "I'm analyzing the lead's information...",
     "I see they're interested in property in the downtown area.",
     "I'll try to schedule a meeting with our agent.",
   ]);
+  const [activityLog, setActivityLog] = useState<{
+    timestamp: string;
+    message: string;
+    type: 'info' | 'success' | 'error';
+  }[]>([]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
-  const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
+  const [interviewId, setInterviewId] = useState(DEFAULT_INTERVIEW_ID);
+  
+  // Ref to store interval ID for the auto-dialer
+  const autoDialerIntervalRef = useRef<number | null>(null);
   
   useEffect(() => {
     fetchLeads();
   }, []);
   
+  const fetchThoughtlyContacts = async () => {
+    setIsLoadingThoughtlyContacts(true);
+    try {
+      const contacts = await thoughtlyService.getContacts({
+        phone_numbers_only: true,
+        limit: 50
+      });
+      
+      if (Array.isArray(contacts)) {
+        console.log('Fetched Thoughtly contacts:', contacts);
+        setThoughtlyContacts(contacts);
+        
+        // Map remote contacts to our local format
+        const mappedContacts = contacts.map(contact => thoughtlyService.mapRemoteContactToLocal(contact));
+        setLeads(mappedContacts);
+        
+        addToActivityLog('Loaded contacts from Thoughtly', 'success');
+      } else {
+        console.error('Invalid response from Thoughtly contacts:', contacts);
+        throw new Error('Invalid response format from Thoughtly API');
+      }
+    } catch (error) {
+      console.error('Error fetching Thoughtly contacts:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch contacts from Thoughtly. Using local data instead.",
+        variant: "destructive",
+      });
+      
+      // Fallback to regular leads
+      fetchLeads();
+      
+      addToActivityLog('Failed to fetch Thoughtly contacts', 'error');
+    } finally {
+      setIsLoadingThoughtlyContacts(false);
+    }
+  };
+  
   const fetchLeads = async () => {
     setIsLoading(true);
     try {
-      const retrievedLeads = await thoughtlyService.retrieveLeads();
+      // Try to get contacts from Thoughtly first
+      await fetchThoughtlyContacts();
+    } catch (thoughtlyError) {
+      console.error("Error fetching Thoughtly contacts:", thoughtlyError);
       
-      if (retrievedLeads && Array.isArray(retrievedLeads) && retrievedLeads.length > 0) {
-        setLeads(retrievedLeads);
-        console.log("Loaded leads from retrieve-leads function:", retrievedLeads);
-      } else {
-        console.log("No leads retrieved, using default data");
+      try {
+        const retrievedLeads = await thoughtlyService.retrieveLeads();
+        
+        if (retrievedLeads && Array.isArray(retrievedLeads) && retrievedLeads.length > 0) {
+          setLeads(retrievedLeads);
+          console.log("Loaded leads from retrieve-leads function:", retrievedLeads);
+          addToActivityLog('Loaded leads from database', 'success');
+        } else {
+          console.log("No leads retrieved, using default data");
+          setLeads(defaultLeads);
+          addToActivityLog('Using sample lead data', 'info');
+        }
+      } catch (error) {
+        console.error("Error fetching leads:", error);
+        toast({
+          title: "Error",
+          description: "Failed to retrieve contacts. Using sample data instead.",
+          variant: "destructive",
+        });
         setLeads(defaultLeads);
+        addToActivityLog('Failed to fetch leads, using sample data', 'error');
       }
-    } catch (error) {
-      console.error("Error fetching leads:", error);
-      toast({
-        title: "Error",
-        description: "Failed to retrieve contacts. Using sample data instead.",
-        variant: "destructive",
-      });
-      setLeads(defaultLeads);
     } finally {
       setIsLoading(false);
     }
@@ -182,7 +225,7 @@ const AIDialer = () => {
       title: "Refreshing Leads",
       description: "Retrieving the latest leads data...",
     });
-    fetchLeads();
+    fetchThoughtlyContacts();
   };
 
   useEffect(() => {
@@ -195,31 +238,200 @@ const AIDialer = () => {
     setIsDialogOpen(true);
   };
 
+  const addToActivityLog = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
+    const timestamp = new Date().toLocaleTimeString();
+    setActivityLog(prev => [...prev, { timestamp, message, type }]);
+  };
+
   const startDialing = async () => {
     const leadsToDial = selectedLeads.length > 0 
-      ? leads.filter(lead => selectedLeads.includes(lead.id!)).map(lead => lead.id!)
-      : leads.map(lead => lead.id!);
+      ? leads.filter(lead => lead.id !== undefined && selectedLeads.includes(lead.id))
+      : leads;
     
-    setDialQueue(leadsToDial);
+    if (leadsToDial.length === 0) {
+      toast({
+        title: "No Leads Selected",
+        description: "Please select at least one lead to dial.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Convert leads to thoughtly contacts if needed
+    let contactsToCall: string[] = [];
+    
+    // Set up the dial queue with thoughtly contact IDs if available
+    if (thoughtlyContacts.length > 0) {
+      // Map our leads back to thoughtly contact IDs
+      contactsToCall = leadsToDial
+        .map(lead => {
+          const thoughtlyContact = thoughtlyContacts.find(tc => 
+            (tc.phone_number === lead.phone1) || 
+            (tc.attributes?.id && String(tc.attributes.id) === String(lead.id))
+          );
+          
+          return thoughtlyContact ? thoughtlyContact.id : null;
+        })
+        .filter((id): id is string => id !== null);
+      
+      if (contactsToCall.length === 0) {
+        toast({
+          title: "No Valid Contacts",
+          description: "Could not find valid Thoughtly contacts to dial.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      toast({
+        title: "No Thoughtly Contacts",
+        description: "Cannot proceed with AI dialing without Thoughtly contacts.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setDialQueue(contactsToCall);
+    setCurrentDialIndex(0);
     setIsDialogOpen(false);
     setIsDialing(true);
+    setActivityLog([]);
     
     toast({
       title: "AI Dialing Started",
-      description: `Now dialing ${leadsToDial.length} leads`,
+      description: `Now dialing ${contactsToCall.length} leads`,
     });
+    
+    addToActivityLog(`Starting AI dialing session for ${contactsToCall.length} leads`, 'info');
+    
+    // Start the dialing process
+    const maxConcurrentCalls = parseInt(lineCount);
+    const processQueue = async () => {
+      if (!isDialing) return;
+      
+      const currentIndex = currentDialIndex;
+      if (currentIndex < contactsToCall.length) {
+        // Calculate how many new calls to initiate
+        const activeCalls = processingLeadIds.length;
+        const newCallsToInitiate = Math.min(
+          maxConcurrentCalls - activeCalls,
+          contactsToCall.length - currentIndex
+        );
+        
+        if (newCallsToInitiate > 0) {
+          const newContactsToCall = contactsToCall.slice(
+            currentIndex,
+            currentIndex + newCallsToInitiate
+          );
+          
+          // Update state to track new calls being processed
+          setProcessingLeadIds(prev => [...prev, ...newContactsToCall]);
+          setCurrentDialIndex(prev => prev + newCallsToInitiate);
+          
+          // Start calls
+          for (const contactId of newContactsToCall) {
+            initiateAICall(contactId);
+            
+            // Small delay between starting calls
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      } else if (processingLeadIds.length === 0) {
+        // All calls are finished
+        setIsDialing(false);
+        toast({
+          title: "Dialing Complete",
+          description: "All leads have been contacted",
+        });
+        addToActivityLog("All leads have been contacted", "success");
+        
+        // Clear interval when done
+        if (autoDialerIntervalRef.current) {
+          clearInterval(autoDialerIntervalRef.current);
+          autoDialerIntervalRef.current = null;
+        }
+      }
+    };
+    
+    // Start auto-dialer interval
+    processQueue(); // Initial run
+    autoDialerIntervalRef.current = window.setInterval(processQueue, 5000);
+  };
+
+  const initiateAICall = async (contactId: string) => {
+    try {
+      // Find the Thoughtly contact
+      const contact = thoughtlyContacts.find(c => c.id === contactId);
+      if (!contact) {
+        throw new Error(`Contact with ID ${contactId} not found`);
+      }
+      
+      // Update UI to show active call
+      setActiveCallId(contactId);
+      
+      const name = contact.name || "Lead";
+      const phone = contact.phone_number || "Unknown";
+      
+      addToActivityLog(`Calling ${name} at ${phone}`, 'info');
+      
+      // Generate some dynamic AI responses
+      const dynamicResponses = [
+        `Hello, this is AI assistant calling for ${name}.`,
+        "I'm reviewing your property interests...",
+        "I see you've been looking at properties in the area.",
+        "Let me connect you with our team to discuss options."
+      ];
+      
+      setAiResponses(dynamicResponses);
+      
+      // Make the actual call through Thoughtly
+      const callResult = await thoughtlyService.callContact(contactId, interviewId);
+      
+      if (callResult.success) {
+        addToActivityLog(`Successfully connected call to ${name}`, 'success');
+        
+        // Simulate a call in progress for 10-15 seconds
+        await new Promise(resolve => setTimeout(resolve, 5000 + Math.random() * 5000));
+        
+        // Update with more AI responses
+        setAiResponses(prev => [
+          ...prev, 
+          `I've gathered some information from ${name}.`,
+          "They're interested in viewing properties next week.",
+          "I've scheduled a follow-up appointment with an agent."
+        ]);
+        
+        // Simulate call completion after another 5-10 seconds
+        await new Promise(resolve => setTimeout(resolve, 5000 + Math.random() * 5000));
+        
+        addToActivityLog(`Call with ${name} completed successfully`, 'success');
+      } else {
+        addToActivityLog(`Failed to connect call to ${name}`, 'error');
+      }
+    } catch (error) {
+      console.error(`Error initiating AI call for contact ${contactId}:`, error);
+      addToActivityLog(`Error calling contact: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    } finally {
+      // Remove from processing list
+      setProcessingLeadIds(prev => prev.filter(id => id !== contactId));
+      
+      // Reset active call ID if this was the active one
+      if (activeCallId === contactId) {
+        setActiveCallId(null);
+      }
+    }
   };
 
   const handleSelectAllLeads = (checked: boolean) => {
     if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id!));
+      setSelectedLeads(leads.filter(lead => lead.id !== undefined).map(lead => lead.id!));
     } else {
       setSelectedLeads([]);
       setIsImportDialogOpen(false);
     }
   };
 
-  const handleSelectLead = (leadId: number, checked: boolean) => {
+  const handleSelectLead = (leadId: number | string, checked: boolean) => {
     if (checked) {
       const newSelectedLeads = [...selectedLeads, leadId];
       setSelectedLeads(newSelectedLeads);
@@ -234,18 +446,27 @@ const AIDialer = () => {
   };
 
   const isAllSelected = leads.length > 0 && leads.every(lead => 
-    lead.id && selectedLeads.includes(lead.id)
+    lead.id !== undefined && selectedLeads.includes(lead.id)
   );
 
   const endDialingSession = () => {
+    // Clear the auto-dialer interval
+    if (autoDialerIntervalRef.current) {
+      clearInterval(autoDialerIntervalRef.current);
+      autoDialerIntervalRef.current = null;
+    }
+    
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
+    setProcessingLeadIds([]);
     
     toast({
       title: "Session Ended",
       description: "AI dialing session has been terminated",
     });
+    
+    addToActivityLog("Dialing session terminated by user", "info");
   };
 
   const importLeadsToThoughtly = async () => {
@@ -264,6 +485,9 @@ const AIDialer = () => {
       });
       
       setIsImportDialogOpen(false);
+      
+      // Refresh contacts after import
+      fetchThoughtlyContacts();
     } catch (error) {
       console.error("Error importing leads to Thoughtly:", error);
       toast({
@@ -289,8 +513,8 @@ const AIDialer = () => {
       const result = await thoughtlyService.syncLeads(leadsWithIds);
       
       if (result?.data) {
-        const mappedLeads = Array.isArray(result.data) ? result.data.map(mapThoughtlyContactToLead) : [];
-        setLeads(mappedLeads);
+        // Refresh Thoughtly contacts after syncing
+        fetchThoughtlyContacts();
         
         toast({
           title: "Leads Synced",
@@ -329,9 +553,19 @@ const AIDialer = () => {
                 <Button 
                   className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
                   onClick={startDialSession}
+                  disabled={isLoadingThoughtlyContacts}
                 >
-                  <Phone className="h-4 w-4" />
-                  Start Dialing Session
+                  {isLoadingThoughtlyContacts ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>
+                      <Phone className="h-4 w-4" />
+                      Start Dialing Session
+                    </>
+                  )}
                 </Button>
               ) : (
                 <Button 
@@ -364,9 +598,14 @@ const AIDialer = () => {
                           AI Dialer is processing calls
                         </span>
                       </div>
-                      <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                        Lines in use: {lineCount}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-blue-100 text-blue-800 px-3 py-1">
+                          {currentDialIndex} / {dialQueue.length} calls processed
+                        </Badge>
+                        <Badge className="bg-green-100 text-green-800 px-3 py-1">
+                          Lines in use: {processingLeadIds.length} / {lineCount}
+                        </Badge>
+                      </div>
                     </div>
                     
                     <Card className="border rounded-md mb-4 bg-gray-50">
@@ -401,8 +640,38 @@ const AIDialer = () => {
                         <CardTitle className="text-sm font-medium">Activity Log</CardTitle>
                       </CardHeader>
                       <ScrollArea className="h-[300px] rounded-md">
-                        <div className="p-4 text-center text-gray-500">
-                          No active calls yet
+                        <div className="p-4">
+                          {activityLog.length > 0 ? (
+                            <div className="space-y-2">
+                              {activityLog.map((log, index) => (
+                                <div 
+                                  key={index} 
+                                  className={`
+                                    flex items-start gap-2 p-2 rounded-md
+                                    ${log.type === 'success' ? 'bg-green-50' : ''}
+                                    ${log.type === 'error' ? 'bg-red-50' : ''}
+                                    ${log.type === 'info' ? 'bg-blue-50' : ''}
+                                  `}
+                                >
+                                  <div className="flex-shrink-0 text-xs text-gray-500 mt-0.5">
+                                    {log.timestamp}
+                                  </div>
+                                  <div className={`
+                                    text-sm
+                                    ${log.type === 'success' ? 'text-green-700' : ''}
+                                    ${log.type === 'error' ? 'text-red-700' : ''}
+                                    ${log.type === 'info' ? 'text-blue-700' : ''}
+                                  `}>
+                                    {log.message}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center text-gray-500">
+                              No activity yet
+                            </div>
+                          )}
                         </div>
                       </ScrollArea>
                     </Card>
@@ -423,8 +692,16 @@ const AIDialer = () => {
                     <Button 
                       className="mt-4 bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
                       onClick={startDialSession}
+                      disabled={isLoadingThoughtlyContacts}
                     >
-                      Start Dialing
+                      {isLoadingThoughtlyContacts ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          Loading Contacts...
+                        </>
+                      ) : (
+                        <>Start Dialing</>
+                      )}
                     </Button>
                   </div>
                 )}
@@ -442,14 +719,14 @@ const AIDialer = () => {
                 size="icon" 
                 className="h-8 w-8" 
                 onClick={handleRefreshLeads}
-                disabled={isLoading}
+                disabled={isLoading || isLoadingThoughtlyContacts}
               >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isLoading || isLoadingThoughtlyContacts ? 'animate-spin' : ''}`} />
                 <span className="sr-only">Refresh leads</span>
               </Button>
             </div>
             <div className="text-sm text-gray-500">
-              {isLoading ? 'Loading leads...' : (
+              {isLoading || isLoadingThoughtlyContacts ? 'Loading leads...' : (
                 selectedLeads.length > 0 ? 
                 `${selectedLeads.length} leads selected` : 
                 `${leads.length} leads available`
@@ -476,7 +753,7 @@ const AIDialer = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoading ? (
+                {isLoading || isLoadingThoughtlyContacts ? (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center py-8">
                       Loading leads...
@@ -495,6 +772,7 @@ const AIDialer = () => {
                       className={`
                         hover:bg-gray-50 
                         ${activeCallId === lead.id ? 'bg-blue-50' : ''}
+                        ${processingLeadIds.includes(String(lead.id)) ? 'bg-green-50' : ''}
                       `}
                     >
                       <TableCell>
@@ -636,7 +914,7 @@ const AIDialer = () => {
             >
               {isImporting ? (
                 <>
-                  <span className="animate-spin mr-2">⏳</span>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   Importing...
                 </>
               ) : (
