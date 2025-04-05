@@ -79,3 +79,4 @@ verify_jwt = false
 # Function to handle voice call operations
 [functions.twilio-voice]
 verify_jwt = false
+

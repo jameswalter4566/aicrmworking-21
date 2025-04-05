@@ -152,18 +152,25 @@ const makeCall = async (phoneNumber: string) => {
       throw new Error('Twilio device not ready');
     }
 
+    // Format phone number correctly if needed
+    const formattedPhone = phoneNumber.startsWith('+') 
+      ? phoneNumber 
+      : `+1${phoneNumber.replace(/\D/g, '')}`;
+
     // Use our edge function to make the outbound call
-    console.log(`Invoking twilio-voice function to call ${phoneNumber}`);
+    console.log(`Invoking twilio-voice function to call ${formattedPhone}`);
     const { data, error } = await supabase.functions.invoke('twilio-voice', {
       body: {
         action: 'makeCall',
-        phoneNumber,
+        phoneNumber: formattedPhone,
         callbackUrl: window.location.origin,
       },
       headers: {
         'Content-Type': 'application/json',
       },
     });
+
+    console.log("Response from twilio-voice:", data, error);
 
     if (error) {
       console.error("Error invoking makeCall:", error);
@@ -172,7 +179,7 @@ const makeCall = async (phoneNumber: string) => {
     
     if (!data || !data.callSid) {
       console.error("No callSid returned:", data);
-      throw new Error('Call failed to connect');
+      throw new Error(data?.error || 'Call failed to connect');
     }
     
     console.log(`Call initialized with SID: ${data.callSid}`);

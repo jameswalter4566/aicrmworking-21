@@ -38,40 +38,65 @@ serve(async (req) => {
     console.log("Environment variables loaded")
     
     // Parse the request body based on content-type
-    let requestData
-    const contentType = req.headers.get('content-type')
+    let requestData = {}
+    const contentType = req.headers.get('content-type') || ''
     console.log('Received content type:', contentType)
     
     try {
-      if (contentType?.includes('application/json')) {
+      if (contentType.includes('application/json')) {
         console.log('Processing JSON data')
-        requestData = await req.json()
-      } else if (contentType?.includes('application/x-www-form-urlencoded')) {
+        try {
+          const text = await req.text()
+          console.log('Raw JSON text:', text)
+          if (text && text.trim()) {
+            requestData = JSON.parse(text)
+          }
+        } catch (parseError) {
+          console.error('JSON parse error:', parseError)
+          return new Response(
+            JSON.stringify({ error: 'JSON parse error', details: parseError.message }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
         console.log('Processing form data')
         const text = await req.text()
-        requestData = Object.fromEntries(text.split('&').map((pair) => {
-          const [key, value] = pair.split('=')
-          return [
-            key,
-            decodeURIComponent(value?.replace(/\+/g, ' ') || '')
-          ]
-        }))
+        console.log('Raw form data:', text)
+        if (text && text.trim()) {
+          try {
+            requestData = Object.fromEntries(text.split('&').map((pair) => {
+              const [key, value] = pair.split('=')
+              return [
+                key,
+                value ? decodeURIComponent(value.replace(/\+/g, ' ')) : ''
+              ]
+            }))
+          } catch (formError) {
+            console.error('Form data parse error:', formError)
+            return new Response(
+              JSON.stringify({ error: 'Form data parse error', details: formError.message }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+        }
         console.log('Parsed form data:', requestData)
       } else {
         console.log('Unexpected content type, treating as text')
         const text = await req.text()
         console.log('Raw request body:', text)
         try {
-          requestData = JSON.parse(text)
-        } catch {
-          requestData = {}
+          if (text && text.trim()) {
+            requestData = JSON.parse(text)
+          }
+        } catch (error) {
+          console.log('Not valid JSON, continuing with empty request data')
         }
       }
       console.log("Request data parsed:", JSON.stringify(requestData))
     } catch (e) {
       console.error("Failed to parse request body:", e)
       return new Response(
-        JSON.stringify({ error: 'Invalid request body' }),
+        JSON.stringify({ error: 'Invalid request body', details: e.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -123,55 +148,63 @@ serve(async (req) => {
           )
         }
         
-        // Method 1: Use Twilio REST API directly
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
-
-        // Create TwiML to instruct Twilio how to handle the call
-        const twimlResponse = `
-          <Response>
-            <Say voice="alice">Hello, this is a call from the CRM system.</Say>
-            <Pause length="1"/>
-            <Say voice="alice">Please hold while we connect you with a representative.</Say>
-            <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30">
-              <Client>browser</Client>
-            </Dial>
-          </Response>
-        `
-
-        // Make API request to Twilio
-        const response = await fetch(twilioUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
-          },
-          body: new URLSearchParams({
-            From: TWILIO_PHONE_NUMBER,
-            To: phoneNumber,
-            Twiml: twimlResponse,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Twilio API error (${response.status}): ${errorText}`)
-          return new Response(
-            JSON.stringify({ 
-              error: 'Twilio API error', 
-              status: response.status, 
-              details: errorText 
+        try {
+          // Method 1: Use Twilio REST API directly
+          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`
+  
+          // Create TwiML to instruct Twilio how to handle the call
+          const twimlResponse = `
+            <Response>
+              <Say voice="alice">Hello, this is a call from the CRM system.</Say>
+              <Pause length="1"/>
+              <Say voice="alice">Please hold while we connect you with a representative.</Say>
+              <Dial callerId="${TWILIO_PHONE_NUMBER}" timeout="30">
+                <Client>browser</Client>
+              </Dial>
+            </Response>
+          `
+  
+          // Make API request to Twilio
+          const response = await fetch(twilioUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
+            },
+            body: new URLSearchParams({
+              From: TWILIO_PHONE_NUMBER,
+              To: phoneNumber,
+              Twiml: twimlResponse,
             }),
+          })
+  
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error(`Twilio API error (${response.status}): ${errorText}`)
+            return new Response(
+              JSON.stringify({ 
+                error: 'Twilio API error', 
+                status: response.status, 
+                details: errorText 
+              }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+  
+          const data = await response.json()
+          console.log(`Call initiated with SID: ${data.sid}`)
+          
+          return new Response(
+            JSON.stringify({ success: true, callSid: data.sid }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } catch (callError) {
+          console.error('Error making call:', callError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to initiate call', details: callError.message }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
-
-        const data = await response.json()
-        console.log(`Call initiated with SID: ${data.sid}`)
-        
-        return new Response(
-          JSON.stringify({ success: true, callSid: data.sid }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
       }
 
       case 'getCallStatus': {
@@ -183,35 +216,43 @@ serve(async (req) => {
         }
 
         console.log(`Getting status for call: ${callSid}`)
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls/${callSid}.json`
-
-        const response = await fetch(twilioUrl, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
-          },
-        })
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Twilio API error (${response.status}): ${errorText}`)
+        try {
+          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls/${callSid}.json`
+  
+          const response = await fetch(twilioUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
+            },
+          })
+  
+          if (!response.ok) {
+            const errorText = await response.text()
+            console.error(`Twilio API error (${response.status}): ${errorText}`)
+            return new Response(
+              JSON.stringify({ 
+                error: 'Failed to retrieve call status', 
+                status: response.status, 
+                details: errorText 
+              }),
+              { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+  
+          const data = await response.json()
+          console.log(`Call status: ${data.status}`)
+          
           return new Response(
-            JSON.stringify({ 
-              error: 'Failed to retrieve call status', 
-              status: response.status, 
-              details: errorText 
-            }),
+            JSON.stringify({ status: data.status }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } catch (statusError) {
+          console.error('Error getting call status:', statusError)
+          return new Response(
+            JSON.stringify({ error: 'Failed to check call status', details: statusError.message }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
         }
-
-        const data = await response.json()
-        console.log(`Call status: ${data.status}`)
-        
-        return new Response(
-          JSON.stringify({ status: data.status }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
       }
 
       case 'check_recording': {
@@ -325,14 +366,14 @@ serve(async (req) => {
 
       default:
         return new Response(
-          JSON.stringify({ error: 'Invalid action' }),
+          JSON.stringify({ error: 'Invalid action', receivedAction: actionToPerform }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
   } catch (error) {
     console.error('Twilio Voice Function Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Unknown error', stack: error.stack }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
