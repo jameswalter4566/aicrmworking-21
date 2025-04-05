@@ -298,11 +298,12 @@ class TwilioService {
       }
       
       console.log("Fetching Twilio token...");
-      // Fetch token from your backend - IMPORTANT: no auth headers
+      // Fetch token from backend - CRITICAL: NO AUTH HEADERS
       const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-token`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
+          // NO Authorization headers
         },
         body: JSON.stringify({ action: 'getToken' })
       });
@@ -549,7 +550,7 @@ class TwilioService {
       // Fall back to Twilio REST API if browser Device fails
       console.log("Making call via REST API");
       
-      // CRITICAL FIX: Make request with NO AUTH HEADERS
+      // CRITICAL FIX: Make request with NO AUTH HEADERS using full URL
       console.log("Sending request to Twilio Voice function with NO auth headers");
       const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice", {
         method: 'POST',
@@ -599,6 +600,7 @@ class TwilioService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
+          // NO Authorization headers
         },
         body: JSON.stringify({
           action: 'checkStatus',

@@ -38,8 +38,12 @@ verify_jwt = false
 
 [edge_functions.twilio-voice]
 verify_jwt = false
-invoker_roles = ["anon", "service_role"]
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 
 [edge_functions.twilio-token]
 verify_jwt = false
-invoker_roles = ["anon", "service_role"]
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[edge_functions.twilio-stream]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]

@@ -32,6 +32,8 @@ function normalizePhoneNumber(phoneNumber: string): string {
 }
 
 serve(async (req) => {
+  // CRITICAL: Log every request in detail to diagnose auth issues
+  console.log(`======== NEW REQUEST ${new Date().toISOString()} ========`);
   console.log(`Received ${req.method} request to Twilio Voice function`)
   console.log(`Request URL: ${req.url}`)
   
@@ -111,6 +113,7 @@ serve(async (req) => {
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID');
     
+    // Log credential availability (not the values themselves)
     console.log("Twilio credentials loaded:", {
       accountSidAvailable: !!TWILIO_ACCOUNT_SID,
       authTokenAvailable: !!TWILIO_AUTH_TOKEN,
