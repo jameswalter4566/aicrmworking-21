@@ -143,7 +143,11 @@ serve(async (req) => {
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
           url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}`,
-          method: 'POST'
+          method: 'POST',
+          // Add statusCallback to monitor call progress
+          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
+          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+          statusCallbackMethod: 'POST'
         });
         
         console.log("Call created successfully:", call.sid);
@@ -173,30 +177,51 @@ serve(async (req) => {
         // This is a browser call to a phone
         console.log("Browser to phone call");
         if (phoneNumber) {
+          // Set high quality audio and allow browser audio output
+          twimlResponse.say({ voice: 'alice' }, 'Connecting your call now.');
+          
           const dial = twimlResponse.dial({
             callerId: TWILIO_PHONE_NUMBER,
+            // Enable audio monitoring
+            record: 'record-from-answer',
+            // Add timeouts
+            timeout: 20,
+            // Set audio quality
+            answerOnBridge: true
           });
+          
           const formattedNumber = normalizePhoneNumber(phoneNumber);
           dial.number(formattedNumber);
         } else {
-          twimlResponse.say('No phone number provided for the call.');
+          twimlResponse.say({ voice: 'alice' }, 'No phone number provided for the call.');
         }
       } else if (phoneNumber && phoneNumber.startsWith('client:')) {
         // This is a phone call to a browser client
         console.log("Phone to browser call");
-        const dial = twimlResponse.dial();
+        twimlResponse.say({ voice: 'alice' }, 'Connecting you to our representative.');
+        
+        const dial = twimlResponse.dial({
+          answerOnBridge: true,
+          callerId: TWILIO_PHONE_NUMBER
+        });
+        
         dial.client(phoneNumber.replace('client:', ''));
       } else {
         // Standard phone to phone call
         console.log("Phone to phone call");
         if (phoneNumber) {
+          twimlResponse.say({ voice: 'alice' }, 'Connecting your call now.');
+          
           const dial = twimlResponse.dial({
             callerId: TWILIO_PHONE_NUMBER,
+            answerOnBridge: true,
+            record: 'record-from-answer'
           });
+          
           const formattedNumber = normalizePhoneNumber(phoneNumber);
           dial.number(formattedNumber);
         } else {
-          twimlResponse.say('Welcome to the phone system. No action specified.');
+          twimlResponse.say({ voice: 'alice' }, 'Welcome to the phone system. No action specified.');
         }
       }
       

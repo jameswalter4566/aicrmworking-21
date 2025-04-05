@@ -1,3 +1,4 @@
+
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
@@ -8,6 +9,7 @@ class TwilioService {
   private analyser: AnalyserNode | null = null;
   private microphone: MediaStreamAudioSourceNode | null = null;
   private microphoneInitialized: boolean = false;
+  private audioOutputInitialized: boolean = false;
   private supabaseUrl: string = "https://imrmboyczebjlbnkgjns.supabase.co";
   
   async initializeAudioContext() {
@@ -29,6 +31,22 @@ class TwilioService {
       
       this.microphoneInitialized = true;
       console.log("Audio context initialized successfully");
+      
+      // Check if audio output is available
+      if (typeof navigator.mediaDevices.selectAudioOutput === 'function') {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const hasAudioOutput = devices.some(device => device.kind === 'audiooutput');
+          
+          if (hasAudioOutput) {
+            console.log("Audio output devices available");
+            this.audioOutputInitialized = true;
+          }
+        } catch (outputError) {
+          console.warn("Could not enumerate audio output devices:", outputError);
+        }
+      }
+      
       return true;
     } catch (error) {
       console.error('Error initializing audio context:', error);
@@ -65,12 +83,25 @@ class TwilioService {
         throw new Error('Failed to get Twilio token');
       }
       
-      // Set up the device
+      // Set up the device with audio settings
       this.device = new Device();
+      
+      // Enable volume indicators to help monitor audio levels
+      const deviceOptions = {
+        // Set codec preferences (optional)
+        codecPreferences: ['opus', 'pcmu'],
+        // Enable debugging if needed
+        debug: true,
+        // Enable sounds
+        enableRingtone: true,
+        // Set volume levels (0.0 to 1.0)
+        incomingSoundVolume: 0.8,
+        outgoingSoundVolume: 0.8,
+      };
       
       // Set up event listeners
       this.device.on('ready', () => {
-        console.log('Twilio device is ready');
+        console.log('Twilio device is ready for audio I/O');
       });
       
       this.device.on('error', (error) => {
@@ -78,17 +109,32 @@ class TwilioService {
       });
       
       this.device.on('connect', (conn) => {
-        console.log('Call connected');
+        console.log('Call connected - audio channels established');
         this.connection = conn;
+        
+        // Ensure audio input and output are working
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+          this.audioContext.resume().then(() => {
+            console.log('Audio context resumed for active call');
+          });
+        }
+        
+        // Monitor incoming audio
+        conn.volume((inputVolume, outputVolume) => {
+          // Log audio levels for debugging
+          if (outputVolume < 0.01) {
+            console.warn('Very low or no incoming audio detected');
+          }
+        });
       });
       
       this.device.on('disconnect', () => {
-        console.log('Call disconnected');
+        console.log('Call disconnected - audio channels closed');
         this.connection = null;
       });
       
       // Initialize the device with the token
-      await this.device.setup(data.token);
+      await this.device.setup(data.token, deviceOptions);
       
       return true;
     } catch (error) {
@@ -137,11 +183,29 @@ class TwilioService {
       if (this.device && this.device.status() === 'ready') {
         try {
           console.log("Using Twilio Device for browser-based calling");
+          
+          // Ensure audio context is active before connecting
+          if (this.audioContext && this.audioContext.state === 'suspended') {
+            await this.audioContext.resume();
+            console.log("Audio context resumed before call");
+          }
+          
+          // Connect with audio parameters specifically set
           this.connection = await this.device.connect({
-            To: formattedPhoneNumber
+            To: formattedPhoneNumber,
+            // Ensure audio output is enabled
+            enableAudioOutput: true
           });
           
-          // Set up connection event listeners
+          // Set up connection event listeners for audio monitoring
+          this.connection.on('volume', (inputVol, outputVol) => {
+            console.log(`Audio levels - Input: ${inputVol.toFixed(2)}, Output: ${outputVol.toFixed(2)}`);
+          });
+          
+          this.connection.on('warning', (warning) => {
+            console.warn('Connection warning:', warning.message);
+          });
+          
           this.connection.on('disconnect', () => {
             this.connection = null;
             console.log('Call ended');
@@ -254,6 +318,21 @@ class TwilioService {
       return false;
     } catch (error) {
       console.error('Error toggling mute:', error);
+      return false;
+    }
+  }
+  
+  toggleSpeaker(speakerOn: boolean) {
+    try {
+      // This is only relevant for mobile browsers that support audio output selection
+      if (this.connection && typeof this.connection.setSinkId === 'function') {
+        const sinkId = speakerOn ? 'speaker' : 'earpiece'; 
+        this.connection.setSinkId(sinkId);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Error toggling speaker:', error);  
       return false;
     }
   }

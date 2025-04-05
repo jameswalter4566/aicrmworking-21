@@ -9,6 +9,7 @@ export interface ActiveCall {
   status: 'connecting' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   leadId: string | number;
   isMuted?: boolean;
+  speakerOn?: boolean;
   usingBrowser?: boolean;
 }
 
@@ -24,6 +25,7 @@ export const useTwilio = () => {
     const initializeTwilio = async () => {
       setIsLoading(true);
       try {
+        // First, try to initialize the audio context
         const micAccess = await twilioService.initializeAudioContext();
         if (!micAccess) {
           toast({
@@ -36,6 +38,7 @@ export const useTwilio = () => {
         
         setMicrophoneActive(true);
 
+        // Then, initialize the Twilio device
         const deviceInitialized = await twilioService.initializeTwilioDevice();
         setInitialized(deviceInitialized);
         
@@ -48,7 +51,7 @@ export const useTwilio = () => {
         } else {
           toast({
             title: "Success",
-            description: "Phone system initialized successfully.",
+            description: "Phone system initialized successfully. Audio inputs and outputs are ready.",
           });
         }
       } catch (error) {
@@ -163,7 +166,7 @@ export const useTwilio = () => {
           
           toast({
             title: "Call Connected",
-            description: `Call is now in progress.`,
+            description: `Call is now in progress. You should hear audio.`,
           });
         }
       } catch (error) {
@@ -212,6 +215,7 @@ export const useTwilio = () => {
           status: 'connecting',
           leadId,
           isMuted: false,
+          speakerOn: false,
           usingBrowser: result.usingBrowser
         }
       }));
@@ -311,6 +315,36 @@ export const useTwilio = () => {
     
     return success;
   }, [activeCalls]);
+  
+  const toggleSpeaker = useCallback((leadId: string | number, speakerOn?: boolean) => {
+    const leadIdStr = String(leadId);
+    
+    if (!activeCalls[leadIdStr]) {
+      return false;
+    }
+    
+    // If speakerOn is not provided, toggle the current state
+    const shouldUseSpeaker = speakerOn !== undefined ? speakerOn : !activeCalls[leadIdStr].speakerOn;
+    
+    const success = twilioService.toggleSpeaker(shouldUseSpeaker);
+    
+    if (success) {
+      setActiveCalls(prev => ({
+        ...prev,
+        [leadIdStr]: {
+          ...prev[leadIdStr],
+          speakerOn: shouldUseSpeaker
+        }
+      }));
+      
+      toast({
+        title: shouldUseSpeaker ? "Speaker On" : "Speaker Off",
+        description: shouldUseSpeaker ? "Audio output set to speaker." : "Audio output set to earpiece.",
+      });
+    }
+    
+    return success;
+  }, [activeCalls]);
 
   return {
     initialized,
@@ -321,5 +355,6 @@ export const useTwilio = () => {
     endCall,
     endAllCalls,
     toggleMute,
+    toggleSpeaker,
   };
 };
