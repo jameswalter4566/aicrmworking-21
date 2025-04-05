@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, Upload, RefreshCw, Loader2 } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
@@ -34,8 +34,6 @@ import { twilioService } from "@/services/twilio";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { supabase } from "@/integrations/supabase/client";
-import { useTwilio } from "@/hooks/use-twilio";
-import { Progress } from "@/components/ui/progress";
 
 const defaultLeads = [
   {
@@ -131,7 +129,7 @@ const getDispositionClass = (disposition: string) => {
   }
 };
 
-type CallStatus = 'queued' | 'connecting' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+type CallStatus = 'not-started' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
 
 interface CallProgress {
   leadId: number;
@@ -151,22 +149,14 @@ const AIDialer = () => {
   const [isDialing, setIsDialing] = useState(false);
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [dialQueue, setDialQueue] = useState<number[]>([]);
-  const [processedLeads, setProcessedLeads] = useState<number[]>([]);
   const [aiResponses, setAiResponses] = useState<string[]>([]);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [thoughtlyContacts, setThoughtlyContacts] = useState<any[]>([]);
   const [callInProgress, setCallInProgress] = useState(false);
-  const [nextCallTimeout, setNextCallTimeout] = useState<number | null>(null);
-  const [progressPercent, setProgressPercent] = useState(0);
   
-  const { 
-    initialized, 
-    isLoading: twilioLoading, 
-    activeCalls, 
-    callLog,
-    addLogEntry,
-    callThoughtlyContact 
-  } = useTwilio();
+  const [activeCalls, setActiveCalls] = useState<CallProgress[]>([]);
+  const [callLogs, setCallLogs] = useState<string[]>([]);
   
   const isAllSelected = leads.length > 0 && selectedLeads.length === leads.length;
   
@@ -223,6 +213,12 @@ const AIDialer = () => {
     fetchLeads();
   };
 
+  useEffect(() => {
+    if (selectedLeads.length === leads.length && selectedLeads.length > 0) {
+      setIsImportDialogOpen(true);
+    }
+  }, [selectedLeads, leads.length]);
+
   const startDialSession = () => {
     setIsDialogOpen(true);
   };
@@ -232,128 +228,29 @@ const AIDialer = () => {
     return lead ? `${lead.firstName} ${lead.lastName}` : `Lead #${leadId}`;
   };
 
-  const processNextLead = useCallback(async () => {
-    if (dialQueue.length === 0) {
-      addLogEntry("Dialing queue is empty, session complete");
-      setIsDialing(false);
-      setCallInProgress(false);
-      
-      toast({
-        title: "Dialing Complete",
-        description: "All leads have been processed.",
-      });
-      return;
-    }
-    
-    const nextLeadId = dialQueue[0];
-    const newQueue = dialQueue.slice(1);
-    setDialQueue(newQueue);
-    setActiveCallId(nextLeadId);
-    
-    const totalLeads = newQueue.length + processedLeads.length + 1;
-    const completedLeads = processedLeads.length;
-    setProgressPercent(Math.round((completedLeads / totalLeads) * 100));
-    
-    const lead = leads.find(l => l.id === nextLeadId);
-    if (!lead) {
-      addLogEntry(`Lead ${nextLeadId} not found, skipping`);
-      processNextLead();
-      return;
-    }
-    
-    setAiResponses(prev => [
-      ...prev, 
-      `Now calling ${lead.firstName} ${lead.lastName} at ${lead.phone1}...`,
-      `Analyzing lead information for ${lead.firstName}...`
-    ]);
-    
-    addLogEntry(`Processing lead: ${lead.firstName} ${lead.lastName} (ID: ${nextLeadId})`);
-    
-    try {
-      const result = await callThoughtlyContact(nextLeadId, "interview_demo_123");
-      
-      if (result.success) {
-        addLogEntry(`Successfully initiated call to ${lead.firstName} ${lead.lastName}`);
-        setProcessedLeads(prev => [...prev, nextLeadId]);
-        
-        setAiResponses(prev => [
-          ...prev,
-          `Call to ${lead.firstName} connected successfully`,
-          `AI is now talking with ${lead.firstName}...`
-        ]);
-
-        const delayMs = 5000 + Math.random() * 3000;
-        const timeoutId = window.setTimeout(() => {
-          setAiResponses(prev => [
-            ...prev,
-            `Call with ${lead.firstName} ${lead.lastName} completed`,
-            `Result: ${Math.random() > 0.3 ? 'Successful conversation' : 'Left voicemail'}`
-          ]);
-          
-          processNextLead();
-        }, delayMs);
-        
-        setNextCallTimeout(timeoutId);
-      } else {
-        addLogEntry(`Failed to call lead ${nextLeadId}: ${result.error}`);
-        setAiResponses(prev => [
-          ...prev,
-          `Failed to connect call to ${lead.firstName} ${lead.lastName}`,
-          `Reason: ${result.error || 'Connection issue'}`
-        ]);
-        
-        const timeoutId = window.setTimeout(() => {
-          processNextLead();
-        }, 3000);
-        setNextCallTimeout(timeoutId);
-      }
-      
-    } catch (error) {
-      addLogEntry(`Error processing lead ${nextLeadId}: ${error instanceof Error ? error.message : String(error)}`);
-      
-      const timeoutId = window.setTimeout(() => {
-        processNextLead();
-      }, 3000);
-      setNextCallTimeout(timeoutId);
-    }
-  }, [dialQueue, leads, processedLeads, addLogEntry, callThoughtlyContact]);
+  const addLogEntry = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setCallLogs(prev => [`[${timestamp}] ${message}`, ...prev]);
+  };
 
   const startDialing = async () => {
-    if (!initialized) {
-      toast({
-        title: "Error",
-        description: "Phone system not initialized. Please refresh and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     const leadsToDial = selectedLeads.length > 0 
       ? leads.filter(lead => selectedLeads.includes(lead.id!)).map(lead => lead.id!)
       : leads.map(lead => lead.id!);
     
-    if (leadsToDial.length === 0) {
-      toast({
-        title: "No Leads Selected",
-        description: "Please select at least one lead to dial.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    setProcessedLeads([]);
     setDialQueue(leadsToDial);
     setIsDialogOpen(false);
     setIsDialing(true);
     setCallInProgress(true);
+    setActiveCalls([]);
+    setCallLogs([]);
     setAiResponses(["Initializing AI Dialer...", "Preparing to make calls..."]);
-    setProgressPercent(0);
     
-    addLogEntry(`Starting AI dialing session with ${leadsToDial.length} leads`);
+    addLogEntry(`Starting AI dialing session with ${lineCount} line(s)`);
     
     toast({
       title: "Starting AI Dialing Session",
-      description: `Now initializing AI dialing for ${leadsToDial.length} leads`,
+      description: `Now initializing AI dialing with ${lineCount} line${Number(lineCount) > 1 ? 's' : ''}`,
     });
 
     try {
@@ -378,11 +275,50 @@ const AIDialer = () => {
         return;
       }
 
-      console.log("Dialing session initialized successfully:", data);
-      addLogEntry(`Dialing session initialized successfully`);
+      console.log("Dialing session started successfully:", data);
+      addLogEntry(`Dialing session started successfully`);
       
       if (data.success) {
-        processNextLead();
+        if (data.contacts && data.contacts.length > 0) {
+          const initialBatch = data.callResults.map((result: any) => {
+            const contact = data.contacts.find((c: any) => c.id === result.contactId);
+            return {
+              leadId: Number(result.contactId),
+              status: result.status as CallStatus,
+              startTime: new Date(),
+              notes: contact?.name ? `Calling ${contact.name}` : `Calling lead #${result.contactId}`
+            };
+          });
+          
+          setActiveCalls(initialBatch);
+          
+          if (initialBatch.length > 0) {
+            setActiveCallId(initialBatch[0].leadId);
+            
+            initialBatch.forEach(call => {
+              addLogEntry(`Started call to ${getLeadNameById(call.leadId)}`);
+            });
+            
+            setAiResponses(prev => [
+              ...prev,
+              `AI Dialer initialized successfully`,
+              `Starting calls to ${initialBatch.length} lead(s)`,
+              `Primary call to ${getLeadNameById(initialBatch[0].leadId)} in progress...`,
+              "Analyzing lead information..."
+            ]);
+          }
+          
+          if (data.queuedContacts && data.queuedContacts.length > 0) {
+            addLogEntry(`${data.queuedContacts.length} lead(s) queued for calling`);
+          }
+        } else {
+          addLogEntry("No contacts available to call");
+          toast({
+            title: "Warning",
+            description: "No contacts available to call",
+            variant: "destructive"
+          });
+        }
       } else {
         addLogEntry(`Error: ${data.error || "Unknown error starting calls"}`);
         toast({
@@ -390,8 +326,6 @@ const AIDialer = () => {
           description: data.error || "There was an issue starting some calls",
           variant: "destructive"
         });
-        setIsDialing(false);
-        setCallInProgress(false);
       }
     } catch (err) {
       console.error("Exception during dialing:", err);
@@ -407,15 +341,11 @@ const AIDialer = () => {
   };
 
   const endDialingSession = () => {
-    if (nextCallTimeout) {
-      clearTimeout(nextCallTimeout);
-      setNextCallTimeout(null);
-    }
-    
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
     setCallInProgress(false);
+    setActiveCalls([]);
     
     addLogEntry("Dialing session manually ended by user");
     
@@ -488,22 +418,18 @@ const AIDialer = () => {
 
   const getCallStatusBadge = (status: CallStatus) => {
     switch (status) {
-      case 'queued':
-        return <Badge className="bg-gray-100 text-gray-800">Queued</Badge>;
-      case 'connecting':
-        return <Badge className="bg-blue-100 text-blue-800">Connecting</Badge>;
       case 'in-progress':
         return <Badge className="bg-green-100 text-green-800">In Progress</Badge>;
       case 'completed':
-        return <Badge className="bg-purple-100 text-purple-800">Completed</Badge>;
+        return <Badge className="bg-blue-100 text-blue-800">Completed</Badge>;
       case 'failed':
         return <Badge className="bg-red-100 text-red-800">Failed</Badge>;
       case 'busy':
         return <Badge className="bg-yellow-100 text-yellow-800">Busy</Badge>;
       case 'no-answer':
-        return <Badge className="bg-orange-100 text-orange-800">No Answer</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800">No Answer</Badge>;
       default:
-        return <Badge className="bg-gray-100 text-gray-800">Unknown</Badge>;
+        return <Badge className="bg-purple-100 text-purple-800">Initializing</Badge>;
     }
   };
 
@@ -518,7 +444,6 @@ const AIDialer = () => {
                 variant="outline"
                 className="rounded-lg flex items-center gap-2"
                 onClick={() => setIsFileUploadOpen(true)}
-                disabled={isDialing}
               >
                 <Upload className="h-4 w-4" />
                 Import Leads
@@ -548,18 +473,9 @@ const AIDialer = () => {
           <div className="grid grid-cols-1 gap-6 h-full">
             <Card className="shadow-sm">
               <CardHeader className="bg-crm-blue/5 border-b pb-3">
-                <CardTitle className="text-lg font-medium flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-crm-blue" />
-                    AI Call Dashboard
-                  </div>
-                  
-                  {isDialing && (
-                    <div className="text-sm flex items-center gap-2">
-                      <span>{processedLeads.length} of {processedLeads.length + dialQueue.length} calls</span>
-                      <Progress value={progressPercent} className="w-28 h-2" />
-                    </div>
-                  )}
+                <CardTitle className="text-lg font-medium flex items-center gap-2">
+                  <Phone className="h-5 w-5 text-crm-blue" />
+                  AI Call Dashboard
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
@@ -569,72 +485,71 @@ const AIDialer = () => {
                       <div className="flex items-center gap-2">
                         <PhoneCall className="h-5 w-5 text-green-500 animate-pulse" />
                         <span className="font-medium">
-                          {activeCallId ? 
-                            `Currently calling: ${getLeadNameById(activeCallId)}` : 
-                            'Initializing calls...'}
+                          AI Dialer is processing calls
                         </span>
                       </div>
                       <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                        AI Dialer Active
+                        Lines in use: {lineCount}
                       </Badge>
                     </div>
                     
-                    {activeCallId && (
-                      <Card className="border rounded-md mb-4">
-                        <CardHeader className="pb-2 pt-3 px-4 border-b">
-                          <CardTitle className="text-sm font-medium flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <PhoneCall className="h-4 w-4 text-crm-blue" />
-                              Current Call
-                            </div>
-                            <Badge className="bg-green-100 text-green-800 animate-pulse">
-                              Active
-                            </Badge>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4">
-                          {(() => {
-                            const lead = leads.find(l => l.id === activeCallId);
-                            return lead ? (
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <Avatar className="h-10 w-10">
-                                    {lead.avatar ? (
-                                      <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                                    ) : (
-                                      <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                                        {lead.firstName ? lead.firstName.charAt(0) : '?'}
-                                      </AvatarFallback>
-                                    )}
-                                  </Avatar>
-                                  <div>
-                                    <div className="font-medium">{lead.firstName} {lead.lastName}</div>
-                                    <div className="text-sm text-gray-500 flex items-center gap-1">
-                                      <Phone className="h-3 w-3" />
-                                      {lead.phone1}
+                    <Card className="border rounded-md mb-4">
+                      <CardHeader className="pb-2 pt-3 px-4 border-b">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <PhoneCall className="h-4 w-4 text-crm-blue" />
+                          Active Calls
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4">
+                        {activeCalls.length > 0 ? (
+                          <div className="space-y-3">
+                            {activeCalls.map((call) => {
+                              const lead = leads.find(l => l.id === call.leadId);
+                              return (
+                                <div 
+                                  key={call.leadId}
+                                  className={`flex items-center justify-between p-3 rounded-md border ${
+                                    activeCallId === call.leadId ? 'bg-blue-50 border-blue-200' : ''
+                                  }`}
+                                  onClick={() => setActiveCallId(call.leadId)}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Avatar className="h-8 w-8">
+                                      {lead?.avatar ? (
+                                        <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                                      ) : (
+                                        <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
+                                          {lead?.firstName ? lead.firstName.charAt(0) : '?'}
+                                        </AvatarFallback>
+                                      )}
+                                    </Avatar>
+                                    <div>
+                                      <div className="font-medium">
+                                        {lead ? `${lead.firstName} ${lead.lastName}` : `Lead #${call.leadId}`}
+                                      </div>
+                                      <div className="text-xs text-gray-500">
+                                        {lead?.phone1 || 'No phone number'}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                                
-                                <div className="flex flex-col items-end">
-                                  <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
-                                    {lead.disposition || 'Not Contacted'}
-                                  </Badge>
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    Lead ID: {lead.id}
+                                  <div className="flex items-center gap-2">
+                                    {call.status === 'in-progress' && (
+                                      <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                    )}
+                                    {getCallStatusBadge(call.status)}
                                   </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <div className="flex items-center justify-center py-4 text-gray-500">
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Loading lead information...
-                              </div>
-                            );
-                          })()}
-                        </CardContent>
-                      </Card>
-                    )}
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center text-gray-500 p-4">
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Initializing calls...
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
                     
                     <Card className="border rounded-md mb-4 bg-gray-50">
                       <CardHeader className="pb-2 pt-3 px-4 border-b">
@@ -644,74 +559,22 @@ const AIDialer = () => {
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="p-4">
-                        <ScrollArea className="h-[150px]">
-                          <div className="flex flex-col gap-2 text-sm">
-                            {aiResponses.map((response, index) => (
-                              <div 
-                                key={index} 
-                                className={`
-                                  ${index === aiResponses.length - 1 ? 'animate-pulse' : ''}
-                                  flex items-start gap-2
-                                `}
-                              >
-                                {index === aiResponses.length - 1 && (
-                                  <span className="block w-2 h-2 rounded-full bg-green-500 mt-2"></span>
-                                )}
-                                <p>{response}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </ScrollArea>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card className="border rounded-md mb-4">
-                      <CardHeader className="pb-2 pt-3 px-4 border-b">
-                        <CardTitle className="text-sm font-medium flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <PhoneIncoming className="h-4 w-4 text-crm-blue" />
-                            Call Queue
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            {dialQueue.length} leads remaining
-                          </span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <ScrollArea className="h-[120px]">
-                          {dialQueue.length > 0 ? (
-                            <div className="divide-y">
-                              {dialQueue.slice(0, 5).map((leadId, index) => {
-                                const lead = leads.find(l => l.id === leadId);
-                                return lead ? (
-                                  <div 
-                                    key={leadId} 
-                                    className="flex items-center justify-between p-3"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <div className="bg-gray-100 rounded-full h-6 w-6 flex items-center justify-center text-xs font-medium text-gray-600">
-                                        {index + 1}
-                                      </div>
-                                      <span>{lead.firstName} {lead.lastName}</span>
-                                    </div>
-                                    <Badge className="bg-gray-100 text-gray-800">
-                                      Queued
-                                    </Badge>
-                                  </div>
-                                ) : null;
-                              })}
-                              {dialQueue.length > 5 && (
-                                <div className="p-3 text-center text-sm text-gray-500">
-                                  +{dialQueue.length - 5} more leads in queue
-                                </div>
+                        <div className="flex flex-col gap-2 text-sm">
+                          {aiResponses.map((response, index) => (
+                            <div 
+                              key={index} 
+                              className={`
+                                ${index === aiResponses.length - 1 ? 'animate-pulse' : ''}
+                                flex items-start gap-2
+                              `}
+                            >
+                              {index === aiResponses.length - 1 && (
+                                <span className="block w-2 h-2 rounded-full bg-green-500 mt-2"></span>
                               )}
+                              <p>{response}</p>
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-center h-[120px] text-gray-500">
-                              Queue is empty
-                            </div>
-                          )}
-                        </ScrollArea>
+                          ))}
+                        </div>
                       </CardContent>
                     </Card>
                     
@@ -719,11 +582,11 @@ const AIDialer = () => {
                       <CardHeader className="pb-2 pt-3 px-4">
                         <CardTitle className="text-sm font-medium">Activity Log</CardTitle>
                       </CardHeader>
-                      <ScrollArea className="h-[180px] rounded-md">
+                      <ScrollArea className="h-[220px] rounded-md">
                         <div className="p-4">
-                          {callLog.length > 0 ? (
+                          {callLogs.length > 0 ? (
                             <div className="space-y-2 text-sm">
-                              {callLog.map((log, index) => (
+                              {callLogs.map((log, index) => (
                                 <div key={index} className="text-gray-700">
                                   {log}
                                 </div>
@@ -760,26 +623,6 @@ const AIDialer = () => {
                   </div>
                 )}
               </CardContent>
-              {isDialing && (
-                <CardFooter className="bg-gray-50 border-t p-3 flex justify-between items-center">
-                  <div className="text-sm text-gray-500">
-                    {processedLeads.length > 0 ? (
-                      <span>Completed {processedLeads.length} calls</span>
-                    ) : (
-                      <span>Starting calls...</span>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-red-500 border-red-200 hover:bg-red-50"
-                    onClick={endDialingSession}
-                  >
-                    <PhoneOff className="h-4 w-4 mr-1" />
-                    Stop Dialer
-                  </Button>
-                </CardFooter>
-              )}
             </Card>
           </div>
         </div>
@@ -793,7 +636,7 @@ const AIDialer = () => {
                 size="icon" 
                 className="h-8 w-8" 
                 onClick={handleRefreshLeads}
-                disabled={isLoading || isDialing}
+                disabled={isLoading}
               >
                 <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
                 <span className="sr-only">Refresh leads</span>
@@ -817,10 +660,9 @@ const AIDialer = () => {
                       checked={isAllSelected}
                       onCheckedChange={handleSelectAllLeads}
                       aria-label="Select all"
-                      disabled={isDialing}
                     />
                   </TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Disposition</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Primary Phone</TableHead>
@@ -843,31 +685,7 @@ const AIDialer = () => {
                 ) : (
                   leads.map((lead) => {
                     const isActive = activeCallId === lead.id;
-                    const isQueued = dialQueue.includes(lead.id!);
-                    const isProcessed = processedLeads.includes(lead.id!);
-                    
-                    let rowStatus: string | React.ReactNode = '';
-                    
-                    if (isDialing) {
-                      if (isActive) {
-                        rowStatus = (
-                          <div className="flex items-center">
-                            <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                            <Badge className="bg-green-100 text-green-800">Active Call</Badge>
-                          </div>
-                        );
-                      } else if (isQueued) {
-                        rowStatus = <Badge className="bg-gray-100 text-gray-800">In Queue</Badge>;
-                      } else if (isProcessed) {
-                        rowStatus = <Badge className="bg-purple-100 text-purple-800">Completed</Badge>;
-                      }
-                    } else {
-                      rowStatus = (
-                        <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
-                          {lead.disposition || 'Not Contacted'}
-                        </Badge>
-                      );
-                    }
+                    const callInfo = activeCalls.find(c => c.leadId === lead.id);
                     
                     return (
                       <TableRow 
@@ -875,7 +693,7 @@ const AIDialer = () => {
                         className={`
                           hover:bg-gray-50 
                           ${isActive ? 'bg-blue-50' : ''}
-                          ${isProcessed && isDialing ? 'bg-gray-50' : ''}
+                          ${callInfo && callInfo.status === 'in-progress' ? 'animate-pulse' : ''}
                         `}
                       >
                         <TableCell>
@@ -883,11 +701,19 @@ const AIDialer = () => {
                             checked={lead.id ? selectedLeads.includes(lead.id) : false}
                             onCheckedChange={(checked) => lead.id && handleSelectLead(lead.id, !!checked)}
                             aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                            disabled={isDialing}
                           />
                         </TableCell>
                         <TableCell>
-                          {rowStatus}
+                          <div className="flex items-center gap-2">
+                            <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
+                              {lead.disposition || 'Not Contacted'}
+                            </Badge>
+                            {callInfo && (
+                              <span className="ml-2">
+                                {getCallStatusBadge(callInfo.status)}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="flex items-center gap-2">
                           <Avatar className="h-8 w-8">

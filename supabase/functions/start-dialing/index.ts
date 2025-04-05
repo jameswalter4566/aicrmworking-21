@@ -41,12 +41,38 @@ serve(async (req) => {
       
     console.log(`Filtered down to ${contactsToCall.length} contacts to call`);
 
-    // Changed: Instead of initiating all calls at once, we return the contacts and let the frontend handle sequencing
+    // Step 2: Start calling the contacts
+    const callResults = [];
+    const maxConcurrentCalls = Math.min(Number(lineCount), 3); // Maximum 3 lines
+    
+    // Take the first batch based on line count
+    const initialBatch = contactsToCall.slice(0, maxConcurrentCalls);
+    
+    for (const contact of initialBatch) {
+      try {
+        console.log(`Initiating call to contact: ${contact.id}`);
+        const callResult = await callThoughtlyContact(contact.id, interviewId);
+        callResults.push({
+          contactId: contact.id,
+          status: 'initiated',
+          result: callResult
+        });
+      } catch (callError) {
+        console.error(`Error calling contact ${contact.id}:`, callError);
+        callResults.push({
+          contactId: contact.id,
+          status: 'failed',
+          error: callError.message
+        });
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         contacts: contactsToCall,
-        message: "Ready to initiate calls in sequence",
+        callResults: callResults,
+        queuedContacts: contactsToCall.slice(maxConcurrentCalls),
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -118,6 +144,41 @@ async function getThoughtlyContacts(params: {
     return data.data?.contacts || [];
   } catch (error) {
     console.error('Error getting contacts from Thoughtly:', error);
+    throw error;
+  }
+}
+
+/**
+ * Call a contact through Thoughtly's API
+ */
+async function callThoughtlyContact(contactId: string, interviewId: string, metadata?: Record<string, any>) {
+  try {
+    console.log(`Calling contact ${contactId} with interview ${interviewId}`);
+    
+    // Use the hard-coded API credentials
+    const response = await fetch('https://api.thoughtly.com/contact/call', {
+      method: 'POST',
+      headers: {
+        'x-api-token': THOUGHTLY_API_TOKEN,
+        'team_id': THOUGHTLY_TEAM_ID,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contact_id: contactId,
+        interview_id: interviewId,
+        metadata: metadata || {}
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Thoughtly call API error (${response.status}): ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data.data || {};
+  } catch (error) {
+    console.error(`Error calling Thoughtly contact ${contactId}:`, error);
     throw error;
   }
 }
