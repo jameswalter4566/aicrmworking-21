@@ -24,3 +24,6 @@ verify_jwt = false
 
 [functions.generate-sms-csv]
 verify_jwt = false
+
+[functions.send-sms-csv-email]
+verify_jwt = false

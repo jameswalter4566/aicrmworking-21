@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Users, Tag, Calendar, Clock, UserPlus, Download } from "lucide-react";
+import { ArrowLeft, Users, Tag, Calendar, Clock, UserPlus, Download, Mail } from "lucide-react";
 import SMSSidebar from "@/components/sms/SMSSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
@@ -88,37 +89,28 @@ const SMSCampaign = () => {
     setIsSending(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('generate-sms-csv', {
+      const { data, error } = await supabase.functions.invoke('send-sms-csv-email', {
         body: JSON.stringify({
           contacts: contacts,
-          message: message
+          message: message,
+          campaignName: campaignName
         })
       });
 
       if (error) {
-        throw new Error(`Error generating CSV: ${error.message}`);
+        throw new Error(`Error sending campaign: ${error.message}`);
       }
 
-      const blob = new Blob([data], { type: 'text/csv' });
-      
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `sms_campaign_${new Date().toISOString().slice(0,10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
       toast({
-        title: "Campaign prepared",
-        description: "Your SMS campaign has been prepared and downloaded as CSV.",
+        title: "Campaign sent successfully",
+        description: "Your SMS campaign has been sent via email.",
         variant: "default",
       });
     } catch (error) {
       console.error("Error sending message:", error);
       toast({
         title: "Send failed",
-        description: "Failed to prepare SMS campaign. Please try again.",
+        description: "Failed to send SMS campaign. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -306,8 +298,8 @@ const SMSCampaign = () => {
                         onClick={handleSendMessage}
                         disabled={isSending || contacts.length === 0}
                       >
-                        {isSending ? "Preparing..." : "Send Message"}
-                        {isSending ? null : <Download className="ml-2 h-4 w-4" />}
+                        {isSending ? "Sending..." : "Send Campaign"}
+                        {isSending ? null : <Mail className="ml-2 h-4 w-4" />}
                       </Button>
                     </div>
                   </div>
