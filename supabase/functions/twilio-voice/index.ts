@@ -113,13 +113,17 @@ serve(async (req) => {
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
     const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID');
+    const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY');
+    const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET');
     
     // Log credential availability (not the values themselves)
     console.log("Twilio credentials loaded:", {
       accountSidAvailable: !!TWILIO_ACCOUNT_SID,
       authTokenAvailable: !!TWILIO_AUTH_TOKEN,
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER,
-      twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID
+      twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID,
+      apiKeyAvailable: !!TWILIO_API_KEY,
+      apiSecretAvailable: !!TWILIO_API_SECRET
     });
     
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
@@ -200,60 +204,71 @@ serve(async (req) => {
         );
       }
       
-      // Check if this is a browser-originated call or a direct REST API call
+      // Check if this is a browser-originated call 
       const isBrowserCall = requestData.browser === true || requestData.browser === 'true';
       
-      console.log(`Making call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}, browser mode: ${isBrowserCall}`);
+      console.log(`Processing makeCall action: number=${formattedPhoneNumber}, browserMode=${isBrowserCall}`);
       
-      try {
-        // Create a new call with enhanced TwiML for better audio
-        const callOptions: any = {
-          to: formattedPhoneNumber,
-          from: TWILIO_PHONE_NUMBER,
-          url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}&browser=${isBrowserCall ? 'true' : 'false'}`,
-          method: 'POST',
-          // Add statusCallback to monitor call progress
-          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
-          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-          statusCallbackMethod: 'POST'
-        };
-        
-        // For browser calls, we need to set up specific settings
-        if (isBrowserCall) {
-          // This is very important - we're telling Twilio to enable media streams for browser audio
-          callOptions.twiml = `<Response><Dial><Number>${formattedPhoneNumber}</Number></Dial><Start><Stream url="wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream" track="both_tracks"/></Start></Response>`;
-        }
-        
-        const call = await client.calls.create(callOptions);
-        
-        console.log("Call created successfully:", call.sid);
+      // CRITICAL CHANGE: For browser calls, we don't create the call server-side
+      // Instead, return info for the browser to use Twilio Device to initiate the call
+      if (isBrowserCall) {
+        console.log("Browser call requested - returning token and settings for client-side call initiation");
         
         return new Response(
           JSON.stringify({ 
             success: true, 
-            callSid: call.sid,
-            usingBrowser: isBrowserCall
+            browserCall: true,
+            twilioPhoneNumber: TWILIO_PHONE_NUMBER,
+            message: "Use Twilio Device in the browser to initiate this call"
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
-      } catch (error) {
-        console.error("Error creating call:", error);
-        
-        // More detailed error logging
-        const errorResponse = {
-          success: false, 
-          error: error.message || 'Failed to create call'
-        };
-        
-        // Add Twilio specific error details if available
-        if (error.code) errorResponse.code = error.code;
-        if (error.status) errorResponse.status = error.status;
-        if (error.moreInfo) errorResponse.moreInfo = error.moreInfo;
-        
-        return new Response(
-          JSON.stringify(errorResponse),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      } else {
+        try {
+          // Create a traditional REST API call (not for browser audio)
+          console.log(`Making server-side call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber}`);
+          
+          const callOptions: any = {
+            to: formattedPhoneNumber,
+            from: TWILIO_PHONE_NUMBER,
+            url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}`,
+            method: 'POST',
+            statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
+            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+            statusCallbackMethod: 'POST'
+          };
+          
+          const call = await client.calls.create(callOptions);
+          
+          console.log("Call created successfully:", call.sid);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              callSid: call.sid,
+              usingBrowser: false
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        } catch (error) {
+          console.error("Error creating call:", error);
+          
+          // More detailed error logging
+          const errorResponse = {
+            success: false, 
+            error: error.message || 'Failed to create call'
+          };
+          
+          // Add Twilio specific error details if available
+          if (error.code) errorResponse.code = error.code;
+          if (error.status) errorResponse.status = error.status;
+          if (error.moreInfo) errorResponse.moreInfo = error.moreInfo;
+          
+          return new Response(
+            JSON.stringify(errorResponse),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
     } else if (action === 'handleVoice' || !action) {
       // Process incoming voice requests from Twilio

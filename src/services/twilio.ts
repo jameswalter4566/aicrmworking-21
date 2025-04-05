@@ -494,119 +494,75 @@ class TwilioService {
       // Play a dialing sound to indicate call is starting
       this.playSound('dialtone');
       
-      // Try using browser audio first
-      if (this.device) {
-        try {
-          console.log("Using Twilio Device for browser-based calling");
-          
-          // Resume audio context if suspended
-          if (this.audioContext && this.audioContext.state !== 'running') {
-            console.log("Resuming audio context...");
-            await this.audioContext.resume();
-            console.log("Audio context state after resume:", this.audioContext.state);
-          }
-          
-          // Double check microphone stream is active
-          if (!this.audioStream || !this.audioStream.active) {
-            console.log("Audio stream inactive, requesting new microphone access");
-            try {
-              this.audioStream = await navigator.mediaDevices.getUserMedia({ 
-                audio: {
-                  echoCancellation: true,
-                  noiseSuppression: true,
-                  autoGainControl: true
-                } 
-              });
-            } catch (micError) {
-              console.error("Could not access microphone:", micError);
-            }
-          }
-          
-          // Ensure WebSocket is ready for audio streaming
-          if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-            this.setupAudioWebSocket();
-          }
-          
-          // Connect to Twilio with enhanced logging
-          console.log("Connecting with phone number:", formattedPhoneNumber);
-          
-          // Use the correct connection format expected by the Device API
-          this.connection = await this.device.connect({
-            To: formattedPhoneNumber
-          });
-          
-          console.log("Call connection established:", this.connection.parameters);
-          this.callActive = true;
-          
-          // Set up connection event listeners for audio monitoring
-          this.connection.on('volume', (inputVol: number, outputVol: number) => {
-            if (outputVol > 0.01) {
-              console.log(`AUDIO ACTIVE - Input: ${inputVol.toFixed(2)}, Output: ${outputVol.toFixed(2)}`);
-            }
-          });
-          
-          this.connection.on('warning', (warning: any) => {
-            console.warn('Connection warning:', warning.message);
-            // Try to recover from warnings when possible
-            if (warning.message.includes('audio input')) {
-              this.initializeAudioContext().then(success => {
-                console.log("Attempted to reinitialize audio after warning:", success);
-              });
-            }
-          });
-          
-          this.connection.on('disconnect', () => {
-            this.connection = null;
-            this.callActive = false;
-            console.log('Call ended');
-          });
-          
-          return { 
-            success: true, 
-            callSid: this.connection.parameters.CallSid,
-            usingBrowser: true 
-          };
-        } catch (deviceError) {
-          console.warn("Browser connection failed, details:", deviceError);
-          console.warn("Falling back to REST API call");
+      // CRITICAL CHANGE: Always use the Twilio Device in browser to make the call
+      try {
+        console.log("Using Twilio Device for browser-based calling");
+        
+        // Resume audio context if suspended
+        if (this.audioContext && this.audioContext.state !== 'running') {
+          console.log("Resuming audio context...");
+          await this.audioContext.resume();
+          console.log("Audio context state after resume:", this.audioContext.state);
         }
+        
+        // Double check microphone stream is active
+        if (!this.audioStream || !this.audioStream.active) {
+          console.log("Audio stream inactive, requesting new microphone access");
+          try {
+            this.audioStream = await navigator.mediaDevices.getUserMedia({ 
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+              } 
+            });
+          } catch (micError) {
+            console.error("Could not access microphone:", micError);
+          }
+        }
+        
+        // Ensure WebSocket is ready for audio streaming
+        if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+          this.setupAudioWebSocket();
+        }
+        
+        // Connect to Twilio with enhanced logging
+        console.log("Connecting with phone number:", formattedPhoneNumber);
+        
+        // Use the Twilio Device to make the call (BROWSER-INITIATED CALL)
+        this.connection = await this.device.connect({
+          To: formattedPhoneNumber
+        });
+        
+        console.log("Call connection established:", this.connection.parameters);
+        this.callActive = true;
+        
+        // Set up connection event listeners for audio monitoring
+        this.connection.on('volume', (inputVol: number, outputVol: number) => {
+          if (outputVol > 0.01) {
+            console.log(`AUDIO ACTIVE - Input: ${inputVol.toFixed(2)}, Output: ${outputVol.toFixed(2)}`);
+          }
+        });
+        
+        this.connection.on('warning', (warning: any) => {
+          console.warn('Connection warning:', warning.message);
+        });
+        
+        this.connection.on('disconnect', () => {
+          this.connection = null;
+          this.callActive = false;
+          console.log('Call ended');
+        });
+        
+        return { 
+          success: true, 
+          callSid: this.connection.parameters.CallSid,
+          usingBrowser: true 
+        };
+      } catch (deviceError) {
+        console.error("Browser connection failed, details:", deviceError);
+        return { success: false, error: deviceError.message || "Failed to connect call" };
       }
-      
-      // Fall back to Twilio REST API if browser Device fails
-      console.log("Making call via REST API");
-      
-      // CRITICAL FIX: Make sure to use the full URL and NO AUTH HEADERS
-      console.log("Sending request to Twilio Voice function with NO auth headers");
-      const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-          // IMPORTANT: NO Authorization headers - this causes 401 errors!
-        },
-        body: JSON.stringify({
-          action: 'makeCall',
-          phoneNumber: formattedPhoneNumber,
-          browser: true // Signal that we want browser audio streaming
-        })
-      });
-      
-      console.log("Twilio Voice response status:", response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server error:", errorText);
-        return { success: false, error: `Server returned ${response.status}: ${errorText}` };
-      }
-      
-      const result = await response.json();
-      console.log("Twilio Voice response:", result);
-      
-      if (!result.success) {
-        console.error("Failed to make call:", result.error);
-        return { success: false, error: result.error || "Failed to make call" };
-      }
-      
-      return { success: true, callSid: result.callSid, usingBrowser: false };
     } catch (error: any) {
       console.error('Error making call:', error);
       return { success: false, error: error.message || "An unknown error occurred" };
@@ -625,7 +581,6 @@ class TwilioService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
-          // IMPORTANT: NO Authorization headers - this causes 401 errors!
         },
         body: JSON.stringify({
           action: 'checkStatus',
