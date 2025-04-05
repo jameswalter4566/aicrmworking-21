@@ -972,7 +972,7 @@ const AIDialer = () => {
           </DialogHeader>
           
           <div className="px-6 py-4">
-            <IntelligentFileUpload onComplete={handleFileUploadComplete} />
+            <IntelligentFileUpload onImportComplete={handleFileUploadComplete} />
           </div>
         </DialogContent>
       </Dialog>
