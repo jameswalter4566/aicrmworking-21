@@ -963,4 +963,61 @@ class TwilioService {
       const audioElements = [
         this.audioElement,
         document.getElementById('ringtone') as HTMLAudioElement,
-        document.getElementById('outgoing') as HTMLAudioElement
+        document.getElementById('outgoing') as HTMLAudioElement,
+        document.getElementById('dialtone') as HTMLAudioElement
+      ];
+      
+      // Set the sink ID for all audio elements
+      for (const element of audioElements) {
+        if (element && 'setSinkId' in element) {
+          try {
+            await (element as any).setSinkId(deviceId);
+            console.log(`Set output device for audio element: ${element.id || 'main'}`);
+          } catch (err) {
+            console.warn(`Could not set output device for ${element.id || 'main'}:`, err);
+          }
+        }
+      }
+      
+      // Also update any active call connection
+      if (this.connection && typeof this.connection.setSinkId === 'function') {
+        try {
+          await this.connection.setSinkId(deviceId);
+          console.log("Updated audio output for active call");
+        } catch (err) {
+          console.warn("Could not update active call audio output:", err);
+        }
+      }
+      
+      return true;
+    } catch (err) {
+      console.error("Error setting audio output device:", err);
+      return false;
+    }
+  }
+  
+  async getAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        console.warn("MediaDevices API not supported");
+        return [];
+      }
+      
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+      
+      return audioOutputs;
+    } catch (err) {
+      console.error("Error getting audio output devices:", err);
+      return [];
+    }
+  }
+  
+  getCurrentAudioDevice(): string {
+    return this.currentAudioOutputDevice;
+  }
+}
+
+// Create singleton instance
+const twilioService = new TwilioService();
+export { twilioService };
