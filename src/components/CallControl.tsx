@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones, RefreshCcw } from 'lucide-react';
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { audioProcessing } from '@/services/audioProcessing';
 
 interface CallControlProps {
   isMuted: boolean;
@@ -37,6 +39,52 @@ const CallControl: React.FC<CallControlProps> = ({
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  
+  // Initialize audio devices and connection
+  useEffect(() => {
+    loadAudioDevices();
+    
+    // Connect to the audio processing service
+    audioProcessing.connect({
+      onConnectionStatus: (connected) => {
+        setIsConnected(connected);
+        if (connected) {
+          toast({
+            title: "Audio Connection Established",
+            description: "Audio streaming connection is ready.",
+          });
+        }
+      },
+      onStreamStarted: () => {
+        setIsConnected(true);
+        toast({
+          title: "Audio Stream Started",
+          description: "Bidirectional audio stream is now active.",
+        });
+      },
+      onStreamStopped: () => {
+        setIsConnected(false);
+      }
+    });
+    
+    // Set up audio level simulation for connected calls
+    const interval = setInterval(() => {
+      if (audioStreaming) {
+        setAudioLevel(prev => {
+          const change = (Math.random() - 0.5) * 0.3;
+          const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
+          return newLevel;
+        });
+      } else {
+        setAudioLevel(0);
+      }
+    }, 200);
+    
+    return () => {
+      clearInterval(interval);
+    };
+  }, [audioStreaming]);
   
   const loadAudioDevices = async () => {
     try {
@@ -93,16 +141,6 @@ const CallControl: React.FC<CallControlProps> = ({
     }
   };
   
-  useEffect(() => {
-    loadAudioDevices();
-    
-    navigator.mediaDevices?.addEventListener('devicechange', loadAudioDevices);
-    
-    return () => {
-      navigator.mediaDevices?.removeEventListener('devicechange', loadAudioDevices);
-    };
-  }, [onAudioDeviceChange]);
-  
   const handleDeviceChange = (deviceId: string) => {
     console.log(`Selecting audio device: ${deviceId}`);
     setSelectedDeviceId(deviceId);
@@ -125,20 +163,6 @@ const CallControl: React.FC<CallControlProps> = ({
       }
     }
   };
-  
-  useEffect(() => {
-    if (!audioStreaming) return;
-    
-    const interval = setInterval(() => {
-      setAudioLevel(prev => {
-        const change = (Math.random() - 0.5) * 0.3;
-        const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
-        return newLevel;
-      });
-    }, 200);
-    
-    return () => clearInterval(interval);
-  }, [audioStreaming]);
   
   return (
     <div className={cn('flex flex-col items-center justify-center gap-4', className)}>

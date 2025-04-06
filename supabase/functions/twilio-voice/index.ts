@@ -206,12 +206,16 @@ serve(async (req) => {
       // Set WebSocket URL for audio stream
       const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
       
+      // IMPORTANT: Fixed TwiML sequence to properly handle the call flow
       const callOptions = {
         to: formattedPhoneNumber,
         from: TWILIO_PHONE_NUMBER,
         twiml: `
           <Response>
             <Say voice="alice">Connecting your call now.</Say>
+            <Dial callerId="${TWILIO_PHONE_NUMBER}">
+              <Number>${formattedPhoneNumber}</Number>
+            </Dial>
             <Connect>
               <Stream url="${streamUrl}" track="both_tracks">
                 <Parameter name="callType" value="outbound" />
@@ -273,7 +277,7 @@ serve(async (req) => {
       console.log("Generating TwiML for call connection with Stream");
       
       if (requestData.Caller && requestData.Caller.startsWith('client:')) {
-        // Browser to phone call
+        // Browser to phone call - FIXED SEQUENCE
         console.log("Browser to phone call - setting up bidirectional stream");
         
         twimlResponse.say({ 
@@ -281,6 +285,21 @@ serve(async (req) => {
           language: 'en-US' 
         }, 'Connecting your call now.');
         
+        // First dial the phone number
+        const formattedNumber = normalizePhoneNumber(phoneNumber);
+        const dial = twimlResponse.dial({
+          callerId: TWILIO_PHONE_NUMBER,
+          answerOnBridge: true,
+          // Add this timeout to ensure the call doesn't hang indefinitely
+          timeout: 30
+        });
+        
+        dial.number({
+          statusCallbackEvent: ['answered', 'completed'],
+          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
+        }, formattedNumber);
+        
+        // After dialing, set up the streaming connection
         const connect = twimlResponse.connect();
         connect.stream({
           url: streamUrl,
@@ -290,21 +309,8 @@ serve(async (req) => {
           name: 'callType',
           value: 'browser_to_phone'
         });
-        
-        // Dial the phone number after establishing the stream
-        if (phoneNumber) {
-          const dial = twimlResponse.dial({
-            callerId: TWILIO_PHONE_NUMBER,
-            answerOnBridge: true
-          });
-          
-          const formattedNumber = normalizePhoneNumber(phoneNumber);
-          dial.number({
-            statusCallbackEvent: ['answered', 'completed'],
-            statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
-          }, formattedNumber);
-        }
-      } else if (phoneNumber && phoneNumber.startsWith('client:')) {
+      } 
+      else if (phoneNumber && phoneNumber.startsWith('client:')) {
         // Phone to browser call
         console.log("Phone to browser call - setting up bidirectional stream");
         
@@ -330,12 +336,27 @@ serve(async (req) => {
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
         }, phoneNumber.replace('client:', ''));
       } else {
-        // Standard phone call
+        // Standard phone call - FIXED SEQUENCE
         console.log("Standard phone call with bidirectional streaming");
         
         twimlResponse.say({ voice: 'alice' }, 'Connecting your call.');
         
-        // Set up bidirectional stream first
+        // First dial the number
+        if (phoneNumber) {
+          const dial = twimlResponse.dial({
+            callerId: TWILIO_PHONE_NUMBER,
+            answerOnBridge: true,
+            timeout: 30
+          });
+          
+          const formattedNumber = normalizePhoneNumber(phoneNumber);
+          dial.number({
+            statusCallbackEvent: ['answered', 'completed'],
+            statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
+          }, formattedNumber);
+        }
+        
+        // Then set up the stream
         const connect = twimlResponse.connect();
         connect.stream({
           url: streamUrl,
@@ -345,19 +366,6 @@ serve(async (req) => {
           name: 'callType', 
           value: 'standard'
         });
-        
-        if (phoneNumber) {
-          const dial = twimlResponse.dial({
-            callerId: TWILIO_PHONE_NUMBER,
-            answerOnBridge: true
-          });
-          
-          const formattedNumber = normalizePhoneNumber(phoneNumber);
-          dial.number({
-            statusCallbackEvent: ['answered', 'completed'],
-            statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
-          }, formattedNumber);
-        }
       }
       
       const twimlString = twimlResponse.toString();

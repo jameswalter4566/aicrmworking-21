@@ -11,6 +11,7 @@ import PowerDialer from "./pages/PowerDialer";
 import AIDialer from "./pages/AIDialer";
 import SMSCampaign from "./pages/SMSCampaign";
 import NotFound from "./pages/NotFound";
+import TwilioScript from "./components/TwilioScript";
 
 const queryClient = new QueryClient();
 
@@ -19,6 +20,10 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <TwilioScript 
+        onLoad={() => console.log("Twilio SDK loaded and ready!")}
+        onError={(error) => console.error("Error loading Twilio SDK:", error)}
+      />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />

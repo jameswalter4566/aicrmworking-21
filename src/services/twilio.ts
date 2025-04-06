@@ -1,1071 +1,509 @@
-// Importing any necessary dependencies
-import { Device } from 'twilio-client';
-
-// Define interface for audio chunks in the queue
-interface AudioChunk {
-  track: string;
-  timestamp: number;
-  payload: string;
-}
+// src/services/twilio.ts
 
 class TwilioService {
-  private device: Device | null = null;
-  private connection: any = null;
-  private audioContext: AudioContext | null = null;
-  private analyser: AnalyserNode | null = null;
-  private microphone: MediaStreamAudioSourceNode | null = null;
-  private microphoneInitialized: boolean = false;
-  private audioOutputInitialized: boolean = false;
-  private supabaseUrl: string = "https://imrmboyczebjlbnkgjns.supabase.co";
-  private audioStream: MediaStream | null = null;
-  private audioElement: HTMLAudioElement | null = null;
-  private socket: WebSocket | null = null;
-  private audioQueue: AudioChunk[] = [];
-  private isProcessingAudio: boolean = false;
-  private audioBufferArray: Float32Array[] = [];
-  private callActive: boolean = false;
-  private dialToneSound: HTMLAudioElement | null = null;
-  private ringingSound: HTMLAudioElement | null = null;
-  private streamingActive: boolean = false;
-  private keepAliveInterval: number | null = null;
-  private reconnectAttempts: number = 0;
-  private maxReconnectAttempts: number = 5;
-  private currentAudioOutputDevice: string = 'default';
-  private streamSid: string | null = null;
-  private callSid: string | null = null;
-  private inboundAudioQueue: AudioChunk[] = [];
-  private outboundAudioQueue: AudioChunk[] = [];
-  
-  constructor() {
-    // Create audio element for output testing and call sounds
-    this.audioElement = document.createElement('audio');
-    this.audioElement.autoplay = true;
-    document.body.appendChild(this.audioElement);
-    
-    // Add hidden audio elements for call sounds
-    this.createHiddenAudio('ringtone', '/sounds/ringtone.mp3');
-    this.createHiddenAudio('outgoing', '/sounds/outgoing.mp3');
-    this.createHiddenAudio('dialtone', '/sounds/dialtone.mp3');
-    
-    // Initialize dial tone for immediate feedback when calling
-    this.dialToneSound = document.getElementById('dialtone') as HTMLAudioElement;
-    this.ringingSound = document.getElementById('outgoing') as HTMLAudioElement;
-    
-    // Setup WebSocket connection for audio streaming
-    this.setupAudioWebSocket();
-    
-    // Initialize AudioContext for better browser compatibility
-    this.initializeAudioContext().catch(err => {
-      console.warn("Initial audio context setup failed:", err);
-    });
-  }
-  
-  private createHiddenAudio(id: string, src: string) {
-    const audio = document.createElement('audio');
-    audio.id = id;
-    audio.src = src;
-    audio.preload = 'auto';
-    document.body.appendChild(audio);
-  }
-  
-  private playSound(soundId: string) {
-    const sound = document.getElementById(soundId) as HTMLAudioElement;
-    if (sound) {
-      sound.currentTime = 0;
-      sound.play().catch(err => console.warn(`Error playing ${soundId} sound:`, err));
-    }
-  }
-  
-  private stopSound(soundId: string) {
-    const sound = document.getElementById(soundId) as HTMLAudioElement;
-    if (sound && !sound.paused) {
-      sound.pause();
-      sound.currentTime = 0;
-    }
-  }
-  
-  // Set up WebSocket for call audio streaming
-  private setupAudioWebSocket() {
-    if (this.socket?.readyState === WebSocket.OPEN) {
-      console.log("WebSocket already connected");
-      return this.socket;
-    }
+  private device: any = null;
+  private call: any = null;
+  private token: string | null = null;
+  private isInitialized: boolean = false;
+  private isAudioContextInitialized: boolean = false;
+  private microphoneStream: MediaStream | null = null;
+  private audioOutputDevices: MediaDeviceInfo[] = [];
+  private currentAudioDeviceId: string = '';
+  private hasActiveCall: boolean = false;
 
+  // Initialize the Twilio device
+  async initializeTwilioDevice(): Promise<boolean> {
     try {
-      const wsUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
-      console.log(`Connecting to WebSocket at ${wsUrl}`);
+      console.log("Initializing Twilio Device...");
+      const tokenResponse = await this.fetchToken();
       
-      this.socket = new WebSocket(wsUrl);
-      
-      this.socket.onopen = () => {
-        console.log("WebSocket connection opened for audio streaming");
-        this.startKeepAlive();
-        
-        if (this.socket) {
-          this.socket.send(JSON.stringify({
-            event: 'browser_connect',
-            clientType: 'browser'
-          }));
-        }
-      };
-      
-      this.socket.onmessage = async (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log("WebSocket message received:", data.event);
-          
-          if (data.event === 'audio') {
-            this.streamingActive = true;
-            console.log(`Received audio data for track: ${data.track}, sequence: ${data.sequence}`);
-            
-            if (!this.audioContext) {
-              await this.initializeAudioContext();
-            }
-
-            // Convert base64 audio data to array buffer
-            const audioData = this.base64ToArrayBuffer(data.payload);
-            const audioBuffer = await this.createAudioBufferFromPCM(audioData);
-            
-            if (audioBuffer && this.audioContext) {
-              const source = this.audioContext.createBufferSource();
-              source.buffer = audioBuffer;
-              
-              const gainNode = this.audioContext.createGain();
-              gainNode.gain.value = 1.0;
-              
-              source.connect(gainNode);
-              gainNode.connect(this.audioContext.destination);
-              
-              source.start();
-              console.log("Playing received audio chunk");
-            }
-          } else if (data.event === 'streamStart') {
-            console.log("Call audio stream started:", data);
-            this.streamSid = data.streamSid;
-            this.callSid = data.callSid;
-            this.stopSound('ringtone');
-            this.stopSound('outgoing');
-            this.stopSound('dialtone');
-            this.streamingActive = true;
-          } else if (data.event === 'streamStop') {
-            console.log("Call audio stream stopped:", data);
-            this.streamingActive = false;
-            this.streamSid = null;
-            this.callSid = null;
-          } else if (data.event === 'connected' || data.event === 'connected_ack') {
-            console.log("Twilio WebSocket protocol connected:", data);
-          } else if (data.event === 'browser_connected' || data.event === 'connection_established') {
-            console.log("WebSocket connection confirmed:", data);
-          } else if (data.event === 'mark') {
-            console.log("Mark received:", data);
-          } else if (data.event === 'dtmf') {
-            console.log("DTMF received:", data);
-          } else if (data.event === 'pong') {
-            // Keep-alive pong received (silent)
-          } else {
-            console.log("Unknown event type received:", data.event);
-          }
-        } catch (err) {
-          console.error("Error processing WebSocket message:", err);
-        }
-      };
-      
-      this.socket.onerror = (error) => {
-        console.error("WebSocket error:", error);
-        this.streamingActive = false;
-      };
-      
-      this.socket.onclose = (event) => {
-        console.log(`WebSocket closed: ${event.code} ${event.reason}`);
-        this.streamingActive = false;
-        this.stopKeepAlive();
-        
-        if (this.callActive && this.reconnectAttempts < this.maxReconnectAttempts) {
-          this.reconnectAttempts++;
-          console.log(`Attempting to reconnect WebSocket (attempt ${this.reconnectAttempts})`);
-          setTimeout(() => this.setupAudioWebSocket(), 2000);
-        }
-        
-        this.socket = null;
-      };
-      
-      return this.socket;
-    } catch (err) {
-      console.error("Failed to set up WebSocket:", err);
-      this.streamingActive = false;
-      return null;
-    }
-  }
-  
-  // Keep the WebSocket connection alive with pings
-  private startKeepAlive() {
-    this.stopKeepAlive(); // Clear any existing interval
-    
-    this.keepAliveInterval = window.setInterval(() => {
-      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-        this.socket.send(JSON.stringify({
-          event: 'ping',
-          timestamp: Date.now()
-        }));
-      }
-    }, 30000); // Send ping every 30 seconds
-  }
-  
-  private stopKeepAlive() {
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-      this.keepAliveInterval = null;
-    }
-  }
-  
-  // Send microphone audio to the WebSocket
-  public sendAudioChunk(audioData: Float32Array) {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || !this.streamSid) {
-      return false;
-    }
-    
-    try {
-      // Convert float audio data to 16-bit PCM
-      const buffer = new ArrayBuffer(audioData.length * 2);
-      const view = new DataView(buffer);
-      
-      for (let i = 0; i < audioData.length; i++) {
-        const s = Math.max(-1, Math.min(1, audioData[i]));
-        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      if (!tokenResponse?.token) {
+        console.error("Failed to get token from server");
+        return false;
       }
       
-      // Convert to base64
-      const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+      this.token = tokenResponse.token;
       
-      // Send to Twilio
-      this.socket.send(JSON.stringify({
-        event: 'media',
-        streamSid: this.streamSid,
-        media: {
-          payload: base64Audio
-        }
-      }));
+      // Check if Twilio.Device is available
+      if (!window.Twilio || !window.Twilio.Device) {
+        console.error("Twilio Device not found. Script may not be loaded.");
+        this.loadTwilioScript();
+        return false;
+      }
+
+      // Create a new Twilio.Device
+      this.device = new window.Twilio.Device(this.token, {
+        codecPreferences: ['opus', 'pcmu'],
+        fakeLocalDTMF: true,
+        enableRingingState: true,
+        debug: true
+      });
+      
+      // Set up event listeners
+      this.setupDeviceEvents();
+      
+      // Register to receive incoming calls
+      this.device.register();
+      
+      this.isInitialized = true;
+      console.log("Twilio Device initialized successfully");
       
       return true;
-    } catch (err) {
-      console.error("Error sending audio chunk:", err);
+    } catch (error) {
+      console.error("Error initializing Twilio Device:", error);
       return false;
     }
   }
-  
-  // Process audio chunks in the queue
-  private async processAudioQueue() {
-    if (!this.audioQueue.length) {
-      this.isProcessingAudio = false;
+
+  // Try to load the Twilio script if it's not already loaded
+  private loadTwilioScript(): void {
+    console.log("Attempting to load Twilio script...");
+    
+    const existingScript = document.getElementById('twilio-js');
+    if (existingScript) {
+      console.log("Twilio script already exists, not loading again");
       return;
     }
     
-    this.isProcessingAudio = true;
+    const script = document.createElement('script');
+    script.id = 'twilio-js';
+    script.src = 'https://sdk.twilio.com/js/client/releases/1.14.0/twilio.js';
+    script.async = true;
+    script.onload = () => {
+      console.log("Twilio script loaded successfully");
+      setTimeout(() => this.initializeTwilioDevice(), 1000);
+    };
+    script.onerror = (error) => {
+      console.error("Failed to load Twilio script:", error);
+    };
     
+    document.head.appendChild(script);
+  }
+
+  // Set up event listeners for the Twilio Device
+  private setupDeviceEvents(): void {
+    if (!this.device) return;
+    
+    this.device.on('ready', () => {
+      console.log("Twilio Device is ready for calls");
+    });
+    
+    this.device.on('error', (error: any) => {
+      console.error("Twilio Device error:", error);
+    });
+    
+    this.device.on('incoming', (call: any) => {
+      console.log("Incoming call from:", call.parameters.From);
+    });
+    
+    this.device.on('offline', () => {
+      console.log("Twilio Device is offline");
+      this.isInitialized = false;
+    });
+    
+    this.device.on('tokenWillExpire', () => {
+      console.log("Token will expire soon, refreshing...");
+      this.refreshToken();
+    });
+  }
+
+  // Fetch a new token from the server
+  private async fetchToken(): Promise<{ token: string; identity: string; } | null> {
     try {
-      const chunk = this.audioQueue.shift();
-      
-      if (chunk && this.audioContext) {
-        const audioData = this.base64ToArrayBuffer(chunk.payload);
-        const audioBuffer = await this.createAudioBufferFromPCM(audioData);
-        
-        if (audioBuffer) {
-          console.log(`Playing audio buffer - Duration: ${audioBuffer.duration.toFixed(2)}s`);
-          
-          const source = this.audioContext.createBufferSource();
-          source.buffer = audioBuffer;
-          
-          const gainNode = this.audioContext.createGain();
-          gainNode.gain.value = 1.0;
-          
-          source.connect(gainNode);
-          gainNode.connect(this.audioContext.destination);
-          
-          source.start();
-          
-          await new Promise<void>((resolve) => {
-            source.onended = () => resolve();
-            setTimeout(() => resolve(), audioBuffer.duration * 1000 + 100);
-          });
-          
-          console.log("Audio chunk finished playing");
-        } else {
-          console.error("Failed to create audio buffer");
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         }
-      }
-    } catch (err) {
-      console.error("Error processing audio queue:", err);
-    } finally {
-      if (this.audioQueue.length > 0) {
-        this.processAudioQueue();
-      } else {
-        this.isProcessingAudio = false;
-      }
-    }
-  }
-  
-  // Convert base64 to array buffer
-  private base64ToArrayBuffer(base64: string): Uint8Array {
-    const binary = atob(base64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    return bytes;
-  }
-  
-  // Create audio buffer from PCM data - CRITICAL FUNCTION FOR AUDIO PLAYBACK
-  private async createAudioBufferFromPCM(pcmData: Uint8Array): Promise<AudioBuffer | null> {
-    if (!this.audioContext) {
-      console.error("AudioContext not initialized");
-      await this.initializeAudioContext();
-      if (!this.audioContext) {
+      });
+      
+      const data = await response.json();
+      
+      if (!data.token) {
+        console.error("No token received from server");
         return null;
       }
-    }
-    
-    try {
-      const samples = new Int16Array(pcmData.buffer);
       
-      const sampleRate = 8000;
-      const audioBuffer = this.audioContext.createBuffer(1, samples.length, sampleRate);
-      const channelData = audioBuffer.getChannelData(0);
-      
-      for (let i = 0; i < samples.length; i++) {
-        channelData[i] = samples[i] / 32768;
-      }
-      
-      return audioBuffer;
-    } catch (err) {
-      console.error("Error creating audio buffer:", err);
+      return {
+        token: data.token,
+        identity: data.identity
+      };
+    } catch (error) {
+      console.error("Error fetching Twilio token:", error);
       return null;
     }
   }
-  
-  async initializeAudioContext() {
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      
-      if (!AudioContextClass) {
-        console.error("AudioContext not supported in this browser");
-        return false;
-      }
-      
-      if (!this.audioContext) {
-        this.audioContext = new AudioContextClass({
-          sampleRate: 48000
-        });
-        
-        console.log("AudioContext created successfully:", this.audioContext);
-        console.log("AudioContext state:", this.audioContext.state);
-        
-        if (this.audioContext.state === 'suspended') {
-          await this.audioContext.resume();
-          console.log("AudioContext resumed:", this.audioContext.state);
-        }
-      }
-      
-      console.log("Requesting microphone access...");
-      try {
-        // Explicitly request microphone with enhanced configuration for call quality
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          audio: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true,
-            sampleRate: 48000,
-            channelCount: 1
-          } 
-        });
-        
-        console.log("Microphone access granted with stream:", stream);
-        console.log("Audio tracks:", stream.getAudioTracks().length);
-        console.log("Audio track settings:", stream.getAudioTracks()[0]?.getSettings());
-        
-        this.audioStream = stream;
-        
-        this.analyser = this.audioContext.createAnalyser();
-        this.analyser.fftSize = 256;
-        
-        this.microphone = this.audioContext.createMediaStreamSource(stream);
-        this.microphone.connect(this.analyser);
-        
-        // Add explicit audio processor to monitor audio levels and send to WebSocket
-        const processor = this.audioContext.createScriptProcessor(1024, 1, 1);
-        this.microphone.connect(processor);
-        processor.connect(this.audioContext.destination);
-        
-        processor.onaudioprocess = (e) => {
-          const input = e.inputBuffer.getChannelData(0);
-          let sum = 0;
-          
-          // Calculate RMS (root mean square) to get audio level
-          for (let i = 0; i < input.length; i++) {
-            sum += input[i] * input[i];
-          }
-          
-          const rms = Math.sqrt(sum / input.length);
-          
-          // Only send if we have active streaming and the level is high enough
-          if (this.streamingActive && this.streamSid && rms > 0.005) {
-            this.sendAudioChunk(input);
-          }
-        };
-        
-        await this.testAudioOutput();
-        
-        this.microphoneInitialized = true;
-        console.log("Audio context initialized successfully with enhanced audio settings");
-        
-        return true;
-      } catch (micError) {
-        console.error('Error accessing microphone:', micError);
-        
-        this.microphoneInitialized = false;
-        return false;
-      }
-    } catch (error) {
-      console.error('Error initializing audio context:', error);
-      this.microphoneInitialized = false;
+
+  // Refresh the token
+  private async refreshToken(): Promise<boolean> {
+    const tokenData = await this.fetchToken();
+    
+    if (!tokenData?.token) {
+      console.error("Failed to refresh token");
       return false;
-    }
-  }
-  
-  isMicrophoneActive() {
-    if (!this.analyser || !this.microphoneInitialized) return false;
-    
-    const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-    this.analyser.getByteFrequencyData(dataArray);
-    
-    const hasAudioSignal = dataArray.some(value => value > 5);
-    
-    return hasAudioSignal;
-  }
-  
-  isStreamingActive() {
-    return this.streamingActive;
-  }
-  
-  async initializeTwilioDevice() {
-    try {
-      // Ensure microphone is initialized first - critical for audio transmission
-      if (!this.microphoneInitialized) {
-        console.log("Microphone not initialized, initializing now...");
-        const audioInitialized = await this.initializeAudioContext();
-        if (!audioInitialized) {
-          console.error("Failed to initialize audio context, cannot proceed with Twilio setup");
-          return false;
-        }
-      }
-      
-      console.log("Fetching Twilio token...");
-      const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ action: 'getToken' })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Error fetching token: ${response.status} - ${errorText}`);
-        return false;
-      }
-      
-      const data = await response.json();
-      console.log("Token response:", data);
-      
-      if (!data.token) {
-        console.error('Failed to get Twilio token - no token in response');
-        throw new Error('Failed to get Twilio token');
-      }
-      
-      console.log("Twilio token received, initializing device");
-      
-      if (this.device) {
-        console.log("Destroying existing Twilio device");
-        this.device.destroy();
-        this.device = null;
-      }
-      
-      this.device = new Device();
-      
-      // Configure Twilio Device with explicit audio settings
-      const deviceOptions = {
-        debug: true,
-        enableRingtone: true,
-        // Critical codec preferences for better audio quality
-        codecPreferences: ['opus', 'pcmu'],
-        // Critical for microphone access
-        audioConstraints: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // Force specific audio constraints for better compatibility
-          peerConnection: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' }
-            ]
-          }
-        },
-        // Set higher outgoing volume
-        outgoingSoundVolume: 1.0,
-        // Set higher incoming volume
-        incomingSoundVolume: 1.0,
-        // Ensure sounds are played
-        sounds: {
-          incoming: '/sounds/ringtone.mp3',
-          outgoing: '/sounds/outgoing.mp3'
-        }
-      };
-      
-      this.device.on('ready', () => {
-        console.log('Twilio device is ready for calls');
-        // Verify microphone access for debugging
-        navigator.mediaDevices.getUserMedia({ audio: true })
-          .then(stream => {
-            console.log('Microphone permission verified on device ready');
-            // Track is established, release the stream
-            stream.getTracks().forEach(track => track.stop());
-          })
-          .catch(err => {
-            console.error('Error verifying microphone permission:', err);
-          });
-      });
-      
-      this.device.on('error', (error) => {
-        console.error('Twilio device error:', error);
-      });
-      
-      this.device.on('connect', (conn) => {
-        console.log('Call connected - audio channels established');
-        this.connection = conn;
-        this.callActive = true;
-        
-        try {
-          // Ensure connection is not muted
-          conn.mute(false);
-          console.log("Connection un-muted explicitly");
-          
-          // Check if audio tracks are available
-          if (this.audioStream && this.audioStream.getAudioTracks().length > 0) {
-            console.log("Audio track enabled status:", this.audioStream.getAudioTracks()[0].enabled);
-            // Ensure audio track is enabled
-            this.audioStream.getAudioTracks()[0].enabled = true;
-          }
-        } catch (e) {
-          console.warn('Could not unmute connection:', e);
-        }
-        
-        // Resume audio context if suspended
-        if (this.audioContext && this.audioContext.state === 'suspended') {
-          this.audioContext.resume().then(() => {
-            console.log('Audio context resumed for active call');
-          });
-        }
-        
-        this.stopSound('ringtone');
-        this.stopSound('outgoing');
-        this.stopSound('dialtone');
-        
-        // Add volume monitor for debugging
-        conn.on('volume', (inputVolume: number, outputVolume: number) => {
-          console.log(`Audio levels - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
-          
-          if (inputVolume < 0.01) {
-            console.warn('Very low or no outgoing audio detected - check microphone');
-          }
-          
-          if (outputVolume < 0.01) {
-            console.warn('Very low or no incoming audio detected');
-          }
-        });
-        
-        conn.on('warning', (warning: any) => {
-          console.warn('Connection warning:', warning.message);
-        });
-      });
-      
-      this.device.on('disconnect', () => {
-        console.log('Call disconnected - audio channels closed');
-        this.connection = null;
-        this.callActive = false;
-        
-        this.stopSound('ringtone');
-        this.stopSound('outgoing');
-        this.stopSound('dialtone');
-      });
-      
-      this.device.on('offline', () => {
-        console.log('Twilio device is offline');
-      });
-      
-      this.device.on('incoming', (conn: any) => {
-        console.log('Incoming call detected');
-        this.playSound('ringtone');
-      });
-      
-      // Setup and initialize the device with token and options
-      await this.device.setup(data.token, deviceOptions as any);
-      
-      await this.testAudioOutput();
-      
-      return true;
-    } catch (error) {
-      console.error('Error initializing Twilio device:', error);
-      return false;
-    }
-  }
-  
-  private normalizePhoneNumber(phoneNumber: string): string {
-    if (!phoneNumber) return '';
-    
-    const digitsOnly = phoneNumber.replace(/\D/g, '');
-    
-    if (digitsOnly.length === 10) {
-      return `+1${digitsOnly}`;
-    } else if (digitsOnly.length > 10 && !digitsOnly.startsWith('1')) {
-      return `+${digitsOnly}`;
-    } else if (digitsOnly.length > 10 && digitsOnly.startsWith('1')) {
-      return `+${digitsOnly}`;
     }
     
-    return digitsOnly ? `+${digitsOnly}` : '';
-  }
-  
-  async makeCall(phoneNumber: string) {
-    try {
-      console.log(`Making Twilio call to ${phoneNumber}`);
-      
-      if (!phoneNumber) {
-        console.error("Phone number is required");
-        return { success: false, error: "Phone number is required" };
-      }
-      
-      const formattedPhoneNumber = this.normalizePhoneNumber(phoneNumber);
-      
-      if (!formattedPhoneNumber) {
-        console.error("Invalid phone number format");
-        return { success: false, error: "Invalid phone number format" };
-      }
-      
-      // Ensure microphone access and permissions before making call
-      if (!this.audioStream || !this.audioStream.active) {
-        console.log("Audio stream inactive or not initialized, requesting permission");
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 48000
-            }
-          });
-          
-          this.audioStream = stream;
-          console.log("New audio stream acquired:", stream);
-          console.log("Audio tracks in stream:", stream.getAudioTracks().length);
-          
-          // Ensure tracks are enabled
-          stream.getAudioTracks().forEach(track => {
-            track.enabled = true;
-            console.log("Audio track enabled:", track.enabled);
-            console.log("Audio track settings:", track.getSettings());
-          });
-          
-          // Create new audio context if needed
-          if (!this.audioContext || this.audioContext.state === 'closed') {
-            await this.initializeAudioContext();
-          } else if (this.audioContext.state === 'suspended') {
-            await this.audioContext.resume();
-          }
-        } catch (micError) {
-          console.error("Could not access microphone:", micError);
-          return { success: false, error: "Microphone access denied" };
-        }
-      }
-      
-      if (!this.device || this.device.status() !== 'ready') {
-        console.log("Twilio device not ready, attempting to initialize...");
-        const initialized = await this.initializeTwilioDevice();
-        if (!initialized) {
-          return { success: false, error: "Failed to initialize Twilio device" };
-        }
-      }
-      
-      this.playSound('dialtone');
-      
-      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        this.setupAudioWebSocket();
-      }
-      
-      this.audioQueue = [];
-      
-      try {
-        console.log("Using Twilio Device for browser-based calling");
-        
-        if (this.audioContext && this.audioContext.state !== 'running') {
-          console.log("Resuming audio context...");
-          await this.audioContext.resume();
-          console.log("Audio context state after resume:", this.audioContext.state);
-        }
-        
-        console.log("Connecting with phone number:", formattedPhoneNumber);
-        
-        // Define audio constraints separately for clarity
-        const audioConstraints = {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // These are critical for proper audio transmission
-          peerConnection: {
-            iceServers: [
-              { urls: 'stun:stun.l.google.com:19302' }
-            ]
-          }
-        };
-        
-        // Create params with just the To parameter - FIX: Convert boolean to string
-        const params = {
-          To: formattedPhoneNumber,
-          // Fix: Convert boolean to string to match the expected type
-          enableMicrophone: 'true'
-        };
-        
-        console.log("Call parameters:", params);
-        console.log("Audio constraints:", audioConstraints);
-        
-        // Pass audioConstraints as a separate parameter to connect
-        this.connection = await this.device.connect(params, audioConstraints);
-        
-        console.log("Call connection established:", this.connection?.parameters);
-        this.callActive = true;
-        
-        // Set up volume monitoring for debugging
-        this.connection.on('volume', (inputVolume: number, outputVolume: number) => {
-          if (inputVolume > 0.01 || outputVolume > 0.01) {
-            console.log(`AUDIO ACTIVE - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
-          }
-        });
-        
-        this.connection.on('warning', (warning: any) => {
-          console.warn('Connection warning:', warning.message);
-        });
-        
-        this.connection.on('disconnect', () => {
-          this.connection = null;
-          this.callActive = false;
-          this.streamingActive = false;
-          console.log('Call ended');
-        });
-        
-        return { 
-          success: true, 
-          callSid: this.connection.parameters.CallSid,
-          usingBrowser: true 
-        };
-      } catch (deviceError) {
-        console.error("Browser connection failed, details:", deviceError);
-        
-        // Fallback to REST API call if Device fails
-        console.log("Falling back to REST API call method");
-        
-        try {
-          const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              action: 'makeCall',
-              phoneNumber: formattedPhoneNumber
-            })
-          });
-          
-          if (!response.ok) {
-            const errorData = await response.text();
-            throw new Error(`API call failed: ${errorData}`);
-          }
-          
-          const result = await response.json();
-          
-          if (result.success && result.callSid) {
-            console.log("REST API call successful:", result);
-            return { 
-              success: true, 
-              callSid: result.callSid,
-              usingBrowser: false
-            };
-          } else {
-            throw new Error(result.error || "Unknown API error");
-          }
-        } catch (apiError) {
-          console.error("REST API call failed:", apiError);
-          return { success: false, error: apiError.message || "Failed to connect call" };
-        }
-      }
-    } catch (error: any) {
-      console.error('Error making call:', error);
-      return { success: false, error: error.message || "An unknown error occurred" };
-    }
-  }
-  
-  async checkCallStatus(callSid: string) {
-    try {
-      if (this.connection && this.connection.parameters.CallSid === callSid) {
-        return this.connection.status();
-      }
-      
-      const response = await fetch(`${this.supabaseUrl}/functions/v1/twilio-voice`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'checkStatus',
-          callSid: callSid
-        })
-      });
-      
-      const result = await response.json();
-      
-      if (!result.success) {
-        return 'unknown';
-      }
-      
-      return result.status;
-    } catch (error) {
-      console.error('Error checking call status:', error);
-      return 'unknown';
-    }
-  }
-  
-  async endCall() {
-    try {
-      if (this.connection) {
-        this.connection.disconnect();
-        this.connection = null;
-        this.callActive = false;
-        return true;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error('Error ending call:', error);
-      return false;
-    }
-  }
-  
-  toggleMute(mute: boolean) {
-    try {
-      if (this.connection) {
-        console.log(`${mute ? 'Muting' : 'Unmuting'} microphone`);
-        
-        if (mute) {
-          this.connection.mute();
-        } else {
-          this.connection.unmute();
-          
-          // Double-check mute status
-          setTimeout(() => {
-            if (this.connection) {
-              try {
-                this.connection.mute(false);  // Explicitly unmute again
-                console.log("Re-confirming unmute state");
-              } catch (e) {
-                console.warn("Error in mute confirmation:", e);
-              }
-            }
-          }, 500);
-        }
-        
-        // Also set audio track enabled state directly if available
-        if (this.audioStream && this.audioStream.getAudioTracks().length > 0) {
-          this.audioStream.getAudioTracks()[0].enabled = !mute;
-          console.log(`Audio track enabled set to ${!mute}`);
-        }
-        
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Error toggling mute:', error);
-      return false;
-    }
-  }
-  
-  toggleSpeaker(speakerOn: boolean) {
-    try {
-      if (this.connection && typeof this.connection.setSinkId === 'function') {
-        const sinkId = speakerOn ? 'speaker' : 'earpiece'; 
-        this.connection.setSinkId(sinkId);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error('Error toggling speaker:', error);  
-      return false;
-    }
-  }
-  
-  cleanup() {
-    if (this.connection) {
-      this.connection.disconnect();
-      this.connection = null;
-    }
+    this.token = tokenData.token;
     
     if (this.device) {
-      this.device.destroy();
-      this.device = null;
+      this.device.updateToken(this.token);
+      return true;
     }
     
-    if (this.microphone) {
-      this.microphone.disconnect();
-      this.microphone = null;
-    }
-    
-    if (this.analyser) {
-      this.analyser.disconnect();
-      this.analyser = null;
-    }
-    
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close();
-      this.audioContext = null;
-    }
-    
-    if (this.audioStream) {
-      this.audioStream.getTracks().forEach(track => track.stop());
-      this.audioStream = null;
-    }
-    
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.close();
-      this.socket = null;
-    }
-    
-    if (this.audioElement) {
-      document.body.removeChild(this.audioElement);
-      this.audioElement = null;
-    }
-    
-    const soundIds = ['ringtone', 'outgoing', 'dialtone'];
-    soundIds.forEach(id => {
-      const element = document.getElementById(id);
-      if (element) document.body.removeChild(element);
-    });
-    
-    this.callActive = false;
-    this.audioQueue = [];
+    return false;
   }
-  
-  async testAudioOutput(deviceId?: string) {
+
+  // Initialize audio context and get microphone access
+  async initializeAudioContext(): Promise<boolean> {
+    if (this.isAudioContextInitialized) {
+      return true;
+    }
+    
     try {
-      if (!this.audioContext) {
-        await this.initializeAudioContext();
+      // Request microphone access
+      this.microphoneStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      });
+      
+      // Stop tracks immediately, we just needed the permission
+      this.microphoneStream.getTracks().forEach(track => track.stop());
+      this.microphoneStream = null;
+      
+      this.isAudioContextInitialized = true;
+      
+      // Get available audio output devices
+      this.getAudioOutputDevices();
+      
+      return true;
+    } catch (error) {
+      console.error("Error initializing audio context:", error);
+      return false;
+    }
+  }
+
+  // Get available audio output devices
+  async getAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        console.error("MediaDevices API not supported");
+        return [];
       }
       
-      if (this.audioContext) {
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      this.audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
+      
+      // Set default device if not already set
+      if (this.audioOutputDevices.length > 0 && !this.currentAudioDeviceId) {
+        const defaultDevice = this.audioOutputDevices.find(d => d.deviceId === 'default') || this.audioOutputDevices[0];
+        this.currentAudioDeviceId = defaultDevice.deviceId;
+      }
+      
+      return this.audioOutputDevices;
+    } catch (error) {
+      console.error("Error getting audio output devices:", error);
+      return [];
+    }
+  }
+
+  // Set audio output device
+  async setAudioOutputDevice(deviceId: string): Promise<boolean> {
+    if (!deviceId) return false;
+    
+    try {
+      // Check if the setSinkId function is available
+      const audio = new Audio();
+      
+      if ('setSinkId' in audio) {
+        this.currentAudioDeviceId = deviceId;
         
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime);
-        gainNode.gain.setValueAtTime(0.1, this.audioContext.currentTime);
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-        
-        if (deviceId) {
-          await this.setAudioOutputDevice(deviceId);
+        // If we have an active call, update it
+        if (this.call) {
+          const callMediaElement = this.call._mediaHandler._remoteStream?.audio?._element;
+          if (callMediaElement) {
+            await (callMediaElement as any).setSinkId(deviceId);
+          }
         }
         
-        oscillator.start();
-        console.log("Playing test tone...");
-        
-        setTimeout(() => {
-          oscillator.stop();
-          oscillator.disconnect();
-          gainNode.disconnect();
-          console.log("Test tone complete");
-        }, 500);
-        
         return true;
+      } else {
+        console.warn("setSinkId is not supported in this browser");
+        return false;
       }
+    } catch (error) {
+      console.error("Error setting audio output device:", error);
       return false;
+    }
+  }
+
+  // Get current audio device ID
+  getCurrentAudioDevice(): string {
+    return this.currentAudioDeviceId;
+  }
+
+  // Test audio output
+  async testAudioOutput(deviceId?: string): Promise<boolean> {
+    try {
+      const audio = new Audio('/sounds/dialtone.mp3');
+      
+      if (deviceId && 'setSinkId' in audio) {
+        await (audio as any).setSinkId(deviceId);
+      }
+      
+      audio.volume = 0.3;
+      await audio.play();
+      
+      // Stop after 1 second
+      setTimeout(() => {
+        audio.pause();
+        audio.currentTime = 0;
+      }, 1000);
+      
+      return true;
     } catch (error) {
       console.error("Error testing audio output:", error);
       return false;
     }
   }
-  
-  async setAudioOutputDevice(deviceId: string): Promise<boolean> {
+
+  // Make a call using Twilio REST API through Edge Functions
+  async makeCall(phoneNumber: string): Promise<{
+    success: boolean;
+    callSid?: string;
+    error?: string;
+    usingBrowser?: boolean;
+  }> {
+    if (!phoneNumber) {
+      return { success: false, error: 'Phone number is required' };
+    }
+    
     try {
-      if (!deviceId) return false;
-      
-      this.currentAudioOutputDevice = deviceId;
-      console.log(`Setting audio output device to: ${deviceId}`);
-      
-      const audioElements = [
-        this.audioElement,
-        document.getElementById('ringtone') as HTMLAudioElement,
-        document.getElementById('outgoing') as HTMLAudioElement,
-        document.getElementById('dialtone') as HTMLAudioElement
-      ];
-      
-      // Set the sink ID for all audio elements
-      for (const element of audioElements) {
-        if (element && 'setSinkId' in element) {
-          try {
-            await (element as any).setSinkId(deviceId);
-            console.log(`Set output device for audio element: ${element.id || 'main'}`);
-          } catch (err) {
-            console.warn(`Could not set output device for ${element.id || 'main'}:`, err);
+      // First, connect to our WebSocket for bidirectional streaming
+      // This should be done before making the call
+      const connected = await import('@/services/audioProcessing')
+        .then(module => module.audioProcessing.connect({
+          onStreamStarted: (streamSid, callSid) => {
+            console.log(`Audio stream started: ${streamSid}, Call: ${callSid}`);
           }
-        }
+        }))
+        .catch(err => {
+          console.error('Error importing audio processing:', err);
+          return false;
+        });
+      
+      if (!connected) {
+        console.warn('Failed to establish WebSocket connection for audio streaming');
+        // Continue with the call anyway, but warn about potential audio issues
       }
       
-      // Also update any active call connection
-      if (this.connection && typeof this.connection.setSinkId === 'function') {
+      // Try to use the Twilio Device for in-browser calling if available
+      if (this.isInitialized && this.device) {
+        console.log(`Making browser call to ${phoneNumber}`);
+        
         try {
-          await this.connection.setSinkId(deviceId);
-          console.log("Updated audio output for active call");
-        } catch (err) {
-          console.warn("Could not update active call audio output:", err);
+          // Connect with specific parameters
+          this.call = this.device.connect({
+            To: phoneNumber,
+            enableRingingState: true
+          });
+          
+          // Set up call event handlers
+          this.call.on('accept', () => {
+            console.log('Call accepted');
+            this.hasActiveCall = true;
+          });
+          
+          this.call.on('disconnect', () => {
+            console.log('Call disconnected');
+            this.hasActiveCall = false;
+          });
+          
+          this.call.on('error', (error: any) => {
+            console.error('Call error:', error);
+            this.hasActiveCall = false;
+          });
+          
+          return {
+            success: true,
+            callSid: this.call.parameters.CallSid,
+            usingBrowser: true
+          };
+        } catch (deviceError) {
+          console.error('Error making call with Twilio Device:', deviceError);
+          // Fall back to REST API call
         }
       }
       
-      return true;
-    } catch (err) {
-      console.error("Error setting audio output device:", err);
+      // Fall back to making a call via the Edge Function
+      console.log(`Making REST API call to ${phoneNumber}`);
+      
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'makeCall',
+          phoneNumber
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error || 'Call failed',
+          usingBrowser: false
+        };
+      }
+      
+      return {
+        success: true,
+        callSid: data.callSid,
+        usingBrowser: false
+      };
+    } catch (error: any) {
+      console.error(`Error making call to ${phoneNumber}:`, error);
+      return {
+        success: false,
+        error: error.message || 'Unknown error',
+        usingBrowser: false
+      };
+    }
+  }
+
+  // End the current call
+  async endCall(): Promise<boolean> {
+    try {
+      // Close the audio processing
+      const audioProcessingModule = await import('@/services/audioProcessing')
+        .catch(err => {
+          console.error('Error importing audio processing:', err);
+          return null;
+        });
+      
+      if (audioProcessingModule) {
+        audioProcessingModule.audioProcessing.cleanup();
+      }
+      
+      // If we have an active call, disconnect it
+      if (this.call) {
+        this.call.disconnect();
+        this.call = null;
+        this.hasActiveCall = false;
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error("Error ending call:", error);
       return false;
     }
   }
-  
-  async getAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
+
+  // Check the status of a call
+  async checkCallStatus(callSid: string): Promise<string> {
+    if (!callSid) {
+      return 'unknown';
+    }
+    
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        console.warn("MediaDevices API not supported");
-        return [];
+      // If it's a browser call, check the local status
+      if (this.call && this.call.parameters.CallSid === callSid) {
+        return this.getBrowserCallStatus();
       }
       
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+      // Otherwise check with the Twilio API
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'checkStatus',
+          callSid
+        })
+      });
       
-      return audioOutputs;
-    } catch (err) {
-      console.error("Error getting audio output devices:", err);
-      return [];
+      const data = await response.json();
+      
+      return data.status || 'unknown';
+    } catch (error) {
+      console.error(`Error checking status for call ${callSid}:`, error);
+      return 'error';
     }
   }
-  
-  getCurrentAudioDevice(): string {
-    return this.currentAudioOutputDevice;
+
+  // Get the status of a browser call
+  private getBrowserCallStatus(): string {
+    if (!this.call) {
+      return 'completed';
+    }
+    
+    const status = this.call.status();
+    
+    // Map Twilio Device call status to our status format
+    switch (status) {
+      case 'open':
+      case 'connecting':
+        return 'connecting';
+      case 'ringing':
+        return 'connecting';
+      case 'connected':
+        return 'in-progress';
+      case 'closed':
+        return 'completed';
+      case 'pending':
+        return 'connecting';
+      default:
+        return status;
+    }
+  }
+
+  // Toggle mute
+  toggleMute(mute: boolean): boolean {
+    try {
+      if (this.call) {
+        mute ? this.call.mute() : this.call.unmute();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error toggling mute:", error);
+      return false;
+    }
+  }
+
+  // Toggle speaker
+  toggleSpeaker(speakerOn: boolean): boolean {
+    // This is handled through the audio output device selection
+    return true;
+  }
+
+  // Check if microphone is active
+  isMicrophoneActive(): boolean {
+    return this.isAudioContextInitialized;
+  }
+
+  // Clean up resources
+  cleanup(): void {
+    if (this.device) {
+      this.device.destroy();
+      this.device = null;
+    }
+    
+    if (this.microphoneStream) {
+      this.microphoneStream.getTracks().forEach(track => track.stop());
+      this.microphoneStream = null;
+    }
+    
+    this.isInitialized = false;
+    this.isAudioContextInitialized = false;
   }
 }
 
-// Create singleton instance
-const twilioService = new TwilioService();
-export { twilioService };
+export const twilioService = new TwilioService();
