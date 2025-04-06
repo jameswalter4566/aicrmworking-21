@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -33,7 +32,6 @@ export const useTwilio = () => {
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
   
-  // WebSocket references
   const webSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
@@ -56,10 +54,8 @@ export const useTwilio = () => {
     }
   }, []);
 
-  // Helper to set up WebSocket for bidirectional media
   const setupWebSocket = useCallback(() => {
     if (webSocketRef.current) {
-      // Already set up
       console.log("WebSocket already set up, not creating a new one");
       return;
     }
@@ -84,29 +80,31 @@ export const useTwilio = () => {
           console.log("WebSocket received message type:", data.event);
           
           if (data.event === 'streamStart') {
-            // Store the stream SID for sending audio back
             activeStreamSidRef.current = data.streamSid;
             setAudioStreaming(true);
             console.log(`Stream started with SID: ${data.streamSid}, Call SID: ${data.callSid}`);
             
-            // Start sending microphone audio when stream starts
             startCapturingMicrophone();
             
             toast({
               title: "Audio Stream Active",
               description: "Bidirectional audio stream established. Audio should now be flowing in both directions.",
             });
+
+            if (currentAudioDevice) {
+              setTimeout(() => {
+                twilioService.setAudioOutputDevice(currentAudioDevice);
+              }, 500);
+            }
           }
           else if (data.event === 'streamStop') {
             activeStreamSidRef.current = null;
             setAudioStreaming(false);
             console.log("Stream stopped");
             
-            // Stop sending microphone audio
             stopCapturingMicrophone();
           }
           else if (data.event === 'audio') {
-            // Process incoming audio
             console.log(`Receiving audio on track: ${data.track}`);
           }
           else if (data.event === 'connected_ack' || data.event === 'connection_established') {
@@ -134,15 +132,13 @@ export const useTwilio = () => {
         setAudioStreaming(false);
         activeStreamSidRef.current = null;
         
-        // Stop microphone capture when connection closes
         stopCapturingMicrophone();
       };
     } catch (err) {
       console.error("Failed to set up WebSocket:", err);
     }
-  }, []);
-  
-  // Helper to start sending microphone audio to Twilio
+  }, [currentAudioDevice]);
+
   const startCapturingMicrophone = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       console.error("getUserMedia not supported in this browser");
@@ -150,7 +146,6 @@ export const useTwilio = () => {
     }
     
     try {
-      // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -164,7 +159,6 @@ export const useTwilio = () => {
       console.log("Microphone access granted for bidirectional streaming");
       microphoneStreamRef.current = stream;
       
-      // Set up audio processing
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioContextRef.current = audioContext;
       
@@ -172,22 +166,17 @@ export const useTwilio = () => {
       const processor = audioContext.createScriptProcessor(1024, 1, 1);
       audioProcessorRef.current = processor;
       
-      // Process audio data
       processor.onaudioprocess = (e) => {
         if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN && activeStreamSidRef.current) {
-          // Get audio data from microphone
           const inputData = e.inputBuffer.getChannelData(0);
           
-          // Calculate audio level to avoid sending silence
           let sum = 0;
           for (let i = 0; i < inputData.length; i++) {
             sum += inputData[i] * inputData[i];
           }
           const rms = Math.sqrt(sum / inputData.length);
           
-          // Only send if audio level is high enough
           if (rms > 0.005) {
-            // Convert to format Twilio expects
             const buffer = new ArrayBuffer(inputData.length * 2);
             const view = new DataView(buffer);
             
@@ -196,7 +185,6 @@ export const useTwilio = () => {
               view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
             }
             
-            // Base64 encode and send to Twilio
             const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
             
             webSocketRef.current.send(JSON.stringify({
@@ -207,7 +195,6 @@ export const useTwilio = () => {
               }
             }));
             
-            // Send a mark to track our audio chunks
             const markId = `browser-audio-${Date.now()}`;
             webSocketRef.current.send(JSON.stringify({
               event: 'mark',
@@ -222,7 +209,6 @@ export const useTwilio = () => {
         }
       };
       
-      // Connect the processor
       source.connect(processor);
       processor.connect(audioContext.destination);
       
@@ -240,8 +226,7 @@ export const useTwilio = () => {
       });
     }
   }, []);
-  
-  // Helper to stop microphone capture
+
   const stopCapturingMicrophone = useCallback(() => {
     if (audioProcessorRef.current && audioContextRef.current) {
       try {
@@ -318,7 +303,6 @@ export const useTwilio = () => {
           });
         }
         
-        // Set up WebSocket for bidirectional audio streaming
         setupWebSocket();
       } catch (error) {
         console.error('Error initializing Twilio:', error);
@@ -362,7 +346,6 @@ export const useTwilio = () => {
         clearInterval(intervalId);
       });
       
-      // Clean up WebSocket and audio resources
       if (webSocketRef.current) {
         webSocketRef.current.close();
         webSocketRef.current = null;
@@ -429,7 +412,6 @@ export const useTwilio = () => {
             };
           });
           
-          // Clean up WebSocket and audio when call ends
           if (Object.keys(activeCalls).length <= 1) {
             stopCapturingMicrophone();
             activeStreamSidRef.current = null;
@@ -504,7 +486,6 @@ export const useTwilio = () => {
     }
     
     try {
-      // Check microphone permission
       const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
       
       if (permissionStatus.state !== 'granted') {
@@ -546,7 +527,6 @@ export const useTwilio = () => {
 
     console.log(`Placing call to ${phoneNumber}`);
     
-    // Make sure WebSocket is ready
     setupWebSocket();
     
     const result = await twilioService.makeCall(phoneNumber);
@@ -597,7 +577,6 @@ export const useTwilio = () => {
       
       await twilioService.endCall();
       
-      // Clean up audio resources if this is the last active call
       if (Object.keys(activeCalls).length <= 1) {
         stopCapturingMicrophone();
         activeStreamSidRef.current = null;
@@ -628,7 +607,6 @@ export const useTwilio = () => {
     
     await twilioService.endCall();
     
-    // Clean up all audio resources
     stopCapturingMicrophone();
     activeStreamSidRef.current = null;
     

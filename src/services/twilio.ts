@@ -1,3 +1,4 @@
+
 // src/services/twilio.ts
 
 class TwilioService {
@@ -228,6 +229,20 @@ class TwilioService {
           }
         }
         
+        // Also update audio from the WebSocket connection
+        const audioElements = document.querySelectorAll('audio');
+        for (let i = 0; i < audioElements.length; i++) {
+          const element = audioElements[i];
+          if ('setSinkId' in element) {
+            try {
+              await (element as any).setSinkId(deviceId);
+              console.log(`Updated audio element ${i} to use device: ${deviceId}`);
+            } catch (err) {
+              console.warn(`Could not set sink ID for audio element ${i}:`, err);
+            }
+          }
+        }
+        
         return true;
       } else {
         console.warn("setSinkId is not supported in this browser");
@@ -314,6 +329,20 @@ class TwilioService {
           this.call.on('accept', () => {
             console.log('Call accepted');
             this.hasActiveCall = true;
+            
+            // Set the audio output device for this call if we have one selected
+            if (this.currentAudioDeviceId) {
+              setTimeout(() => {
+                this.setAudioOutputDevice(this.currentAudioDeviceId)
+                  .then(success => {
+                    if (success) {
+                      console.log(`Set call audio output to device: ${this.currentAudioDeviceId}`);
+                    } else {
+                      console.warn('Could not set audio output device for call');
+                    }
+                  });
+              }, 500);
+            }
           });
           
           this.call.on('disconnect', () => {
