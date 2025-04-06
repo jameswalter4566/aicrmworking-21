@@ -178,7 +178,12 @@ const PowerDialer = () => {
       });
       
       if (!connected) {
-        throw new Error("Failed to connect to audio streaming service");
+        toast({
+          title: "Warning",
+          description: "Audio streaming setup failed. Proceeding with limited functionality.",
+          variant: "default", // Changed from "warning" to "default"
+        });
+        return false;
       }
       
       return true;
@@ -187,7 +192,7 @@ const PowerDialer = () => {
       toast({
         title: "Audio Connection Failed",
         description: "Could not establish audio streaming connection. Calls may have limited functionality.",
-        variant: "default", // Changed from "warning" to "default"
+        variant: "default", // Ensure consistent variant
       });
       return false;
     }
