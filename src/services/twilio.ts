@@ -31,6 +31,10 @@ class TwilioService {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private currentAudioOutputDevice: string = 'default';
+  private streamSid: string | null = null;
+  private callSid: string | null = null;
+  private inboundAudioQueue: AudioChunk[] = [];
+  private outboundAudioQueue: AudioChunk[] = [];
   
   constructor() {
     // Create audio element for output testing and call sounds
@@ -108,9 +112,11 @@ class TwilioService {
       this.socket.onmessage = async (event) => {
         try {
           const data = JSON.parse(event.data);
+          console.log("WebSocket message received:", data.event);
           
           if (data.event === 'audio') {
             this.streamingActive = true;
+            console.log(`Received audio data for track: ${data.track}, sequence: ${data.sequence}`);
             
             if (!this.audioContext) {
               await this.initializeAudioContext();
@@ -131,20 +137,33 @@ class TwilioService {
               gainNode.connect(this.audioContext.destination);
               
               source.start();
+              console.log("Playing received audio chunk");
             }
           } else if (data.event === 'streamStart') {
-            console.log("Call audio stream started", data);
+            console.log("Call audio stream started:", data);
+            this.streamSid = data.streamSid;
+            this.callSid = data.callSid;
             this.stopSound('ringtone');
             this.stopSound('outgoing');
             this.stopSound('dialtone');
             this.streamingActive = true;
           } else if (data.event === 'streamStop') {
-            console.log("Call audio stream stopped", data);
+            console.log("Call audio stream stopped:", data);
             this.streamingActive = false;
+            this.streamSid = null;
+            this.callSid = null;
+          } else if (data.event === 'connected' || data.event === 'connected_ack') {
+            console.log("Twilio WebSocket protocol connected:", data);
           } else if (data.event === 'browser_connected' || data.event === 'connection_established') {
-            console.log("WebSocket connection confirmed: ", data);
+            console.log("WebSocket connection confirmed:", data);
+          } else if (data.event === 'mark') {
+            console.log("Mark received:", data);
+          } else if (data.event === 'dtmf') {
+            console.log("DTMF received:", data);
           } else if (data.event === 'pong') {
             // Keep-alive pong received (silent)
+          } else {
+            console.log("Unknown event type received:", data.event);
           }
         } catch (err) {
           console.error("Error processing WebSocket message:", err);
@@ -196,6 +215,41 @@ class TwilioService {
     if (this.keepAliveInterval) {
       clearInterval(this.keepAliveInterval);
       this.keepAliveInterval = null;
+    }
+  }
+  
+  // Send microphone audio to the WebSocket
+  public sendAudioChunk(audioData: Float32Array) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || !this.streamSid) {
+      return false;
+    }
+    
+    try {
+      // Convert float audio data to 16-bit PCM
+      const buffer = new ArrayBuffer(audioData.length * 2);
+      const view = new DataView(buffer);
+      
+      for (let i = 0; i < audioData.length; i++) {
+        const s = Math.max(-1, Math.min(1, audioData[i]));
+        view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      }
+      
+      // Convert to base64
+      const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+      
+      // Send to Twilio
+      this.socket.send(JSON.stringify({
+        event: 'media',
+        streamSid: this.streamSid,
+        media: {
+          payload: base64Audio
+        }
+      }));
+      
+      return true;
+    } catch (err) {
+      console.error("Error sending audio chunk:", err);
+      return false;
     }
   }
   
@@ -282,7 +336,6 @@ class TwilioService {
         channelData[i] = samples[i] / 32768;
       }
       
-      console.log(`Created audio buffer: ${samples.length} samples, ${sampleRate}Hz`);
       return audioBuffer;
     } catch (err) {
       console.error("Error creating audio buffer:", err);
@@ -321,9 +374,7 @@ class TwilioService {
             echoCancellation: true,
             noiseSuppression: true,
             autoGainControl: true,
-            // Add explicit sample rate for better audio clarity
             sampleRate: 48000,
-            // Ensure the microphone is prioritized
             channelCount: 1
           } 
         });
@@ -340,7 +391,7 @@ class TwilioService {
         this.microphone = this.audioContext.createMediaStreamSource(stream);
         this.microphone.connect(this.analyser);
         
-        // Add explicit audio processor to monitor audio levels
+        // Add explicit audio processor to monitor audio levels and send to WebSocket
         const processor = this.audioContext.createScriptProcessor(1024, 1, 1);
         this.microphone.connect(processor);
         processor.connect(this.audioContext.destination);
@@ -355,47 +406,21 @@ class TwilioService {
           }
           
           const rms = Math.sqrt(sum / input.length);
-          if (rms > 0.01) {  // Only log when audio is detected
-            console.log("Microphone audio level:", rms);
+          
+          // Only send if we have active streaming and the level is high enough
+          if (this.streamingActive && this.streamSid && rms > 0.005) {
+            this.sendAudioChunk(input);
           }
         };
         
         await this.testAudioOutput();
         
-        this.setupAudioWebSocket();
-        
         this.microphoneInitialized = true;
         console.log("Audio context initialized successfully with enhanced audio settings");
-        
-        // Enumerate devices to check audio configuration
-        try {
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-          const audioInputs = devices.filter(device => device.kind === 'audioinput');
-          
-          console.log(`Audio input devices available: ${audioInputs.length}`);
-          audioInputs.forEach(device => {
-            console.log(`- Input: ${device.label || 'Unnamed device'} (${device.deviceId})`);
-          });
-          
-          console.log(`Audio output devices available: ${audioOutputs.length}`);
-          audioOutputs.forEach(device => {
-            console.log(`- Output: ${device.label || 'Unnamed device'} (${device.deviceId})`);
-          });
-          
-          this.audioOutputInitialized = true;
-        } catch (outputError) {
-          console.warn("Could not enumerate audio devices:", outputError);
-        }
         
         return true;
       } catch (micError) {
         console.error('Error accessing microphone:', micError);
-        
-        // Show a notification to the user about microphone issues
-        if (micError.name === 'NotAllowedError') {
-          alert('Please allow microphone access to make calls. Click the camera icon in your browser address bar and enable the microphone.');
-        }
         
         this.microphoneInitialized = false;
         return false;
@@ -471,15 +496,19 @@ class TwilioService {
       const deviceOptions = {
         debug: true,
         enableRingtone: true,
-        // Ensure full audio quality settings
+        // Critical codec preferences for better audio quality
+        codecPreferences: ['opus', 'pcmu'],
+        // Critical for microphone access
         audioConstraints: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          googEchoCancellation: true,
-          googAutoGainControl: true,
-          googNoiseSuppression: true,
-          sampleRate: 48000
+          // Force specific audio constraints for better compatibility
+          peerConnection: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' }
+            ]
+          }
         },
         // Set higher outgoing volume
         outgoingSoundVolume: 1.0,
@@ -487,19 +516,27 @@ class TwilioService {
         incomingSoundVolume: 1.0,
         // Ensure sounds are played
         sounds: {
-          incoming: '/sounds/incoming.mp3',
+          incoming: '/sounds/ringtone.mp3',
           outgoing: '/sounds/outgoing.mp3'
         }
       };
       
       this.device.on('ready', () => {
-        console.log('Twilio device is ready for audio I/O');
-        this.playSound('outgoing');
+        console.log('Twilio device is ready for calls');
+        // Verify microphone access for debugging
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(stream => {
+            console.log('Microphone permission verified on device ready');
+            // Track is established, release the stream
+            stream.getTracks().forEach(track => track.stop());
+          })
+          .catch(err => {
+            console.error('Error verifying microphone permission:', err);
+          });
       });
       
       this.device.on('error', (error) => {
         console.error('Twilio device error:', error);
-        alert(`Call error: ${error.message || 'Unknown error'}. Please check your microphone and try again.`);
       });
       
       this.device.on('connect', (conn) => {
@@ -534,7 +571,7 @@ class TwilioService {
         this.stopSound('dialtone');
         
         // Add volume monitor for debugging
-        conn.volume((inputVolume: number, outputVolume: number) => {
+        conn.on('volume', (inputVolume: number, outputVolume: number) => {
           console.log(`Audio levels - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
           
           if (inputVolume < 0.01) {
@@ -570,6 +607,7 @@ class TwilioService {
         this.playSound('ringtone');
       });
       
+      // Setup and initialize the device with token and options
       await this.device.setup(data.token, deviceOptions as any);
       
       await this.testAudioOutput();
@@ -645,7 +683,6 @@ class TwilioService {
           }
         } catch (micError) {
           console.error("Could not access microphone:", micError);
-          alert("Microphone access is required to make calls. Please allow microphone access in your browser settings.");
           return { success: false, error: "Microphone access denied" };
         }
       }
@@ -677,16 +714,24 @@ class TwilioService {
         
         console.log("Connecting with phone number:", formattedPhoneNumber);
         
-        // Define audio constraints separately from the params object
+        // Define audio constraints separately for clarity
         const audioConstraints = {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: true
+          autoGainControl: true,
+          // These are critical for proper audio transmission
+          peerConnection: {
+            iceServers: [
+              { urls: 'stun:stun.l.google.com:19302' }
+            ]
+          }
         };
         
         // Create params with just the To parameter
         const params = {
-          To: formattedPhoneNumber
+          To: formattedPhoneNumber,
+          // Explicitly enable microphone
+          enableMicrophone: true
         };
         
         console.log("Call parameters:", params);

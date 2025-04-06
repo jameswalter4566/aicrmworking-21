@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from '@/components/ui/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 interface CallControlProps {
   isMuted: boolean;
@@ -120,8 +121,8 @@ const CallControl: React.FC<CallControlProps> = ({
       
       // Play a short test tone when changing devices
       const audio = new Audio('/sounds/dialtone.mp3');
-      if (audio.setSinkId && typeof audio.setSinkId === 'function') {
-        audio.setSinkId(deviceId)
+      if ('setSinkId' in audio && typeof (audio as any).setSinkId === 'function') {
+        (audio as any).setSinkId(deviceId)
           .then(() => {
             audio.volume = 0.3; // Lower volume for test
             audio.play()
@@ -131,7 +132,7 @@ const CallControl: React.FC<CallControlProps> = ({
               })
               .catch(err => console.warn("Could not play test tone:", err));
           })
-          .catch(err => console.warn("Could not set audio device:", err));
+          .catch((err: Error) => console.warn("Could not set audio device:", err));
       }
     }
   };
@@ -141,7 +142,12 @@ const CallControl: React.FC<CallControlProps> = ({
     if (!audioStreaming) return;
     
     const interval = setInterval(() => {
-      setAudioLevel(Math.random() * 0.7 + 0.1); // Random value between 0.1 and 0.8
+      // More dynamic audio level simulation that changes gradually
+      setAudioLevel(prev => {
+        const change = (Math.random() - 0.5) * 0.3; // Random change between -0.15 and 0.15
+        const newLevel = Math.max(0.05, Math.min(0.95, prev + change)); // Keep between 0.05 and 0.95
+        return newLevel;
+      });
     }, 200);
     
     return () => clearInterval(interval);
@@ -219,24 +225,42 @@ const CallControl: React.FC<CallControlProps> = ({
       </div>
       
       {audioStreaming ? (
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-2 w-full max-w-xs">
           <div className="flex items-center gap-2 text-sm text-green-500">
             <Wifi className="h-3.5 w-3.5 text-green-500 animate-pulse" />
             <span>Audio streaming active</span>
           </div>
           
-          {/* Audio level visualization */}
-          <div className="w-40 h-2 bg-gray-200 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-green-500 transition-all duration-200 ease-in-out"
-              style={{ width: `${audioLevel * 100}%` }}
+          {/* Enhanced audio level visualization */}
+          <div className="w-full h-2">
+            <Progress 
+              value={audioLevel * 100} 
+              className="h-2"
+              indicatorClassName="bg-gradient-to-r from-green-500 to-emerald-600"
             />
+          </div>
+          
+          <div className="text-xs text-muted-foreground mt-1">
+            Bidirectional audio stream connected
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <WifiOff className="h-3.5 w-3.5 text-gray-400" />
-          <span>Connecting to audio stream...</span>
+        <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <WifiOff className="h-3.5 w-3.5" />
+            <span>Waiting for audio stream...</span>
+          </div>
+          
+          <div className="w-full h-2">
+            <Progress 
+              value={0} 
+              className="h-2"
+            />
+          </div>
+          
+          <div className="text-xs text-muted-foreground mt-1">
+            Call must be connected to enable audio streaming
+          </div>
         </div>
       )}
     </div>
