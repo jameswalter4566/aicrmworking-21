@@ -1,4 +1,3 @@
-
 /**
  * Audio processing utilities for browser-based Twilio calls
  */
@@ -39,7 +38,7 @@ export async function startCapturingMicrophone(
     console.log('Microphone access granted for audio streaming');
     
     // Create audio context
-    audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
     
     // Create source from microphone stream
     microphoneSource = audioContext.createMediaStreamSource(microphoneStream);
@@ -76,7 +75,7 @@ export async function startCapturingMicrophone(
         }
         
         // Convert to base64 for WebSocket transmission
-        const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+        const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer) as unknown as number[]));
         
         // Send to WebSocket
         webSocket.send(JSON.stringify({

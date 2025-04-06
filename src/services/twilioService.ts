@@ -1,4 +1,3 @@
-
 /**
  * Twilio service to handle browser-based calls
  */
