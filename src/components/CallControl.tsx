@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones, RefreshCcw } from 'lucide-react';
@@ -39,12 +38,10 @@ const CallControl: React.FC<CallControlProps> = ({
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   
-  // Load available audio output devices
   const loadAudioDevices = async () => {
     try {
       setIsRefreshing(true);
       
-      // Check if the browser supports enumerateDevices
       if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
         console.warn("This browser doesn't support device enumeration");
         toast({
@@ -55,11 +52,9 @@ const CallControl: React.FC<CallControlProps> = ({
         return;
       }
       
-      // Request permission for audio (needed for some browsers to show devices)
       await navigator.mediaDevices.getUserMedia({ audio: true })
         .catch(err => {
           console.warn("Could not get microphone access:", err);
-          // Continue anyway to get output devices
         });
       
       const devices = await navigator.mediaDevices.enumerateDevices();
@@ -75,7 +70,6 @@ const CallControl: React.FC<CallControlProps> = ({
       
       setAudioDevices(audioOutputs);
       
-      // Set default device if available and none is selected
       if (audioOutputs.length > 0 && !selectedDeviceId) {
         const defaultDevice = audioOutputs.find(d => d.deviceId === 'default') || audioOutputs[0];
         setSelectedDeviceId(defaultDevice.deviceId);
@@ -99,11 +93,9 @@ const CallControl: React.FC<CallControlProps> = ({
     }
   };
   
-  // Initial load of audio devices
   useEffect(() => {
     loadAudioDevices();
     
-    // Add event listener for device changes
     navigator.mediaDevices?.addEventListener('devicechange', loadAudioDevices);
     
     return () => {
@@ -111,7 +103,6 @@ const CallControl: React.FC<CallControlProps> = ({
     };
   }, [onAudioDeviceChange]);
   
-  // Handle device selection change
   const handleDeviceChange = (deviceId: string) => {
     console.log(`Selecting audio device: ${deviceId}`);
     setSelectedDeviceId(deviceId);
@@ -119,15 +110,13 @@ const CallControl: React.FC<CallControlProps> = ({
     if (onAudioDeviceChange) {
       onAudioDeviceChange(deviceId);
       
-      // Play a short test tone when changing devices
       const audio = new Audio('/sounds/dialtone.mp3');
       if ('setSinkId' in audio && typeof (audio as any).setSinkId === 'function') {
         (audio as any).setSinkId(deviceId)
           .then(() => {
-            audio.volume = 0.3; // Lower volume for test
+            audio.volume = 0.3;
             audio.play()
               .then(() => {
-                // Stop after 500ms
                 setTimeout(() => audio.pause(), 500);
               })
               .catch(err => console.warn("Could not play test tone:", err));
@@ -137,15 +126,13 @@ const CallControl: React.FC<CallControlProps> = ({
     }
   };
   
-  // Simulate audio level visualization
   useEffect(() => {
     if (!audioStreaming) return;
     
     const interval = setInterval(() => {
-      // More dynamic audio level simulation that changes gradually
       setAudioLevel(prev => {
-        const change = (Math.random() - 0.5) * 0.3; // Random change between -0.15 and 0.15
-        const newLevel = Math.max(0.05, Math.min(0.95, prev + change)); // Keep between 0.05 and 0.95
+        const change = (Math.random() - 0.5) * 0.3;
+        const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
         return newLevel;
       });
     }, 200);
@@ -187,7 +174,6 @@ const CallControl: React.FC<CallControlProps> = ({
         </Button>
       </div>
       
-      {/* Audio device selection with refresh button */}
       <div className="flex flex-col items-center gap-2 mt-2 w-full max-w-xs">
         <div className="flex items-center justify-between w-full">
           <label className="text-sm text-muted-foreground flex items-center gap-1">
@@ -231,12 +217,10 @@ const CallControl: React.FC<CallControlProps> = ({
             <span>Audio streaming active</span>
           </div>
           
-          {/* Enhanced audio level visualization */}
           <div className="w-full h-2">
             <Progress 
               value={audioLevel * 100} 
-              className="h-2"
-              indicatorClassName="bg-gradient-to-r from-green-500 to-emerald-600"
+              className="h-2 bg-secondary [&>div]:bg-gradient-to-r [&>div]:from-green-500 [&>div]:to-emerald-600"
             />
           </div>
           

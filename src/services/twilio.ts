@@ -727,11 +727,11 @@ class TwilioService {
           }
         };
         
-        // Create params with just the To parameter
+        // Create params with just the To parameter - FIX: Convert boolean to string
         const params = {
           To: formattedPhoneNumber,
-          // Explicitly enable microphone
-          enableMicrophone: true
+          // Fix: Convert boolean to string to match the expected type
+          enableMicrophone: 'true'
         };
         
         console.log("Call parameters:", params);
@@ -744,9 +744,9 @@ class TwilioService {
         this.callActive = true;
         
         // Set up volume monitoring for debugging
-        this.connection.on('volume', (inputVol: number, outputVol: number) => {
-          if (inputVol > 0.01 || outputVol > 0.01) {
-            console.log(`AUDIO ACTIVE - Input: ${inputVol.toFixed(2)}, Output: ${outputVol.toFixed(2)}`);
+        this.connection.on('volume', (inputVolume: number, outputVolume: number) => {
+          if (inputVolume > 0.01 || outputVolume > 0.01) {
+            console.log(`AUDIO ACTIVE - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
           }
         });
         
