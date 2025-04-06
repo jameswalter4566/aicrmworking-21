@@ -1,9 +1,6 @@
 // Importing any necessary dependencies
 import { Device } from 'twilio-client';
 
-// Define proper codec type to match Twilio's expectations
-type Codec = 'pcmu' | 'pcma' | 'opus' | 'g722' | 'vp8';
-
 // Define interface for audio chunks in the queue
 interface AudioChunk {
   track: string;
@@ -431,7 +428,6 @@ class TwilioService {
         const deviceOptions = {
           debug: true,
           enableRingtone: true,
-          codecPreferences: ["opus", "pcmu"] as Codec[],
           fakeLocalDTMF: true,
           disableAudioContextSounds: false,
           sounds: {
