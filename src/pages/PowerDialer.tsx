@@ -31,6 +31,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
+import { useTwilio } from "@/hooks/use-twilio";
 
 const activityLogsData = {
   1: [
@@ -96,9 +97,17 @@ const PowerDialer = () => {
     "I see they're interested in property in the downtown area.",
     "I'll try to schedule a meeting with our agent.",
   ]);
-  const [callSids, setCallSids] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [noLeadsSelectedError, setNoLeadsSelectedError] = useState(false);
+  
+  const { 
+    initialized, 
+    makeCall, 
+    endCall, 
+    activeCalls, 
+    microphoneActive, 
+    audioStreaming 
+  } = useTwilio();
 
   useEffect(() => {
     fetchLeads();
@@ -147,6 +156,15 @@ const PowerDialer = () => {
       return;
     }
     
+    if (!initialized) {
+      toast({
+        title: "Phone System Not Ready",
+        description: "The browser-based phone system is not initialized. Please refresh the page and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsDialogOpen(true);
   };
 
@@ -179,11 +197,7 @@ const PowerDialer = () => {
         description: `Dialing with ${batchSize} line${batchSize > 1 ? 's' : ''}`,
       });
       
-      firstBatch.forEach((leadId, index) => {
-        setTimeout(() => {
-          initiateCall(leadId);
-        }, index * 500);
-      });
+      initiateCall(firstBatch[0]);
     }
   };
 
@@ -218,37 +232,18 @@ const PowerDialer = () => {
       description: `Calling ${lead.firstName} ${lead.lastName} at ${normalizedPhone}...`,
     });
     
-    console.log(`Making call to lead ${leadId} with phone number ${normalizedPhone}`);
+    console.log(`Making browser-based call to lead ${leadId} with phone number ${normalizedPhone}`);
     
     try {
-      const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          action: 'makeCall',
-          phoneNumber: normalizedPhone
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Server returned ${response.status}: ${errorText}`);
-      }
-      
-      const result = await response.json();
+      const result = await makeCall(normalizedPhone, leadId);
       
       if (result.success) {
-        setCallSids(prev => ({ ...prev, [leadId]: result.callSid }));
-        
         toast({
           title: "Call Connected",
-          description: `Call to ${lead.firstName} ${lead.lastName} is in progress`,
+          description: `Call to ${lead.firstName} ${lead.lastName} is in progress.`,
         });
         
-        monitorCallStatus(leadId, result.callSid);
+        setActiveCallId(leadId);
       } else {
         toast({
           title: "Call Failed",
@@ -270,121 +265,37 @@ const PowerDialer = () => {
     }
   };
 
-  const monitorCallStatus = async (leadId: number, callSid: string) => {
-    const intervalId = setInterval(async () => {
-      try {
-        const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-        const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'checkStatus',
-            callSid: callSid
-          })
-        });
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-          clearInterval(intervalId);
-          moveToNextLead(leadId);
-          return;
-        }
-        
-        const status = result.status;
-        
-        if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
-          clearInterval(intervalId);
-          
-          const lead = leads.find(l => l.id === leadId);
-          const leadName = lead ? `${lead.firstName} ${lead.lastName}` : `Lead #${leadId}`;
-          
-          switch(status) {
-            case "completed":
-              toast({
-                title: "Call Completed",
-                description: `Call with ${leadName} has ended`,
-              });
-              break;
-            case "busy":
-              toast({
-                title: "Line Busy",
-                description: `${leadName}'s line is busy`,
-                variant: "destructive",
-              });
-              break;
-            case "no-answer":
-              toast({
-                title: "No Answer",
-                description: `${leadName} did not answer`,
-                variant: "destructive",
-              });
-              break;
-            default:
-              toast({
-                title: "Call Failed",
-                description: `Call to ${leadName} could not be completed`,
-                variant: "destructive",
-              });
-          }
-          
-          moveToNextLead(leadId);
-        }
-      } catch (error) {
-        console.error(`Error checking status for call ${callSid}:`, error);
-      }
-    }, 3000);
-  };
-
   const moveToNextLead = (currentLeadId: number) => {
     const currentIndex = dialQueue.indexOf(currentLeadId);
-    const linesInUse = parseInt(lineCount);
-    const nextIndex = currentIndex + linesInUse;
+    
+    endCall(currentLeadId);
+    
+    const nextIndex = currentIndex + 1;
     
     if (nextIndex < dialQueue.length) {
       const nextLeadId = dialQueue[nextIndex];
-      initiateCall(nextLeadId);
-      
-      if (activeCallId === currentLeadId) {
+      setTimeout(() => {
+        initiateCall(nextLeadId);
         setActiveCallId(nextLeadId);
-      }
+      }, 1000);
     } else {
-      if (dialQueue.slice(Math.max(0, dialQueue.length - linesInUse)).includes(currentLeadId)) {
-        setIsDialing(false);
-        setActiveCallId(null);
-        toast({
-          title: "Dialing Complete",
-          description: "All leads have been contacted",
-        });
-      }
+      setIsDialing(false);
+      setActiveCallId(null);
+      toast({
+        title: "Dialing Complete",
+        description: "All leads have been contacted",
+      });
     }
   };
 
   const endDialingSession = async () => {
-    for (const [leadId, callSid] of Object.entries(callSids)) {
-      try {
-        const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-        await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'endCall',
-            callSid
-          })
-        });
-      } catch (error) {
-        console.error(`Error ending call ${callSid}:`, error);
-      }
+    if (activeCallId) {
+      await endCall(activeCallId);
     }
     
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
-    setCallSids({});
     
     toast({
       title: "Session Ended",
@@ -429,13 +340,19 @@ const PowerDialer = () => {
     return digitsOnly ? `+${digitsOnly}` : '';
   };
 
+  const currentCallStatus = activeCallId && activeCalls[activeCallId] 
+    ? activeCalls[activeCallId].status 
+    : null;
+
+  const showAudioIndicators = activeCallId && activeCalls[activeCallId];
+
   return (
     <MainLayout>
       <div className="flex flex-col h-[calc(100vh-64px)]">
         <div className="flex-1 p-6 overflow-hidden">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">
-              {dialingMode === "ai" ? "AI Dialer" : "Power Dialer"}
+              Browser-Based {dialingMode === "ai" ? "AI Dialer" : "Power Dialer"}
             </h1>
             {!isDialing ? (
               <div className="flex items-center gap-2">
@@ -448,6 +365,7 @@ const PowerDialer = () => {
                 <Button 
                   className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
                   onClick={startDialSession}
+                  disabled={!initialized}
                 >
                   <Phone className="h-4 w-4" />
                   Start Dialing Session
@@ -484,9 +402,19 @@ const PowerDialer = () => {
                             ? `Calling ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName}`
                             : 'Initializing calls...'}
                         </span>
+                        {showAudioIndicators && (
+                          <div className="flex items-center ml-2 gap-2 text-sm">
+                            <Badge className={microphoneActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                              {microphoneActive ? "Mic active" : "Mic inactive"}
+                            </Badge>
+                            <Badge className={audioStreaming ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                              {audioStreaming ? "Audio streaming" : "No audio stream"}
+                            </Badge>
+                          </div>
+                        )}
                       </div>
-                      <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                        Lines in use: {lineCount}
+                      <Badge className={currentCallStatus === 'in-progress' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800"} px-3 py-1>
+                        {currentCallStatus === 'in-progress' ? 'Connected' : 'Connecting...'}
                       </Badge>
                     </div>
                     
@@ -583,6 +511,47 @@ const PowerDialer = () => {
                         </div>
                       </ScrollArea>
                     </Card>
+
+                    {activeCallId && activeCalls[activeCallId] && (
+                      <Card className="border rounded-md mt-2">
+                        <CardContent className="p-4 flex justify-center items-center gap-4">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className={`${activeCalls[activeCallId].isMuted ? 'bg-red-50' : 'bg-gray-50'} rounded-full h-12 w-12`}
+                            onClick={() => useTwilio().toggleMute(activeCallId)}
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mic-off">
+                              {activeCalls[activeCallId].isMuted ? (
+                                <>
+                                  <line x1="2" x2="22" y1="2" y2="22" />
+                                  <path d="M18.89 13.23A7.12 7.12 0 0 0 19 12v-2" />
+                                  <path d="M5 12v-2a7 7 0 0 1 12-5" />
+                                  <path d="M15 9.34V5a3 3 0 0 0-5.68-1.33" />
+                                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12" />
+                                  <line x1="12" x2="12" y1="19" y2="22" />
+                                </>
+                              ) : (
+                                <>
+                                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                                  <line x1="12" x2="12" y1="19" y2="22" />
+                                </>
+                              )}
+                            </svg>
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="bg-red-500 text-white rounded-full h-14 w-14"
+                            onClick={() => moveToNextLead(activeCallId)}
+                          >
+                            <PhoneOff className="h-6 w-6" />
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-[300px] gap-4">
@@ -595,19 +564,24 @@ const PowerDialer = () => {
                     </div>
                     <div className="text-center">
                       <h3 className="text-lg font-medium mb-2">
-                        {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Power Dialing Session"}
+                        {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Browser Dialing Session"}
                       </h3>
                       <p className="text-gray-500 max-w-md">
                         {dialingMode === "ai"
-                          ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
-                          : "Call multiple leads in sequence with our power dialer. First select leads from the table below, then start dialing."
+                          ? "Let our AI assistant call leads for you using your browser. Watch and intervene only when needed."
+                          : "Make calls to leads directly from your browser. First select leads from the table below, then start dialing."
                         }
                       </p>
+                      {!initialized && (
+                        <div className="mt-2 text-amber-600 font-medium">
+                          Phone system not yet initialized. Please wait or refresh the page.
+                        </div>
+                      )}
                     </div>
                     <Button 
-                      className={`mt-4 rounded-lg ${selectedLeads.length > 0 ? 'bg-crm-blue hover:bg-crm-blue/90' : 'bg-gray-300'}`}
+                      className={`mt-4 rounded-lg ${selectedLeads.length > 0 && initialized ? 'bg-crm-blue hover:bg-crm-blue/90' : 'bg-gray-300'}`}
                       onClick={startDialSession}
-                      disabled={selectedLeads.length === 0}
+                      disabled={selectedLeads.length === 0 || !initialized}
                     >
                       {selectedLeads.length > 0 
                         ? `Start Dialing (${selectedLeads.length} selected)` 
@@ -750,15 +724,13 @@ const PowerDialer = () => {
                   <div className="flex items-center gap-2">
                     <Phone className="h-5 w-5 text-crm-blue" />
                     <div className="flex-1">
-                      <div className="font-medium">Power Dialer</div>
-                      <div className="text-xs text-gray-500">
-                        Manually call leads in sequence
-                      </div>
+                      <div className="font-medium">Browser Dialer</div>
+                      <div className="text-xs text-gray-500">Make calls directly from your browser</div>
                     </div>
                   </div>
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="outline" 
                   className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "ai" ? "border-crm-blue bg-crm-blue/5" : ""}`}
                   onClick={() => setDialingMode("ai")}
                 >
@@ -766,9 +738,7 @@ const PowerDialer = () => {
                     <Bot className="h-5 w-5 text-crm-blue" />
                     <div className="flex-1">
                       <div className="font-medium">AI Dialer</div>
-                      <div className="text-xs text-gray-500">
-                        AI assistant handles calls
-                      </div>
+                      <div className="text-xs text-gray-500">AI calls leads for you</div>
                     </div>
                   </div>
                 </Button>
@@ -776,46 +746,28 @@ const PowerDialer = () => {
             </div>
             
             <div>
-              <h3 className="text-sm font-medium mb-2">Concurrent Lines</h3>
-              <ToggleGroup 
-                type="single" 
-                value={lineCount}
-                onValueChange={(value) => {
-                  if (value) setLineCount(value);
-                }}
-                className="justify-start border rounded-lg p-1"
-              >
-                <ToggleGroupItem value="1" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone className="h-4 w-4" />
-                  <span>1 Line</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="2" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone2 className="h-4 w-4" />
-                  <span>2 Lines</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="3" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone3 className="h-4 w-4" />
-                  <span>3 Lines</span>
-                </ToggleGroupItem>
+              <h3 className="text-sm font-medium mb-2">Number of Lines</h3>
+              <ToggleGroup type="single" value={lineCount} onValueChange={(value) => value && setLineCount(value)} className="flex justify-center">
+                <ToggleGroupItem value="1" className="px-5 data-[state=on]:bg-crm-blue data-[state=on]:text-white">1</ToggleGroupItem>
+                <ToggleGroupItem value="2" className="px-5 data-[state=on]:bg-crm-blue data-[state=on]:text-white">2</ToggleGroupItem>
+                <ToggleGroupItem value="3" className="px-5 data-[state=on]:bg-crm-blue data-[state=on]:text-white">3</ToggleGroupItem>
               </ToggleGroup>
             </div>
           </div>
           
-          <DialogFooter className="flex sm:justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-lg"
+          <DialogFooter>
+            <Button 
+              variant="outline" 
               onClick={() => setIsDialogOpen(false)}
+              className="rounded-lg"
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+            <Button 
               onClick={startDialing}
+              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
             >
-              Start Dialing {selectedLeads.length > 0 && `(${selectedLeads.length} leads)`}
+              Start Dialing
             </Button>
           </DialogFooter>
         </DialogContent>
