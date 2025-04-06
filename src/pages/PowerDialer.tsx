@@ -105,7 +105,7 @@ const PowerDialer = () => {
   useEffect(() => {
     fetchLeads();
   }, []);
-  
+
   const fetchLeads = async () => {
     setIsLoading(true);
     try {
@@ -214,7 +214,7 @@ const PowerDialer = () => {
       toast({
         title: "Warning",
         description: "Audio streaming setup failed. Proceeding with limited functionality.",
-        variant: "warning",
+        variant: "default",
       });
     }
 
