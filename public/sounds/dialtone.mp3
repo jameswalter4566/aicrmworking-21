@@ -1,4 +1,3 @@
 
-// This is still a placeholder for the dialtone.mp3 file.
-// You'll need to add an actual MP3 file for dial tone sound.
-// Recommended: A standard US dial tone sound (350Hz + 440Hz tone)
+// This MP3 file should be replaced with an actual dialtone sound.
+// For reference, a standard US dialtone uses a combination of 350Hz and 440Hz tones.
