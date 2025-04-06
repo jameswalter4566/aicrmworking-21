@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const corsHeaders = {
@@ -7,6 +6,42 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'OPTIONS, GET, POST',
   'Access-Control-Max-Age': '86400',
 };
+
+interface StreamConnection {
+  socket: WebSocket;
+  streamSid: string | null;
+  callSid: string | null;
+  lastActivity: number;
+  inboundAudioCount: number;
+  outboundAudioCount: number;
+  connectionId: string;
+}
+
+const activeConnections: Map<string, StreamConnection> = new Map();
+
+function cleanupInactiveConnections() {
+  const now = Date.now();
+  let count = 0;
+  
+  activeConnections.forEach((conn, id) => {
+    if (now - conn.lastActivity > 120000) {
+      console.log(`Closing inactive WebSocket connection: ${id} (no activity for ${(now - conn.lastActivity)/1000}s)`);
+      try {
+        conn.socket.close(1000, "Connection timeout due to inactivity");
+        activeConnections.delete(id);
+        count++;
+      } catch (err) {
+        console.error(`Error closing inactive connection ${id}:`, err);
+      }
+    }
+  });
+  
+  if (count > 0) {
+    console.log(`Cleaned up ${count} inactive connection(s). Remaining: ${activeConnections.size}`);
+  }
+}
+
+setInterval(cleanupInactiveConnections, 30000);
 
 serve(async (req) => {
   console.log(`WebSocket connection request received: ${new Date().toISOString()}`);
@@ -25,11 +60,18 @@ serve(async (req) => {
     const { socket, response } = Deno.upgradeWebSocket(req);
     const connId = crypto.randomUUID();
     
-    console.log(`New WebSocket connection established: ${connId}`);
-
-    let activeStreamSid = null;
-    let callSid = null;
-    let streamStarted = false;
+    const connectionState: StreamConnection = {
+      socket,
+      streamSid: null,
+      callSid: null,
+      lastActivity: Date.now(),
+      inboundAudioCount: 0,
+      outboundAudioCount: 0,
+      connectionId: connId
+    };
+    
+    activeConnections.set(connId, connectionState);
+    console.log(`New WebSocket connection established: ${connId} (total active: ${activeConnections.size})`);
 
     socket.onopen = () => {
       console.log(`WebSocket connection opened: ${connId}`);
@@ -42,14 +84,49 @@ serve(async (req) => {
 
     socket.onmessage = (event) => {
       try {
+        if (activeConnections.has(connId)) {
+          activeConnections.get(connId)!.lastActivity = Date.now();
+        }
+        
         const data = JSON.parse(event.data);
-        console.log(`Received message type: ${data.event} (${connId})`);
+        
+        switch (data.event) {
+          case 'ping':
+          case 'pong':
+            break;
+          
+          case 'media':
+          case 'browser_audio':
+            if (data.event === 'media') {
+              connectionState.outboundAudioCount++;
+              if (connectionState.outboundAudioCount % 100 === 0) {
+                console.log(`Processed ${connectionState.outboundAudioCount} outbound audio chunks on connection ${connId}`);
+              }
+            } else {
+              if (connectionState.inboundAudioCount % 100 === 0) {
+                console.log(`Processed ${connectionState.inboundAudioCount} browser audio chunks on connection ${connId}`);
+              }
+            }
+            break;
+            
+          default:
+            console.log(`Connection ${connId} received ${data.event} event`);
+        }
 
-        if (data.event === 'start') {
-          console.log('Stream started:', JSON.stringify(data).substring(0, 100) + '...');
-          activeStreamSid = data.streamSid;
-          callSid = data.callSid;
-          streamStarted = true;
+        if (data.event === 'connected') {
+          console.log(`Twilio WebSocket protocol connected: ${JSON.stringify(data)}`);
+          
+          socket.send(JSON.stringify({
+            event: 'connected_ack',
+            timestamp: Date.now()
+          }));
+        }
+        else if (data.event === 'start') {
+          console.log('Stream started:', JSON.stringify(data));
+          if (activeConnections.has(connId)) {
+            connectionState.streamSid = data.streamSid;
+            connectionState.callSid = data.callSid;
+          }
           
           socket.send(JSON.stringify({
             event: 'streamStart',
@@ -57,55 +134,112 @@ serve(async (req) => {
             callSid: data.callSid,
             timestamp: Date.now()
           }));
+
+          console.log(`
+Stream details:
+- Stream SID: ${data.streamSid}
+- Call SID: ${data.callSid}
+- Tracks: ${data.start?.tracks?.join(', ') || 'unknown'}
+- Media Format: ${JSON.stringify(data.start?.mediaFormat || {})}
+- Account SID: ${data.start?.accountSid || 'unknown'}
+          `);
         }
-        else if (data.event === 'media') {
-          if (!streamStarted) {
+        else if (data.event === 'media' && data.media?.payload) {
+          if (!connectionState.streamSid) {
             console.warn('Received media before stream start');
             return;
           }
+
+          const track = data.media.track || 'unknown';
           
-          // Forward audio data in both directions
           socket.send(JSON.stringify({
             event: 'audio',
-            track: data.track || 'inbound',
-            payload: data.media?.payload || data.payload,
-            streamSid: activeStreamSid,
-            timestamp: Date.now()
+            track: track,
+            payload: data.media.payload,
+            timestamp: Date.now(),
+            streamSid: connectionState.streamSid,
+            chunk: data.media.chunk || 0,
+            sequence: data.sequenceNumber || 0
           }));
+          
+          if (track === 'inbound') {
+            connectionState.inboundAudioCount++;
+          } else {
+            connectionState.outboundAudioCount++;
+          }
         }
         else if (data.event === 'stop') {
           console.log('Stream stopped:', JSON.stringify(data));
-          streamStarted = false;
           
           socket.send(JSON.stringify({
             event: 'streamStop',
             streamSid: data.streamSid,
-            callSid: data.callSid || callSid,
+            callSid: data.callSid || connectionState.callSid,
             timestamp: Date.now()
           }));
           
-          activeStreamSid = null;
-          callSid = null;
+          if (activeConnections.has(connId)) {
+            connectionState.streamSid = null;
+            connectionState.callSid = null;
+          }
         }
-        else if (data.event === 'browser_audio' && activeStreamSid) {
-          if (!streamStarted) {
+        else if (data.event === 'mark') {
+          console.log('Mark received:', JSON.stringify(data));
+          
+          socket.send(JSON.stringify({
+            event: 'mark',
+            name: data.mark?.name || '',
+            streamSid: data.streamSid,
+            timestamp: Date.now()
+          }));
+        }
+        else if (data.event === 'dtmf') {
+          console.log('DTMF received:', JSON.stringify(data));
+          
+          socket.send(JSON.stringify({
+            event: 'dtmf',
+            digit: data.dtmf?.digit || '',
+            streamSid: data.streamSid,
+            timestamp: Date.now()
+          }));
+        }
+        else if (data.event === 'browser_audio' && connectionState.streamSid) {
+          if (!connectionState.streamSid) {
             console.warn('Received browser audio before stream start');
             return;
           }
           
-          // Send browser audio back to Twilio
           socket.send(JSON.stringify({
             event: 'media',
-            streamSid: activeStreamSid,
+            streamSid: connectionState.streamSid,
             media: {
               payload: data.payload
-            },
-            track: 'outbound'
+            }
           }));
+          
+          const markId = `browser-audio-${Date.now()}`;
+          socket.send(JSON.stringify({
+            event: 'mark',
+            streamSid: connectionState.streamSid,
+            mark: {
+              name: markId
+            }
+          }));
+          
+          connectionState.outboundAudioCount++;
         }
         else if (data.event === 'ping') {
           socket.send(JSON.stringify({
             event: 'pong',
+            timestamp: Date.now()
+          }));
+        }
+        else if (data.event === 'browser_connect') {
+          console.log(`Browser client connected: ${connId}`);
+          
+          socket.send(JSON.stringify({
+            event: 'browser_connected',
+            connId: connId,
             timestamp: Date.now()
           }));
         }
@@ -120,9 +254,8 @@ serve(async (req) => {
 
     socket.onclose = () => {
       console.log(`WebSocket connection closed: ${connId}`);
-      activeStreamSid = null;
-      callSid = null;
-      streamStarted = false;
+      activeConnections.delete(connId);
+      console.log(`Connection removed. Total active: ${activeConnections.size}`);
     };
 
     return response;
