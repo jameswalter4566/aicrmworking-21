@@ -31,6 +31,7 @@ class TwilioService {
   private reconnectAttempts: number = 0;
   private maxReconnectAttempts: number = 5;
   private currentAudioOutputDevice: string = 'default';
+  private forceRestApi: boolean = true; // Force using REST API approach to avoid browser compatibility issues
   
   constructor() {
     // Create audio element for output testing and call sounds
@@ -410,6 +411,11 @@ class TwilioService {
         throw new Error('Failed to get Twilio token');
       }
       
+      if (this.forceRestApi) {
+        console.log("Using REST API approach instead of browser Twilio Device");
+        return true;
+      }
+      
       console.log("Twilio token received, initializing device");
       
       if (this.device) {
@@ -436,74 +442,86 @@ class TwilioService {
           }
         };
         
-        this.device = new Device();
-        
-        this.device.on('ready', () => {
-          console.log('Twilio device is ready for audio I/O');
-          this.playSound('outgoing');
-        });
-        
-        this.device.on('error', (error) => {
-          console.error('Twilio device error:', error);
-        });
-        
-        this.device.on('connect', (conn) => {
-          console.log('Call connected - audio channels established');
-          this.connection = conn;
-          this.callActive = true;
+        try {
+          this.device = new Device();
           
-          try {
-            conn.mute(false);
-          } catch (e) {
-            console.warn('Could not unmute connection:', e);
+          if (!this.device) {
+            throw new Error("Failed to create Twilio Device instance");
           }
           
-          if (this.audioContext && this.audioContext.state === 'suspended') {
-            this.audioContext.resume().then(() => {
-              console.log('Audio context resumed for active call');
-            });
-          }
-          
-          this.stopSound('ringtone');
-          this.stopSound('outgoing');
-          this.stopSound('dialtone');
-          
-          conn.volume((inputVolume: number, outputVolume: number) => {
-            console.log(`Audio levels - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
-            
-            if (outputVolume < 0.01) {
-              console.warn('Very low or no incoming audio detected');
-            }
+          console.log("Device instance created successfully");
+        } catch (deviceCreateError) {
+          console.error("Error creating Twilio Device:", deviceCreateError);
+          this.device = null;
+          throw deviceCreateError;
+        }
+        
+        if (this.device) {
+          this.device.on('ready', () => {
+            console.log('Twilio device is ready for audio I/O');
+            this.playSound('outgoing');
           });
-        });
-        
-        this.device.on('disconnect', () => {
-          console.log('Call disconnected - audio channels closed');
-          this.connection = null;
-          this.callActive = false;
           
-          this.stopSound('ringtone');
-          this.stopSound('outgoing');
-          this.stopSound('dialtone');
-        });
+          this.device.on('error', (error) => {
+            console.error('Twilio device error:', error);
+          });
+          
+          this.device.on('connect', (conn) => {
+            console.log('Call connected - audio channels established');
+            this.connection = conn;
+            this.callActive = true;
+            
+            try {
+              conn.mute(false);
+            } catch (e) {
+              console.warn('Could not unmute connection:', e);
+            }
+            
+            if (this.audioContext && this.audioContext.state === 'suspended') {
+              this.audioContext.resume().then(() => {
+                console.log('Audio context resumed for active call');
+              });
+            }
+            
+            this.stopSound('ringtone');
+            this.stopSound('outgoing');
+            this.stopSound('dialtone');
+            
+            conn.volume((inputVolume: number, outputVolume: number) => {
+              console.log(`Audio levels - Input: ${inputVolume.toFixed(2)}, Output: ${outputVolume.toFixed(2)}`);
+              
+              if (outputVolume < 0.01) {
+                console.warn('Very low or no incoming audio detected');
+              }
+            });
+          });
+          
+          this.device.on('disconnect', () => {
+            console.log('Call disconnected - audio channels closed');
+            this.connection = null;
+            this.callActive = false;
+            
+            this.stopSound('ringtone');
+            this.stopSound('outgoing');
+            this.stopSound('dialtone');
+          });
+          
+          this.device.on('offline', () => {
+            console.log('Twilio device is offline');
+          });
+          
+          this.device.on('incoming', (conn) => {
+            console.log('Incoming call detected');
+            this.playSound('ringtone');
+          });
+          
+          await this.device.setup(data.token, deviceOptions);
+          await this.testAudioOutput();
+        }
         
-        this.device.on('offline', () => {
-          console.log('Twilio device is offline');
-        });
-        
-        this.device.on('incoming', (conn) => {
-          console.log('Incoming call detected');
-          this.playSound('ringtone');
-        });
-        
-        await this.device.setup(data.token, deviceOptions);
-        
-        await this.testAudioOutput();
-        
-        return true;
+        return !!this.device;
       } catch (deviceError) {
         console.error("Failed to initialize Twilio device with standard approach:", deviceError);
-        
         console.log("Will use REST API for calls instead of browser Device");
         return true;
       }
