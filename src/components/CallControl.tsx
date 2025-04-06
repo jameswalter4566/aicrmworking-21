@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones, RefreshCcw } from 'lucide-react';
@@ -11,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { getWebSocketStatus } from '@/utils/webSocketManager';
 
 interface CallControlProps {
   isMuted: boolean;
