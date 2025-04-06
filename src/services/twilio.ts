@@ -677,20 +677,23 @@ class TwilioService {
         
         console.log("Connecting with phone number:", formattedPhoneNumber);
         
-        // Set up parameters with explicit audio options
+        // Define audio constraints separately from the params object
+        const audioConstraints = {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        };
+        
+        // Create params with just the To parameter
         const params = {
-          To: formattedPhoneNumber,
-          // Force high quality audio
-          audioConstraints: {
-            echoCancellation: true,
-            noiseSuppression: true,
-            autoGainControl: true
-          }
+          To: formattedPhoneNumber
         };
         
         console.log("Call parameters:", params);
+        console.log("Audio constraints:", audioConstraints);
         
-        this.connection = await this.device.connect(params);
+        // Pass audioConstraints as a separate parameter to connect
+        this.connection = await this.device.connect(params, audioConstraints);
         
         console.log("Call connection established:", this.connection?.parameters);
         this.callActive = true;
