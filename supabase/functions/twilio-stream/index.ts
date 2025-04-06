@@ -9,7 +9,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Log each request for debugging
   console.log(`WebSocket connection request received: ${new Date().toISOString()}`);
   
   const upgradeHeader = req.headers.get('Upgrade');
@@ -28,9 +27,9 @@ serve(async (req) => {
     
     console.log(`New WebSocket connection established: ${connId}`);
 
-    // Store the active streamSid for sending audio back to Twilio
     let activeStreamSid = null;
     let callSid = null;
+    let streamStarted = false;
 
     socket.onopen = () => {
       console.log(`WebSocket connection opened: ${connId}`);
@@ -46,12 +45,11 @@ serve(async (req) => {
         const data = JSON.parse(event.data);
         console.log(`Received message type: ${data.event} (${connId})`);
 
-        // Handle different WebSocket message types
         if (data.event === 'start') {
           console.log('Stream started:', JSON.stringify(data).substring(0, 100) + '...');
-          // Store the stream SID for sending audio back to Twilio
           activeStreamSid = data.streamSid;
           callSid = data.callSid;
+          streamStarted = true;
           
           socket.send(JSON.stringify({
             event: 'streamStart',
@@ -61,8 +59,12 @@ serve(async (req) => {
           }));
         }
         else if (data.event === 'media') {
-          // Forward audio data from Twilio to client
-          // No need to log every media packet
+          if (!streamStarted) {
+            console.warn('Received media before stream start');
+            return;
+          }
+          
+          // Forward audio data in both directions
           socket.send(JSON.stringify({
             event: 'audio',
             track: data.track || 'inbound',
@@ -73,6 +75,7 @@ serve(async (req) => {
         }
         else if (data.event === 'stop') {
           console.log('Stream stopped:', JSON.stringify(data));
+          streamStarted = false;
           
           socket.send(JSON.stringify({
             event: 'streamStop',
@@ -84,34 +87,27 @@ serve(async (req) => {
           activeStreamSid = null;
           callSid = null;
         }
-        else if (data.event === 'ping') {
-          // Respond to keep-alive pings
-          socket.send(JSON.stringify({
-            event: 'pong',
-            timestamp: Date.now()
-          }));
-        }
-        else if (data.event === 'browser_connect') {
-          // Acknowledge browser client connection
-          console.log('Browser client connected to WebSocket');
-          socket.send(JSON.stringify({
-            event: 'browser_connected',
-            timestamp: Date.now()
-          }));
-        }
-        // Handle browser audio to send back to Twilio for bidirectional streaming
         else if (data.event === 'browser_audio' && activeStreamSid) {
-          // Format the message according to Twilio's WebSocket protocol for sending audio back
+          if (!streamStarted) {
+            console.warn('Received browser audio before stream start');
+            return;
+          }
+          
+          // Send browser audio back to Twilio
           socket.send(JSON.stringify({
             event: 'media',
             streamSid: activeStreamSid,
             media: {
               payload: data.payload
-            }
+            },
+            track: 'outbound'
           }));
         }
-        else {
-          console.log(`Unknown event type: ${data.event}`, JSON.stringify(data).substring(0, 100));
+        else if (data.event === 'ping') {
+          socket.send(JSON.stringify({
+            event: 'pong',
+            timestamp: Date.now()
+          }));
         }
       } catch (err) {
         console.error('Error processing WebSocket message:', err);
@@ -126,6 +122,7 @@ serve(async (req) => {
       console.log(`WebSocket connection closed: ${connId}`);
       activeStreamSid = null;
       callSid = null;
+      streamStarted = false;
     };
 
     return response;
