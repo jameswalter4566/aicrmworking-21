@@ -247,7 +247,7 @@ const PowerDialer = () => {
       } else {
         toast({
           title: "Call Failed",
-          description: result.error !== undefined ? result.error : "Could not connect the call",
+          description: "Could not connect the call",
           variant: "destructive",
         });
         
