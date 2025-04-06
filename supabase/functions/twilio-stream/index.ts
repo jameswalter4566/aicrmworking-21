@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const corsHeaders = {
@@ -57,6 +56,15 @@ serve(async (req) => {
             streamSid: data.streamSid,
             timestamp: Date.now()
           }));
+          
+          // Add acknowledgment for media packets to ensure continuous flow
+          if (Math.random() < 0.1) {  // Only ack about 10% of packets to avoid flooding
+            socket.send(JSON.stringify({
+              event: 'mediaAck',
+              streamSid: data.streamSid,
+              timestamp: Date.now()
+            }));
+          }
         }
         else if (data.event === 'stop') {
           console.log('Stream stopped:', data);
@@ -68,8 +76,17 @@ serve(async (req) => {
           }));
         }
         else if (data.event === 'ping') {
+          // Respond to keep-alive pings
           socket.send(JSON.stringify({
             event: 'pong',
+            timestamp: Date.now()
+          }));
+        }
+        else if (data.event === 'browser_connect') {
+          // Acknowledge browser client connection
+          console.log('Browser client connected');
+          socket.send(JSON.stringify({
+            event: 'browser_connected',
             timestamp: Date.now()
           }));
         }

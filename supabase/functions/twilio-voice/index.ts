@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -214,7 +213,10 @@ serve(async (req) => {
         method: 'POST',
         statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        statusCallbackMethod: 'POST'
+        statusCallbackMethod: 'POST',
+        machineDetection: 'Enable',
+        record: false,
+        timeout: 30
       };
       
       try {
@@ -224,7 +226,7 @@ serve(async (req) => {
         const stream = await client.calls(call.sid).streams.create({
           name: `stream-${call.sid}`,
           url: streamUrl,
-          track: 'both_tracks', // Stream both inbound and outbound audio
+          track: 'both_tracks',
           parameter1: { name: 'callSid', value: call.sid },
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=streamStatus`,
           statusCallbackMethod: 'POST'
@@ -286,8 +288,10 @@ serve(async (req) => {
           
           const dial = twimlResponse.dial({
             callerId: TWILIO_PHONE_NUMBER,
-            // Enhanced audio quality - crucial for browser audio
-            answerOnBridge: true
+            answerOnBridge: true,
+            record: false,
+            trim: 'trim-silence',
+            timeLimit: 14400
           });
           
           const formattedNumber = normalizePhoneNumber(phoneNumber);

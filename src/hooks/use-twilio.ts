@@ -26,11 +26,30 @@ export const useTwilio = () => {
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
 
+  const checkPermissions = useCallback(async () => {
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      
+      if (permissionStatus.state !== 'granted') {
+        toast({
+          title: "Microphone Permission Required",
+          description: "Please allow microphone access when prompted to make calls.",
+          variant: "default",
+        });
+      }
+    } catch (err) {
+      console.log("Permission API not supported, skipping check");
+    }
+  }, []);
+
   useEffect(() => {
     const initializeTwilio = async () => {
       setIsLoading(true);
       try {
         console.log("Initializing Twilio service...");
+        
+        await checkPermissions();
+        
         const micAccess = await twilioService.initializeAudioContext();
         if (!micAccess) {
           toast({
@@ -43,11 +62,9 @@ export const useTwilio = () => {
         
         setMicrophoneActive(true);
         
-        // Load available audio devices
         const devices = await twilioService.getAudioOutputDevices();
         setAudioOutputDevices(devices);
         
-        // Set the current device
         const currentDevice = twilioService.getCurrentAudioDevice();
         setCurrentAudioDevice(currentDevice);
         
@@ -68,9 +85,9 @@ export const useTwilio = () => {
         
         if (!deviceInitialized) {
           toast({
-            title: "Error",
-            description: "Failed to initialize phone system. Please check the console for details.",
-            variant: "destructive",
+            title: "Phone System Warning",
+            description: "Phone system initialized with limited features. Calls will still work but audio quality may be affected.",
+            variant: "default",
           });
         } else {
           toast({
@@ -96,16 +113,15 @@ export const useTwilio = () => {
       const isActive = twilioService.isMicrophoneActive();
       setMicrophoneActive(isActive);
       
-      // Check audio streaming status
       const isStreaming = twilioService.isStreamingActive?.() || false;
       setAudioStreaming(isStreaming);
       
-      // Update any active calls with the streaming status
       if (Object.keys(activeCalls).length > 0) {
         setActiveCalls(prev => {
           const updated = {...prev};
           Object.keys(updated).forEach(leadId => {
             updated[leadId].audioStreaming = isStreaming;
+            updated[leadId].audioActive = isActive;
           });
           return updated;
         });
@@ -123,7 +139,7 @@ export const useTwilio = () => {
       
       twilioService.cleanup();
     };
-  }, []);
+  }, [checkPermissions]);
 
   const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = false) => {
     const leadIdStr = String(leadId);
@@ -248,6 +264,20 @@ export const useTwilio = () => {
       return { success: false };
     }
     
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      
+      if (permissionStatus.state !== 'granted') {
+        toast({
+          title: "Microphone Permission Required",
+          description: "Please allow microphone access when prompted.",
+          variant: "default", 
+        });
+      }
+    } catch (err) {
+      console.log("Permission API not supported, proceeding with call");
+    }
+    
     if (!twilioService.isMicrophoneActive()) {
       toast({
         title: "Microphone Check",
@@ -259,9 +289,18 @@ export const useTwilio = () => {
       if (!twilioService.isMicrophoneActive()) {
         toast({
           title: "Microphone Inactive",
-          description: "Your microphone appears to be unavailable. Call will proceed but audio may not work.",
-          variant: "default",
+          description: "Your microphone appears to be unavailable. Check your browser permissions.",
+          variant: "destructive",
         });
+        
+        toast({
+          title: "Enable Microphone",
+          description: "Click the camera/microphone icon in your browser's address bar and allow access.",
+          variant: "default",
+          duration: 10000,
+        });
+        
+        return { success: false, error: "Microphone access required" };
       }
     }
 
@@ -410,7 +449,6 @@ export const useTwilio = () => {
     if (success) {
       setCurrentAudioDevice(deviceId);
       
-      // Play a test tone through the new device
       await twilioService.testAudioOutput(deviceId);
       
       toast({
