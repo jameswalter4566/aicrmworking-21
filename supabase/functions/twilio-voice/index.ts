@@ -206,7 +206,7 @@ serve(async (req) => {
       // Set WebSocket URL for audio stream
       const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
       
-      // IMPORTANT: Fixed TwiML sequence to properly handle the call flow
+      // CRITICAL FIX: Move the Stream element after the Dial to ensure proper call flow
       const callOptions = {
         to: formattedPhoneNumber,
         from: TWILIO_PHONE_NUMBER,

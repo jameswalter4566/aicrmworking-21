@@ -15,7 +15,11 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     
     // Check if Twilio is already loaded
     if (window.Twilio) {
-      console.log("Twilio already loaded");
+      console.log("Twilio already loaded", { 
+        version: window.Twilio.VERSION || 'unknown',
+        deviceAvailable: !!window.Twilio.Device,
+        audioEnabled: typeof window.AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined'
+      });
       setLoaded(true);
       if (onLoad) onLoad();
       return;
@@ -35,14 +39,18 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     script.defer = true;
     
     script.onload = () => {
-      console.log("Twilio JS SDK loaded successfully");
+      console.log("Twilio JS SDK loaded successfully", {
+        version: window.Twilio?.VERSION || 'unknown',
+        deviceAvailable: !!window.Twilio?.Device,
+        audioEnabled: typeof window.AudioContext !== 'undefined' || typeof (window as any).webkitAudioContext !== 'undefined'
+      });
       setLoaded(true);
       if (onLoad) onLoad();
     };
     
     script.onerror = (e) => {
       const error = new Error("Failed to load Twilio script");
-      console.error(error);
+      console.error(error, e);
       setError(error);
       if (onError) onError(error);
     };

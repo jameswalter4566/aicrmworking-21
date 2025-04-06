@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const corsHeaders = {
@@ -42,6 +43,18 @@ function cleanupInactiveConnections() {
 }
 
 setInterval(cleanupInactiveConnections, 30000);
+
+// Start a periodic diagnostics reporter
+setInterval(() => {
+  console.log(`Active connections: ${activeConnections.size}`);
+  
+  if (activeConnections.size > 0) {
+    const now = Date.now();
+    activeConnections.forEach((conn, id) => {
+      console.log(`Connection ${id}: streamSid=${conn.streamSid || 'none'}, callSid=${conn.callSid || 'none'}, inbound=${conn.inboundAudioCount}, outbound=${conn.outboundAudioCount}, age=${((now - conn.lastActivity)/1000).toFixed(1)}s`);
+    });
+  }
+}, 10000);
 
 serve(async (req) => {
   console.log(`WebSocket connection request received: ${new Date().toISOString()}`);
@@ -93,6 +106,7 @@ serve(async (req) => {
         switch (data.event) {
           case 'ping':
           case 'pong':
+            // Don't log pings
             break;
           
           case 'media':
@@ -100,12 +114,19 @@ serve(async (req) => {
             if (data.event === 'media') {
               connectionState.outboundAudioCount++;
               if (connectionState.outboundAudioCount % 100 === 0) {
-                console.log(`Processed ${connectionState.outboundAudioCount} outbound audio chunks on connection ${connId}`);
+                console.log(`Received ${connectionState.outboundAudioCount} outbound audio chunks on connection ${connId}`);
               }
             } else {
+              connectionState.inboundAudioCount++;
               if (connectionState.inboundAudioCount % 100 === 0) {
-                console.log(`Processed ${connectionState.inboundAudioCount} browser audio chunks on connection ${connId}`);
+                console.log(`Received ${connectionState.inboundAudioCount} browser audio chunks on connection ${connId}`);
               }
+            }
+            // Log first few audio chunks to confirm format
+            if (connectionState.inboundAudioCount < 5 || connectionState.outboundAudioCount < 5) {
+              const payloadLength = data.payload?.length || data.media?.payload?.length || 0;
+              console.log(`Received ${data.event} chunk #${data.event === 'media' ? 
+                connectionState.outboundAudioCount : connectionState.inboundAudioCount} - payload length: ${payloadLength}`);
             }
             break;
             
@@ -126,6 +147,8 @@ serve(async (req) => {
           if (activeConnections.has(connId)) {
             connectionState.streamSid = data.streamSid;
             connectionState.callSid = data.callSid;
+            connectionState.inboundAudioCount = 0;
+            connectionState.outboundAudioCount = 0;
           }
           
           socket.send(JSON.stringify({
@@ -152,6 +175,7 @@ Stream details:
 
           const track = data.media.track || 'unknown';
           
+          // Forward the audio to browser client
           socket.send(JSON.stringify({
             event: 'audio',
             track: track,
@@ -164,8 +188,15 @@ Stream details:
           
           if (track === 'inbound') {
             connectionState.inboundAudioCount++;
+            // Log periodically to confirm we're receiving audio
+            if (connectionState.inboundAudioCount % 50 === 0) {
+              console.log(`Forwarded ${connectionState.inboundAudioCount} inbound audio chunks for stream ${connectionState.streamSid}`);
+            }
           } else {
             connectionState.outboundAudioCount++;
+            if (connectionState.outboundAudioCount % 50 === 0) {
+              console.log(`Forwarded ${connectionState.outboundAudioCount} outbound audio chunks for stream ${connectionState.streamSid}`);
+            }
           }
         }
         else if (data.event === 'stop') {
@@ -177,6 +208,8 @@ Stream details:
             callSid: data.callSid || connectionState.callSid,
             timestamp: Date.now()
           }));
+          
+          console.log(`Stream ${data.streamSid} stats: inbound=${connectionState.inboundAudioCount}, outbound=${connectionState.outboundAudioCount}`);
           
           if (activeConnections.has(connId)) {
             connectionState.streamSid = null;
@@ -203,12 +236,13 @@ Stream details:
             timestamp: Date.now()
           }));
         }
-        else if (data.event === 'browser_audio' && connectionState.streamSid) {
+        else if (data.event === 'browser_audio' && data.payload) {
           if (!connectionState.streamSid) {
             console.warn('Received browser audio before stream start');
             return;
           }
           
+          // This is critical - forward browser audio to Twilio stream
           socket.send(JSON.stringify({
             event: 'media',
             streamSid: connectionState.streamSid,
@@ -217,6 +251,7 @@ Stream details:
             }
           }));
           
+          // Send a mark to confirm audio was sent
           const markId = `browser-audio-${Date.now()}`;
           socket.send(JSON.stringify({
             event: 'mark',
@@ -227,6 +262,9 @@ Stream details:
           }));
           
           connectionState.outboundAudioCount++;
+          if (connectionState.outboundAudioCount % 50 === 0) {
+            console.log(`Forwarded ${connectionState.outboundAudioCount} browser audio chunks to Twilio`);
+          }
         }
         else if (data.event === 'ping') {
           socket.send(JSON.stringify({
