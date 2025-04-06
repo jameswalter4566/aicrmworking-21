@@ -1,35 +1,38 @@
 
-import { Routes, Route } from 'react-router-dom';
-import Index from './pages/Index';
-import AIDialer from './pages/AIDialer';
-import PowerDialer from './pages/PowerDialer';
-import SMSCampaign from './pages/SMSCampaign';
-import People from './pages/People';
-import Deals from './pages/Deals';
-import NotFound from './pages/NotFound';
-import MainLayout from './components/layouts/MainLayout';
-import './App.css';
-import { Toaster } from 'sonner';
-import { Toaster as ShadcnToaster } from '@/components/ui/toaster';
-import TwilioScript from './components/TwilioScript';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Index from "./pages/Index";
+import People from "./pages/People";
+import Deals from "./pages/Deals";
+import PowerDialer from "./pages/PowerDialer";
+import AIDialer from "./pages/AIDialer";
+import SMSCampaign from "./pages/SMSCampaign";
+import NotFound from "./pages/NotFound";
 
-function App() {
-  return (
-    <>
-      <TwilioScript />
-      <Routes>
-        <Route path="/" element={<MainLayout><Index /></MainLayout>} />
-        <Route path="/ai-dialer" element={<MainLayout><AIDialer /></MainLayout>} />
-        <Route path="/power-dialer" element={<MainLayout><PowerDialer /></MainLayout>} />
-        <Route path="/sms-campaign" element={<MainLayout><SMSCampaign /></MainLayout>} />
-        <Route path="/people" element={<MainLayout><People /></MainLayout>} />
-        <Route path="/deals" element={<MainLayout><Deals /></MainLayout>} />
-        <Route path="*" element={<MainLayout><NotFound /></MainLayout>} />
-      </Routes>
-      <Toaster position="top-right" />
-      <ShadcnToaster />
-    </>
-  );
-}
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Index />} />
+          <Route path="/people" element={<People />} />
+          <Route path="/deals" element={<Deals />} />
+          <Route path="/power-dialer" element={<PowerDialer />} />
+          <Route path="/ai-dialer" element={<AIDialer />} />
+          <Route path="/sms-campaign" element={<SMSCampaign />} />
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
 export default App;
