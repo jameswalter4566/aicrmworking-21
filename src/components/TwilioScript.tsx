@@ -6,26 +6,7 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
-// Define a more complete interface for the Twilio object
-interface TwilioDeviceInterface {
-  activeDevice?: any;
-  info?: { toString: () => string };
-  [key: string]: any;
-}
-
-interface TwilioInterface {
-  VERSION?: string;
-  Device?: TwilioDeviceInterface;
-  [key: string]: any;
-}
-
-declare global {
-  interface Window {
-    Twilio?: TwilioInterface;
-    AudioContext?: typeof AudioContext;
-    webkitAudioContext?: typeof AudioContext;
-  }
-}
+// No need to redeclare global interfaces since they're in vite-env.d.ts
 
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   const [loaded, setLoaded] = useState(false);

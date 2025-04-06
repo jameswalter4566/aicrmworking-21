@@ -36,6 +36,8 @@ interface Window {
     VERSION?: string;
     [key: string]: any;
   };
+  AudioContext?: typeof AudioContext;
+  webkitAudioContext?: typeof AudioContext;
 }
 
 // Declare global Twilio object
