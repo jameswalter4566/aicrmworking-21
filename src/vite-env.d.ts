@@ -10,10 +10,30 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+// Create a more detailed interface for the Twilio Device
+interface TwilioDeviceInterface {
+  new(token: string, options?: any): TwilioDeviceInstance;
+  [key: string]: any;
+}
+
+interface TwilioDeviceInstance {
+  on(event: string, callback: Function): void;
+  connect(options?: any): any;
+  disconnectAll(): void;
+  destroy(): void;
+  register(): void;
+  unregister(): void;
+  updateToken(token: string): void;
+  activeDevice?: any;
+  info?: { toString: () => string };
+  [key: string]: any;
+}
+
 // Declare Twilio on the window object
 interface Window {
   Twilio: {
-    Device: new (token: string, options?: any) => any;
+    Device: TwilioDeviceInterface;
+    VERSION?: string;
     [key: string]: any;
   };
 }

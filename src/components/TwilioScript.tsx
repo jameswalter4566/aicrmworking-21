@@ -6,11 +6,24 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
+// Define a more complete interface for the Twilio object
+interface TwilioDeviceInterface {
+  activeDevice?: any;
+  info?: { toString: () => string };
+  [key: string]: any;
+}
+
+interface TwilioInterface {
+  VERSION?: string;
+  Device?: TwilioDeviceInterface;
+  [key: string]: any;
+}
+
 declare global {
   interface Window {
-    Twilio?: any;
-    AudioContext?: any;
-    webkitAudioContext?: any;
+    Twilio?: TwilioInterface;
+    AudioContext?: typeof AudioContext;
+    webkitAudioContext?: typeof AudioContext;
   }
 }
 
@@ -62,7 +75,7 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
 
       // Immediately test if Twilio.Device can be instantiated
       try {
-        const deviceTest = window.Twilio.Device;
+        const deviceTest = window.Twilio?.Device;
         console.log("🔶 Twilio Device constructor available:", !!deviceTest);
       } catch (e) {
         console.error("🔶 Error accessing Twilio.Device constructor:", e);
