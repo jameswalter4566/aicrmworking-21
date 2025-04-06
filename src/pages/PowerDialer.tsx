@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -186,7 +187,7 @@ const PowerDialer = () => {
       toast({
         title: "Audio Connection Failed",
         description: "Could not establish audio streaming connection. Calls may have limited functionality.",
-        variant: "destructive",
+        variant: "default", // Changed from "warning" to "default"
       });
       return false;
     }
