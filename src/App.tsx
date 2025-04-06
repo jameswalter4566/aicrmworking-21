@@ -18,15 +18,13 @@ function App() {
     <>
       <TwilioScript />
       <Routes>
-        <Route path="/" element={<MainLayout />}>
-          <Route index element={<Index />} />
-          <Route path="/ai-dialer" element={<AIDialer />} />
-          <Route path="/power-dialer" element={<PowerDialer />} />
-          <Route path="/sms-campaign" element={<SMSCampaign />} />
-          <Route path="/people" element={<People />} />
-          <Route path="/deals" element={<Deals />} />
-          <Route path="*" element={<NotFound />} />
-        </Route>
+        <Route path="/" element={<MainLayout><Index /></MainLayout>} />
+        <Route path="/ai-dialer" element={<MainLayout><AIDialer /></MainLayout>} />
+        <Route path="/power-dialer" element={<MainLayout><PowerDialer /></MainLayout>} />
+        <Route path="/sms-campaign" element={<MainLayout><SMSCampaign /></MainLayout>} />
+        <Route path="/people" element={<MainLayout><People /></MainLayout>} />
+        <Route path="/deals" element={<MainLayout><Deals /></MainLayout>} />
+        <Route path="*" element={<MainLayout><NotFound /></MainLayout>} />
       </Routes>
       <Toaster position="top-right" />
       <ShadcnToaster />
