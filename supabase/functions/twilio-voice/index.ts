@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -31,8 +32,8 @@ function normalizePhoneNumber(phoneNumber: string): string {
   return digitsOnly ? `+${digitsOnly}` : '';
 }
 
-// CRITICAL: Fix the TwiML generation for voice calls
-// This function should return TwiML with Stream element INSIDE the Dial element
+// FIXED: Corrected TwiML generation for voice calls
+// This function should correctly add a Stream element to capture audio
 function generateCallTwiML(phoneNumber: string, streamUrl: string): string {
   const twimlResponse = new twilio.twiml.VoiceResponse();
   
@@ -42,33 +43,34 @@ function generateCallTwiML(phoneNumber: string, streamUrl: string): string {
     language: 'en-US' 
   }, 'Connecting your call now.');
   
-  // First dial the number WITH the stream inside it
+  // First dial the number
   if (phoneNumber) {
     const formattedNumber = normalizePhoneNumber(phoneNumber);
     
-    // THIS IS CRITICAL: Put the Stream INSIDE the Dial to maintain audio connection
+    // Fix: Create the dial first
     const dial = twimlResponse.dial({
       callerId: Deno.env.get('TWILIO_PHONE_NUMBER'),
       answerOnBridge: true,
       timeout: 30
     });
     
-    // Add the Stream element INSIDE the Dial
-    dial.connect().stream({
-      url: streamUrl,
-      track: 'both_tracks',
-      name: 'browser_call'
-    }).parameter({
-      name: 'callType',
-      value: 'browser_to_phone'
-    });
-    
-    // Add the Number element inside the Dial after the Stream
+    // Now add the number to the dial
     dial.number({
       statusCallbackEvent: ['answered', 'completed'],
       statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
     }, formattedNumber);
   }
+  
+  // After the Dial, add a Stream element at the top level (not inside dial)
+  const connect = twimlResponse.connect();
+  connect.stream({
+    url: streamUrl,
+    track: 'both_tracks',
+    name: 'browser_call'
+  }).parameter({
+    name: 'callType',
+    value: 'browser_to_phone'
+  });
   
   // Output the TwiML for debugging
   const twimlString = twimlResponse.toString();
