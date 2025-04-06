@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -204,174 +203,157 @@ serve(async (req) => {
         );
       }
       
-      // Check if this is a browser-originated call 
-      const isBrowserCall = requestData.browser === true || requestData.browser === 'true';
+      // Set streaming URL for WebSocket connection
+      const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
       
-      console.log(`Processing makeCall action: number=${formattedPhoneNumber}, browserMode=${isBrowserCall}`);
+      const callOptions: any = {
+        to: formattedPhoneNumber,
+        from: TWILIO_PHONE_NUMBER,
+        url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}`,
+        method: 'POST',
+        statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
+        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+        statusCallbackMethod: 'POST'
+      };
       
-      // CRITICAL CHANGE: For browser calls, we don't create the call server-side
-      // Instead, return info for the browser to use Twilio Device to initiate the call
-      if (isBrowserCall) {
-        console.log("Browser call requested - returning token and settings for client-side call initiation");
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            browserCall: true,
-            phoneNumber: formattedPhoneNumber,
-            twilioPhoneNumber: TWILIO_PHONE_NUMBER,
-            message: "Use Twilio Device in the browser to initiate this call"
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } else {
-        try {
-          // Create a traditional REST API call (not for browser audio)
-          // BUT ENABLE AUDIO STREAMING for all calls
-          console.log(`Making server-side call from ${TWILIO_PHONE_NUMBER} to ${formattedPhoneNumber} WITH audio streaming enabled`);
-          
-          // Set streaming URL for WebSocket connection
-          const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
-          
-          const callOptions: any = {
-            to: formattedPhoneNumber,
-            from: TWILIO_PHONE_NUMBER,
-            url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&To=${encodeURIComponent(formattedPhoneNumber)}&enableStreaming=true`,
-            method: 'POST',
-            statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
-            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-            statusCallbackMethod: 'POST',
-            // Set high-quality audio settings for better streaming
-            record: true,
-            recordingStatusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=recordingStatus`,
-            recordingStatusCallbackMethod: 'POST'
-          };
-          
-          const call = await client.calls.create(callOptions);
-          
-          console.log("Call created successfully:", call.sid);
-          
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              callSid: call.sid,
-              streamEnabled: true,
-              streamUrl: streamUrl
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        } catch (error) {
-          console.error("Error creating call:", error);
-          
-          // More detailed error logging
-          const errorResponse = {
-            success: false, 
-            error: error.message || 'Failed to create call'
-          };
-          
-          // Add Twilio specific error details if available
-          if (error.code) errorResponse.code = error.code;
-          if (error.status) errorResponse.status = error.status;
-          if (error.moreInfo) errorResponse.moreInfo = error.moreInfo;
-          
-          return new Response(
-            JSON.stringify(errorResponse),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-    } else if (action === 'handleVoice' || !action) {
-      // Process incoming voice requests from Twilio
-      console.log("Handling Voice Request", JSON.stringify(requestData));
+      const call = await client.calls.create(callOptions);
       
-      const twimlResponse = new twilio.twiml.VoiceResponse();
+      // Create media stream for the call
+      const stream = await client.calls(call.sid).streams.create({
+        name: `stream-${call.sid}`,
+        url: streamUrl,
+        track: 'both_tracks', // Stream both inbound and outbound audio
+        parameter1: { name: 'callSid', value: call.sid },
+        statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=streamStatus`,
+        statusCallbackMethod: 'POST'
+      });
+
+      console.log("Call and stream created successfully:", {
+        callSid: call.sid,
+        streamSid: stream.sid,
+        streamUrl: streamUrl
+      });
       
-      // Check if streaming is requested
-      const enableStreaming = requestData.enableStreaming === 'true' || requestData.browser === 'true';
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          callSid: call.sid,
+          streamSid: stream.sid,
+          streamUrl: streamUrl
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error("Error creating call:", error);
       
-      if (requestData.Caller && requestData.Caller.startsWith('client:')) {
-        // This is a browser call to a phone - critical for audio in browser
-        console.log("Browser to phone call - enhancing audio quality and setting up stream");
-        if (phoneNumber) {
-          // Set high quality audio settings for browser calls
-          twimlResponse.say({ 
-            voice: 'alice',
-            language: 'en-US' 
-          }, 'Connecting your call now.');
-          
-          const dial = twimlResponse.dial({
-            callerId: TWILIO_PHONE_NUMBER,
-            // Enhanced audio quality - crucial for browser audio
-            answerOnBridge: true
-          });
-          
-          const formattedNumber = normalizePhoneNumber(phoneNumber);
-          dial.number({
-            statusCallbackEvent: ['answered', 'completed'],
-            statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
-          }, formattedNumber);
-          
-          // Always stream media for browser originated calls
-          twimlResponse.start().stream({
-            url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
-            track: 'both_tracks'
-          });
-        } else {
-          twimlResponse.say({ voice: 'alice' }, 'No phone number provided for the call.');
-        }
-      } else if (phoneNumber && phoneNumber.startsWith('client:')) {
-        // This is a phone call to a browser client
-        console.log("Phone to browser call - enhancing audio quality");
-        twimlResponse.say({ voice: 'alice' }, 'Connecting you to our representative.');
+      // More detailed error logging
+      const errorResponse = {
+        success: false, 
+        error: error.message || 'Failed to create call'
+      };
+      
+      // Add Twilio specific error details if available
+      if (error.code) errorResponse.code = error.code;
+      if (error.status) errorResponse.status = error.status;
+      if (error.moreInfo) errorResponse.moreInfo = error.moreInfo;
+      
+      return new Response(
+        JSON.stringify(errorResponse),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+  } else if (action === 'handleVoice' || !action) {
+    const twimlResponse = new twilio.twiml.VoiceResponse();
+    
+    // Always start streaming for all calls
+    twimlResponse.start().stream({
+      url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
+      track: 'both_tracks'
+    });
+
+    if (requestData.Caller && requestData.Caller.startsWith('client:')) {
+      // This is a browser call to a phone - critical for audio in browser
+      console.log("Browser to phone call - enhancing audio quality and setting up stream");
+      if (phoneNumber) {
+        // Set high quality audio settings for browser calls
+        twimlResponse.say({ 
+          voice: 'alice',
+          language: 'en-US' 
+        }, 'Connecting your call now.');
         
         const dial = twimlResponse.dial({
-          answerOnBridge: true,
-          callerId: TWILIO_PHONE_NUMBER
+          callerId: TWILIO_PHONE_NUMBER,
+          // Enhanced audio quality - crucial for browser audio
+          answerOnBridge: true
         });
         
-        dial.client({
+        const formattedNumber = normalizePhoneNumber(phoneNumber);
+        dial.number({
           statusCallbackEvent: ['answered', 'completed'],
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
-        }, phoneNumber.replace('client:', ''));
+        }, formattedNumber);
         
-        // Always stream for browser client calls
+        // Always stream media for browser originated calls
         twimlResponse.start().stream({
           url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
           track: 'both_tracks'
         });
       } else {
-        // Standard phone to phone call - ALWAYS ENABLE AUDIO STREAMING
-        console.log("Processing standard call with ALWAYS ENABLED audio streaming");
-        
-        if (phoneNumber) {
-          twimlResponse.say({ voice: 'alice' }, 'Connecting your call with audio streaming enabled.');
-          
-          const dial = twimlResponse.dial({
-            callerId: TWILIO_PHONE_NUMBER,
-            answerOnBridge: true,
-            record: 'record-from-answer'
-          });
-          
-          const formattedNumber = normalizePhoneNumber(phoneNumber);
-          dial.number(formattedNumber);
-          
-          // ALWAYS add media streaming for all calls
-          twimlResponse.start().stream({
-            url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
-            track: 'both_tracks'
-          });
-        } else {
-          twimlResponse.say({ voice: 'alice' }, 'Welcome to the phone system. No action specified.');
-        }
+        twimlResponse.say({ voice: 'alice' }, 'No phone number provided for the call.');
       }
+    } else if (phoneNumber && phoneNumber.startsWith('client:')) {
+      // This is a phone call to a browser client
+      console.log("Phone to browser call - enhancing audio quality");
+      twimlResponse.say({ voice: 'alice' }, 'Connecting you to our representative.');
       
-      console.log("Generated TwiML:", twimlResponse.toString());
+      const dial = twimlResponse.dial({
+        answerOnBridge: true,
+        callerId: TWILIO_PHONE_NUMBER
+      });
       
-      return new Response(
-        twimlResponse.toString(),
-        { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-      );
-    } else if (action === 'checkStatus') {
+      dial.client({
+        statusCallbackEvent: ['answered', 'completed'],
+        statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
+      }, phoneNumber.replace('client:', ''));
+      
+      // Always stream for browser client calls
+      twimlResponse.start().stream({
+        url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
+        track: 'both_tracks'
+      });
+    } else {
+      // Standard phone call
+      if (phoneNumber) {
+        twimlResponse.say({ voice: 'alice' }, 'Connecting your call.');
+        
+        const dial = twimlResponse.dial({
+          callerId: TWILIO_PHONE_NUMBER,
+          answerOnBridge: true
+        });
+        
+        const formattedNumber = normalizePhoneNumber(phoneNumber);
+        dial.number({
+          statusCallbackEvent: ['answered', 'completed'],
+          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
+        }, formattedNumber);
+      } else {
+        twimlResponse.say({ voice: 'alice' }, 'Welcome to the phone system.');
+      }
+    }
+    
+    return new Response(
+      twimlResponse.toString(),
+      { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+    );
+  } else if (action === 'streamStatus') {
+    // Handle stream status callbacks
+    console.log("Stream status update:", requestData);
+    
+    return new Response(
+      JSON.stringify({ success: true }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  } else if (action === 'checkStatus') {
       const { callSid } = requestData;
       
       if (!callSid) {
