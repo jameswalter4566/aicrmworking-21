@@ -31,6 +31,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
+import { audioProcessing } from "@/services/audioProcessing";
 
 const activityLogsData = {
   1: [
@@ -99,6 +100,7 @@ const PowerDialer = () => {
   const [callSids, setCallSids] = useState<Record<number, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [noLeadsSelectedError, setNoLeadsSelectedError] = useState(false);
+  const [audioWebSocketReady, setAudioWebSocketReady] = useState(false);
 
   useEffect(() => {
     fetchLeads();
@@ -150,6 +152,46 @@ const PowerDialer = () => {
     setIsDialogOpen(true);
   };
 
+  const initializeAudioConnection = async () => {
+    try {
+      console.log("Initializing audio WebSocket connection...");
+      const connected = await audioProcessing.connect({
+        onConnectionStatus: (status) => {
+          console.log(`Audio WebSocket connection status: ${status ? 'connected' : 'disconnected'}`);
+          setAudioWebSocketReady(status);
+          
+          if (status) {
+            toast({
+              title: "Audio Connection Ready",
+              description: "Audio streaming connection established successfully.",
+            });
+          }
+        },
+        onStreamStarted: (streamSid, callSid) => {
+          console.log(`Audio stream started: ${streamSid} for call ${callSid}`);
+          toast({
+            title: "Audio Stream Active",
+            description: "Bidirectional audio stream is now active.",
+          });
+        }
+      });
+      
+      if (!connected) {
+        throw new Error("Failed to connect to audio streaming service");
+      }
+      
+      return true;
+    } catch (error) {
+      console.error("Error initializing audio connection:", error);
+      toast({
+        title: "Audio Connection Failed",
+        description: "Could not establish audio streaming connection. Calls may have limited functionality.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
   const startDialing = async () => {
     if (selectedLeads.length === 0) {
       toast({
@@ -160,6 +202,15 @@ const PowerDialer = () => {
       setNoLeadsSelectedError(true);
       setIsDialogOpen(false);
       return;
+    }
+
+    const audioReady = await initializeAudioConnection();
+    if (!audioReady) {
+      toast({
+        title: "Warning",
+        description: "Audio streaming setup failed. Proceeding with limited functionality.",
+        variant: "warning",
+      });
     }
 
     const leadsToDial = selectedLeads;
@@ -229,7 +280,9 @@ const PowerDialer = () => {
         },
         body: JSON.stringify({
           action: 'makeCall',
-          phoneNumber: normalizedPhone
+          phoneNumber: normalizedPhone,
+          useWebSocket: true,
+          streamUrl: window.location.origin
         })
       });
       
@@ -247,6 +300,8 @@ const PowerDialer = () => {
           title: "Call Connected",
           description: `Call to ${lead.firstName} ${lead.lastName} is in progress`,
         });
+        
+        audioProcessing.startCapturingMicrophone();
         
         monitorCallStatus(leadId, result.callSid);
       } else {
@@ -381,10 +436,14 @@ const PowerDialer = () => {
       }
     }
     
+    audioProcessing.stopCapturingMicrophone();
+    audioProcessing.cleanup(false);
+    
     setIsDialing(false);
     setActiveCallId(null);
     setDialQueue([]);
     setCallSids({});
+    setAudioWebSocketReady(false);
     
     toast({
       title: "Session Ended",
@@ -485,9 +544,14 @@ const PowerDialer = () => {
                             : 'Initializing calls...'}
                         </span>
                       </div>
-                      <Badge className="bg-green-100 text-green-800 px-3 py-1">
-                        Lines in use: {lineCount}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={audioWebSocketReady ? "bg-green-100 text-green-800 px-3 py-1" : "bg-yellow-100 text-yellow-800 px-3 py-1"}>
+                          {audioWebSocketReady ? "Audio Stream Ready" : "Audio Connecting..."}
+                        </Badge>
+                        <Badge className="bg-blue-100 text-blue-800 px-3 py-1">
+                          Lines in use: {lineCount}
+                        </Badge>
+                      </div>
                     </div>
                     
                     {dialingMode === "ai" && (
@@ -803,19 +867,16 @@ const PowerDialer = () => {
           
           <DialogFooter className="flex sm:justify-between gap-2">
             <Button
-              type="button"
               variant="outline"
-              className="rounded-lg"
               onClick={() => setIsDialogOpen(false)}
             >
               Cancel
             </Button>
             <Button
-              type="button"
-              className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+              className="bg-crm-blue hover:bg-crm-blue/90"
               onClick={startDialing}
             >
-              Start Dialing {selectedLeads.length > 0 && `(${selectedLeads.length} leads)`}
+              Start Dialing
             </Button>
           </DialogFooter>
         </DialogContent>
