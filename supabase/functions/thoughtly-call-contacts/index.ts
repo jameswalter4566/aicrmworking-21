@@ -15,8 +15,8 @@ console.log("Thoughtly Call Contacts function loaded and ready")
 const THOUGHTLY_API_URL = "https://api.thoughtly.com"
 
 // Retrieve API credentials 
-const THOUGHTLY_API_TOKEN = "8f6vq0cwvk59qwi63rcf1o";
-const THOUGHTLY_TEAM_ID = "aa7e6d5e-35b5-491a-9111-18790d37612f";
+const THOUGHTLY_API_TOKEN = Deno.env.get('THOUGHTLY_API_TOKEN') || "8f6vq0cwvk59qwi63rcf1o";
+const THOUGHTLY_TEAM_ID = Deno.env.get('THOUGHTLY_TEAM_ID') || "aa7e6d5e-35b5-491a-9111-18790d37612f";
 
 // Known working interview ID
 const DEFAULT_INTERVIEW_ID = "ctAaNCdh";
@@ -66,9 +66,7 @@ serve(async (req) => {
 
     console.log(`Initiating calls for ${contacts.length} contacts using interview_id: ${interview_id}`);
     console.log(`Contact data sample:`, JSON.stringify(contacts[0]));
-    console.log(`Using API token: ${THOUGHTLY_API_TOKEN}`);
-    console.log(`Using team ID: ${THOUGHTLY_TEAM_ID}`);
-
+    
     const results = {
       success: [],
       errors: []
