@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 const corsHeaders = {
@@ -17,11 +18,14 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Upgrading connection to WebSocket...');
+    console.log('Upgrading connection to WebSocket for bidirectional audio...');
     const { socket, response } = Deno.upgradeWebSocket(req);
     const connId = crypto.randomUUID();
     
     console.log(`New WebSocket connection: ${connId}`);
+
+    // Store the active streamSid to send audio back to Twilio
+    let activeStreamSid = null;
 
     socket.onopen = () => {
       console.log(`WebSocket connection opened: ${connId}`);
@@ -40,6 +44,9 @@ serve(async (req) => {
         // Handle different Twilio WebSocket message types
         if (data.event === 'start') {
           console.log('Stream started:', data);
+          // Store the stream SID for sending audio back to Twilio
+          activeStreamSid = data.streamSid;
+          
           socket.send(JSON.stringify({
             event: 'streamStart',
             streamSid: data.streamSid,
@@ -48,7 +55,7 @@ serve(async (req) => {
           }));
         }
         else if (data.event === 'media') {
-          // Forward audio data to client
+          // Forward audio data from Twilio to client
           socket.send(JSON.stringify({
             event: 'audio',
             track: data.track,
@@ -68,6 +75,8 @@ serve(async (req) => {
         }
         else if (data.event === 'stop') {
           console.log('Stream stopped:', data);
+          activeStreamSid = null;
+          
           socket.send(JSON.stringify({
             event: 'streamStop',
             streamSid: data.streamSid,
@@ -89,6 +98,20 @@ serve(async (req) => {
             event: 'browser_connected',
             timestamp: Date.now()
           }));
+        }
+        // Handle browser audio to send back to Twilio for bidirectional streaming
+        else if (data.event === 'browser_audio') {
+          if (activeStreamSid) {
+            // Format the message according to Twilio's WebSocket protocol
+            // for sending audio data back to the call
+            socket.send(JSON.stringify({
+              event: 'media',
+              streamSid: activeStreamSid,
+              media: {
+                payload: data.payload
+              }
+            }));
+          }
         }
       } catch (err) {
         console.error('Error processing WebSocket message:', err);

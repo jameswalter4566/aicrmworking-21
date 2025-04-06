@@ -14,6 +14,12 @@ export interface ActiveCall {
   audioStreaming?: boolean;
 }
 
+interface AudioChunk {
+  track: string;
+  timestamp: number;
+  payload: string;
+}
+
 export const useTwilio = () => {
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,6 +31,13 @@ export const useTwilio = () => {
   const [currentAudioDevice, setCurrentAudioDevice] = useState<string>('');
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
+  
+  // New WebSocket references
+  const webSocketRef = useRef<WebSocket | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
+  const microphoneStreamRef = useRef<MediaStream | null>(null);
+  const activeStreamSidRef = useRef<string | null>(null);
 
   const checkPermissions = useCallback(async () => {
     try {
@@ -40,6 +53,158 @@ export const useTwilio = () => {
     } catch (err) {
       console.log("Permission API not supported, skipping check");
     }
+  }, []);
+
+  // Helper to set up WebSocket for bidirectional media
+  const setupWebSocket = useCallback(() => {
+    if (webSocketRef.current) {
+      // Already set up
+      return;
+    }
+    
+    console.log("Setting up WebSocket for bidirectional media streaming");
+    
+    try {
+      const socket = new WebSocket('wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream');
+      webSocketRef.current = socket;
+      
+      socket.onopen = () => {
+        console.log("WebSocket connection opened for bidirectional media");
+        socket.send(JSON.stringify({
+          event: 'browser_connect',
+          timestamp: Date.now()
+        }));
+      };
+      
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          if (data.event === 'streamStart') {
+            // Store the stream SID for sending audio back
+            activeStreamSidRef.current = data.streamSid;
+            setAudioStreaming(true);
+            console.log(`Stream started with SID: ${data.streamSid}`);
+            
+            // Start sending microphone audio when stream starts
+            startCapturingMicrophone();
+          }
+          else if (data.event === 'streamStop') {
+            activeStreamSidRef.current = null;
+            setAudioStreaming(false);
+            console.log("Stream stopped");
+            
+            // Stop sending microphone audio
+            stopCapturingMicrophone();
+          }
+          else if (data.event === 'audio') {
+            // Process incoming audio if needed
+            // This is the audio coming from the call
+          }
+        } catch (err) {
+          console.error("Error processing WebSocket message:", err);
+        }
+      };
+      
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        setAudioStreaming(false);
+      };
+      
+      socket.onclose = () => {
+        console.log("WebSocket connection closed");
+        webSocketRef.current = null;
+        setAudioStreaming(false);
+        activeStreamSidRef.current = null;
+        
+        // Stop microphone capture when connection closes
+        stopCapturingMicrophone();
+      };
+    } catch (err) {
+      console.error("Failed to set up WebSocket:", err);
+    }
+  }, []);
+  
+  // Helper to start sending microphone audio to Twilio
+  const startCapturingMicrophone = useCallback(async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error("getUserMedia not supported in this browser");
+      return;
+    }
+    
+    try {
+      // Get microphone access
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      microphoneStreamRef.current = stream;
+      
+      // Set up audio processing
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioContext;
+      
+      const source = audioContext.createMediaStreamSource(stream);
+      const processor = audioContext.createScriptProcessor(1024, 1, 1);
+      audioProcessorRef.current = processor;
+      
+      // Process audio data
+      processor.onaudioprocess = (e) => {
+        if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN && activeStreamSidRef.current) {
+          // Get audio data from microphone
+          const inputData = e.inputBuffer.getChannelData(0);
+          
+          // Convert to format Twilio expects
+          const buffer = new ArrayBuffer(inputData.length * 2);
+          const view = new DataView(buffer);
+          
+          for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+          }
+          
+          // Base64 encode and send to Twilio
+          const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+          
+          webSocketRef.current.send(JSON.stringify({
+            event: 'browser_audio',
+            payload: base64Audio,
+            timestamp: Date.now()
+          }));
+        }
+      };
+      
+      // Connect the processor
+      source.connect(processor);
+      processor.connect(audioContext.destination);
+      
+      console.log("Microphone audio capture started for bidirectional streaming");
+      setMicrophoneActive(true);
+      
+    } catch (err) {
+      console.error("Error accessing microphone for bidirectional streaming:", err);
+      setMicrophoneActive(false);
+    }
+  }, []);
+  
+  // Helper to stop microphone capture
+  const stopCapturingMicrophone = useCallback(() => {
+    if (audioProcessorRef.current && audioContextRef.current) {
+      try {
+        audioProcessorRef.current.disconnect();
+        audioProcessorRef.current = null;
+      } catch (err) {
+        console.warn("Error disconnecting audio processor:", err);
+      }
+    }
+    
+    if (microphoneStreamRef.current) {
+      try {
+        microphoneStreamRef.current.getTracks().forEach(track => track.stop());
+        microphoneStreamRef.current = null;
+      } catch (err) {
+        console.warn("Error stopping microphone tracks:", err);
+      }
+    }
+    
+    console.log("Microphone audio capture stopped");
   }, []);
 
   useEffect(() => {
@@ -95,6 +260,9 @@ export const useTwilio = () => {
             description: "Phone system initialized successfully. Audio inputs and outputs are ready.",
           });
         }
+        
+        // Set up WebSocket for bidirectional audio streaming
+        setupWebSocket();
       } catch (error) {
         console.error('Error initializing Twilio:', error);
         toast({
@@ -113,7 +281,7 @@ export const useTwilio = () => {
       const isActive = twilioService.isMicrophoneActive();
       setMicrophoneActive(isActive);
       
-      const isStreaming = twilioService.isStreamingActive?.() || false;
+      const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && activeStreamSidRef.current !== null;
       setAudioStreaming(isStreaming);
       
       if (Object.keys(activeCalls).length > 0) {
@@ -137,9 +305,17 @@ export const useTwilio = () => {
         clearInterval(intervalId);
       });
       
+      // Clean up WebSocket and audio resources
+      if (webSocketRef.current) {
+        webSocketRef.current.close();
+        webSocketRef.current = null;
+      }
+      
+      stopCapturingMicrophone();
+      
       twilioService.cleanup();
     };
-  }, [checkPermissions]);
+  }, [checkPermissions, setupWebSocket, stopCapturingMicrophone]);
 
   const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = false) => {
     const leadIdStr = String(leadId);
@@ -154,7 +330,7 @@ export const useTwilio = () => {
       try {
         if (usingBrowser) {
           const isAudioActive = twilioService.isMicrophoneActive();
-          const isStreaming = twilioService.isStreamingActive?.() || false;
+          const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && activeStreamSidRef.current !== null;
           
           setActiveCalls(prev => {
             if (!prev[leadIdStr]) return prev;
@@ -195,6 +371,12 @@ export const useTwilio = () => {
               }
             };
           });
+          
+          // Clean up WebSocket and audio when call ends
+          if (Object.keys(activeCalls).length <= 1) {
+            stopCapturingMicrophone();
+            activeStreamSidRef.current = null;
+          }
           
           switch(status) {
             case "completed":
@@ -252,7 +434,7 @@ export const useTwilio = () => {
     }, 2000);
     
     statusCheckIntervals.current[leadIdStr] = intervalId;
-  }, [activeCalls, microphoneActive]);
+  }, [activeCalls, microphoneActive, stopCapturingMicrophone]);
 
   const makeCall = useCallback(async (phoneNumber: string, leadId: string | number) => {
     if (!initialized) {
@@ -330,6 +512,9 @@ export const useTwilio = () => {
         description: `Calling ${phoneNumber}... Audio will stream through your browser when connected.`,
       });
       
+      // Ensure WebSocket is set up for bidirectional audio
+      setupWebSocket();
+      
       monitorCallStatus(leadId, result.callSid, result.usingBrowser);
     } else {
       toast({
@@ -340,7 +525,7 @@ export const useTwilio = () => {
     }
 
     return result;
-  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming]);
+  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket]);
 
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
@@ -352,6 +537,12 @@ export const useTwilio = () => {
       }
       
       await twilioService.endCall();
+      
+      // Clean up audio resources if this is the last active call
+      if (Object.keys(activeCalls).length <= 1) {
+        stopCapturingMicrophone();
+        activeStreamSidRef.current = null;
+      }
       
       setActiveCalls(prev => {
         const newCalls = {...prev};
@@ -368,7 +559,7 @@ export const useTwilio = () => {
     }
     
     return false;
-  }, [activeCalls]);
+  }, [activeCalls, stopCapturingMicrophone]);
 
   const endAllCalls = useCallback(async () => {
     Object.values(statusCheckIntervals.current).forEach(intervalId => {
@@ -377,13 +568,18 @@ export const useTwilio = () => {
     statusCheckIntervals.current = {};
     
     await twilioService.endCall();
+    
+    // Clean up all audio resources
+    stopCapturingMicrophone();
+    activeStreamSidRef.current = null;
+    
     setActiveCalls({});
     
     toast({
       title: "All Calls Ended",
       description: `All active calls have been disconnected.`,
     });
-  }, []);
+  }, [stopCapturingMicrophone]);
 
   const toggleMute = useCallback((leadId: string | number, mute?: boolean) => {
     const leadIdStr = String(leadId);

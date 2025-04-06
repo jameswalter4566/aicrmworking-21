@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -221,29 +222,16 @@ serve(async (req) => {
       
       try {
         const call = await client.calls.create(callOptions);
-        
-        // Create media stream for the call
-        const stream = await client.calls(call.sid).streams.create({
-          name: `stream-${call.sid}`,
-          url: streamUrl,
-          track: 'both_tracks',
-          parameter1: { name: 'callSid', value: call.sid },
-          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=streamStatus`,
-          statusCallbackMethod: 'POST'
-        });
-
-        console.log("Call and stream created successfully:", {
+        console.log("Call created successfully:", {
           callSid: call.sid,
-          streamSid: stream.sid,
-          streamUrl: streamUrl
+          status: call.status
         });
         
         return new Response(
           JSON.stringify({ 
             success: true, 
             callSid: call.sid,
-            streamSid: stream.sid,
-            streamUrl: streamUrl
+            status: call.status
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -270,15 +258,13 @@ serve(async (req) => {
     else if (action === 'handleVoice' || !action) {
       const twimlResponse = new twilio.twiml.VoiceResponse();
       
-      // Always start streaming for all calls
-      twimlResponse.start().stream({
-        url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
-        track: 'both_tracks'
-      });
-
+      // For bidirectional media streams, we need to use <Connect><Stream> instead of <Start><Stream>
+      // This is the key change that makes bidirectional audio work properly
+      
       if (requestData.Caller && requestData.Caller.startsWith('client:')) {
         // This is a browser call to a phone - critical for audio in browser
-        console.log("Browser to phone call - enhancing audio quality and setting up stream");
+        console.log("Browser to phone call - enhancing audio quality and setting up bidirectional stream");
+        
         if (phoneNumber) {
           // Set high quality audio settings for browser calls
           twimlResponse.say({ 
@@ -300,10 +286,11 @@ serve(async (req) => {
             statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
           }, formattedNumber);
           
-          // Always stream media for browser originated calls
-          twimlResponse.start().stream({
+          // Use Connect and Stream for bidirectional media streaming
+          const connect = twimlResponse.connect();
+          connect.stream({
             url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
-            track: 'both_tracks'
+            track: 'inbound_track' // For bidirectional streaming
           });
         } else {
           twimlResponse.say({ voice: 'alice' }, 'No phone number provided for the call.');
@@ -323,10 +310,11 @@ serve(async (req) => {
           statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
         }, phoneNumber.replace('client:', ''));
         
-        // Always stream for browser client calls
-        twimlResponse.start().stream({
+        // Use Connect and Stream for bidirectional media streaming
+        const connect = twimlResponse.connect();
+        connect.stream({
           url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
-          track: 'both_tracks'
+          track: 'inbound_track' // For bidirectional streaming
         });
       } else {
         // Standard phone call
@@ -343,6 +331,13 @@ serve(async (req) => {
             statusCallbackEvent: ['answered', 'completed'],
             statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
           }, formattedNumber);
+          
+          // Use Connect and Stream for bidirectional media streaming
+          const connect = twimlResponse.connect();
+          connect.stream({
+            url: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream',
+            track: 'inbound_track' // For bidirectional streaming
+          });
         } else {
           twimlResponse.say({ voice: 'alice' }, 'Welcome to the phone system.');
         }
