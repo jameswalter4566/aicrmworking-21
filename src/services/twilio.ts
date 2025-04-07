@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 // Create Supabase client with direct URL and key
@@ -313,9 +314,14 @@ class TwilioService {
       if (callSid === 'browser-call') {
         // For browser-based calls, check device status
         if (this.device?.calls?.size > 0) {
-          // Type the call object properly to avoid the error
-          const firstCall = Array.from(this.device.calls.values())[0] as TwilioCall;
-          return firstCall?.status() || 'unknown';
+          // Use type assertion with a conditional check to ensure firstCall exists
+          const firstCall = Array.from(this.device.calls.values())[0];
+          
+          // First check if firstCall exists and has a status method
+          if (firstCall && typeof firstCall.status === 'function') {
+            return (firstCall as TwilioCall).status() || 'unknown';
+          }
+          return 'unknown';
         }
         return 'unknown';
       }
