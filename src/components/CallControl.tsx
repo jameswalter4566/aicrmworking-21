@@ -63,7 +63,7 @@ const CallControl: React.FC<CallControlProps> = ({
           description: "Bidirectional audio stream is now active.",
         });
       },
-      onStreamStopped: () => {
+      onStreamEnded: () => {
         setIsConnected(false);
       }
     });
