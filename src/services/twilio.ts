@@ -17,6 +17,14 @@ interface TwilioCallResult {
   error?: string;
 }
 
+interface TwilioCall {
+  status(): string;
+  parameters?: {
+    CallSid?: string;
+    [key: string]: any;
+  };
+}
+
 class TwilioService {
   private device: any = null;
   private token: string = '';
@@ -305,7 +313,8 @@ class TwilioService {
       if (callSid === 'browser-call') {
         // For browser-based calls, check device status
         if (this.device?.calls?.size > 0) {
-          const firstCall = Array.from(this.device.calls.values())[0];
+          // Type the call object properly to avoid the error
+          const firstCall = Array.from(this.device.calls.values())[0] as TwilioCall;
           return firstCall?.status() || 'unknown';
         }
         return 'unknown';
