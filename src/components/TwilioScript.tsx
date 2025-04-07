@@ -36,8 +36,9 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     console.log("🔶 Loading Twilio Voice JavaScript SDK...");
     const script = document.createElement('script');
     script.id = 'twilio-js-sdk';
-    // Use the NPM package via CDN for the latest 2.x version
-    script.src = 'https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.5.0/dist/voice.min.js';
+    
+    // Updated to use the official Twilio SDK URL instead of CDN (more reliable)
+    script.src = 'https://sdk.twilio.com/js/voice/releases/2.5.0/twilio-voice.min.js';
     script.async = true;
     script.defer = true;
     
@@ -68,6 +69,15 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     script.onerror = (e) => {
       const error = new Error("Failed to load Twilio Voice SDK");
       console.error("🔶 Error loading Twilio Voice SDK:", error, e);
+      
+      // Additional diagnostic information
+      console.log("🔶 SDK Load Diagnostics:", {
+        url: script.src,
+        timestamp: new Date().toISOString(),
+        networkStatus: navigator.onLine,
+        crossOrigin: script.crossOrigin
+      });
+      
       setError(error);
       if (onError) onError(error);
     };

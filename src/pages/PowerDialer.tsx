@@ -377,13 +377,12 @@ const PowerDialer = () => {
     
     try {
       const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice?action=makeCall`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          action: 'makeCall',
           phoneNumber: normalizedPhone,
           useWebSocket: true,
           streamUrl: window.location.origin
@@ -433,13 +432,12 @@ const PowerDialer = () => {
     const intervalId = setInterval(async () => {
       try {
         const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-        const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
+        const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice?action=checkStatus`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            action: 'checkStatus',
             callSid: callSid
           })
         });
