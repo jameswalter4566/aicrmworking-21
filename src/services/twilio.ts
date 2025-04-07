@@ -607,6 +607,11 @@ class TwilioService {
     this.isInitialized = false;
     this.isAudioContextInitialized = false;
   }
+
+  // Add the missing getCurrentAudioDevice method
+  getCurrentAudioDevice(): string {
+    return this.currentAudioDeviceId;
+  }
 }
 
 export const twilioService = new TwilioService();
