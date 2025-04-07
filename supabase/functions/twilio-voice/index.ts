@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import twilio from 'npm:twilio@4.23.0';
 
@@ -40,11 +39,21 @@ serve(async (req) => {
       const text = await req.text();
       console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''));
       if (text && text.trim()) {
-        requestData = JSON.parse(text);
-        
-        // If no action in URL, try to get it from the request body
-        if (!action && requestData.action) {
-          action = requestData.action;
+        try {
+          requestData = JSON.parse(text);
+          
+          // If no action in URL, try to get it from the request body
+          if (!action && requestData.action) {
+            action = requestData.action;
+          }
+        } catch (e) {
+          // If parsing as JSON fails, it might be form data
+          console.log("Not JSON, trying to parse as form data");
+          const formData = new URLSearchParams(text);
+          formData.forEach((value, key) => {
+            // @ts-ignore
+            requestData[key] = value;
+          });
         }
       }
     } catch (e) {
@@ -161,51 +170,47 @@ serve(async (req) => {
       // Handle TwiML generation for voice call
       const phoneNumber = url.searchParams.get('phoneNumber');
       const streamUrl = url.searchParams.get('streamUrl');
-      const formData = await req.formData();
       
       console.log(`Generating TwiML for call to ${phoneNumber}`);
       console.log(`Stream URL: ${streamUrl}`);
-      console.log("Call parameters:", Object.fromEntries(formData));
       
-      // Create TwiML for the call with proper Media streaming
+      // Parse form data if available
+      let formData = {};
+      if (req.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
+        const formText = await req.text();
+        const params = new URLSearchParams(formText);
+        params.forEach((value, key) => {
+          // @ts-ignore
+          formData[key] = value;
+        });
+        console.log("Call parameters from form:", formData);
+      }
+      
+      // Create TwiML for the call
       const twiml = new twilio.twiml.VoiceResponse();
       
-      // Check if we have a stream URL
+      // Add some audio playback
+      twiml.say("Hello! This call is being processed by our system. Please wait while we connect you.");
+      
+      // Add a pause to keep the call open
+      twiml.pause({ length: 2 });
+      
+      // Using standard <Connect> with a websocket
       if (streamUrl) {
-        console.log("Setting up Media stream");
+        console.log("Setting up websocket connection");
         
-        // Add Stream for bidirectional audio - compatible with Voice SDK 2.x
-        const stream = twiml.stream({
-          url: streamUrl,
-          track: 'both_tracks', // Stream both inbound and outbound audio
-        });
-        
-        // Add custom parameters to the stream that will be sent in events
-        stream.parameter({
-          name: 'callSid',
-          value: formData.get('CallSid') || 'unknown',
-        });
-        
-        stream.parameter({
-          name: 'phoneNumber',
-          value: phoneNumber || 'unknown',
-        });
-        
-        // Add some audio playback
-        twiml.say("Hello! This call is being streamed through your browser. You should hear audio now.");
-        
-        // Also add Dial if you need to connect to another number
-        // const dial = twiml.dial();
-        // dial.number('+1234567890');
+        // Use Connect verb for websocket
+        const connect = twiml.connect();
+        connect.stream({ url: streamUrl });
         
         // Add pause to keep the call open
-        twiml.pause({ length: 60 });
+        twiml.pause({ length: 30 });
         
-        // And another message
+        // Add another message
         twiml.say("Still connected. The audio stream should be active.");
         
         // Add another long pause to keep the call open
-        twiml.pause({ length: 120 });
+        twiml.pause({ length: 60 });
         
         // Final message before hanging up
         twiml.say("Thank you for testing the audio streaming. Goodbye!");
@@ -213,18 +218,31 @@ serve(async (req) => {
         twiml.say("Sorry, we encountered a technical issue. Please try again later.");
       }
       
+      console.log("Generated TwiML:", twiml.toString());
+      
       return new Response(twiml.toString(), {
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
       });
     }
     else if (action === 'statusCallback') {
       // Handle call status callbacks
-      const formData = await req.formData();
-      const callStatus = formData.get('CallStatus');
-      const callSid = formData.get('CallSid');
+      console.log("Status callback received, parsing form data");
+      
+      let callbackData = {};
+      if (req.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
+        const formText = await req.text();
+        const params = new URLSearchParams(formText);
+        params.forEach((value, key) => {
+          // @ts-ignore
+          callbackData[key] = value;
+        });
+      }
+      
+      const callStatus = callbackData.CallStatus || requestData.CallStatus;
+      const callSid = callbackData.CallSid || requestData.CallSid;
       
       console.log(`Call ${callSid} status: ${callStatus}`);
-      console.log("Status callback parameters:", Object.fromEntries(formData));
+      console.log("Status callback parameters:", callbackData);
       
       return new Response(
         JSON.stringify({ success: true, message: `Call status recorded: ${callStatus}` }),
