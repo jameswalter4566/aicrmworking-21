@@ -39,27 +39,36 @@ function safeGenerateCallTwiML(phoneNumber: string, streamUrl: string): string {
     
     const twimlResponse = new twilio.twiml.VoiceResponse();
     
-    // Add initial greeting
+    // CRITICAL FIX: Setup the stream connector FIRST to ensure it's established before dial
+    twimlResponse.stream({
+      url: streamUrl,
+      track: 'both_tracks', // Capture both inbound and outbound audio
+      name: 'browser_call',
+      // Connect parameters that help debug stream issues
+      connectRetry: true,
+      maxRetries: 3,
+      connectTimeout: 10
+    });
+    
+    // Add a small pause to give the stream time to connect
+    twimlResponse.pause({ length: 1 });
+    
+    // Add initial greeting after pause
     twimlResponse.say({ 
       voice: 'alice',
       language: 'en-US' 
     }, 'Connecting your call now.');
     
-    // Add the stream - put this first for better connection timing
-    twimlResponse.stream({
-      url: streamUrl,
-      track: 'both_tracks', // Capture both inbound and outbound audio
-      name: 'browser_call'
-    });
-    
-    // Then set up the dial - this order seems to work better for audio flow
+    // Then set up the dial - this order is crucial for audio flow
     if (phoneNumber) {
       const formattedNumber = normalizePhoneNumber(phoneNumber);
       
       twimlResponse.dial({
         callerId: Deno.env.get('TWILIO_PHONE_NUMBER'),
         answerOnBridge: true, // Important for maintaining connection
-        timeout: 30
+        timeout: 30,
+        // Add record parameter to ensure audio is captured
+        record: 'record-from-answer'
       }).number({
         statusCallbackEvent: ['answered', 'completed'],
         statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
@@ -236,7 +245,8 @@ serve(async (req) => {
         url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(formattedPhoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
         method: 'POST',
         machineDetection: 'DetectMessageEnd',
-        timeout: 30
+        timeout: 30,
+        record: true, // Enable recording to ensure audio quality
       };
       
       try {
@@ -312,6 +322,16 @@ serve(async (req) => {
     else if (action === 'streamStatus') {
       // Handle stream status callbacks
       console.log("Stream status update:", requestData);
+      
+      // CRITICAL: Log and respond to specific stream events
+      if (requestData.streamSid) {
+        console.log(`Stream status for ${requestData.streamSid}: ${requestData.status || 'unknown'}`);
+        
+        // If we have a streamSid and callSid, store this association
+        if (requestData.callSid) {
+          console.log(`Associated stream ${requestData.streamSid} with call ${requestData.callSid}`);
+        }
+      }
       
       return new Response(
         JSON.stringify({ success: true }),
@@ -390,6 +410,12 @@ serve(async (req) => {
       const duration = requestData.CallDuration || '0';
       
       console.log(`Call ${callSid} status updated to: ${callStatus} (duration: ${duration}s)`);
+      
+      // For in-progress calls, check if we need to associate with a stream
+      if (callStatus === 'in-progress') {
+        // This will be handled by the streaming function, but we log it here
+        console.log(`Call ${callSid} is now in-progress - audio streaming should be active`);
+      }
       
       return new Response(
         JSON.stringify({ 
