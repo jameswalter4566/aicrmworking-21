@@ -442,7 +442,7 @@ const PowerDialer = () => {
     }
     
     audioProcessing.stopCapturingMicrophone();
-    audioProcessing.cleanup(false);
+    audioProcessing.cleanup();
     
     setIsDialing(false);
     setActiveCallId(null);

@@ -1,3 +1,4 @@
+
 // Create a simple audio processing service to handle audio streaming
 // This is a placeholder - in a real app, this would be more complex
 
@@ -17,6 +18,8 @@ class AudioProcessingService {
   private audioDestination: AudioDestinationNode | null = null;
   private currentAudioDevice: string = 'default';
   private availableDevices: MediaDeviceInfo[] = [];
+  private microphoneStream: MediaStream | null = null;
+  private audioProcessor: ScriptProcessorNode | null = null;
 
   // Connect to the audio stream
   async connect(options: any = {}): Promise<boolean> {
@@ -123,6 +126,92 @@ class AudioProcessingService {
       console.error("Error connecting to WebSocket:", error);
       return false;
     }
+  }
+
+  // Start capturing microphone input for streaming
+  async startCapturingMicrophone(): Promise<boolean> {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.error("getUserMedia not supported in this browser");
+      return false;
+    }
+    
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        } 
+      });
+      
+      console.log("Microphone access granted for streaming");
+      this.microphoneStream = stream;
+      
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      
+      const source = this.audioContext.createMediaStreamSource(stream);
+      this.audioProcessor = this.audioContext.createScriptProcessor(1024, 1, 1);
+      
+      this.audioProcessor.onaudioprocess = (e) => {
+        if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN && this.streamSid) {
+          const inputData = e.inputBuffer.getChannelData(0);
+          
+          // Process audio data (simplified example)
+          const buffer = new ArrayBuffer(inputData.length * 2);
+          const view = new DataView(buffer);
+          
+          for (let i = 0; i < inputData.length; i++) {
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+          }
+          
+          const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+          
+          this.webSocket.send(JSON.stringify({
+            event: 'media',
+            streamSid: this.streamSid,
+            media: {
+              payload: base64Audio
+            }
+          }));
+          
+          this.outboundAudioCount++;
+        }
+      };
+      
+      source.connect(this.audioProcessor);
+      this.audioProcessor.connect(this.audioContext.destination);
+      
+      return true;
+    } catch (err) {
+      console.error("Error accessing microphone:", err);
+      return false;
+    }
+  }
+
+  // Stop capturing microphone input
+  stopCapturingMicrophone(): void {
+    if (this.audioProcessor && this.audioContext) {
+      try {
+        this.audioProcessor.disconnect();
+        this.audioProcessor = null;
+      } catch (err) {
+        console.warn("Error disconnecting audio processor:", err);
+      }
+    }
+    
+    if (this.microphoneStream) {
+      try {
+        this.microphoneStream.getTracks().forEach(track => track.stop());
+        this.microphoneStream = null;
+      } catch (err) {
+        console.warn("Error stopping microphone tracks:", err);
+      }
+    }
+    
+    console.log("Microphone audio capture stopped");
   }
   
   // Get available audio output devices
@@ -314,7 +403,7 @@ class AudioProcessingService {
   }
   
   // Clean up resources
-  async cleanup(): Promise<void> {
+  async cleanup(closeAudioContext: boolean = true): Promise<void> {
     try {
       // Close WebSocket if open
       if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
@@ -324,12 +413,15 @@ class AudioProcessingService {
       this.webSocket = null;
       this.isConnected = false;
       
-      // Close AudioContext if exists
-      if (this.audioContext && this.audioContext.state !== 'closed') {
+      // Stop any active microphone capture
+      this.stopCapturingMicrophone();
+      
+      // Close AudioContext if exists and requested
+      if (closeAudioContext && this.audioContext && this.audioContext.state !== 'closed') {
         await this.audioContext.close();
+        this.audioContext = null;
       }
       
-      this.audioContext = null;
       this.audioQueue = [];
       this.isPlaying = false;
       
@@ -355,7 +447,7 @@ class AudioProcessingService {
       isProcessing: this.isProcessing,
       inboundAudioCount: this.inboundAudioCount,
       outboundAudioCount: this.outboundAudioCount,
-      microphoneActive: false, // To be implemented
+      microphoneActive: !!this.microphoneStream,
       audioContextState: this.audioContext ? this.audioContext.state : 'closed',
       reconnectAttempts: this.reconnectAttempts,
       lastProcessedAudio: this.lastProcessedTime,

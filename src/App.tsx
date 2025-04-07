@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -17,6 +16,23 @@ import { audioProcessing } from "./services/audioProcessing";
 import { twilioService } from "./services/twilio";
 
 const queryClient = new QueryClient();
+
+interface AudioDiagnostics {
+  isWebSocketConnected: boolean;
+  webSocketState: string;
+  activeStreamSid: string | null;
+  isProcessing: boolean;
+  inboundAudioCount: number;
+  outboundAudioCount: number;
+  microphoneActive: boolean;
+  audioContextState: string;
+  reconnectAttempts: number;
+  lastProcessedAudio: string;
+  audioQueueLength: number;
+  isPlaying: boolean;
+  selectedDevice?: string;
+  availableDevices?: number;
+}
 
 const AudioDiagnosticLogger = () => {
   const [audioContextState, setAudioContextState] = useState<string>("unknown");
@@ -94,7 +110,7 @@ const AudioDiagnosticLogger = () => {
         console.group('🎤 Audio Streaming Diagnostics');
         
         // Get detailed diagnostics from audio processing service
-        const audioDiagnostics = audioProcessing.getDiagnostics();
+        const audioDiagnostics = audioProcessing.getDiagnostics() as AudioDiagnostics;
         console.log('Audio Processing:', audioDiagnostics);
         
         // Test if WebSocket could be created
@@ -122,7 +138,7 @@ const AudioDiagnosticLogger = () => {
         console.log('Audio Context available:', audioContextState);
         console.log('Microphone permission:', microphoneState);
         
-        if (!audioDiagnostics.isWebSocketConnected && audioDiagnostics.reconnectAttempts > 0) {
+        if (audioDiagnostics.isWebSocketConnected === false && audioDiagnostics.reconnectAttempts > 0) {
           console.warn('⚠️ WebSocket connection failed after multiple attempts. Check network and server status.');
         }
         
