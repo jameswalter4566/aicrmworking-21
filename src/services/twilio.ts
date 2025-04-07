@@ -1,5 +1,7 @@
 // src/services/twilio.ts
 
+import { twilioAudioHandler } from './TwilioAudioHandler';
+
 class TwilioService {
   private device: any = null;
   private call: any = null;
@@ -46,6 +48,9 @@ class TwilioService {
       
       // Set up event listeners with Voice SDK 2.x syntax
       this.setupDeviceEvents();
+      
+      // Initialize the audio handler with our device instance
+      twilioAudioHandler.initialize(this.device);
       
       // Register to receive incoming calls
       this.device.register();
@@ -167,7 +172,7 @@ class TwilioService {
       
       this.isAudioContextInitialized = true;
       
-      // Get available audio output devices
+      // Get available audio output devices - now using our audio handler
       await this.getAudioOutputDevices();
       
       return true;
@@ -180,26 +185,20 @@ class TwilioService {
   // Get available audio output devices with enhanced logging
   async getAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        console.error("MediaDevices API not supported");
-        return [];
-      }
+      // Refresh devices with TwilioAudioHandler
+      await twilioAudioHandler.refreshDeviceLists();
       
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      this.audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
-      
-      console.log("Available audio output devices:", 
-        this.audioOutputDevices.map(d => ({ 
-          deviceId: d.deviceId, 
-          label: d.label || 'Unlabeled device' 
-        }))
-      );
+      // Get devices from our handler
+      this.audioOutputDevices = twilioAudioHandler.getOutputDevices();
       
       // Set default device if not already set
       if (this.audioOutputDevices.length > 0 && !this.currentAudioDeviceId) {
         const defaultDevice = this.audioOutputDevices.find(d => d.deviceId === 'default') || this.audioOutputDevices[0];
         this.currentAudioDeviceId = defaultDevice.deviceId;
         console.log(`Selected default audio output device: ${defaultDevice.label || 'Unlabeled device'}`);
+        
+        // Set it in our handler
+        await twilioAudioHandler.setOutputDevice(this.currentAudioDeviceId);
       }
       
       return this.audioOutputDevices;
@@ -216,59 +215,19 @@ class TwilioService {
     try {
       console.log(`Setting audio output device to: ${deviceId}`);
       
-      // Check if the setSinkId function is available
-      const audio = new Audio();
+      // Use our TwilioAudioHandler to set the device
+      const success = await twilioAudioHandler.setOutputDevice(deviceId);
       
-      if ('setSinkId' in audio) {
+      if (success) {
         this.currentAudioDeviceId = deviceId;
         
-        // If we have an active call, update it - different method in Voice SDK 2.x
-        if (this.call) {
-          console.log("Active call detected, updating output device for call audio");
-          
-          try {
-            // Voice SDK 2.x uses different method to set audio device
-            if (typeof this.call.setOutputDevice === 'function') {
-              await this.call.setOutputDevice(deviceId);
-              console.log("Updated call audio to use device:", deviceId);
-            }
-            // Fallback to direct manipulation of audio elements
-            else if (this.call._mediaHandler && this.call._mediaHandler._remoteStream) {
-              const audioEl = this.call._mediaHandler._remoteStream.audio;
-              if (audioEl && audioEl._element && 'setSinkId' in audioEl._element) {
-                await audioEl._element.setSinkId(deviceId);
-                console.log("Updated call audio element to use device:", deviceId);
-              }
-            }
-          } catch (err) {
-            console.error("Error setting audio device for call:", err);
-          }
-        }
+        // Test the device
+        await twilioAudioHandler.testAudioOutput();
         
-        // Also update audio from any WebSocket connection or other audio elements
-        const audioElements = document.querySelectorAll('audio');
-        let updatedElements = 0;
-        
-        for (let i = 0; i < audioElements.length; i++) {
-          const element = audioElements[i];
-          if ('setSinkId' in element) {
-            try {
-              await (element as any).setSinkId(deviceId);
-              updatedElements++;
-            } catch (err) {
-              console.warn(`Could not set sink ID for audio element ${i}:`, err);
-            }
-          }
-        }
-        
-        console.log(`Updated ${updatedElements} audio elements to use device: ${deviceId}`);
-        
-        // Test the new audio device to confirm it works
-        await this.testAudioOutput(deviceId);
-        
+        console.log(`Successfully set audio device to: ${deviceId}`);
         return true;
       } else {
-        console.warn("setSinkId is not supported in this browser");
+        console.warn("Failed to set audio output device");
         return false;
       }
     } catch (error) {
@@ -280,50 +239,14 @@ class TwilioService {
   // Test audio output with enhanced error handling
   async testAudioOutput(deviceId?: string): Promise<boolean> {
     try {
-      console.log(`Testing audio output${deviceId ? ` on device: ${deviceId}` : ''}`);
-      
-      const audio = new Audio('/sounds/dialtone.mp3');
-      
-      // If no sound file is available, generate a test tone
-      if (!audio.src || audio.src.includes('undefined')) {
-        console.log("No test sound available, generating tone");
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.type = 'sine';
-        oscillator.frequency.value = 440; // A4 note
-        gainNode.gain.value = 0.3; // Lower volume
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.start();
-        setTimeout(() => {
-          oscillator.stop();
-          audioContext.close();
-        }, 1000);
-        
-        return true;
+      if (deviceId) {
+        // If a specific device ID was passed, use it
+        return await twilioAudioHandler.setOutputDevice(deviceId)
+          .then(() => twilioAudioHandler.testAudioOutput());
+      } else {
+        // Otherwise test the current device
+        return await twilioAudioHandler.testAudioOutput();
       }
-      
-      if (deviceId && 'setSinkId' in audio) {
-        await (audio as any).setSinkId(deviceId);
-        console.log(`Audio sink set to device ID: ${deviceId}`);
-      }
-      
-      audio.volume = 0.3;
-      await audio.play();
-      console.log("Test audio playback started");
-      
-      // Stop after 1 second
-      setTimeout(() => {
-        audio.pause();
-        audio.currentTime = 0;
-        console.log("Test audio playback stopped");
-      }, 1000);
-      
-      return true;
     } catch (error) {
       console.error("Error testing audio output:", error);
       return false;
@@ -363,6 +286,9 @@ class TwilioService {
         console.log(`Making browser call to ${phoneNumber} with Voice SDK 2.x`);
         
         try {
+          // Set up audio before making the call
+          await twilioAudioHandler.setOutgoingSound(true);
+          
           // Voice SDK 2.x connect params 
           const params = {
             To: phoneNumber,
@@ -402,6 +328,13 @@ class TwilioService {
           this.call.on('error', (error: any) => {
             console.error('Call error:', error);
             this.hasActiveCall = false;
+          });
+          
+          // Listen for volume events to verify audio is working
+          this.call.on('volume', (inputVolume: number, outputVolume: number) => {
+            if (outputVolume > 0.05) {
+              console.log(`Detected audio output volume: ${outputVolume.toFixed(2)}`);
+            }
           });
           
           return {
@@ -457,6 +390,9 @@ class TwilioService {
   // End the current call
   async endCall(): Promise<boolean> {
     try {
+      // Ensure disconnect sound is enabled
+      twilioAudioHandler.setDisconnectSound(true);
+      
       // Close the audio processing
       const audioProcessingModule = await import('@/services/audioProcessing')
         .catch(err => {
@@ -544,8 +480,12 @@ class TwilioService {
   toggleMute(mute: boolean): boolean {
     try {
       if (this.call) {
-        // Voice SDK 2.x uses mute() and unmute() methods
-        mute ? this.call.mute() : this.call.unmute();
+        // Voice SDK 2.x uses mute(true/false) method 
+        if (mute) {
+          this.call.mute(true);
+        } else {
+          this.call.mute(false);
+        }
         return true;
       }
       return false;

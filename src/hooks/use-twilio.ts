@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
+import { twilioAudioHandler } from '@/services/TwilioAudioHandler';
 import { toast } from '@/components/ui/use-toast';
 
 export interface ActiveCall {
@@ -77,7 +78,6 @@ export const useTwilio = () => {
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("WebSocket received message type:", data.event);
           
           if (data.event === 'streamStart') {
             activeStreamSidRef.current = data.streamSid;
@@ -93,7 +93,7 @@ export const useTwilio = () => {
 
             if (currentAudioDevice) {
               setTimeout(() => {
-                twilioService.setAudioOutputDevice(currentAudioDevice);
+                twilioAudioHandler.setOutputDevice(currentAudioDevice);
               }, 500);
             }
           }
@@ -106,15 +106,6 @@ export const useTwilio = () => {
           }
           else if (data.event === 'audio') {
             console.log(`Receiving audio on track: ${data.track}`);
-          }
-          else if (data.event === 'connected_ack' || data.event === 'connection_established') {
-            console.log("WebSocket connection acknowledged by server");
-          }
-          else if (data.event === 'mark') {
-            console.log("Mark event received:", data.mark?.name);
-          }
-          else if (data.event === 'dtmf') {
-            console.log("DTMF received:", data.dtmf?.digit);
           }
         } catch (err) {
           console.error("Error processing WebSocket message:", err);
@@ -203,8 +194,6 @@ export const useTwilio = () => {
                 name: markId
               }
             }));
-            
-            console.log("Sent microphone audio chunk to Twilio");
           }
         }
       };
@@ -269,13 +258,14 @@ export const useTwilio = () => {
         
         setMicrophoneActive(true);
         
-        const devices = await twilioService.getAudioOutputDevices();
+        await twilioAudioHandler.refreshDeviceLists();
+        const devices = twilioAudioHandler.getOutputDevices();
         setAudioOutputDevices(devices);
         
-        const currentDevice = twilioService.getCurrentAudioDevice();
+        const currentDevice = twilioAudioHandler.getCurrentOutputDeviceId();
         setCurrentAudioDevice(currentDevice);
         
-        const audioTest = await twilioService.testAudioOutput(currentDevice);
+        const audioTest = await twilioAudioHandler.testAudioOutput();
         setAudioTested(audioTest);
         
         if (!audioTest) {
@@ -531,6 +521,13 @@ export const useTwilio = () => {
     
     setupWebSocket();
     
+    if (currentAudioDevice) {
+      await twilioAudioHandler.setOutputDevice(currentAudioDevice);
+      console.log(`Set output device to ${currentAudioDevice} before making call`);
+    }
+    
+    twilioAudioHandler.setOutgoingSound(true);
+    
     const result = await twilioService.makeCall(phoneNumber);
     
     if (result.success && result.callSid) {
@@ -566,7 +563,7 @@ export const useTwilio = () => {
     }
 
     return result;
-  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket]);
+  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket, currentAudioDevice]);
 
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
@@ -576,6 +573,8 @@ export const useTwilio = () => {
         clearInterval(statusCheckIntervals.current[leadIdStr]);
         delete statusCheckIntervals.current[leadIdStr];
       }
+      
+      twilioAudioHandler.setDisconnectSound(true);
       
       await twilioService.endCall();
       
@@ -658,35 +657,31 @@ export const useTwilio = () => {
     
     const shouldUseSpeaker = speakerOn !== undefined ? speakerOn : !activeCalls[leadIdStr].speakerOn;
     
-    const success = twilioService.toggleSpeaker(shouldUseSpeaker);
+    setActiveCalls(prev => ({
+      ...prev,
+      [leadIdStr]: {
+        ...prev[leadIdStr],
+        speakerOn: shouldUseSpeaker
+      }
+    }));
     
-    if (success) {
-      setActiveCalls(prev => ({
-        ...prev,
-        [leadIdStr]: {
-          ...prev[leadIdStr],
-          speakerOn: shouldUseSpeaker
-        }
-      }));
-      
-      toast({
-        title: shouldUseSpeaker ? "Speaker On" : "Speaker Off",
-        description: shouldUseSpeaker ? "Audio output set to speaker." : "Audio output set to earpiece.",
-      });
-    }
+    toast({
+      title: shouldUseSpeaker ? "Speaker On" : "Speaker Off",
+      description: shouldUseSpeaker ? "Audio output set to speaker." : "Audio output set to earpiece.",
+    });
     
-    return success;
+    return true;
   }, [activeCalls]);
 
   const setAudioOutputDevice = useCallback(async (deviceId: string) => {
     console.log(`Setting audio output device to: ${deviceId}`);
     
-    const success = await twilioService.setAudioOutputDevice(deviceId);
+    const success = await twilioAudioHandler.setOutputDevice(deviceId);
     
     if (success) {
       setCurrentAudioDevice(deviceId);
       
-      await twilioService.testAudioOutput(deviceId);
+      await twilioAudioHandler.testAudioOutput();
       
       toast({
         title: "Audio Device Changed",
@@ -713,7 +708,8 @@ export const useTwilio = () => {
     try {
       console.log("Refreshing audio devices list");
       
-      const devices = await twilioService.getAudioOutputDevices();
+      await twilioAudioHandler.refreshDeviceLists();
+      const devices = twilioAudioHandler.getOutputDevices();
       setAudioOutputDevices(devices);
       
       const currentDeviceStillAvailable = devices.some(device => device.deviceId === currentAudioDevice);
@@ -768,6 +764,6 @@ export const useTwilio = () => {
     toggleSpeaker,
     setAudioOutputDevice,
     refreshAudioDevices,
-    testAudio: twilioService.testAudioOutput
+    testAudio: twilioAudioHandler.testAudioOutput.bind(twilioAudioHandler)
   };
 };
