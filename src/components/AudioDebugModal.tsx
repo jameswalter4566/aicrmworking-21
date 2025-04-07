@@ -61,6 +61,17 @@ export function AudioDebugModal() {
     return isActive ? 'bg-green-500' : 'bg-red-500';
   };
   
+  const reconnectWebsocket = async () => {
+    try {
+      await audioProcessing.cleanup();
+      await new Promise(resolve => setTimeout(resolve, 500)); // Short delay
+      await audioProcessing.connect();
+      updateDebugInfo();
+    } catch (err) {
+      console.error("Error reconnecting:", err);
+    }
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
@@ -115,6 +126,9 @@ export function AudioDebugModal() {
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={testAudio}>
               Test Audio
+            </Button>
+            <Button variant="outline" onClick={reconnectWebsocket}>
+              Reconnect
             </Button>
             <Button variant="outline" onClick={updateDebugInfo}>
               Refresh

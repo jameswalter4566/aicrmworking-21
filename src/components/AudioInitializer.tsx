@@ -24,23 +24,31 @@ export function AudioInitializer() {
       await tempContext.resume();
       console.log('🎤 Audio context initialized on user interaction');
       
-      // Test audio output
-      const testResult = true; // Simplified for this example
+      // Create and play a test tone to ensure audio output is working
+      const oscillator = tempContext.createOscillator();
+      const gainNode = tempContext.createGain();
       
-      if (testResult) {
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(440, tempContext.currentTime); // A4 note
+      gainNode.gain.setValueAtTime(0.2, tempContext.currentTime); // Lower volume
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(tempContext.destination);
+      
+      oscillator.start();
+      
+      // Play for 0.5 seconds then stop
+      setTimeout(() => {
+        oscillator.stop();
+        
         toast({
           title: "Audio System Ready",
           description: "Your audio system is now initialized and ready for calls.",
         });
-      } else {
-        toast({
-          title: "Audio Initialization",
-          description: "Audio system initialized but test failed. You may have issues with calls.",
-          variant: "destructive", // Changed from "warning" to "destructive"
-        });
-      }
+        
+        setAudioInitialized(true);
+      }, 500);
       
-      setAudioInitialized(true);
     } catch (error) {
       console.error('🎤 Error initializing audio context:', error);
       toast({
@@ -57,7 +65,13 @@ export function AudioInitializer() {
       const hasMicrophonePermission = await checkAudioPermission();
       
       if (hasMicrophonePermission) {
-        setAudioInitialized(true);
+        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        if (audioCtx.state === "running") {
+          setAudioInitialized(true);
+          console.log("🎤 Audio context already initialized and running");
+        } else {
+          console.log("🎤 Audio context exists but suspended, needs user interaction");
+        }
       }
     };
     
