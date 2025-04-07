@@ -21,7 +21,6 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         version: window.Twilio.VERSION || 'unknown',
         deviceAvailable: !!window.Twilio.Device,
         audioEnabled: typeof window.AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined',
-        deviceInitialized: !!window.Twilio.Device?.activeDevice,
         deviceDeviceInfo: window.Twilio.Device?.info?.toString() || 'not available'
       });
       setLoaded(true);

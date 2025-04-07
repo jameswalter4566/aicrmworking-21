@@ -300,11 +300,6 @@ class TwilioService {
     }
   }
 
-  // Get current audio device ID
-  getCurrentAudioDevice(): string {
-    return this.currentAudioDeviceId;
-  }
-
   // Test audio output with enhanced error handling
   async testAudioOutput(deviceId?: string): Promise<boolean> {
     try {

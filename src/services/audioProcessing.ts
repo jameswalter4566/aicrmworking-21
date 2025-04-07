@@ -28,7 +28,6 @@ class AudioProcessingService {
   private lastProcessedAudio: number = 0;
 
   constructor() {
-    // Initialize connection check interval
     this.connectionCheckInterval = window.setInterval(() => {
       if (this.webSocket && this.activeStreamSid && 
           this.webSocket.readyState !== WebSocket.OPEN) {
@@ -36,12 +35,10 @@ class AudioProcessingService {
         this.reconnect();
       }
       
-      // Check if we've processed audio recently (within last 5 seconds)
       const now = Date.now();
       if (this.isProcessing && now - this.lastProcessedAudio > 5000) {
         console.warn('⚠️ No audio processed in last 5 seconds despite active processing');
         
-        // Try to restart audio processing
         this.stopCapturingMicrophone();
         setTimeout(() => {
           if (this.activeStreamSid) {
@@ -52,9 +49,6 @@ class AudioProcessingService {
     }, 5000);
   }
 
-  /**
-   * Connect to the streaming WebSocket
-   */
   public connect(options: AudioStreamingOptions = {}): Promise<boolean> {
     this.options = options;
     console.log('🎤 [AudioProcessing] Attempting to connect to WebSocket stream', {
@@ -72,26 +66,22 @@ class AudioProcessingService {
       }
       
       try {
-        // Clear any existing reconnect timeouts
         if (this.reconnectTimeout !== null) {
           window.clearTimeout(this.reconnectTimeout);
           this.reconnectTimeout = null;
         }
 
-        // Create WebSocket connection to Supabase streaming endpoint
         console.log('🎤 [AudioProcessing] Creating new WebSocket connection');
         this.webSocket = new WebSocket('wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream');
         
         this.webSocket.onopen = () => {
           console.log('🎤 [AudioProcessing] WebSocket connection established for bidirectional audio');
           
-          // Send initial browser connect message
           this.sendToWebSocket({
             event: 'browser_connect',
             timestamp: Date.now()
           });
           
-          // Set up ping interval to keep connection alive
           if (this.pingInterval) {
             window.clearInterval(this.pingInterval);
           }
@@ -109,7 +99,6 @@ class AudioProcessingService {
             this.options.onConnectionStatus(true);
           }
           
-          // Reset reconnect attempts on successful connection
           this.reconnectAttempts = 0;
           
           resolve(true);
@@ -137,7 +126,6 @@ class AudioProcessingService {
             this.options.onStreamStopped();
           }
           
-          // Only attempt to reconnect if we didn't explicitly close it
           if (event.code !== 1000) {
             this.scheduleReconnect();
           }
@@ -149,17 +137,12 @@ class AudioProcessingService {
     });
   }
 
-  /**
-   * Schedule a reconnect attempt with exponential backoff
-   */
   private scheduleReconnect(): void {
-    // Don't try to reconnect too many times
     if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
       console.warn(`🎤 Maximum reconnect attempts (${this.MAX_RECONNECT_ATTEMPTS}) reached`);
       return;
     }
     
-    // Exponential backoff with 1s base (1s, 2s, 4s, 8s, 16s)
     const delay = Math.min(30000, Math.pow(2, this.reconnectAttempts) * 1000);
     this.reconnectAttempts++;
     
@@ -170,30 +153,21 @@ class AudioProcessingService {
     }, delay);
   }
 
-  /**
-   * Attempt to reconnect to the WebSocket
-   */
   private reconnect(): void {
     console.log('🎤 Attempting to reconnect WebSocket...');
     
-    // Clean up existing connection
     this.cleanup(false);
     
-    // Try to reconnect
     this.connect(this.options).catch(err => {
       console.error('🎤 Failed to reconnect:', err);
       this.scheduleReconnect();
     });
   }
 
-  /**
-   * Handle incoming WebSocket messages
-   */
   private handleWebSocketMessage(event: MessageEvent): void {
     try {
       const data = JSON.parse(event.data);
       
-      // Handle different event types
       switch (data.event) {
         case 'streamStart':
           console.log(`🎤 [AudioProcessing] Stream started: ${data.streamSid} (Call: ${data.callSid})`, data);
@@ -201,7 +175,6 @@ class AudioProcessingService {
           this.inboundAudioCount = 0;
           this.outboundAudioCount = 0;
           
-          // Start capturing microphone
           this.startCapturingMicrophone();
           
           if (this.options.onStreamStarted) {
@@ -245,24 +218,20 @@ class AudioProcessingService {
         case 'browser_connected':
           console.log(`🎤 [AudioProcessing] Connection established:`, data);
           
-          // Check if there are any active streams we should join
           if (data.activeStreams && data.activeStreams.length > 0) {
             console.log(`🎤 [AudioProcessing] Found ${data.activeStreams.length} active streams to join`);
-            const stream = data.activeStreams[0]; // Just join the first one for now
+            const stream = data.activeStreams[0];
             this.activeStreamSid = stream.streamSid;
             
-            // Notify as if we received a streamStart event
             if (this.options.onStreamStarted) {
               this.options.onStreamStarted(stream.streamSid, stream.callSid);
             }
             
-            // Start capturing microphone
             this.startCapturingMicrophone();
           }
           break;
           
         case 'pong':
-          // Ping response received, connection still alive
           break;
           
         case 'mark':
@@ -281,9 +250,6 @@ class AudioProcessingService {
     }
   }
 
-  /**
-   * Start capturing microphone audio
-   */
   public async startCapturingMicrophone(): Promise<boolean> {
     if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
       console.error('🎤 [AudioProcessing] Cannot start capturing: WebSocket not connected');
@@ -297,7 +263,6 @@ class AudioProcessingService {
     
     try {
       console.log('🎤 [AudioProcessing] Requesting microphone access...');
-      // Request microphone access with optimized settings
       this.microphoneStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -318,14 +283,12 @@ class AudioProcessingService {
         }))
       });
       
-      // Create audio context
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       console.log('🎤 [AudioProcessing] Audio context created', {
         sampleRate: this.audioContext.sampleRate,
         state: this.audioContext.state
       });
       
-      // Resume the audio context if it's suspended (autoplay policy)
       if (this.audioContext.state === 'suspended') {
         console.log('🎤 [AudioProcessing] Audio context suspended, attempting to resume...');
         try {
@@ -341,25 +304,18 @@ class AudioProcessingService {
         }
       }
       
-      // Create source from microphone stream
       this.microphoneSource = this.audioContext.createMediaStreamSource(this.microphoneStream);
       
-      // Create processor node for audio processing
-      // Note: ScriptProcessorNode is deprecated but still works in most browsers
-      // AudioWorklet would be the modern alternative but requires more setup
       this.processorNode = this.audioContext.createScriptProcessor(1024, 1, 1);
       
-      // Process audio data
       this.processorNode.onaudioprocess = this.processAudio.bind(this);
       
-      // Connect nodes
       this.microphoneSource.connect(this.processorNode);
       this.processorNode.connect(this.audioContext.destination);
       
       this.isProcessing = true;
       console.log('🎤 [AudioProcessing] Microphone audio capture started');
       
-      // Diagnostic: After 1 second, check if we're getting audio
       setTimeout(() => {
         if (this.isProcessing && this.outboundAudioCount === 0) {
           console.warn('🎤 [AudioProcessing] No audio packets sent after 1 second');
@@ -378,9 +334,6 @@ class AudioProcessingService {
     }
   }
 
-  /**
-   * Process audio from microphone for transmission
-   */
   private processAudio(e: AudioProcessingEvent): void {
     if (!this.webSocket || 
         this.webSocket.readyState !== WebSocket.OPEN || 
@@ -390,18 +343,15 @@ class AudioProcessingService {
     
     this.lastProcessedAudio = Date.now();
     
-    // Get audio data
     const inputBuffer = e.inputBuffer;
     const inputData = inputBuffer.getChannelData(0);
     
-    // Calculate audio level (RMS)
     let sum = 0;
     for (let i = 0; i < inputData.length; i++) {
       sum += inputData[i] * inputData[i];
     }
     const rms = Math.sqrt(sum / inputData.length);
     
-    // Log audio levels periodically
     const now = Date.now();
     if (now - this.lastAudioLevelLog > this.logAudioInterval) {
       console.log('🎤 [AudioProcessing] Microphone audio level:', {
@@ -415,26 +365,20 @@ class AudioProcessingService {
       this.lastAudioLevelLog = now;
     }
     
-    // Always send some audio data, even if quiet (needed for stream)
-    // Just less frequently if quiet
     const shouldSend = rms > 0.005 || (this.outboundAudioCount % 10 === 0);
     
     if (shouldSend) {
-      // Convert to format suitable for WebSocket transmission
       const buffer = new ArrayBuffer(inputData.length * 2);
       const view = new DataView(buffer);
       
       for (let i = 0; i < inputData.length; i++) {
-        // Convert Float32 to Int16
         const s = Math.max(-1, Math.min(1, inputData[i]));
         view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
       }
       
       try {
-        // Convert to base64
         const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
         
-        // Send to WebSocket
         const result = this.sendToWebSocket({
           event: 'browser_audio',
           payload: base64Audio,
@@ -459,20 +403,15 @@ class AudioProcessingService {
     }
   }
 
-  /**
-   * Play incoming audio from the WebSocket
-   */
   private async playAudio(base64Audio: string): Promise<void> {
     if (!this.audioContext) {
       try {
-        // Create audio context on demand if it doesn't exist
         this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         console.log('🎤 Created new audio context for playback:', {
           sampleRate: this.audioContext.sampleRate,
           state: this.audioContext.state
         });
         
-        // Make sure it's running
         if (this.audioContext.state === 'suspended') {
           await this.audioContext.resume();
         }
@@ -483,7 +422,6 @@ class AudioProcessingService {
     }
     
     try {
-      // Convert base64 to array buffer
       const binary = atob(base64Audio);
       const buffer = new ArrayBuffer(binary.length);
       const bytes = new Uint8Array(buffer);
@@ -492,7 +430,6 @@ class AudioProcessingService {
         bytes[i] = binary.charCodeAt(i);
       }
       
-      // Log the first few audio chunks in detail
       if (this.inboundAudioCount <= 5) {
         console.log('🎤 [AudioProcessing] First audio chunk details:', {
           bufferSize: buffer.byteLength,
@@ -500,51 +437,32 @@ class AudioProcessingService {
         });
       }
       
-      // Decode audio data with Promise-based approach
-      try {
-        const decodedData = await this.decodeAudioData(buffer);
-        
-        // Create buffer source
-        const source = this.audioContext.createBufferSource();
-        source.buffer = decodedData;
-        
-        // Create a gain node to control volume
-        const gainNode = this.audioContext.createGain();
-        gainNode.gain.value = 1.0; // Full volume
-        
-        // Connect through gain node to destination (speakers)
-        source.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
-        
-        // Play the audio
-        source.start(0);
-        
-        if (this.inboundAudioCount % 100 === 0) {
-          console.log('🎤 [AudioProcessing] Playing received audio', {
-            sampleRate: decodedData.sampleRate,
-            duration: decodedData.duration,
-            numberOfChannels: decodedData.numberOfChannels,
-            bufferLength: decodedData.length
-          });
-        }
-      } catch (err) {
-        console.error('🎤 [AudioProcessing] Error decoding audio data:', err);
-        
-        // Only log detailed error info for the first few failures
-        if (this.inboundAudioCount <= 10) {
-          console.log('🎤 [AudioProcessing] Audio decoding error details:', {
-            bufferSize: buffer.byteLength,
-            isAudioContextActive: this.audioContext?.state,
-            audioSample: base64Audio.substring(0, 30) + "..."
-          });
-        }
+      const decodedData = await this.decodeAudioData(buffer);
+      
+      const source = this.audioContext.createBufferSource();
+      source.buffer = decodedData;
+      
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.value = 1.0;
+      
+      source.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      source.start(0);
+      
+      if (this.inboundAudioCount % 100 === 0) {
+        console.log('🎤 [AudioProcessing] Playing received audio', {
+          sampleRate: decodedData.sampleRate,
+          duration: decodedData.duration,
+          numberOfChannels: decodedData.numberOfChannels,
+          bufferLength: decodedData.length
+        });
       }
     } catch (err) {
       console.error('🎤 [AudioProcessing] Error processing incoming audio:', err);
     }
   }
 
-  // Helper method to decode audio data with Promise API
   private decodeAudioData(buffer: ArrayBuffer): Promise<AudioBuffer> {
     return new Promise((resolve, reject) => {
       if (!this.audioContext) {
@@ -552,11 +470,9 @@ class AudioProcessingService {
         return;
       }
       
-      // Try the Promise-based API first
       if (this.audioContext.decodeAudioData.length === 1) {
         this.audioContext.decodeAudioData(buffer).then(resolve).catch(reject);
       } else {
-        // Fall back to callback-based API for older browsers
         this.audioContext.decodeAudioData(
           buffer, 
           (decodedData) => resolve(decodedData),
@@ -566,24 +482,18 @@ class AudioProcessingService {
     });
   }
 
-  /**
-   * Stop capturing microphone audio
-   */
   public stopCapturingMicrophone(): void {
     try {
-      // Disconnect processor node
       if (this.processorNode && this.audioContext) {
         this.processorNode.disconnect();
         this.processorNode = null;
       }
       
-      // Disconnect source
       if (this.microphoneSource) {
         this.microphoneSource.disconnect();
         this.microphoneSource = null;
       }
       
-      // Stop microphone tracks
       if (this.microphoneStream) {
         this.microphoneStream.getTracks().forEach(track => track.stop());
         this.microphoneStream = null;
@@ -596,16 +506,13 @@ class AudioProcessingService {
     }
   }
 
-  /**
-   * Send data to WebSocket
-   */
   private sendToWebSocket(data: any): boolean {
     try {
       if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
         this.webSocket.send(JSON.stringify(data));
         return true;
       } else {
-        if (data.event !== 'ping') {  // Don't log ping failures
+        if (data.event !== 'ping') {
           console.warn('🎤 [AudioProcessing] Failed to send to WebSocket - connection not open', {
             readyState: this.webSocket ? this.webSocket.readyState : 'null',
             event: data.event
@@ -618,9 +525,6 @@ class AudioProcessingService {
     return false;
   }
 
-  /**
-   * Send browser audio to the WebSocket
-   */
   public sendAudio(audioData: string): boolean {
     if (!this.activeStreamSid) {
       return false;
@@ -633,9 +537,6 @@ class AudioProcessingService {
     });
   }
 
-  /**
-   * Force connect to existing stream
-   */
   public connectToStream(streamSid: string): boolean {
     if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN) {
       console.error('🎤 [AudioProcessing] Cannot connect to stream: WebSocket not connected');
@@ -645,20 +546,14 @@ class AudioProcessingService {
     this.activeStreamSid = streamSid;
     console.log(`🎤 [AudioProcessing] Manually connected to stream: ${streamSid}`);
     
-    // Start capturing microphone
     this.startCapturingMicrophone();
     
     return true;
   }
 
-  /**
-   * Clean up all resources
-   */
   public cleanup(closeSocket: boolean = true): void {
-    // Stop audio processing
     this.stopCapturingMicrophone();
     
-    // Clear intervals
     if (this.pingInterval !== null) {
       window.clearInterval(this.pingInterval);
       this.pingInterval = null;
@@ -669,7 +564,6 @@ class AudioProcessingService {
       this.reconnectTimeout = null;
     }
     
-    // Close audio context
     if (this.audioContext && this.audioContext.state !== 'closed') {
       try {
         this.audioContext.close();
@@ -679,7 +573,6 @@ class AudioProcessingService {
       this.audioContext = null;
     }
     
-    // Close WebSocket connection
     if (closeSocket && this.webSocket) {
       try {
         if (this.webSocket.readyState === WebSocket.OPEN || 
@@ -696,9 +589,6 @@ class AudioProcessingService {
     this.isProcessing = false;
   }
 
-  /**
-   * Get diagnostic information about the current state
-   */
   public getDiagnostics(): any {
     return {
       isWebSocketConnected: this.webSocket?.readyState === WebSocket.OPEN,
@@ -715,5 +605,4 @@ class AudioProcessingService {
   }
 }
 
-// Export singleton instance
 export const audioProcessing = new AudioProcessingService();
