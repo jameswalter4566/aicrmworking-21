@@ -1,3 +1,4 @@
+
 import { toast } from '@/components/ui/use-toast';
 
 interface AudioStreamingOptions {
@@ -26,6 +27,9 @@ class AudioProcessingService {
   private lastAudioLevelLog: number = 0;
   private logAudioInterval: number = 2000; // Log every 2 seconds
   private lastProcessedAudio: number = 0;
+  private audioQueue: ArrayBuffer[] = [];
+  private isPlaying: boolean = false;
+  private outputGainNode: GainNode | null = null;
 
   constructor() {
     this.connectionCheckInterval = window.setInterval(() => {
@@ -246,7 +250,7 @@ class AudioProcessingService {
           console.log(`🎤 [AudioProcessing] Unhandled WebSocket event: ${data.event}`, data);
       }
     } catch (err) {
-      console.error('🎤 [AudioProcessing] Error processing WebSocket message:', err, event.data);
+      console.error('🎤 [AudioProcessing] Error processing WebSocket message:', err);
     }
   }
 
@@ -283,7 +287,11 @@ class AudioProcessingService {
         }))
       });
       
-      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+        latencyHint: 'interactive',
+        sampleRate: 48000
+      });
+      
       console.log('🎤 [AudioProcessing] Audio context created', {
         sampleRate: this.audioContext.sampleRate,
         state: this.audioContext.state
@@ -306,12 +314,17 @@ class AudioProcessingService {
       
       this.microphoneSource = this.audioContext.createMediaStreamSource(this.microphoneStream);
       
-      this.processorNode = this.audioContext.createScriptProcessor(1024, 1, 1);
+      // Create gain node for output control
+      this.outputGainNode = this.audioContext.createGain();
+      this.outputGainNode.gain.value = 1.0; // Full volume
+      this.outputGainNode.connect(this.audioContext.destination);
+      
+      this.processorNode = this.audioContext.createScriptProcessor(2048, 1, 1);
       
       this.processorNode.onaudioprocess = this.processAudio.bind(this);
       
       this.microphoneSource.connect(this.processorNode);
-      this.processorNode.connect(this.audioContext.destination);
+      this.processorNode.connect(this.outputGainNode);
       
       this.isProcessing = true;
       console.log('🎤 [AudioProcessing] Microphone audio capture started');
@@ -365,6 +378,8 @@ class AudioProcessingService {
       this.lastAudioLevelLog = now;
     }
     
+    // Send audio packets more frequently when sound is detected
+    // Also send periodic packets even during silence to maintain the connection
     const shouldSend = rms > 0.005 || (this.outboundAudioCount % 10 === 0);
     
     if (shouldSend) {
@@ -415,6 +430,11 @@ class AudioProcessingService {
         if (this.audioContext.state === 'suspended') {
           await this.audioContext.resume();
         }
+        
+        // Create gain node
+        this.outputGainNode = this.audioContext.createGain();
+        this.outputGainNode.gain.value = 1.0;
+        this.outputGainNode.connect(this.audioContext.destination);
       } catch (err) {
         console.error('🎤 Error creating audio context for playback:', err);
         return;
@@ -437,29 +457,56 @@ class AudioProcessingService {
         });
       }
       
+      // Add to the queue
+      this.audioQueue.push(buffer);
+      
+      // Start playback if not already playing
+      if (!this.isPlaying) {
+        this.playNextAudio();
+      }
+    } catch (err) {
+      console.error('🎤 [AudioProcessing] Error processing incoming audio:', err);
+    }
+  }
+
+  private async playNextAudio(): Promise<void> {
+    if (!this.audioContext || this.audioQueue.length === 0) {
+      this.isPlaying = false;
+      return;
+    }
+    
+    this.isPlaying = true;
+    
+    try {
+      const buffer = this.audioQueue.shift()!;
       const decodedData = await this.decodeAudioData(buffer);
       
       const source = this.audioContext.createBufferSource();
       source.buffer = decodedData;
       
-      const gainNode = this.audioContext.createGain();
-      gainNode.gain.value = 1.0;
-      
-      source.connect(gainNode);
-      gainNode.connect(this.audioContext.destination);
+      // Connect through gain node
+      source.connect(this.outputGainNode!);
       
       source.start(0);
+      
+      // When this chunk finishes, play the next one
+      source.onended = () => {
+        this.playNextAudio();
+      };
       
       if (this.inboundAudioCount % 100 === 0) {
         console.log('🎤 [AudioProcessing] Playing received audio', {
           sampleRate: decodedData.sampleRate,
           duration: decodedData.duration,
           numberOfChannels: decodedData.numberOfChannels,
-          bufferLength: decodedData.length
+          bufferLength: decodedData.length,
+          queueLength: this.audioQueue.length
         });
       }
     } catch (err) {
-      console.error('🎤 [AudioProcessing] Error processing incoming audio:', err);
+      console.error('🎤 [AudioProcessing] Error playing audio chunk:', err);
+      // Continue with next audio chunk
+      this.playNextAudio();
     }
   }
 
@@ -571,7 +618,11 @@ class AudioProcessingService {
         console.warn('🎤 [AudioProcessing] Error closing audio context:', err);
       }
       this.audioContext = null;
+      this.outputGainNode = null;
     }
+    
+    this.audioQueue = [];
+    this.isPlaying = false;
     
     if (closeSocket && this.webSocket) {
       try {
@@ -600,8 +651,81 @@ class AudioProcessingService {
       microphoneActive: !!this.microphoneStream && this.microphoneStream.getAudioTracks().some(t => t.enabled && !t.muted),
       audioContextState: this.audioContext ? this.audioContext.state : 'null',
       reconnectAttempts: this.reconnectAttempts,
-      lastProcessedAudio: this.lastProcessedAudio ? (Date.now() - this.lastProcessedAudio) / 1000 + 's ago' : 'never'
+      lastProcessedAudio: this.lastProcessedAudio ? (Date.now() - this.lastProcessedAudio) / 1000 + 's ago' : 'never',
+      audioQueueLength: this.audioQueue.length,
+      isPlaying: this.isPlaying
     };
+  }
+  
+  // Add a method to test the audio output
+  public async testAudio(): Promise<boolean> {
+    try {
+      if (!this.audioContext) {
+        await this.initAudioContext();
+      }
+      
+      if (!this.audioContext) {
+        return false;
+      }
+      
+      // Generate a test tone
+      const oscillator = this.audioContext.createOscillator();
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(440, this.audioContext.currentTime); // 440 Hz (A4)
+      
+      const gainNode = this.audioContext.createGain();
+      gainNode.gain.setValueAtTime(0.2, this.audioContext.currentTime); // Low volume
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      oscillator.start();
+      
+      // Play for 0.5 seconds
+      setTimeout(() => {
+        oscillator.stop();
+        oscillator.disconnect();
+        gainNode.disconnect();
+      }, 500);
+      
+      return true;
+    } catch (err) {
+      console.error('🎤 [AudioProcessing] Error testing audio output:', err);
+      return false;
+    }
+  }
+  
+  private async initAudioContext(): Promise<AudioContext | null> {
+    try {
+      if (!this.audioContext) {
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
+          latencyHint: 'interactive',
+          sampleRate: 48000
+        });
+        
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
+        
+        this.outputGainNode = this.audioContext.createGain();
+        this.outputGainNode.gain.value = 1.0;
+        this.outputGainNode.connect(this.audioContext.destination);
+      }
+      
+      return this.audioContext;
+    } catch (err) {
+      console.error('🎤 [AudioProcessing] Error initializing audio context:', err);
+      return null;
+    }
+  }
+  
+  // Add method to set output volume
+  public setVolume(volume: number): void {
+    if (this.outputGainNode) {
+      const safeVolume = Math.max(0, Math.min(1, volume));
+      this.outputGainNode.gain.value = safeVolume;
+      console.log(`🎤 [AudioProcessing] Output volume set to ${safeVolume}`);
+    }
   }
 }
 

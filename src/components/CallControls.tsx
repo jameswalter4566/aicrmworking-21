@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff, Mic, MicOff, Volume, Volume2 } from "lucide-react";
 import { ActiveCall } from "@/hooks/use-twilio";
 import AudioDeviceSelector from "./AudioDeviceSelector";
+import { AudioDebugModal } from "./AudioDebugModal";
+import { AudioInitializer } from "./AudioInitializer";
 
 interface CallControlsProps {
   phoneNumber?: string;
@@ -71,78 +73,93 @@ export function CallControls({
   };
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-center gap-2">
-        {!isInCall ? (
-          <Button
-            variant="default"
-            size="lg"
-            className={`rounded-full w-12 h-12 p-0 bg-green-500 hover:bg-green-600 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={handleCall}
-            disabled={isDisabled}
-            onMouseEnter={() => setIsCallButtonHovered(true)}
-            onMouseLeave={() => setIsCallButtonHovered(false)}
-            title={`Call ${phoneNumber || ''}`}
-          >
-            <Phone size={20} className={isCallButtonHovered ? "animate-pulse" : ""} />
-          </Button>
-        ) : (
-          <Button
-            variant="destructive"
-            size="lg"
-            className="rounded-full w-12 h-12 p-0"
-            onClick={handleHangup}
-            title="End call"
-          >
-            <PhoneOff size={20} />
-          </Button>
-        )}
+    <>
+      {/* Always render the AudioInitializer component to ensure audio permissions */}
+      <AudioInitializer />
+      
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-center gap-2">
+          {!isInCall ? (
+            <Button
+              variant="default"
+              size="lg"
+              className={`rounded-full w-12 h-12 p-0 bg-green-500 hover:bg-green-600 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={handleCall}
+              disabled={isDisabled}
+              onMouseEnter={() => setIsCallButtonHovered(true)}
+              onMouseLeave={() => setIsCallButtonHovered(false)}
+              title={`Call ${phoneNumber || ''}`}
+            >
+              <Phone size={20} className={isCallButtonHovered ? "animate-pulse" : ""} />
+            </Button>
+          ) : (
+            <Button
+              variant="destructive"
+              size="lg"
+              className="rounded-full w-12 h-12 p-0"
+              onClick={handleHangup}
+              title="End call"
+            >
+              <PhoneOff size={20} />
+            </Button>
+          )}
+          
+          {isInCall && showAudioControls && (
+            <>
+              <Button
+                variant={isMuted ? "destructive" : "outline"}
+                size="icon"
+                onClick={toggleMute}
+                title={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
+              </Button>
+              
+              <Button
+                variant={isSpeakerOn ? "default" : "outline"}
+                size="icon"
+                onClick={toggleDeviceSelector}
+                title="Audio device settings"
+              >
+                {isSpeakerOn ? <Volume2 size={18} /> : <Volume size={18} />}
+              </Button>
+              
+              {/* Add audio debug modal if in active call */}
+              <AudioDebugModal />
+            </>
+          )}
+        </div>
         
-        {isInCall && showAudioControls && (
-          <>
-            <Button
-              variant={isMuted ? "destructive" : "outline"}
-              size="icon"
-              onClick={toggleMute}
-              title={isMuted ? "Unmute" : "Mute"}
-            >
-              {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
-            </Button>
-            
-            <Button
-              variant={isSpeakerOn ? "default" : "outline"}
-              size="icon"
-              onClick={toggleDeviceSelector}
-              title="Audio device settings"
-            >
-              {isSpeakerOn ? <Volume2 size={18} /> : <Volume size={18} />}
-            </Button>
-          </>
+        {showDeviceSelector && isInCall && showAudioControls && (
+          <div className="mt-2 p-2 border rounded-md">
+            <AudioDeviceSelector 
+              devices={audioOutputDevices}
+              currentDeviceId={currentAudioDevice}
+              onDeviceChange={onChangeAudioDevice}
+              onRefreshDevices={onRefreshDevices}
+              onTestAudio={onTestAudio}
+            />
+          </div>
+        )}
+
+        {!showDeviceSelector && isInCall && (
+          <div className="text-xs text-center text-muted-foreground">
+            {activeCall.status === 'connecting' ? 'Connecting...' : 
+             activeCall.status === 'in-progress' ? 'In call' :
+             activeCall.status === 'completed' ? 'Call ended' :
+             activeCall.status === 'failed' ? 'Call failed' :
+             activeCall.status === 'busy' ? 'Line busy' : 
+             activeCall.status === 'no-answer' ? 'No answer' : ''}
+             
+            {activeCall.audioActive && activeCall.audioStreaming && (
+              <span className="ml-1 inline-flex items-center">
+                <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
+                Audio streaming
+              </span>
+            )}
+          </div>
         )}
       </div>
-      
-      {showDeviceSelector && isInCall && showAudioControls && (
-        <div className="mt-2 p-2 border rounded-md">
-          <AudioDeviceSelector 
-            devices={audioOutputDevices}
-            currentDeviceId={currentAudioDevice}
-            onDeviceChange={onChangeAudioDevice}
-            onRefreshDevices={onRefreshDevices}
-            onTestAudio={onTestAudio}
-          />
-        </div>
-      )}
-
-      {!showDeviceSelector && isInCall && (
-        <div className="text-xs text-center text-muted-foreground">
-          {activeCall.status === 'connecting' ? 'Connecting...' : 
-           activeCall.status === 'in-progress' ? 'In call' :
-           activeCall.status === 'completed' ? 'Call ended' :
-           activeCall.status === 'failed' ? 'Call failed' :
-           activeCall.status === 'busy' ? 'Line busy' : 
-           activeCall.status === 'no-answer' ? 'No answer' : ''}
-        </div>
-      )}
-    </div>
+    </>
   );
 }
