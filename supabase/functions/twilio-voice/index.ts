@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import twilio from 'npm:twilio@4.23.0';
 
@@ -92,11 +93,28 @@ serve(async (req) => {
     
     console.log("Action from URL params:", url.searchParams.get('action'));
     console.log("Action from request body:", requestData.action);
-    console.log("Final action being used:", action || requestData.action);
-
+    
     // If no action in URL, try to get it from the request body
     if (!action && requestData.action) {
       action = requestData.action;
+    }
+    
+    // Check for Twilio status callback (which doesn't include an action parameter)
+    const isStatusCallback = requestData.CallSid && (
+      requestData.CallStatus || 
+      requestData.CallbackSource === 'call-progress-events' || 
+      url.searchParams.get('statusCallback') ||
+      requestData.statusCallback
+    );
+
+    if (isStatusCallback) {
+      console.log("Detected Twilio status callback:", {
+        callSid: requestData.CallSid,
+        callStatus: requestData.CallStatus,
+        callbackSource: requestData.CallbackSource
+      });
+
+      action = 'statusCallback';
     }
     
     console.log("Final action being used:", action);
@@ -119,13 +137,15 @@ serve(async (req) => {
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
 
-    // If no action is specified at all, return an error
+    // If no action is specified at all, return a simple TwiML response
     if (!action) {
-      console.error("No action specified in request");
-      return new Response(
-        JSON.stringify({ success: false, error: 'No action specified' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.log("No action specified, returning default TwiML response");
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("Welcome to the Twilio Voice API. No specific action was requested.");
+      
+      return new Response(twiml.toString(), { 
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+      });
     }
 
     // If requesting configuration
@@ -344,17 +364,23 @@ serve(async (req) => {
       }
     }
     else {
-      // Default response for unknown actions
-      return new Response(
-        JSON.stringify({ success: false, error: `Unknown action: ${action}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Default response for unknown actions - return a simple TwiML
+      console.log(`Unknown action: ${action}, returning default TwiML response`);
+      
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say(`The requested action ${action} is not supported.`);
+      
+      return new Response(twiml.toString(), {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+      });
     }
   } catch (error) {
     console.error('Error in function:', error);
     
     // Return a simple valid TwiML response for error cases to avoid Twilio errors
     const errorTwiml = new twilio.twiml.VoiceResponse();
+    errorTwiml.say("Sorry, an error occurred while processing this request.");
+    
     return new Response(errorTwiml.toString(), {
       status: 200, // Return 200 even on error to prevent Twilio error loops
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
