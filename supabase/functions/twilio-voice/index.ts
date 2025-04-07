@@ -171,18 +171,20 @@ serve(async (req) => {
       try {
         console.log(`Making call to ${phoneNumber}`);
         
-        // IMPORTANT: Use wss:// protocol for WebSocket stream URL, not https://
-        // Extract the host from the request URL to construct the WebSocket URL
-        const requestUrl = new URL(req.url);
-        const host = requestUrl.hostname;
-        const streamUrl = `wss://${host}/functions/v1/twilio-stream`;
+        // We need to use a PUBLIC URL for both TwiML and WebSocket
+        // Using a proper public URL ensures Twilio can reach our functions
+        const PUBLIC_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
+        
+        // For WebSocket, we must use wss:// protocol
+        const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
         console.log(`Using stream URL: ${streamUrl}`);
         
         const call = await client.calls.create({
           to: phoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          url: `https://${host}/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(phoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
-          statusCallback: `https://${host}/functions/v1/twilio-voice?action=statusCallback`,
+          url: `${PUBLIC_URL}/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(phoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
+          // NO SPECIAL PARAMS IN THE STATUS CALLBACK URL - keeping it simple:
+          statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
           machineDetection: 'DetectMessageEnd',
@@ -258,8 +260,9 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
       });
     }
-    else if (action === 'statusCallback') {
+    else if (action === 'statusCallback' || (!action && requestData.CallSid)) {
       // Handle call status callbacks with improved error handling
+      // This will also catch requests without an action parameter but with CallSid
       console.log("Status callback received");
       
       let callbackData: Record<string, any> = {};
