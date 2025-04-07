@@ -42,28 +42,26 @@ function generateCallTwiML(phoneNumber: string, streamUrl: string): string {
     language: 'en-US' 
   }, 'Connecting your call now.');
   
-  // IMPORTANT: For proper media streaming, the <Stream> element should be directly under <Response>
-  // Add stream instruction first at the top level
-  const connect = twimlResponse.connect();
-  connect.stream({
-    url: streamUrl,
-    track: 'both_tracks', // Capture both inbound and outbound tracks
-    name: 'browser_call'
-  });
-  
-  // Then dial the number
+  // First set up the dial - this should come BEFORE the stream for better audio flow
   if (phoneNumber) {
     const formattedNumber = normalizePhoneNumber(phoneNumber);
     
     twimlResponse.dial({
       callerId: Deno.env.get('TWILIO_PHONE_NUMBER'),
-      answerOnBridge: true,
+      answerOnBridge: true, // Important for maintaining connection
       timeout: 30
     }).number({
       statusCallbackEvent: ['answered', 'completed'],
       statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
     }, formattedNumber);
   }
+  
+  // IMPORTANT: Now add the stream element for audio streaming
+  twimlResponse.stream({
+    url: streamUrl,
+    track: 'both_tracks', // Capture both inbound and outbound tracks
+    name: 'browser_call'
+  });
   
   // Output the TwiML for debugging
   const twimlString = twimlResponse.toString();

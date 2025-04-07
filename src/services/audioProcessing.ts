@@ -1,4 +1,3 @@
-
 import { toast } from '@/components/ui/use-toast';
 
 interface AudioStreamingOptions {
@@ -464,7 +463,24 @@ class AudioProcessingService {
    * Play incoming audio from the WebSocket
    */
   private async playAudio(base64Audio: string): Promise<void> {
-    if (!this.audioContext) return;
+    if (!this.audioContext) {
+      try {
+        // Create audio context on demand if it doesn't exist
+        this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        console.log('🎤 Created new audio context for playback:', {
+          sampleRate: this.audioContext.sampleRate,
+          state: this.audioContext.state
+        });
+        
+        // Make sure it's running
+        if (this.audioContext.state === 'suspended') {
+          await this.audioContext.resume();
+        }
+      } catch (err) {
+        console.error('🎤 Error creating audio context for playback:', err);
+        return;
+      }
+    }
     
     try {
       // Convert base64 to array buffer
@@ -484,47 +500,70 @@ class AudioProcessingService {
         });
       }
       
-      // Decode audio data
-      // Note: We're using the deprecated callback pattern for wider browser support
+      // Decode audio data with Promise-based approach
       try {
-        this.audioContext.decodeAudioData(buffer, (decodedData) => {
-          // Create buffer source
-          const source = this.audioContext!.createBufferSource();
-          source.buffer = decodedData;
-          
-          // Connect to destination (speakers)
-          source.connect(this.audioContext!.destination);
-          
-          // Play the audio
-          source.start(0);
-          
-          if (this.inboundAudioCount % 100 === 0) {
-            console.log('🎤 [AudioProcessing] Playing received audio', {
-              sampleRate: decodedData.sampleRate,
-              duration: decodedData.duration,
-              numberOfChannels: decodedData.numberOfChannels,
-              bufferLength: decodedData.length
-            });
-          }
-        }, 
-        (err) => {
-          console.error('🎤 [AudioProcessing] Error decoding audio data:', err);
-          
-          // Log detailed info for troubleshooting
-          if (this.inboundAudioCount <= 10) {
-            console.log('🎤 [AudioProcessing] Audio decoding error details:', {
-              bufferSize: buffer.byteLength,
-              isAudioContextActive: this.audioContext?.state,
-              audioSample: base64Audio.substring(0, 30) + "..."
-            });
-          }
-        });
+        const decodedData = await this.decodeAudioData(buffer);
+        
+        // Create buffer source
+        const source = this.audioContext.createBufferSource();
+        source.buffer = decodedData;
+        
+        // Create a gain node to control volume
+        const gainNode = this.audioContext.createGain();
+        gainNode.gain.value = 1.0; // Full volume
+        
+        // Connect through gain node to destination (speakers)
+        source.connect(gainNode);
+        gainNode.connect(this.audioContext.destination);
+        
+        // Play the audio
+        source.start(0);
+        
+        if (this.inboundAudioCount % 100 === 0) {
+          console.log('🎤 [AudioProcessing] Playing received audio', {
+            sampleRate: decodedData.sampleRate,
+            duration: decodedData.duration,
+            numberOfChannels: decodedData.numberOfChannels,
+            bufferLength: decodedData.length
+          });
+        }
       } catch (err) {
-        console.error('🎤 [AudioProcessing] Error in decodeAudioData:', err);
+        console.error('🎤 [AudioProcessing] Error decoding audio data:', err);
+        
+        // Only log detailed error info for the first few failures
+        if (this.inboundAudioCount <= 10) {
+          console.log('🎤 [AudioProcessing] Audio decoding error details:', {
+            bufferSize: buffer.byteLength,
+            isAudioContextActive: this.audioContext?.state,
+            audioSample: base64Audio.substring(0, 30) + "..."
+          });
+        }
       }
     } catch (err) {
       console.error('🎤 [AudioProcessing] Error processing incoming audio:', err);
     }
+  }
+
+  // Helper method to decode audio data with Promise API
+  private decodeAudioData(buffer: ArrayBuffer): Promise<AudioBuffer> {
+    return new Promise((resolve, reject) => {
+      if (!this.audioContext) {
+        reject(new Error('No audio context available'));
+        return;
+      }
+      
+      // Try the Promise-based API first
+      if (this.audioContext.decodeAudioData.length === 1) {
+        this.audioContext.decodeAudioData(buffer).then(resolve).catch(reject);
+      } else {
+        // Fall back to callback-based API for older browsers
+        this.audioContext.decodeAudioData(
+          buffer, 
+          (decodedData) => resolve(decodedData),
+          (err) => reject(err)
+        );
+      }
+    });
   }
 
   /**

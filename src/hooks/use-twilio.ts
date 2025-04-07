@@ -275,7 +275,7 @@ export const useTwilio = () => {
         const currentDevice = twilioService.getCurrentAudioDevice();
         setCurrentAudioDevice(currentDevice);
         
-        const audioTest = await twilioService.testAudioOutput();
+        const audioTest = await twilioService.testAudioOutput(currentDevice);
         setAudioTested(audioTest);
         
         if (!audioTest) {
@@ -284,6 +284,8 @@ export const useTwilio = () => {
             description: "Unable to test your speakers. Please check your audio output settings.",
             variant: "default",
           });
+        } else {
+          console.log("Audio test successful");
         }
 
         console.log("Initializing Twilio device...");
@@ -677,6 +679,8 @@ export const useTwilio = () => {
   }, [activeCalls]);
 
   const setAudioOutputDevice = useCallback(async (deviceId: string) => {
+    console.log(`Setting audio output device to: ${deviceId}`);
+    
     const success = await twilioService.setAudioOutputDevice(deviceId);
     
     if (success) {
@@ -686,8 +690,14 @@ export const useTwilio = () => {
       
       toast({
         title: "Audio Device Changed",
-        description: "Audio output device has been updated.",
+        description: "Audio output device has been updated. You should hear audio through your selected device.",
       });
+      
+      try {
+        localStorage.setItem('preferredAudioDevice', deviceId);
+      } catch (err) {
+        console.warn('Could not save audio device preference:', err);
+      }
     } else {
       toast({
         title: "Audio Device Error",
@@ -697,18 +707,50 @@ export const useTwilio = () => {
     }
     
     return success;
-  }, []);
+  }, [activeCalls]);
 
   const refreshAudioDevices = useCallback(async () => {
     try {
+      console.log("Refreshing audio devices list");
+      
       const devices = await twilioService.getAudioOutputDevices();
       setAudioOutputDevices(devices);
+      
+      const currentDeviceStillAvailable = devices.some(device => device.deviceId === currentAudioDevice);
+      
+      if (!currentDeviceStillAvailable && devices.length > 0) {
+        const defaultDevice = devices.find(d => d.deviceId === 'default') || devices[0];
+        await setAudioOutputDevice(defaultDevice.deviceId);
+      }
+      
       return devices;
     } catch (err) {
       console.error("Error refreshing audio devices:", err);
+      toast({
+        title: "Device Error",
+        description: "Failed to refresh audio devices list.",
+        variant: "destructive",
+      });
       return [];
     }
-  }, []);
+  }, [currentAudioDevice, setAudioOutputDevice]);
+
+  useEffect(() => {
+    try {
+      const savedDevice = localStorage.getItem('preferredAudioDevice');
+      if (savedDevice && savedDevice !== currentAudioDevice) {
+        console.log(`Found saved audio device preference: ${savedDevice}`);
+        if (audioOutputDevices.length > 0) {
+          const deviceExists = audioOutputDevices.some(device => device.deviceId === savedDevice);
+          if (deviceExists) {
+            setAudioOutputDevice(savedDevice);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Could not load audio device preference:', err);
+    }
+  }, [audioOutputDevices, currentAudioDevice, setAudioOutputDevice]);
 
   return {
     initialized,

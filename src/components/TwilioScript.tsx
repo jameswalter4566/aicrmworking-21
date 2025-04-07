@@ -38,7 +38,8 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     console.log("🔶 Loading Twilio Client JS SDK...");
     const script = document.createElement('script');
     script.id = 'twilio-js-sdk';
-    script.src = 'https://sdk.twilio.com/js/client/releases/1.14.0/twilio.js';
+    // Use the latest stable version of Twilio Client JS SDK
+    script.src = 'https://sdk.twilio.com/js/client/v1.14/twilio.min.js';
     script.async = true;
     script.defer = true;
     
