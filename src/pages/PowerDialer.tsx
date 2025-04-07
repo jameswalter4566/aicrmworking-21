@@ -152,27 +152,29 @@ const PowerDialer = () => {
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   
   // Twilio integration
-  const twilio = useTwilio();
+  const twilioState = useTwilio();
   const [twilioDevice, setTwilioDevice] = useState<any>(null);
   const [activeCall, setActiveCall] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [twilioReady, setTwilioReady] = useState(false);
   
   useEffect(() => {
-    if (twilio && twilio.twilioDevice) {
-      console.log("Twilio device available:", twilio.twilioDevice);
-      setTwilioDevice(twilio.twilioDevice);
+    if (twilioState && twilioState.device) {
+      console.log("Twilio device available:", twilioState.device);
+      setTwilioDevice(twilioState.device);
       setTwilioReady(true);
       
       // Set up event listeners
-      twilio.twilioDevice.on("ready", () => console.log("Twilio device is ready"));
+      twilioState.device.on("ready", () => console.log("Twilio device is ready"));
       
       // Clean up event listeners
       return () => {
-        twilio.twilioDevice.removeAllListeners();
+        if (twilioState.device) {
+          twilioState.device.removeAllListeners();
+        }
       };
     }
-  }, [twilio]);
+  }, [twilioState]);
   
   const startTimer = () => {
     if (timer) clearInterval(timer);
@@ -226,7 +228,7 @@ const PowerDialer = () => {
     
     try {
       // Generate a Twilio token
-      const token = await twilioService.generateToken();
+      const token = await twilioService.fetchToken();
       console.log("Got Twilio token:", token);
       
       // Initialize the dialing session
@@ -865,9 +867,15 @@ const PowerDialer = () => {
           </DialogHeader>
           <div className="py-4">
             <AudioDeviceSelector 
-              onDeviceChange={() => {}}
-              onRefreshDevices={() => {}}
-              onTestAudio={() => {}}
+              onDeviceChange={async () => {
+                return Promise.resolve([]);
+              }}
+              onRefreshDevices={async () => {
+                return Promise.resolve([]);
+              }}
+              onTestAudio={async () => {
+                return Promise.resolve(true);
+              }}
               devices={[]}
               currentDeviceId=""
             />
