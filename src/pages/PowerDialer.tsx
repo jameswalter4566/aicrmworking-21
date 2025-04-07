@@ -47,11 +47,11 @@ const SAMPLE_LEADS = [
   },
   {
     id: "2",
-    name: "Sarah Johnson",
-    company: "Widget Corp",
-    phone: "+18775557777",
-    status: "Attempted",
-    priority: "Medium",
+    name: "James Walter",
+    company: "Golden Pathway Financial",
+    phone: "+17142449021", 
+    status: "New",
+    priority: "High",
   },
   {
     id: "3",
