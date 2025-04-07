@@ -13,6 +13,7 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { audioProcessing } from '@/services/audioProcessing';
+import TwilioAudioPlayer from './TwilioAudioPlayer';
 
 interface CallControlProps {
   isMuted: boolean;
@@ -23,6 +24,7 @@ interface CallControlProps {
   audioStreaming?: boolean;
   className?: string;
   onAudioDeviceChange?: (deviceId: string) => void;
+  streamSid?: string | null;
 }
 
 const CallControl: React.FC<CallControlProps> = ({
@@ -33,7 +35,8 @@ const CallControl: React.FC<CallControlProps> = ({
   onEndCall,
   audioStreaming = false,
   className,
-  onAudioDeviceChange
+  onAudioDeviceChange,
+  streamSid = null
 }) => {
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
@@ -63,6 +66,17 @@ const CallControl: React.FC<CallControlProps> = ({
           title: "Audio Stream Started",
           description: "Bidirectional audio stream is now active.",
         });
+        
+        // Attempt to immediately acquire microphone for bidirectional audio
+        if (audioStreaming) {
+          audioProcessing.startCapturingMicrophone().then(success => {
+            if (success) {
+              console.log("🎤 Microphone capture started for bidirectional audio");
+            } else {
+              console.warn("⚠️ Could not start microphone capture");
+            }
+          });
+        }
       },
       onStreamEnded: (streamSid) => {
         console.log(`Audio stream ended: ${streamSid}`);
@@ -70,14 +84,33 @@ const CallControl: React.FC<CallControlProps> = ({
       }
     });
     
+    // If audioStreaming is true, start microphone capture right away
+    if (audioStreaming) {
+      audioProcessing.startCapturingMicrophone().catch(err => {
+        console.warn("Could not start microphone capture:", err);
+      });
+    }
+    
     // Set up audio level simulation for connected calls
     const interval = setInterval(() => {
       if (audioStreaming) {
-        setAudioLevel(prev => {
-          const change = (Math.random() - 0.5) * 0.3;
-          const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
-          return newLevel;
-        });
+        // Get real audio diagnostics if available
+        const diagnostics = audioProcessing.getDiagnostics();
+        if (diagnostics.inboundAudioCount > 0) {
+          // Show slightly randomized audio level based on real activity
+          setAudioLevel(prev => {
+            const change = (Math.random() - 0.5) * 0.2;
+            const base = diagnostics.isPlaying ? 0.6 : 0.3;
+            return Math.max(0.1, Math.min(0.9, base + change));
+          });
+        } else {
+          // Fallback to simulated levels
+          setAudioLevel(prev => {
+            const change = (Math.random() - 0.5) * 0.3;
+            const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
+            return newLevel;
+          });
+        }
       } else {
         setAudioLevel(0);
       }
@@ -162,8 +195,45 @@ const CallControl: React.FC<CallControlProps> = ({
     }
   };
   
+  // In development, let's add a debug function to send a test audio tone
+  const playTestAudioTone = () => {
+    if (!audioStreaming) return;
+    
+    // Create a test tone
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = 440; // A4 note
+    gainNode.gain.value = 0.3; // Moderate volume
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.start();
+    
+    // Play for 1 second
+    setTimeout(() => {
+      oscillator.stop();
+      audioCtx.close();
+      
+      toast({
+        title: "Test Tone Played",
+        description: "If you didn't hear anything, there might be an issue with your audio setup.",
+      });
+    }, 1000);
+  };
+  
   return (
     <div className={cn('flex flex-col items-center justify-center gap-4', className)}>
+      {/* Invisible but functional TwilioAudioPlayer component */}
+      <TwilioAudioPlayer 
+        streamSid={streamSid}
+        isActive={audioStreaming || false}
+        deviceId={selectedDeviceId}
+      />
+      
       <div className="flex items-center justify-center gap-4">
         <Button
           variant={isMuted ? 'default' : 'secondary'}
@@ -246,8 +316,16 @@ const CallControl: React.FC<CallControlProps> = ({
             />
           </div>
           
-          <div className="text-xs text-muted-foreground mt-1">
-            Bidirectional audio stream connected
+          <div className="text-xs text-muted-foreground mt-1 flex justify-between w-full">
+            <span>Bidirectional audio stream {isConnected ? 'connected' : 'connecting...'}</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="h-5 px-2 text-xs"
+              onClick={playTestAudioTone}
+            >
+              Test Audio
+            </Button>
           </div>
         </div>
       ) : (

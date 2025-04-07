@@ -1,4 +1,3 @@
-
 // Create a simple audio processing service to handle audio streaming
 
 interface AudioProcessingOptions {
@@ -29,6 +28,7 @@ class AudioProcessingService {
   private microphoneStream: MediaStream | null = null;
   private audioProcessor: ScriptProcessorNode | null = null;
   private connectionOptions: AudioProcessingOptions | null = null;
+  private pingInterval: number | null = null;
 
   // Connect to the audio stream - making this more reliable
   async connect(options: AudioProcessingOptions = {}): Promise<boolean> {
@@ -53,6 +53,7 @@ class AudioProcessingService {
         this.webSocket = null;
       }
       
+      // Use the full Supabase URL
       this.webSocket = new WebSocket('wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream');
       
       this.webSocket.onopen = () => {
@@ -76,8 +77,12 @@ class AudioProcessingService {
           options.onConnected();
         }
         
-        // Send a ping to verify the connection is working
-        setTimeout(() => {
+        // Set up regular ping to keep connection alive
+        if (this.pingInterval) {
+          clearInterval(this.pingInterval);
+        }
+        
+        this.pingInterval = window.setInterval(() => {
           if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
             this.webSocket.send(JSON.stringify({
               event: 'ping',
@@ -85,12 +90,18 @@ class AudioProcessingService {
             }));
             console.log("Ping sent to server");
           }
-        }, 1000);
+        }, 15000); // Every 15 seconds
       };
       
       this.webSocket.onclose = () => {
         console.log("WebSocket connection closed");
         this.isConnected = false;
+        
+        // Clear ping interval
+        if (this.pingInterval) {
+          clearInterval(this.pingInterval);
+          this.pingInterval = null;
+        }
         
         if (options.onConnectionStatus) {
           options.onConnectionStatus(false);
@@ -133,6 +144,8 @@ class AudioProcessingService {
               this.streamSid = data.streamSid;
               this.callSid = data.callSid;
               this.isProcessing = true;
+              this.inboundAudioCount = 0;
+              this.outboundAudioCount = 0;
               
               console.log(`Stream started: ${this.streamSid}, Call: ${this.callSid}`);
               
@@ -164,13 +177,52 @@ class AudioProcessingService {
               break;
               
             case 'audio':
-            case 'media':
-              if (data.payload || (data.media && data.media.payload)) {
-                const audioPayload = data.payload || data.media.payload;
+              if (data.payload) {
                 this.inboundAudioCount++;
                 this.lastProcessedTime = new Date().toLocaleTimeString();
-                console.log(`Received audio packet ${this.inboundAudioCount}`);
-                this.playAudioFromBase64(audioPayload);
+                
+                // Log every 50th audio packet
+                if (this.inboundAudioCount % 50 === 0) {
+                  console.log(`Received audio packet ${this.inboundAudioCount}`);
+                }
+                
+                // Use the global twilioAudioPlayer if available, otherwise fall back to internal method
+                if (window.twilioAudioPlayer && window.twilioAudioPlayer.addAudioData) {
+                  // Only send to the player if the stream SIDs match or global player has no streamSid
+                  if (!window.twilioAudioPlayer.streamSid || 
+                      window.twilioAudioPlayer.streamSid === this.streamSid || 
+                      window.twilioAudioPlayer.streamSid === data.streamSid) {
+                    window.twilioAudioPlayer.addAudioData(data.payload);
+                  }
+                } else {
+                  // Fall back to internal playback method
+                  this.playAudioFromBase64(data.payload);
+                }
+              }
+              break;
+              
+            case 'media':
+              if (data.media && data.media.payload) {
+                this.inboundAudioCount++;
+                this.lastProcessedTime = new Date().toLocaleTimeString();
+                
+                // Log every 50th audio packet
+                if (this.inboundAudioCount % 50 === 0) {
+                  console.log(`Received audio packet ${this.inboundAudioCount} from media event`);
+                }
+                
+                // Use the global twilioAudioPlayer if available, otherwise fall back to internal method
+                if (window.twilioAudioPlayer && window.twilioAudioPlayer.addAudioData) {
+                  // Only send to the player if the stream SIDs match or global player has no streamSid
+                  if (!window.twilioAudioPlayer.streamSid || 
+                      window.twilioAudioPlayer.streamSid === this.streamSid || 
+                      window.twilioAudioPlayer.streamSid === data.streamSid) {
+                    window.twilioAudioPlayer.addAudioData(data.media.payload);
+                  }
+                } else {
+                  // Fall back to internal playback method
+                  this.playAudioFromBase64(data.media.payload);
+                }
               }
               break;
               
@@ -245,35 +297,47 @@ class AudioProcessingService {
         if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN && this.streamSid) {
           const inputData = e.inputBuffer.getChannelData(0);
           
-          // Process audio data (simplified example)
-          const buffer = new ArrayBuffer(inputData.length * 2);
-          const view = new DataView(buffer);
-          
+          let sum = 0;
           for (let i = 0; i < inputData.length; i++) {
-            const s = Math.max(-1, Math.min(1, inputData[i]));
-            view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+            sum += inputData[i] * inputData[i];
           }
+          const rms = Math.sqrt(sum / inputData.length);
           
-          const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
-          
-          this.webSocket.send(JSON.stringify({
-            event: 'media',
-            streamSid: this.streamSid,
-            media: {
-              payload: base64Audio
+          if (rms > 0.005) {
+            const buffer = new ArrayBuffer(inputData.length * 2);
+            const view = new DataView(buffer);
+            
+            for (let i = 0; i < inputData.length; i++) {
+              const s = Math.max(-1, Math.min(1, inputData[i]));
+              view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
             }
-          }));
-          
-          this.outboundAudioCount++;
+            
+            const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
+            
+            this.webSocket.send(JSON.stringify({
+              event: 'browser_audio',
+              streamSid: this.streamSid,
+              payload: base64Audio
+            }));
+            
+            this.outboundAudioCount++;
+            
+            // Log every 50th outbound audio packet
+            if (this.outboundAudioCount % 50 === 0) {
+              console.log(`Sent microphone audio chunk #${this.outboundAudioCount} to Twilio`);
+            }
+          }
         }
       };
       
       source.connect(this.audioProcessor);
       this.audioProcessor.connect(this.audioContext.destination);
       
+      console.log("Microphone audio capture started for bidirectional streaming");
+      
       return true;
     } catch (err) {
-      console.error("Error accessing microphone:", err);
+      console.error("Error accessing microphone for bidirectional streaming:", err);
       return false;
     }
   }
@@ -423,7 +487,6 @@ class AudioProcessingService {
       }
       
       // Create a new Audio element for playing the sound
-      // This is a workaround that often works better than AudioContext for some browsers
       try {
         const blob = new Blob([new Uint8Array(audioBuffer)], { type: 'audio/mp3' });
         const url = URL.createObjectURL(blob);
@@ -448,41 +511,32 @@ class AudioProcessingService {
           this.playNextInQueue();
         };
         
-        audio.play().catch(err => {
-          console.warn("Could not play audio:", err);
-          URL.revokeObjectURL(url);
-          this.playNextInQueue();
-        });
+        await audio.play();
       } catch (audioErr) {
         console.warn("Error with Audio element approach, falling back to AudioContext:", audioErr);
         
         // Fall back to AudioContext approach
-        this.audioContext.decodeAudioData(
-          audioBuffer,
-          (decodedData) => {
-            try {
-              const source = this.audioContext!.createBufferSource();
-              source.buffer = decodedData;
-              source.connect(this.audioDestination!);
-              source.start(0);
-              
-              source.onended = () => {
-                this.playNextInQueue();
-              };
-            } catch (playError) {
-              console.error("Error starting audio playback:", playError);
-              this.playNextInQueue();
-            }
-          },
-          (error) => {
-            console.error("Error decoding audio data:", error);
+        try {
+          const decodedData = await this.audioContext.decodeAudioData(audioBuffer.slice(0));
+          const source = this.audioContext.createBufferSource();
+          source.buffer = decodedData;
+          source.connect(this.audioContext.destination);
+          
+          source.onended = () => {
             this.playNextInQueue();
-          }
-        );
+          };
+          
+          source.start(0);
+        } catch (decodeErr) {
+          console.error("Error decoding audio data:", decodeErr);
+          this.playNextInQueue();
+        }
       }
     } catch (error) {
       console.error("Error playing audio from queue:", error);
-      this.playNextInQueue();
+      this.isPlaying = false;
+      // Try again after a short delay
+      setTimeout(() => this.playNextInQueue(), 100);
     }
   }
   
@@ -493,152 +547,57 @@ class AudioProcessingService {
         await this.setAudioDevice(deviceId);
       }
       
-      // Try using both the Audio element approach and AudioContext for compatibility
       try {
-        // First approach: Use an audio element with a test sound
-        const audio = new Audio();
-        
-        // Generate a data URL for a simple tone
-        const sampleRate = 44100;
-        const duration = 0.5;
-        const freq = 440; // A4 tone
-        
+        // Generate a simple, clear test tone
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const arrayBuffer = audioCtx.createBuffer(1, sampleRate * duration, sampleRate);
-        const data = arrayBuffer.getChannelData(0);
-        
-        for (let i = 0; i < data.length; i++) {
-          data[i] = Math.sin(2 * Math.PI * freq * i / sampleRate) * 0.5;
-        }
-        
-        const audioBlob = await this.bufferToWave(arrayBuffer, sampleRate * duration);
-        const audioUrl = URL.createObjectURL(audioBlob);
-        
-        audio.src = audioUrl;
-        
-        if (this.currentAudioDevice && 'setSinkId' in HTMLMediaElement.prototype) {
-          await (audio as any).setSinkId(this.currentAudioDevice);
-        }
-        
-        await audio.play();
-        
-        // Clean up after playback
-        setTimeout(() => {
-          URL.revokeObjectURL(audioUrl);
-        }, 1000);
-        
-        return true;
-      } catch (err) {
-        console.warn("Audio element approach failed, falling back to AudioContext:", err);
-        
-        // Second approach: Use AudioContext
-        if (!this.audioContext) {
-          this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
-        
-        // Create oscillator for test tone
-        const oscillator = this.audioContext.createOscillator();
-        const gainNode = this.audioContext.createGain();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
         
         oscillator.type = 'sine';
         oscillator.frequency.value = 440; // A4 note
         gainNode.gain.value = 0.2; // Lower volume
         
         oscillator.connect(gainNode);
-        gainNode.connect(this.audioContext.destination);
+        gainNode.connect(audioCtx.destination);
         
         oscillator.start();
         
-        // Play for 0.5 seconds
+        // Play for 1 second
         setTimeout(() => {
           oscillator.stop();
-        }, 500);
+          audioCtx.close();
+        }, 1000);
         
+        console.log("🔊 Test tone played successfully");
+        return true;
+      } catch (err) {
+        console.warn("⚠️ AudioContext test failed:", err);
+        
+        // Fall back to playing an audio file
+        const audio = new Audio('/sounds/dialtone.mp3');
+        
+        if (deviceId && 'setSinkId' in HTMLMediaElement.prototype) {
+          try {
+            await (audio as any).setSinkId(deviceId);
+          } catch (sinkErr) {
+            console.warn("⚠️ Could not set sink ID:", sinkErr);
+          }
+        }
+        
+        audio.volume = 0.3;
+        await audio.play();
+        
+        // Stop after 1 second
+        setTimeout(() => {
+          audio.pause();
+          audio.currentTime = 0;
+        }, 1000);
+        
+        console.log("🔊 Test audio file played successfully");
         return true;
       }
     } catch (error) {
-      console.error("Error testing audio:", error);
-      return false;
-    }
-  }
-  
-  // Helper method to convert AudioBuffer to WAV
-  private bufferToWave(abuffer: AudioBuffer, len: number): Promise<Blob> {
-    const numOfChan = abuffer.numberOfChannels;
-    const length = len * numOfChan * 2;
-    const buffer = new ArrayBuffer(44 + length);
-    const view = new DataView(buffer);
-
-    // Write WAV header
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + length, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, numOfChan, true);
-    view.setUint32(24, abuffer.sampleRate, true);
-    view.setUint32(28, abuffer.sampleRate * numOfChan * 2, true);
-    view.setUint16(32, numOfChan * 2, true);
-    view.setUint16(34, 16, true);
-    writeString(view, 36, 'data');
-    view.setUint32(40, length, true);
-
-    // Write PCM data
-    const channelData = [];
-    for (let i = 0; i < numOfChan; i++) {
-        channelData.push(abuffer.getChannelData(i));
-    }
-
-    let offset = 44;
-    for (let i = 0; i < len; i++) {
-        for (let c = 0; c < numOfChan; c++) {
-            const sample = Math.max(-1, Math.min(1, channelData[c][i]));
-            const val = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
-            view.setInt16(offset, val, true);
-            offset += 2;
-        }
-    }
-
-    return new Promise((resolve) => {
-      resolve(new Blob([buffer], { type: 'audio/wav' }));
-    });
-
-    function writeString(view: DataView, offset: number, str: string) {
-      for (let i = 0; i < str.length; i++) {
-        view.setUint8(offset + i, str.charCodeAt(i));
-      }
-    }
-  }
-  
-  // Send audio data to the stream
-  sendAudio(audioData: ArrayBuffer): boolean {
-    if (!this.webSocket || this.webSocket.readyState !== WebSocket.OPEN || !this.streamSid) {
-      return false;
-    }
-    
-    try {
-      // Convert ArrayBuffer to Base64
-      const bytes = new Uint8Array(audioData);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
-      
-      // Send to WebSocket
-      this.webSocket.send(JSON.stringify({
-        event: 'media',
-        streamSid: this.streamSid,
-        media: {
-          payload: base64
-        }
-      }));
-      
-      this.outboundAudioCount++;
-      return true;
-    } catch (error) {
-      console.error("Error sending audio:", error);
+      console.error("❌ Error testing audio:", error);
       return false;
     }
   }
@@ -647,6 +606,12 @@ class AudioProcessingService {
   async cleanup(): Promise<void> {
     try {
       console.log("Cleaning up audio processing resources...");
+      
+      // Clear ping interval
+      if (this.pingInterval) {
+        clearInterval(this.pingInterval);
+        this.pingInterval = null;
+      }
       
       // Close WebSocket if open
       if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
@@ -734,6 +699,16 @@ interface AudioDiagnostics {
   isPlaying: boolean;
   selectedDevice?: string;
   availableDevices?: number;
+}
+
+// Add TypeScript declarations
+declare global {
+  interface Window {
+    twilioAudioPlayer?: {
+      addAudioData: (base64Audio: string) => void;
+      streamSid?: string | null;
+    };
+  }
 }
 
 export const audioProcessing = new AudioProcessingService();

@@ -1,1042 +1,359 @@
-import React, { useState, useEffect } from "react";
-import MainLayout from "@/components/layouts/MainLayout";
-import { Button } from "@/components/ui/button";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+import { useState, useEffect, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Phone } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import CallControl from '@/components/CallControl';
+import MainLayout from "@/components/MainLayout";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, RefreshCw, AlertCircle, Speaker } from "lucide-react";
-import Phone2 from "@/components/icons/Phone2";
-import Phone3 from "@/components/icons/Phone3";
-import {
-  ToggleGroup,
-  ToggleGroupItem
-} from "@/components/ui/toggle-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
-import { audioProcessing } from "@/services/audioProcessing";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { twilioService } from '@/services/twilio';
+import TwilioAudioPlayer from '@/components/TwilioAudioPlayer';
+import { audioProcessing } from '@/services/audioProcessing';
 
-const activityLogsData = {
-  1: [
-    { type: "call", status: "attempted", timestamp: "2023-05-15 10:23 AM", notes: "No answer", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-15 10:30 AM", content: "Hi Dan, I tried reaching out to you. Would you be available later today?", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-15 10:32 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-  2: [
-    { type: "call", status: "completed", timestamp: "2023-05-14 2:45 PM", duration: "4:32", notes: "Discussed property requirements", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-14 3:15 PM", content: "Thanks for the call. Can you send me more info about the property?", sender: "lead" },
-    { type: "sms", status: "sent", timestamp: "2023-05-14 3:20 PM", content: "Of course! I'll email you the details shortly.", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-14 3:25 PM", from: "New Lead", to: "Contacted", sender: "user" },
-  ],
-  3: [
-    { type: "call", status: "completed", timestamp: "2023-05-13 11:15 AM", duration: "7:21", notes: "Scheduled property viewing", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-13 11:25 AM", from: "Contacted", to: "Appointment Set", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-13 11:30 AM", content: "Looking forward to showing you the property on Friday at 3 PM!", sender: "user" },
-    { type: "sms", status: "received", timestamp: "2023-05-13 11:35 AM", content: "Great, I'll see you then. Thank you!", sender: "lead" },
-  ],
-  4: [
-    { type: "call", status: "attempted", timestamp: "2023-05-12 9:10 AM", notes: "Voicemail left", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 9:15 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-  5: [
-    { type: "call", status: "attempted", timestamp: "2023-05-11 4:30 PM", notes: "No answer", sender: "user" },
-    { type: "call", status: "attempted", timestamp: "2023-05-12 10:45 AM", notes: "No answer", sender: "user" },
-    { type: "sms", status: "sent", timestamp: "2023-05-12 10:50 AM", content: "Hi James, I've tried to reach you. Please call me back when you have a moment.", sender: "user" },
-    { type: "disposition", status: "changed", timestamp: "2023-05-12 10:55 AM", from: "New Lead", to: "Not Contacted", sender: "user" },
-  ],
-};
-
-const getDispositionClass = (disposition: string) => {
-  switch(disposition) {
-    case "Not Contacted":
-      return "bg-gray-100 text-gray-800";
-    case "Contacted":
-      return "bg-blue-100 text-blue-800";
-    case "Appointment Set":
-      return "bg-purple-100 text-purple-800";
-    case "Submitted":
-      return "bg-green-100 text-green-800";
-    case "Dead":
-      return "bg-red-100 text-red-800";
-    case "DNC":
-      return "bg-yellow-100 text-yellow-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
-
-const PowerDialer = () => {
-  const [leads, setLeads] = useState<ThoughtlyContact[]>([]);
-  const [activeCallId, setActiveCallId] = useState<number | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [lineCount, setLineCount] = useState("1");
-  const [isDialing, setIsDialing] = useState(false);
-  const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
-  const [dialQueue, setDialQueue] = useState<number[]>([]);
-  const [dialingMode, setDialingMode] = useState<"power" | "ai">("power");
-  const [aiResponses, setAiResponses] = useState<string[]>([
-    "Hello, this is AI assistant calling on behalf of SalesPro CRM.",
-    "I'm analyzing the lead's information...",
-    "I see they're interested in property in the downtown area.",
-    "I'll try to schedule a meeting with our agent.",
-  ]);
-  const [callSids, setCallSids] = useState<Record<number, string>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [noLeadsSelectedError, setNoLeadsSelectedError] = useState(false);
-  const [audioWebSocketReady, setAudioWebSocketReady] = useState(false);
-  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
-  const [currentAudioDevice, setCurrentAudioDevice] = useState<string>('default');
-  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
-
+export default function PowerDialer() {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [isCallActive, setIsCallActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [speakerOn, setSpeakerOn] = useState(true);
+  const [activeCallSid, setActiveCallSid] = useState<string | null>(null);
+  const [activeStreamSid, setActiveStreamSid] = useState<string | null>(null);
+  const [callDuration, setCallDuration] = useState(0);
+  
+  // Initialize the audio context as soon as possible
   useEffect(() => {
-    fetchLeads();
-    loadAudioDevices();
-  }, []);
-
-  const fetchLeads = async () => {
-    setIsLoading(true);
-    try {
-      const retrievedLeads = await thoughtlyService.retrieveLeads();
-      if (retrievedLeads && Array.isArray(retrievedLeads) && retrievedLeads.length > 0) {
-        setLeads(retrievedLeads);
-        console.log("Loaded leads from retrieve-leads function:", retrievedLeads);
-      } else {
-        console.log("No leads retrieved, using default data");
+    const initAudio = async () => {
+      try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+          const context = new AudioContext();
+          
+          // If the context is suspended (browser policy), resume it on user interaction
+          if (context.state === 'suspended') {
+            document.addEventListener('click', () => {
+              context.resume().then(() => {
+                console.log('AudioContext resumed successfully');
+              });
+            }, { once: true });
+          }
+          
+          // Create a silent oscillator just to activate the audio system
+          const oscillator = context.createOscillator();
+          const gainNode = context.createGain();
+          gainNode.gain.value = 0; // silent
+          oscillator.connect(gainNode);
+          gainNode.connect(context.destination);
+          oscillator.start(0);
+          oscillator.stop(0.001); // Very short duration
+          
+          console.log("Audio context initialized:", context.state);
+        }
+      } catch (err) {
+        console.error("Failed to initialize audio context:", err);
       }
-    } catch (error) {
-      console.error("Error fetching leads:", error);
+    };
+    
+    initAudio();
+    
+    // Connect to the audio WebSocket at component mount
+    audioProcessing.connect({
+      onConnectionStatus: (connected) => {
+        console.log(`Audio connection status: ${connected}`);
+      },
+      onStreamStarted: (streamSid, callSid) => {
+        console.log(`Stream started: ${streamSid}, Call: ${callSid}`);
+        setActiveStreamSid(streamSid);
+      },
+      onStreamEnded: () => {
+        setActiveStreamSid(null);
+      }
+    });
+    
+    // Initialize Twilio service
+    twilioService.initializeAudioContext()
+      .then(success => {
+        if (!success) {
+          toast({
+            title: "Audio System Error",
+            description: "Could not initialize audio system. Please check your browser permissions.",
+            variant: "destructive"
+          });
+        }
+      })
+      .catch(err => console.error("Audio initialization error:", err));
+    
+    return () => {
+      // Clean up audio resources
+      audioProcessing.cleanup();
+    };
+  }, []);
+  
+  // Reset call duration timer when call status changes
+  useEffect(() => {
+    let timer: number;
+    
+    if (isCallActive) {
+      setCallDuration(0);
+      timer = window.setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isCallActive]);
+  
+  // Handle call initiation
+  const handleMakeCall = useCallback(async () => {
+    if (!phoneNumber.trim()) {
       toast({
-        title: "Error",
-        description: "Failed to load leads. Please refresh and try again.",
-        variant: "destructive",
+        title: "Phone Number Required",
+        description: "Please enter a phone number to call.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsLoading(true);
+    
+    try {
+      // Make sure audio is ready
+      await twilioService.initializeAudioContext();
+      
+      // Ensure we're connected to the WebSocket
+      await audioProcessing.connect({
+        onStreamStarted: (streamSid, callSid) => {
+          console.log(`Stream started: ${streamSid}, Call: ${callSid}`);
+          setActiveStreamSid(streamSid);
+        }
+      });
+      
+      const result = await twilioService.makeCall(phoneNumber.trim());
+      
+      if (result.success) {
+        setIsCallActive(true);
+        setActiveCallSid(result.callSid || null);
+        
+        toast({
+          title: "Call Connected",
+          description: `Connected to ${phoneNumber}`,
+        });
+        
+        // Start microphone capture for bidirectional audio
+        audioProcessing.startCapturingMicrophone()
+          .then(success => {
+            if (!success) {
+              console.warn("Failed to start microphone capture");
+            }
+          });
+          
+      } else {
+        toast({
+          title: "Call Failed",
+          description: result.error || "Unable to connect the call. Please try again.",
+          variant: "destructive"
+        });
+      }
+    } catch (err) {
+      console.error("Error making call:", err);
+      toast({
+        title: "Call Error",
+        description: "An error occurred while trying to make the call.",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const loadAudioDevices = async () => {
-    setIsLoadingDevices(true);
+  }, [phoneNumber]);
+  
+  // Handle call end
+  const handleEndCall = useCallback(async () => {
     try {
-      const devices = await audioProcessing.getAudioDevices();
-      setAudioDevices(devices);
+      await twilioService.endCall();
+      await audioProcessing.cleanup();
       
-      let savedDevice;
-      try {
-        savedDevice = localStorage.getItem('preferredAudioDevice');
-      } catch (err) {
-        console.warn('Could not access localStorage:', err);
-      }
+      setIsCallActive(false);
+      setActiveCallSid(null);
+      setActiveStreamSid(null);
       
-      if (savedDevice) {
-        setCurrentAudioDevice(savedDevice);
-      } else {
-        const defaultDevice = devices.find(d => d.deviceId === 'default')?.deviceId || 
-                             (devices.length > 0 ? devices[0].deviceId : 'default');
-        setCurrentAudioDevice(defaultDevice);
-      }
-    } catch (err) {
-      console.error('Error loading audio devices:', err);
-    } finally {
-      setIsLoadingDevices(false);
-    }
-  };
-
-  const handleAudioDeviceChange = async (deviceId: string) => {
-    try {
-      const success = await audioProcessing.setAudioDevice(deviceId);
-      if (success) {
-        setCurrentAudioDevice(deviceId);
-        
-        try {
-          localStorage.setItem('preferredAudioDevice', deviceId);
-        } catch (err) {
-          console.warn('Could not save audio device preference:', err);
-        }
-        
-        toast({
-          title: "Audio Device Changed",
-          description: "Audio output device has been updated.",
-        });
-      }
-    } catch (err) {
-      console.error('Error changing audio device:', err);
       toast({
-        title: "Error",
-        description: "Failed to change audio device.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const testSelectedAudio = async () => {
-    try {
-      await audioProcessing.testAudio(currentAudioDevice);
-      toast({
-        title: "Audio Test",
-        description: "Playing test sound on selected device.",
+        title: "Call Ended",
+        description: `Call duration: ${formatDuration(callDuration)}`,
       });
     } catch (err) {
-      console.error('Error testing audio:', err);
-      toast({
-        title: "Audio Test Failed",
-        description: "Could not play test sound.",
-        variant: "destructive",
+      console.error("Error ending call:", err);
+    }
+  }, [callDuration]);
+  
+  // Format call duration as mm:ss
+  const formatDuration = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Handle mute toggle
+  const handleMuteToggle = useCallback(() => {
+    setIsMuted(prev => !prev);
+    twilioService.toggleMute(!isMuted);
+  }, [isMuted]);
+  
+  // Handle speaker toggle
+  const handleSpeakerToggle = useCallback(() => {
+    setSpeakerOn(prev => !prev);
+    twilioService.toggleSpeaker(!speakerOn);
+  }, [speakerOn]);
+  
+  // Handle audio device change
+  const handleAudioDeviceChange = useCallback((deviceId: string) => {
+    twilioService.setAudioOutputDevice(deviceId)
+      .then(success => {
+        console.log(`Audio device ${deviceId} set: ${success}`);
       });
-    }
-  };
-
-  const formatDeviceName = (device: MediaDeviceInfo): string => {
-    if (!device.label) {
-      return device.deviceId === 'default' ? 'System Default' : `Device ${device.deviceId.substring(0, 4)}`;
-    }
-    
-    let label = device.label;
-    if (label.length > 30) {
-      label = `${label.substring(0, 27)}...`;
-    }
-    
-    if (device.deviceId === 'default') {
-      label += ' (Default)';
-    }
-    
-    return label;
-  };
-
-  const handleRefreshLeads = () => {
-    toast({
-      title: "Refreshing Leads",
-      description: "Retrieving the latest leads data...",
-    });
-    fetchLeads();
-  };
-
-  const startDialSession = () => {
-    setNoLeadsSelectedError(false);
-    
-    if (selectedLeads.length === 0) {
-      toast({
-        title: "No Leads Selected",
-        description: "Please select at least one lead to dial.",
-        variant: "destructive",
-      });
-      setNoLeadsSelectedError(true);
-      return;
-    }
-    
-    setIsDialogOpen(true);
-  };
-
-  const initializeAudioConnection = async () => {
-    try {
-      console.log("Initializing audio WebSocket connection...");
-      const connected = await audioProcessing.connect({
-        onConnectionStatus: (status) => {
-          console.log(`Audio WebSocket connection status: ${status ? 'connected' : 'disconnected'}`);
-          setAudioWebSocketReady(status);
-          
-          if (status) {
-            toast({
-              title: "Audio Connection Ready",
-              description: "Audio streaming connection established successfully.",
-            });
-          }
-        },
-        onStreamStarted: (streamSid, callSid) => {
-          console.log(`Audio stream started: ${streamSid} for call ${callSid}`);
-          toast({
-            title: "Audio Stream Active",
-            description: "Bidirectional audio stream is now active.",
-          });
-        }
-      });
-      
-      if (!connected) {
-        toast({
-          title: "Warning",
-          description: "Audio streaming setup failed. Proceeding with limited functionality.",
-          variant: "default",
-        });
-        return false;
-      }
-      
-      return true;
-    } catch (error) {
-      console.error("Error initializing audio connection:", error);
-      toast({
-        title: "Audio Connection Failed",
-        description: "Could not establish audio streaming connection. Calls may have limited functionality.",
-        variant: "default",
-      });
-      return false;
-    }
-  };
-
-  const startDialing = async () => {
-    if (selectedLeads.length === 0) {
-      toast({
-        title: "No Leads Selected",
-        description: "Please select at least one lead to dial.",
-        variant: "destructive",
-      });
-      setNoLeadsSelectedError(true);
-      setIsDialogOpen(false);
-      return;
-    }
-
-    const audioReady = await initializeAudioConnection();
-    if (!audioReady) {
-      toast({
-        title: "Warning",
-        description: "Audio streaming setup failed. Proceeding with limited functionality.",
-        variant: "default",
-      });
-    }
-
-    const leadsToDial = selectedLeads;
-    
-    setDialQueue(leadsToDial);
-    setIsDialogOpen(false);
-    setIsDialing(true);
-    
-    const batchSize = parseInt(lineCount);
-    const firstBatch = leadsToDial.slice(0, batchSize);
-    
-    if (firstBatch.length > 0) {
-      setActiveCallId(firstBatch[0]);
-      
-      toast({
-        title: `Starting ${dialingMode === "ai" ? "AI" : "power"} dialer`,
-        description: `Dialing with ${batchSize} line${batchSize > 1 ? 's' : ''}`,
-      });
-      
-      firstBatch.forEach((leadId, index) => {
-        setTimeout(() => {
-          initiateCall(leadId);
-        }, index * 500);
-      });
-    }
-  };
-
-  const initiateCall = async (leadId: number) => {
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead || !lead.phone1) {
-      toast({
-        title: "Invalid Lead",
-        description: `Lead #${leadId} has no phone number.`,
-        variant: "destructive",
-      });
-      
-      moveToNextLead(leadId);
-      return;
-    }
-    
-    const normalizedPhone = normalizePhoneNumber(lead.phone1);
-    
-    if (!normalizedPhone) {
-      toast({
-        title: "Invalid Phone Number",
-        description: `The phone number for ${lead.firstName} ${lead.lastName} is invalid.`,
-        variant: "destructive",
-      });
-      
-      moveToNextLead(leadId);
-      return;
-    }
-    
-    toast({
-      title: "Dialing",
-      description: `Calling ${lead.firstName} ${lead.lastName} at ${normalizedPhone}...`,
-    });
-    
-    console.log(`Making call to lead ${leadId} with phone number ${normalizedPhone}`);
-    
-    try {
-      const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-      const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice?action=makeCall`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          phoneNumber: normalizedPhone,
-          useWebSocket: true,
-          streamUrl: window.location.origin
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Server returned ${response.status}: ${errorText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        setCallSids(prev => ({ ...prev, [leadId]: result.callSid }));
-        
-        toast({
-          title: "Call Connected",
-          description: `Call to ${lead.firstName} ${lead.lastName} is in progress`,
-        });
-        
-        audioProcessing.startCapturingMicrophone();
-        
-        monitorCallStatus(leadId, result.callSid);
-      } else {
-        toast({
-          title: "Call Failed",
-          description: result.error || "Could not connect the call",
-          variant: "destructive",
-        });
-        
-        moveToNextLead(leadId);
-      }
-    } catch (error) {
-      console.error(`Error making call to ${lead.phone1}:`, error);
-      toast({
-        title: "Call Failed",
-        description: "Network error or service unavailable",
-        variant: "destructive",
-      });
-      
-      moveToNextLead(leadId);
-    }
-  };
-
-  const monitorCallStatus = async (leadId: number, callSid: string) => {
-    const intervalId = setInterval(async () => {
-      try {
-        const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-        const response = await fetch(`${supabaseUrl}/functions/v1/twilio-voice?action=checkStatus`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            callSid: callSid
-          })
-        });
-        
-        const result = await response.json();
-        
-        if (!result.success) {
-          clearInterval(intervalId);
-          moveToNextLead(leadId);
-          return;
-        }
-        
-        const status = result.status;
-        
-        if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
-          clearInterval(intervalId);
-          
-          const lead = leads.find(l => l.id === leadId);
-          const leadName = lead ? `${lead.firstName} ${lead.lastName}` : `Lead #${leadId}`;
-          
-          switch(status) {
-            case "completed":
-              toast({
-                title: "Call Completed",
-                description: `Call with ${leadName} has ended`,
-              });
-              break;
-            case "busy":
-              toast({
-                title: "Line Busy",
-                description: `${leadName}'s line is busy`,
-                variant: "destructive",
-              });
-              break;
-            case "no-answer":
-              toast({
-                title: "No Answer",
-                description: `${leadName} did not answer`,
-                variant: "destructive",
-              });
-              break;
-            default:
-              toast({
-                title: "Call Failed",
-                description: `Call to ${leadName} could not be completed`,
-                variant: "destructive",
-              });
-          }
-          
-          moveToNextLead(leadId);
-        }
-      } catch (error) {
-        console.error(`Error checking status for call ${callSid}:`, error);
-      }
-    }, 3000);
-  };
-
-  const moveToNextLead = (currentLeadId: number) => {
-    const currentIndex = dialQueue.indexOf(currentLeadId);
-    const linesInUse = parseInt(lineCount);
-    const nextIndex = currentIndex + linesInUse;
-    
-    if (nextIndex < dialQueue.length) {
-      const nextLeadId = dialQueue[nextIndex];
-      initiateCall(nextLeadId);
-      
-      if (activeCallId === currentLeadId) {
-        setActiveCallId(nextLeadId);
-      }
-    } else {
-      if (dialQueue.slice(Math.max(0, dialQueue.length - linesInUse)).includes(currentLeadId)) {
-        setIsDialing(false);
-        setActiveCallId(null);
-        toast({
-          title: "Dialing Complete",
-          description: "All leads have been contacted",
-        });
-      }
-    }
-  };
-
-  const endDialingSession = async () => {
-    for (const [leadId, callSid] of Object.entries(callSids)) {
-      try {
-        const supabaseUrl = "https://imrmboyczebjlbnkgjns.supabase.co";
-        await fetch(`${supabaseUrl}/functions/v1/twilio-voice`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            action: 'endCall',
-            callSid
-          })
-        });
-      } catch (error) {
-        console.error(`Error ending call ${callSid}:`, error);
-      }
-    }
-    
-    audioProcessing.stopCapturingMicrophone();
-    audioProcessing.cleanup();
-    
-    setIsDialing(false);
-    setActiveCallId(null);
-    setDialQueue([]);
-    setCallSids({});
-    setAudioWebSocketReady(false);
-    
-    toast({
-      title: "Session Ended",
-      description: "Dialing session has been terminated",
-    });
-  };
-
-  const handleSelectAllLeads = (checked: boolean) => {
-    if (checked) {
-      setSelectedLeads(leads.map(lead => lead.id!).filter(Boolean));
-    } else {
-      setSelectedLeads([]);
-    }
-  };
-
-  const handleSelectLead = (leadId: number, checked: boolean) => {
-    if (checked) {
-      setSelectedLeads(prev => [...prev, leadId]);
-      setNoLeadsSelectedError(false);
-    } else {
-      setSelectedLeads(prev => prev.filter(id => id !== leadId));
-    }
-  };
-
-  const isAllSelected = leads.length > 0 && leads.every(lead => 
-    lead.id && selectedLeads.includes(lead.id)
-  );
-
-  const normalizePhoneNumber = (phone: string): string => {
-    if (!phone) return '';
-    
-    const digitsOnly = phone.replace(/\D/g, '');
-    
-    if (digitsOnly.length === 10) {
-      return `+1${digitsOnly}`;
-    } else if (digitsOnly.length > 10 && !digitsOnly.startsWith('1')) {
-      return `+${digitsOnly}`;
-    } else if (digitsOnly.length > 10 && digitsOnly.startsWith('1')) {
-      return `+${digitsOnly}`;
-    }
-    
-    return digitsOnly ? `+${digitsOnly}` : '';
-  };
+  }, []);
 
   return (
     <MainLayout>
-      <div className="flex flex-col h-[calc(100vh-64px)]">
-        <div className="flex-1 p-6 overflow-hidden">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-2xl font-bold">
-              {dialingMode === "ai" ? "AI Dialer" : "Power Dialer"}
-            </h1>
-            {!isDialing ? (
-              <div className="flex items-center gap-2">
-                {noLeadsSelectedError && (
-                  <div className="text-red-500 flex items-center gap-1 text-sm">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>Please select leads to dial</span>
-                  </div>
-                )}
-                <Button 
-                  className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg flex items-center gap-2"
-                  onClick={startDialSession}
-                >
-                  <Phone className="h-4 w-4" />
-                  Start Dialing Session
-                </Button>
-              </div>
-            ) : (
-              <Button 
-                variant="destructive"
-                className="rounded-lg flex items-center gap-2"
-                onClick={endDialingSession}
-              >
-                <PhoneOff className="h-4 w-4" />
-                End Session
-              </Button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 gap-6 h-full">
-            <Card className="shadow-sm">
-              <CardHeader className="bg-crm-blue/5 border-b pb-3">
-                <CardTitle className="text-lg font-medium flex items-center gap-2">
-                  <Phone className="h-5 w-5 text-crm-blue" />
-                  {isDialing ? 'Active Call' : (dialingMode === "ai" ? 'AI Call Dashboard' : 'Call Dashboard')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-4">
-                {isDialing ? (
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <PhoneCall className="h-5 w-5 text-green-500 animate-pulse" />
-                        <span className="font-medium">
-                          {activeCallId && leads.find(l => l.id === activeCallId) 
-                            ? `Calling ${leads.find(l => l.id === activeCallId)?.firstName} ${leads.find(l => l.id === activeCallId)?.lastName}`
-                            : 'Initializing calls...'}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={audioWebSocketReady ? "bg-green-100 text-green-800 px-3 py-1" : "bg-yellow-100 text-yellow-800 px-3 py-1"}>
-                          {audioWebSocketReady ? "Audio Stream Ready" : "Audio Connecting..."}
-                        </Badge>
-                        <Badge className="bg-blue-100 text-blue-800 px-3 py-1">
-                          Lines in use: {lineCount}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    {dialingMode === "ai" && (
-                      <Card className="border rounded-md mb-4 bg-gray-50">
-                        <CardHeader className="pb-2 pt-3 px-4 border-b">
-                          <CardTitle className="text-sm font-medium flex items-center gap-2">
-                            <Bot className="h-4 w-4 text-crm-blue" />
-                            AI Assistant
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-4">
-                          <div className="flex flex-col gap-2 text-sm">
-                            {aiResponses.map((response, index) => (
-                              <div 
-                                key={index} 
-                                className={`
-                                  ${index === aiResponses.length - 1 ? 'animate-pulse' : ''}
-                                  flex items-start gap-2
-                                `}
-                              >
-                                {index === aiResponses.length - 1 && (
-                                  <span className="block w-2 h-2 rounded-full bg-green-500 mt-2"></span>
-                                )}
-                                <p>{response}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                    
-                    <Card className="border rounded-md">
-                      <CardHeader className="pb-2 pt-3 px-4">
-                        <CardTitle className="text-sm font-medium">Activity Log</CardTitle>
-                      </CardHeader>
-                      <ScrollArea className="h-[300px] rounded-md">
-                        <div className="p-4">
-                          {activeCallId && activityLogsData[activeCallId as keyof typeof activityLogsData] ? (
-                            <div className="space-y-4">
-                              {activityLogsData[activeCallId as keyof typeof activityLogsData].map((log, index) => (
-                                <div 
-                                  key={index} 
-                                  className={`flex ${log.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                                >
-                                  <div 
-                                    className={`flex max-w-[75%] ${
-                                      log.sender === 'user' 
-                                        ? 'bg-crm-blue text-white rounded-tl-lg rounded-bl-lg rounded-tr-lg' 
-                                        : 'bg-gray-100 text-gray-800 rounded-tr-lg rounded-br-lg rounded-tl-lg'
-                                    } p-3 shadow-sm`}
-                                  >
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-center gap-2">
-                                        {log.type === 'call' && (
-                                          log.status === 'attempted' ? 
-                                            <PhoneOff className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-red-500'}`} /> : 
-                                            <PhoneIncoming className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-green-500'}`} />
-                                        )}
-                                        {log.type === 'sms' && (
-                                          <MessageSquare className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-blue-500'}`} />
-                                        )}
-                                        {log.type === 'disposition' && (
-                                          <User className={`h-4 w-4 ${log.sender === 'user' ? 'text-white' : 'text-purple-500'}`} />
-                                        )}
-                                        <span className={`font-medium text-sm ${log.sender === 'user' ? 'text-white' : 'text-gray-800'}`}>
-                                          {log.type === 'call' && `Call ${log.status}`}
-                                          {log.type === 'sms' && `Message ${log.status === 'received' ? 'received' : 'sent'}`}
-                                          {log.type === 'disposition' && 'Status Changed'}
-                                        </span>
-                                      </div>
-                                      <div className={`text-sm ${log.sender === 'user' ? 'text-white/90' : 'text-gray-700'}`}>
-                                        {log.type === 'call' && log.notes}
-                                        {log.type === 'sms' && log.content}
-                                        {log.type === 'disposition' && `From "${log.from}" to "${log.to}"`}
-                                      </div>
-                                      <div className={`text-xs ${log.sender === 'user' ? 'text-white/70' : 'text-gray-500'} mt-1 flex items-center`}>
-                                        <Clock className="h-3 w-3 mr-1" />
-                                        {log.timestamp}
-                                        {log.type === 'call' && log.duration && (
-                                          <span className="ml-2">Duration: {log.duration}</span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-10 text-gray-500">
-                              {isDialing ? 'Loading activity log...' : 'No active call selected'}
-                            </div>
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </Card>
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-[300px] gap-4">
-                    <div className="w-20 h-20 rounded-full bg-crm-blue/10 flex items-center justify-center">
-                      {dialingMode === "ai" ? (
-                        <Bot className="h-10 w-10 text-crm-blue" />
-                      ) : (
-                        <Phone className="h-10 w-10 text-crm-blue" />
-                      )}
-                    </div>
-                    <div className="text-center">
-                      <h3 className="text-lg font-medium mb-2">
-                        {dialingMode === "ai" ? "Start an AI Dialing Session" : "Start a Power Dialing Session"}
-                      </h3>
-                      <p className="text-gray-500 max-w-md">
-                        {dialingMode === "ai"
-                          ? "Let our AI assistant call leads for you. Watch and intervene only when needed."
-                          : "Call multiple leads in sequence with our power dialer. First select leads from the table below, then start dialing."
-                        }
-                      </p>
-                    </div>
-                    <Button 
-                      className={`mt-4 rounded-lg ${selectedLeads.length > 0 ? 'bg-crm-blue hover:bg-crm-blue/90' : 'bg-gray-300'}`}
-                      onClick={startDialSession}
-                      disabled={selectedLeads.length === 0}
-                    >
-                      {selectedLeads.length > 0 
-                        ? `Start Dialing (${selectedLeads.length} selected)` 
-                        : "Select Leads First"}
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="border-t p-6 bg-white">
-          <div className="mb-4 flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <h2 className="text-lg font-medium">Leads to Dial</h2>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8" 
-                onClick={handleRefreshLeads}
-                disabled={isLoading}
-              >
-                <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                <span className="sr-only">Refresh leads</span>
-              </Button>
-            </div>
-            <div className="text-sm flex items-center gap-2">
-              {noLeadsSelectedError && (
-                <div className="text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  <span>Please select leads to dial</span>
-                </div>
-              )}
-              <div className="text-gray-500">
-                {isLoading ? 'Loading leads...' : (
-                  selectedLeads.length > 0 ? 
-                  `${selectedLeads.length} leads selected` : 
-                  `${leads.length} leads available`
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-            <Table>
-              <TableHeader className="bg-crm-blue/10">
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox 
-                      checked={isAllSelected}
-                      onCheckedChange={handleSelectAllLeads}
-                      aria-label="Select all"
+      <div className="container mx-auto py-6 max-w-4xl">
+        <h1 className="text-3xl font-bold mb-6">Power Dialer</h1>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="col-span-1 md:col-span-2">
+            <CardHeader>
+              <CardTitle>Make a Call</CardTitle>
+              <CardDescription>Enter a phone number to start calling</CardDescription>
+            </CardHeader>
+            
+            <CardContent>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <div className="flex space-x-2">
+                    <Input 
+                      id="phone" 
+                      placeholder="+1 (555) 123-4567" 
+                      value={phoneNumber}
+                      onChange={e => setPhoneNumber(e.target.value)}
+                      disabled={isCallActive}
                     />
-                  </TableHead>
-                  <TableHead>Disposition</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Primary Phone</TableHead>
-                  <TableHead>Secondary Phone</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      Loading leads...
-                    </TableCell>
-                  </TableRow>
-                ) : leads.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      No leads found. Import leads to get started.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  leads.map((lead) => (
-                    <TableRow 
-                      key={lead.id} 
-                      className={`
-                        hover:bg-gray-50 
-                        ${activeCallId === lead.id ? 'bg-blue-50' : ''}
-                        ${selectedLeads.includes(lead.id!) ? 'bg-blue-50/50' : ''}
-                      `}
-                    >
-                      <TableCell>
-                        <Checkbox 
-                          checked={lead.id ? selectedLeads.includes(lead.id) : false}
-                          onCheckedChange={(checked) => lead.id && handleSelectLead(lead.id, !!checked)}
-                          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getDispositionClass(lead.disposition || 'Not Contacted')}>
-                          {lead.disposition || 'Not Contacted'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          {lead.avatar ? (
-                            <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                          ) : (
-                            <AvatarFallback className="bg-crm-blue/10 text-crm-blue">
-                              {lead.firstName ? lead.firstName.charAt(0) : '?'}
-                            </AvatarFallback>
-                          )}
-                        </Avatar>
-                        <span>{lead.firstName} {lead.lastName}</span>
-                      </TableCell>
-                      <TableCell>{lead.email}</TableCell>
-                      <TableCell>{lead.phone1}</TableCell>
-                      <TableCell>{lead.phone2 || "-"}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </div>
-
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px] rounded-xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Dialer Settings</DialogTitle>
-            <DialogDescription>
-              You've selected {selectedLeads.length} leads to dial
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="py-4 space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-2">Dialing Mode</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <Button
-                  variant="outline"
-                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "power" ? "border-crm-blue bg-crm-blue/5" : ""}`}
-                  onClick={() => setDialingMode("power")}
-                >
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-crm-blue" />
-                    <div className="flex-1">
-                      <div className="font-medium">Power Dialer</div>
-                      <div className="text-xs text-gray-500">
-                        Manually call leads in sequence
-                      </div>
-                    </div>
-                  </div>
-                </Button>
-                <Button
-                  variant="outline"
-                  className={`justify-start text-left h-auto py-3 rounded-lg ${dialingMode === "ai" ? "border-crm-blue bg-crm-blue/5" : ""}`}
-                  onClick={() => setDialingMode("ai")}
-                >
-                  <div className="flex items-center gap-2">
-                    <Bot className="h-5 w-5 text-crm-blue" />
-                    <div className="flex-1">
-                      <div className="font-medium">AI Dialer</div>
-                      <div className="text-xs text-gray-500">
-                        AI assistant handles calls
-                      </div>
-                    </div>
-                  </div>
-                </Button>
-              </div>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Concurrent Lines</h3>
-              <ToggleGroup 
-                type="single" 
-                value={lineCount}
-                onValueChange={(value) => {
-                  if (value) setLineCount(value);
-                }}
-                className="justify-start border rounded-lg p-1"
-              >
-                <ToggleGroupItem value="1" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone className="h-4 w-4" />
-                  <span>1 Line</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="2" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone2 className="h-4 w-4" />
-                  <span>2 Lines</span>
-                </ToggleGroupItem>
-                <ToggleGroupItem value="3" className="data-[state=on]:bg-crm-blue data-[state=on]:text-white rounded gap-1">
-                  <Phone3 className="h-4 w-4" />
-                  <span>3 Lines</span>
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-            
-            <div>
-              <h3 className="text-sm font-medium mb-2">Audio Output Device</h3>
-              <div className="space-y-2">
-                <Select
-                  value={currentAudioDevice}
-                  onValueChange={handleAudioDeviceChange}
-                  disabled={isLoadingDevices}
-                >
-                  <SelectTrigger className="w-full">
-                    <div className="flex items-center gap-2">
-                      <Speaker className="h-4 w-4" />
-                      <SelectValue placeholder="Select audio device" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {audioDevices.length === 0 ? (
-                      <SelectItem value="default" disabled>No audio devices found</SelectItem>
+                    {!isCallActive ? (
+                      <Button 
+                        onClick={handleMakeCall} 
+                        disabled={isLoading || !phoneNumber.trim()}
+                        className="min-w-[100px]"
+                      >
+                        {isLoading ? (
+                          "Calling..."
+                        ) : (
+                          <>
+                            <Phone className="mr-2 h-4 w-4" /> Call
+                          </>
+                        )}
+                      </Button>
                     ) : (
-                      audioDevices.map(device => (
-                        <SelectItem key={device.deviceId} value={device.deviceId}>
-                          {formatDeviceName(device)}
-                        </SelectItem>
-                      ))
+                      <Button 
+                        variant="destructive" 
+                        onClick={handleEndCall}
+                        className="min-w-[100px]"
+                      >
+                        End Call
+                      </Button>
                     )}
-                  </SelectContent>
-                </Select>
+                  </div>
+                </div>
                 
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={loadAudioDevices}
-                    disabled={isLoadingDevices}
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingDevices ? 'animate-spin' : ''}`} />
-                    {isLoadingDevices ? 'Refreshing...' : 'Refresh Devices'}
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={testSelectedAudio}
-                  >
-                    <Speaker className="h-4 w-4 mr-2" />
-                    Test Audio
-                  </Button>
+                {isCallActive && (
+                  <div className="mt-4 p-3 bg-muted rounded-md">
+                    <p className="text-center font-medium">
+                      {activeCallSid ? (
+                        <>Call in progress • {formatDuration(callDuration)}</>
+                      ) : (
+                        <>Connecting call...</>
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+            
+            <CardFooter className="flex justify-center">
+              {isCallActive && (
+                <CallControl 
+                  isMuted={isMuted} 
+                  speakerOn={speakerOn}
+                  onMuteToggle={handleMuteToggle}
+                  onSpeakerToggle={handleSpeakerToggle}
+                  onEndCall={handleEndCall}
+                  audioStreaming={!!activeStreamSid}
+                  onAudioDeviceChange={handleAudioDeviceChange}
+                  streamSid={activeStreamSid}
+                />
+              )}
+            </CardFooter>
+          </Card>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Call Status</CardTitle>
+              <CardDescription>Current call information</CardDescription>
+            </CardHeader>
+            
+            <CardContent>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Status:</span>
+                  <span className="font-medium">
+                    {isCallActive ? (
+                      <span className="text-green-500">Active</span>
+                    ) : (
+                      <span className="text-muted-foreground">Idle</span>
+                    )}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Duration:</span>
+                  <span className="font-medium">{formatDuration(callDuration)}</span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Audio Streaming:</span>
+                  <span className="font-medium">
+                    {activeStreamSid ? (
+                      <span className="text-green-500">Connected</span>
+                    ) : (
+                      <span className="text-muted-foreground">Inactive</span>
+                    )}
+                  </span>
+                </div>
+                
+                <div className="flex justify-between">
+                  <span className="text-sm text-muted-foreground">Microphone:</span>
+                  <span className="font-medium">
+                    {isMuted ? (
+                      <span className="text-amber-500">Muted</span>
+                    ) : (
+                      <span>Active</span>
+                    )}
+                  </span>
                 </div>
               </div>
-            </div>
-          </div>
-          
-          <DialogFooter className="flex sm:justify-between gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-crm-blue hover:bg-crm-blue/90"
-              onClick={startDialing}
-            >
-              Start Dialing
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Hidden but active audio player */}
+        {activeStreamSid && (
+          <TwilioAudioPlayer 
+            streamSid={activeStreamSid}
+            isActive={isCallActive}
+            deviceId={speakerOn ? undefined : 'default'}
+          />
+        )}
+      </div>
     </MainLayout>
   );
-};
-
-export default PowerDialer;
+}
