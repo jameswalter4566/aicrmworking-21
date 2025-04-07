@@ -171,14 +171,18 @@ serve(async (req) => {
       try {
         console.log(`Making call to ${phoneNumber}`);
         
-        const streamUrl = requestData.streamUrl || `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
+        // IMPORTANT: Use wss:// protocol for WebSocket stream URL, not https://
+        // Extract the host from the request URL to construct the WebSocket URL
+        const requestUrl = new URL(req.url);
+        const host = requestUrl.hostname;
+        const streamUrl = `wss://${host}/functions/v1/twilio-stream`;
         console.log(`Using stream URL: ${streamUrl}`);
         
         const call = await client.calls.create({
           to: phoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          url: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(phoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
-          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`,
+          url: `https://${host}/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(phoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
+          statusCallback: `https://${host}/functions/v1/twilio-voice?action=statusCallback`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
           machineDetection: 'DetectMessageEnd',
@@ -211,46 +215,41 @@ serve(async (req) => {
       console.log(`Generating TwiML for call to ${phoneNumber}`);
       console.log(`Stream URL: ${streamUrl}`);
       
-      // Create TwiML for the call
+      if (!streamUrl) {
+        console.error("No stream URL provided in handleVoice action");
+        return new Response(
+          JSON.stringify({ success: false, error: 'Stream URL is required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Create TwiML for the call using the Voice Response object
       const twiml = new twilio.twiml.VoiceResponse();
       
-      // Add some audio playback
+      // Add some initial audio playback
       twiml.say("Hello! This call is being processed by our system. Please wait while we connect you.");
       
       // Add a pause to keep the call open
       twiml.pause({ length: 2 });
       
-      // Using standard <Connect> with a websocket
-      if (streamUrl) {
-        console.log("Setting up websocket connection");
-        
-        // Use Connect verb for websocket
-        const connect = twiml.connect();
-        
-        // Make sure we're checking if the stream method exists
-        if (connect.stream) {
-          connect.stream({ url: streamUrl });
-          console.log("Added stream to connect");
-        } else {
-          console.error("connect.stream method not available");
-          // Fallback if stream method is not available
-          twiml.say("Sorry, streaming is not available. Please try again later.");
-        }
-        
-        // Add pause to keep the call open
-        twiml.pause({ length: 30 });
-        
-        // Add another message
-        twiml.say("Still connected. The audio stream should be active.");
-        
-        // Add another long pause to keep the call open
-        twiml.pause({ length: 60 });
-        
-        // Final message before hanging up
-        twiml.say("Thank you for testing the audio streaming. Goodbye!");
-      } else {
-        twiml.say("Sorry, we encountered a technical issue. Please try again later.");
-      }
+      // Using Connect with a Stream
+      const connect = twiml.connect();
+      connect.stream({
+        url: streamUrl,
+        track: "both_tracks"
+      });
+      
+      // Add a pause to keep the call open if needed
+      twiml.pause({ length: 30 });
+      
+      // Add another message
+      twiml.say("Still connected. The audio stream should be active.");
+      
+      // Add another long pause to keep the call open
+      twiml.pause({ length: 60 });
+      
+      // Final message before hanging up
+      twiml.say("Thank you for testing the audio streaming. Goodbye!");
       
       const generatedTwiML = twiml.toString();
       console.log("Generated TwiML:", generatedTwiML);
@@ -279,7 +278,7 @@ serve(async (req) => {
       console.log(`Call ${callSid} status: ${callStatus}`);
       console.log("Status callback parameters:", callbackData);
       
-      // Return a valid TwiML response
+      // Return a valid TwiML response (properly formatted XML)
       const twimlResponse = new twilio.twiml.VoiceResponse();
       return new Response(twimlResponse.toString(), {
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
