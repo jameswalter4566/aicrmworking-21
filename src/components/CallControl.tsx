@@ -13,8 +13,6 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { audioProcessing } from '@/services/audioProcessing';
-import { twilioAudioHandler } from '@/services/TwilioAudioHandler';
-import { TwilioAudioDebug } from './TwilioAudioDebug';
 
 interface CallControlProps {
   isMuted: boolean;
@@ -42,7 +40,6 @@ const CallControl: React.FC<CallControlProps> = ({
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const [showDebugView, setShowDebugView] = useState<boolean>(false);
   
   // Initialize audio devices and connection
   useEffect(() => {
@@ -73,11 +70,10 @@ const CallControl: React.FC<CallControlProps> = ({
       }
     });
     
-    // Set up audio level monitoring
+    // Set up audio level simulation for connected calls
     const interval = setInterval(() => {
       if (audioStreaming) {
         setAudioLevel(prev => {
-          // If we're actively streaming, simulate realistic audio levels
           const change = (Math.random() - 0.5) * 0.3;
           const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
           return newLevel;
@@ -86,12 +82,6 @@ const CallControl: React.FC<CallControlProps> = ({
         setAudioLevel(0);
       }
     }, 200);
-    
-    // Handle device change events from TwilioAudioHandler
-    twilioAudioHandler.onDeviceChange(() => {
-      console.log("Device change detected, refreshing audio devices");
-      loadAudioDevices();
-    });
     
     return () => {
       clearInterval(interval);
@@ -102,31 +92,25 @@ const CallControl: React.FC<CallControlProps> = ({
     try {
       setIsRefreshing(true);
       
-      // First try to get devices from TwilioAudioHandler
-      let devices = twilioAudioHandler.getOutputDevices();
-      
-      // If that fails, fall back to browser API
-      if (!devices || devices.length === 0) {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-          console.warn("This browser doesn't support device enumeration");
-          toast({
-            title: "Audio Device Error",
-            description: "This browser doesn't support audio device selection.",
-            variant: "destructive"
-          });
-          return;
-        }
-        
-        await navigator.mediaDevices.getUserMedia({ audio: true })
-          .catch(err => {
-            console.warn("Could not get microphone access:", err);
-          });
-        
-        const browserDevices = await navigator.mediaDevices.enumerateDevices();
-        devices = browserDevices.filter(device => device.kind === 'audiooutput');
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        console.warn("This browser doesn't support device enumeration");
+        toast({
+          title: "Audio Device Error",
+          description: "This browser doesn't support audio device selection.",
+          variant: "destructive"
+        });
+        return;
       }
       
-      if (devices.length === 0) {
+      await navigator.mediaDevices.getUserMedia({ audio: true })
+        .catch(err => {
+          console.warn("Could not get microphone access:", err);
+        });
+      
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
+      
+      if (audioOutputs.length === 0) {
         toast({
           title: "No Audio Devices",
           description: "No audio output devices detected. Please check your system settings.",
@@ -134,15 +118,15 @@ const CallControl: React.FC<CallControlProps> = ({
         });
       }
       
-      setAudioDevices(devices);
+      setAudioDevices(audioOutputs);
       
-      if (devices.length > 0 && !selectedDeviceId) {
-        const defaultDevice = devices.find(d => d.deviceId === 'default') || devices[0];
+      if (audioOutputs.length > 0 && !selectedDeviceId) {
+        const defaultDevice = audioOutputs.find(d => d.deviceId === 'default') || audioOutputs[0];
         setSelectedDeviceId(defaultDevice.deviceId);
         if (onAudioDeviceChange) onAudioDeviceChange(defaultDevice.deviceId);
       }
       
-      console.log("Available audio output devices:", devices.map(d => ({ 
+      console.log("Available audio output devices:", audioOutputs.map(d => ({ 
         label: d.label || 'Unknown Device', 
         deviceId: d.deviceId
       })));
@@ -166,33 +150,16 @@ const CallControl: React.FC<CallControlProps> = ({
     if (onAudioDeviceChange) {
       onAudioDeviceChange(deviceId);
       
-      // First try with TwilioAudioHandler
-      twilioAudioHandler.setOutputDevice(deviceId)
-        .then(success => {
-          if (success) {
-            return twilioAudioHandler.testAudioOutput();
-          }
-          return false;
-        })
-        .then(success => {
-          if (success) {
-            toast({
-              title: "Audio Device Selected",
-              description: "Test tone played through the selected device.",
-            });
-          } else {
-            // Fall back to audioProcessing for testing audio
-            return audioProcessing.testAudio(deviceId);
-          }
-        })
-        .catch(err => {
-          console.error("Error setting audio device:", err);
-        });
+      // Test the selected audio device
+      audioProcessing.testAudio(deviceId).then(success => {
+        if (success) {
+          toast({
+            title: "Audio Device Selected",
+            description: "Test tone played through the selected device.",
+          });
+        }
+      });
     }
-  };
-
-  const toggleDebugView = () => {
-    setShowDebugView(!showDebugView);
   };
   
   return (
@@ -235,27 +202,16 @@ const CallControl: React.FC<CallControlProps> = ({
             <Headphones className="h-3.5 w-3.5" />
             <span>Audio output device</span>
           </label>
-          <div className="flex gap-1">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-6 w-6" 
-              onClick={loadAudioDevices}
-              disabled={isRefreshing}
-              title="Refresh audio devices"
-            >
-              <RefreshCcw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={toggleDebugView}
-              title={showDebugView ? "Hide audio debug info" : "Show audio debug info"}
-            >
-              {showDebugView ? "−" : "+"}
-            </Button>
-          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-6 w-6" 
+            onClick={loadAudioDevices}
+            disabled={isRefreshing}
+            title="Refresh audio devices"
+          >
+            <RefreshCcw className={cn("h-3.5 w-3.5", isRefreshing && "animate-spin")} />
+          </Button>
         </div>
         
         <Select value={selectedDeviceId} onValueChange={handleDeviceChange}>
@@ -275,16 +231,6 @@ const CallControl: React.FC<CallControlProps> = ({
           </SelectContent>
         </Select>
       </div>
-      
-      {showDebugView && (
-        <div className="w-full max-w-xs">
-          <TwilioAudioDebug 
-            callActive={audioStreaming}
-            deviceId={selectedDeviceId}
-            onDeviceChange={handleDeviceChange}
-          />
-        </div>
-      )}
       
       {audioStreaming ? (
         <div className="flex flex-col items-center gap-2 w-full max-w-xs">
