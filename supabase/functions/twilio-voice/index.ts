@@ -33,35 +33,72 @@ serve(async (req) => {
     const url = new URL(req.url);
     let action = url.searchParams.get('action');
     
+    // Clone request to safely read body multiple times if needed
+    const reqClone = req.clone();
+    
     // Parse request data
-    let requestData = {};
-    try {
-      const text = await req.text();
-      console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''));
-      if (text && text.trim()) {
-        try {
-          requestData = JSON.parse(text);
-          
-          // If no action in URL, try to get it from the request body
-          if (!action && requestData.action) {
-            action = requestData.action;
-          }
-        } catch (e) {
-          // If parsing as JSON fails, it might be form data
-          console.log("Not JSON, trying to parse as form data");
-          const formData = new URLSearchParams(text);
-          formData.forEach((value, key) => {
-            // @ts-ignore
-            requestData[key] = value;
-          });
-        }
+    let requestData: Record<string, any> = {};
+    
+    // Check content type to determine how to parse the body
+    const contentType = req.headers.get('content-type') || '';
+    
+    if (contentType.includes('application/json')) {
+      try {
+        // Parse JSON data
+        requestData = await reqClone.json();
+        console.log("Parsed JSON request data:", JSON.stringify(requestData).substring(0, 200));
+      } catch (e) {
+        console.error("Failed to parse JSON body:", e);
       }
-    } catch (e) {
-      console.error("Failed to parse request body:", e);
+    } else if (contentType.includes('application/x-www-form-urlencoded')) {
+      // Parse form data
+      try {
+        const formText = await reqClone.text();
+        console.log("Received form data:", formText.substring(0, 200) + (formText.length > 200 ? '...' : ''));
+        
+        const params = new URLSearchParams(formText);
+        params.forEach((value, key) => {
+          requestData[key] = value;
+        });
+        
+        console.log("Parsed form data:", Object.keys(requestData).length, "fields");
+      } catch (e) {
+        console.error("Failed to parse form data:", e);
+      }
+    } else {
+      // Try to parse as text and check if it can be processed
+      try {
+        const text = await reqClone.text();
+        console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''));
+        
+        if (text && text.trim()) {
+          try {
+            // Try parsing as JSON
+            requestData = JSON.parse(text);
+            console.log("Successfully parsed text as JSON");
+          } catch (e) {
+            // If not JSON, try parsing as form data
+            console.log("Not JSON, trying to parse as form data");
+            const params = new URLSearchParams(text);
+            params.forEach((value, key) => {
+              requestData[key] = value;
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse request body:", e);
+      }
     }
     
     console.log("Action from URL params:", url.searchParams.get('action'));
     console.log("Action from request body:", requestData.action);
+    console.log("Final action being used:", action || requestData.action);
+
+    // If no action in URL, try to get it from the request body
+    if (!action && requestData.action) {
+      action = requestData.action;
+    }
+    
     console.log("Final action being used:", action);
 
     // Get Twilio credentials
@@ -174,18 +211,6 @@ serve(async (req) => {
       console.log(`Generating TwiML for call to ${phoneNumber}`);
       console.log(`Stream URL: ${streamUrl}`);
       
-      // Parse form data if available
-      let formData = {};
-      if (req.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
-        const formText = await req.text();
-        const params = new URLSearchParams(formText);
-        params.forEach((value, key) => {
-          // @ts-ignore
-          formData[key] = value;
-        });
-        console.log("Call parameters from form:", formData);
-      }
-      
       // Create TwiML for the call
       const twiml = new twilio.twiml.VoiceResponse();
       
@@ -201,7 +226,16 @@ serve(async (req) => {
         
         // Use Connect verb for websocket
         const connect = twiml.connect();
-        connect.stream({ url: streamUrl });
+        
+        // Make sure we're checking if the stream method exists
+        if (connect.stream) {
+          connect.stream({ url: streamUrl });
+          console.log("Added stream to connect");
+        } else {
+          console.error("connect.stream method not available");
+          // Fallback if stream method is not available
+          twiml.say("Sorry, streaming is not available. Please try again later.");
+        }
         
         // Add pause to keep the call open
         twiml.pause({ length: 30 });
@@ -218,36 +252,38 @@ serve(async (req) => {
         twiml.say("Sorry, we encountered a technical issue. Please try again later.");
       }
       
-      console.log("Generated TwiML:", twiml.toString());
+      const generatedTwiML = twiml.toString();
+      console.log("Generated TwiML:", generatedTwiML);
       
-      return new Response(twiml.toString(), {
+      return new Response(generatedTwiML, {
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
       });
     }
     else if (action === 'statusCallback') {
-      // Handle call status callbacks
-      console.log("Status callback received, parsing form data");
+      // Handle call status callbacks with improved error handling
+      console.log("Status callback received");
       
-      let callbackData = {};
-      if (req.headers.get('content-type')?.includes('application/x-www-form-urlencoded')) {
-        const formText = await req.text();
-        const params = new URLSearchParams(formText);
-        params.forEach((value, key) => {
-          // @ts-ignore
-          callbackData[key] = value;
-        });
-      }
+      let callbackData: Record<string, any> = {};
       
-      const callStatus = callbackData.CallStatus || requestData.CallStatus;
-      const callSid = callbackData.CallSid || requestData.CallSid;
+      // Extract data from both URL query parameters and request body
+      url.searchParams.forEach((value, key) => {
+        callbackData[key] = value;
+      });
+      
+      // Merge with request data
+      callbackData = { ...callbackData, ...requestData };
+      
+      const callStatus = callbackData.CallStatus;
+      const callSid = callbackData.CallSid;
       
       console.log(`Call ${callSid} status: ${callStatus}`);
       console.log("Status callback parameters:", callbackData);
       
-      return new Response(
-        JSON.stringify({ success: true, message: `Call status recorded: ${callStatus}` }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Return a valid TwiML response
+      const twimlResponse = new twilio.twiml.VoiceResponse();
+      return new Response(twimlResponse.toString(), {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+      });
     }
     else if (action === 'checkStatus') {
       // Check the status of a call
@@ -277,6 +313,34 @@ serve(async (req) => {
         );
       }
     }
+    else if (action === 'endCall') {
+      // End an active call
+      const { callSid } = requestData;
+      
+      if (!callSid) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Call SID is required' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      try {
+        console.log(`Ending call ${callSid}`);
+        
+        await client.calls(callSid).update({ status: 'completed' });
+        
+        return new Response(
+          JSON.stringify({ success: true, message: 'Call ended' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      } catch (error) {
+        console.error(`Error ending call ${callSid}:`, error);
+        return new Response(
+          JSON.stringify({ success: false, error: error.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
     else {
       // Default response for unknown actions
       return new Response(
@@ -286,9 +350,12 @@ serve(async (req) => {
     }
   } catch (error) {
     console.error('Error in function:', error);
-    return new Response(
-      JSON.stringify({ success: false, error: 'Internal server error', details: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    
+    // Return a simple valid TwiML response for error cases to avoid Twilio errors
+    const errorTwiml = new twilio.twiml.VoiceResponse();
+    return new Response(errorTwiml.toString(), {
+      status: 200, // Return 200 even on error to prevent Twilio error loops
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+    });
   }
 });
