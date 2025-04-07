@@ -531,8 +531,7 @@ export const useTwilio = () => {
     
     setupWebSocket();
     
-    // Always use browser dialing - explicitly enforced for Power Dialer
-    const result = await twilioService.makeCall(phoneNumber, true); // Force browser calling
+    const result = await twilioService.makeCall(phoneNumber);
     
     if (result.success && result.callSid) {
       const leadIdStr = String(leadId);
