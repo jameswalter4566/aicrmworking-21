@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import twilio from 'npm:twilio@4.23.0';
 
@@ -11,6 +10,24 @@ const corsHeaders = {
 };
 
 console.log("Twilio Voice function loaded and ready");
+
+// Debugging helper function
+function debugTwiML(twiml: any) {
+  try {
+    const twimlString = twiml.toString();
+    console.log("Generated TwiML:", twimlString);
+    
+    // Validate TwiML structure
+    if (!twimlString.includes("<Conference>")) {
+      console.warn("WARNING: TwiML does not contain <Conference> tag!");
+    }
+    
+    return twimlString;
+  } catch (err) {
+    console.error("Error debugging TwiML:", err);
+    throw err;
+  }
+}
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Voice function`);
@@ -217,6 +234,8 @@ serve(async (req) => {
           statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
           statusCallbackEvent: ['join', 'leave', 'end', 'start'],
           endConferenceOnExit: true,
+          waitUrl: "http://twimlets.com/holdmusic?Bucket=com.twilio.music.classical",
+          waitMethod: "GET",
         };
 
         // First make the outbound call to the phone number
@@ -225,14 +244,19 @@ serve(async (req) => {
         twiml.say("Hello! You're receiving a call from the Power Dialer. Please wait while we connect you.");
         twiml.conference('power-dialer-conference', conferenceOptions);
         
+        // Debug the generated TwiML
+        const twimlString = debugTwiML(twiml);
+        
         const call = await client.calls.create({
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          twiml: twiml.toString(),
+          twiml: twimlString,
           statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
         });
+        
+        console.log(`Phone call initiated with SID: ${call.sid} to ${formattedPhoneNumber}`);
         
         // Now if we have a browser client, make a second call to connect that client
         if (browserClientName) {
@@ -243,16 +267,19 @@ serve(async (req) => {
           browserTwiml.say("Connecting you to the call...");
           browserTwiml.conference('power-dialer-conference', conferenceOptions);
           
+          // Debug the generated browser TwiML
+          const browserTwimlString = debugTwiML(browserTwiml);
+          
           const browserCall = await client.calls.create({
             to: `client:${browserClientName}`,
             from: TWILIO_PHONE_NUMBER,
-            twiml: browserTwiml.toString(),
+            twiml: browserTwimlString,
             statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
           
-          console.log(`Browser call initiated with SID: ${browserCall.sid}`);
+          console.log(`Browser call initiated with SID: ${browserCall.sid} to client:${browserClientName}`);
           
           return new Response(
             JSON.stringify({ 
@@ -264,8 +291,6 @@ serve(async (req) => {
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        
-        console.log(`Call initiated with SID: ${call.sid}`);
         
         return new Response(
           JSON.stringify({ success: true, callSid: call.sid }),

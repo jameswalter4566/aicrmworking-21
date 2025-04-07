@@ -18,7 +18,7 @@ interface TwilioCallResult {
 }
 
 interface TwilioCall {
-  status(): string;
+  status: () => string;
   parameters?: {
     CallSid?: string;
     [key: string]: any;
