@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
 import twilio from 'npm:twilio@4.23.0'
 
@@ -31,90 +32,98 @@ function normalizePhoneNumber(phoneNumber: string): string {
   return digitsOnly ? `+${digitsOnly}` : '';
 }
 
-// FIX: Completely revised TwiML generation for voice calls
-// Based on Twilio's latest recommendations for media streams
-function generateCallTwiML(phoneNumber: string, streamUrl: string): string {
-  const twimlResponse = new twilio.twiml.VoiceResponse();
-  
-  // Add initial greeting
-  twimlResponse.say({ 
-    voice: 'alice',
-    language: 'en-US' 
-  }, 'Connecting your call now.');
-  
-  // First set up the dial - this should come BEFORE the stream for better audio flow
-  if (phoneNumber) {
-    const formattedNumber = normalizePhoneNumber(phoneNumber);
+// Enhanced error handling wrapper for TwiML generation
+function safeGenerateCallTwiML(phoneNumber: string, streamUrl: string): string {
+  try {
+    console.log(`Generating TwiML for call to ${phoneNumber} with stream URL ${streamUrl}`);
     
-    twimlResponse.dial({
-      callerId: Deno.env.get('TWILIO_PHONE_NUMBER'),
-      answerOnBridge: true, // Important for maintaining connection
-      timeout: 30
-    }).number({
-      statusCallbackEvent: ['answered', 'completed'],
-      statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
-    }, formattedNumber);
+    const twimlResponse = new twilio.twiml.VoiceResponse();
+    
+    // Add initial greeting
+    twimlResponse.say({ 
+      voice: 'alice',
+      language: 'en-US' 
+    }, 'Connecting your call now.');
+    
+    // Add the stream - put this first for better connection timing
+    twimlResponse.stream({
+      url: streamUrl,
+      track: 'both_tracks', // Capture both inbound and outbound audio
+      name: 'browser_call'
+    });
+    
+    // Then set up the dial - this order seems to work better for audio flow
+    if (phoneNumber) {
+      const formattedNumber = normalizePhoneNumber(phoneNumber);
+      
+      twimlResponse.dial({
+        callerId: Deno.env.get('TWILIO_PHONE_NUMBER'),
+        answerOnBridge: true, // Important for maintaining connection
+        timeout: 30
+      }).number({
+        statusCallbackEvent: ['answered', 'completed'],
+        statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
+      }, formattedNumber);
+    }
+    
+    const twimlString = twimlResponse.toString();
+    console.log("Generated TwiML:", twimlString);
+    
+    return twimlString;
+  } catch (e) {
+    console.error("Error generating TwiML:", e);
+    // Return simple TwiML that won't error
+    const fallbackTwiml = new twilio.twiml.VoiceResponse();
+    fallbackTwiml.say('Sorry, we encountered a technical issue. Please try again later.');
+    return fallbackTwiml.toString();
   }
-  
-  // IMPORTANT: Now add the stream element for audio streaming
-  twimlResponse.stream({
-    url: streamUrl,
-    track: 'both_tracks', // Capture both inbound and outbound tracks
-    name: 'browser_call'
-  });
-  
-  // Output the TwiML for debugging
-  const twimlString = twimlResponse.toString();
-  console.log("Generated TwiML:", twimlString);
-  
-  return twimlString;
 }
 
 serve(async (req) => {
   // CRITICAL: Log every request in detail to diagnose auth issues
   console.log(`======== NEW REQUEST ${new Date().toISOString()} ========`);
-  console.log(`Received ${req.method} request to Twilio Voice function`)
-  console.log(`Request URL: ${req.url}`)
+  console.log(`Received ${req.method} request to Twilio Voice function`);
+  console.log(`Request URL: ${req.url}`);
   
   // Log all headers for debugging
   const headerEntries = [...req.headers.entries()];
   console.log(`Request headers (${headerEntries.length}):`, JSON.stringify(headerEntries));
   
-  // CRITICAL: Always handle preflight requests properly first
-  if (req.method === 'OPTIONS') {
-    console.log("Handling OPTIONS preflight request")
-    return new Response(null, { 
-      status: 204,
-      headers: corsHeaders
-    })
-  }
-
   try {
-    // Parse request data - enhanced for more robust parsing
-    let requestData: any = {}
+    // CRITICAL: Always handle preflight requests properly first
+    if (req.method === 'OPTIONS') {
+      console.log("Handling OPTIONS preflight request");
+      return new Response(null, { 
+        status: 204,
+        headers: corsHeaders
+      });
+    }
+
+    // Enhanced request parsing with better error handling
+    let requestData: any = {};
     
     try {
       const contentType = req.headers.get('content-type') || '';
-      console.log(`Request content-type: ${contentType}`)
+      console.log(`Request content-type: ${contentType}`);
       
       if (contentType.includes('application/json')) {
         // Handle JSON data
         const text = await req.text();
-        console.log("Received JSON text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
+        console.log("Received JSON text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''));
         if (text && text.trim()) {
           requestData = JSON.parse(text);
         }
       } else if (contentType.includes('application/x-www-form-urlencoded')) {
         // Handle form data from Twilio
         const formData = await req.formData();
-        console.log("Received form data with fields:", Array.from(formData.keys()).join(', '))
+        console.log("Received form data with fields:", Array.from(formData.keys()).join(', '));
         for (const [key, value] of formData.entries()) {
           requestData[key] = value;
         }
       } else {
         // Try to parse as text and then as JSON
         const text = await req.text();
-        console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''))
+        console.log("Received text:", text.substring(0, 200) + (text.length > 200 ? '...' : ''));
         if (text && text.trim()) {
           try {
             requestData = JSON.parse(text);
@@ -140,28 +149,22 @@ serve(async (req) => {
     } catch (e) {
       console.error("Failed to parse request body:", e);
       return new Response(
-        JSON.stringify({ error: 'Invalid request body' }),
+        JSON.stringify({ error: 'Invalid request body', details: e.message }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Get Twilio credentials - added extra logging to trace issues
-    console.log("Attempting to retrieve Twilio credentials from environment");
+    console.log("Retrieving Twilio credentials from environment");
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
-    const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID');
-    const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY');
-    const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET');
     
     // Log credential availability (not the values themselves)
     console.log("Twilio credentials loaded:", {
       accountSidAvailable: !!TWILIO_ACCOUNT_SID,
       authTokenAvailable: !!TWILIO_AUTH_TOKEN,
-      phoneNumberAvailable: !!TWILIO_PHONE_NUMBER,
-      twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID,
-      apiKeyAvailable: !!TWILIO_API_KEY,
-      apiSecretAvailable: !!TWILIO_API_SECRET
+      phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
     
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN || !TWILIO_PHONE_NUMBER) {
@@ -179,38 +182,17 @@ serve(async (req) => {
       );
     }
 
-    // Validate Twilio Account SID format (should start with 'AC')
-    if (!TWILIO_ACCOUNT_SID.startsWith('AC')) {
-      console.error("Invalid Twilio Account SID format - should start with 'AC'");
-      return new Response(
-        JSON.stringify({ 
-          error: 'Invalid Twilio Account SID format', 
-          hint: 'Should start with AC'
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    // Initialize Twilio client
     let client;
     try {
       client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
       console.log("Twilio client initialized successfully");
-      
-      // Verify credentials with a small test API call
-      try {
-        const account = await client.api.accounts(TWILIO_ACCOUNT_SID).fetch();
-        console.log("Twilio credentials verified successfully:", account.friendlyName);
-      } catch (verifyError) {
-        console.error("Failed to verify Twilio credentials:", verifyError);
-        // Continue anyway - we'll catch actual API errors later
-      }
     } catch (err) {
       console.error("Error initializing Twilio client:", err);
       return new Response(
         JSON.stringify({ 
           error: 'Failed to initialize Twilio client', 
-          twilioError: err.message || String(err),
-          suggestion: "Check your Twilio credentials in Supabase secrets"
+          twilioError: err.message || String(err)
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -220,7 +202,7 @@ serve(async (req) => {
     const action = requestData.action;
     const phoneNumber = requestData.phoneNumber || requestData.To;
 
-    console.log(`Processing ${action} action with phone ${phoneNumber}`);
+    console.log(`Processing ${action || 'default'} action with phone ${phoneNumber}`);
 
     if (action === 'makeCall') {
       if (!phoneNumber) {
@@ -242,10 +224,9 @@ serve(async (req) => {
         );
       }
       
-      // Set WebSocket URL for audio stream - make sure this is exactly the stream URL you need
+      // Set WebSocket URL for audio stream
       const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
       
-      // FIX: Don't use twiml parameter with makeCall - specify individual params instead
       const callOptions = {
         to: formattedPhoneNumber,
         from: TWILIO_PHONE_NUMBER,
@@ -295,50 +276,38 @@ serve(async (req) => {
       }
     } 
     else if (action === 'handleVoice' || !action) {
-      // Extract stream URL from query parameters if available
-      const url = new URL(req.url);
-      const streamUrl = url.searchParams.get('streamUrl') || `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
-      const phoneNumberParam = url.searchParams.get('phoneNumber') || phoneNumber;
-      
-      console.log(`Handling voice with streamUrl=${streamUrl} and phoneNumber=${phoneNumberParam}`);
-      
-      let twiml;
-      if (requestData.Caller && requestData.Caller.startsWith('client:')) {
-        // Browser to phone call
-        console.log("Browser to phone call - setting up bidirectional stream");
-        twiml = generateCallTwiML(phoneNumberParam, streamUrl);
-      } 
-      else if (phoneNumberParam && phoneNumberParam.startsWith('client:')) {
-        // Phone to browser call
-        console.log("Phone to browser call - setting up bidirectional stream");
-        const twimlResponse = new twilio.twiml.VoiceResponse();
+      try {
+        // Extract stream URL from query parameters if available
+        const url = new URL(req.url);
+        const streamUrl = url.searchParams.get('streamUrl') || `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
+        const phoneNumberParam = url.searchParams.get('phoneNumber') || phoneNumber;
         
-        twimlResponse.say({ voice: 'alice' }, 'Connecting to browser client.');
+        console.log(`Handling voice with streamUrl=${streamUrl} and phoneNumber=${phoneNumberParam}`);
         
-        const connect = twimlResponse.connect();
-        connect.stream({
-          url: streamUrl,
-          track: 'both_tracks',
-          name: 'phone_call'
+        // Generate TwiML with fallback handling
+        const twiml = safeGenerateCallTwiML(phoneNumberParam, streamUrl);
+        
+        console.log("Returning TwiML response");
+        return new Response(twiml, { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'text/xml' 
+          } 
         });
+      } catch (error) {
+        console.error("Error in handleVoice:", error);
         
-        twimlResponse.dial({
-          answerOnBridge: true,
-          callerId: TWILIO_PHONE_NUMBER
-        }).client({
-          statusCallbackEvent: ['answered', 'completed'],
-          statusCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=statusCallback`
-        }, phoneNumberParam.replace('client:', ''));
+        // Provide a fallback TwiML that won't error
+        const fallbackTwiml = new twilio.twiml.VoiceResponse();
+        fallbackTwiml.say('Sorry, there was an error processing your call. Please try again later.');
         
-        twiml = twimlResponse.toString();
-      } else {
-        // Standard phone call with streamUrl
-        console.log("Standard phone call with bidirectional streaming");
-        twiml = generateCallTwiML(phoneNumberParam, streamUrl);
+        return new Response(fallbackTwiml.toString(), { 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'text/xml' 
+          } 
+        });
       }
-      
-      console.log("Generated TwiML:", twiml);
-      return new Response(twiml, { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } });
     }
     else if (action === 'streamStatus') {
       // Handle stream status callbacks
@@ -450,14 +419,18 @@ serve(async (req) => {
     }
     else {
       return new Response(
-        JSON.stringify({ error: 'Invalid action' }),
+        JSON.stringify({ error: 'Invalid action', action: action }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({ 
+        error: 'Internal server error', 
+        details: error.message,
+        stack: error.stack
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
