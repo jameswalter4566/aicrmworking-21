@@ -282,15 +282,18 @@ class TwilioService {
           
           console.log('Browser-based call connected:', call);
           
-          // Fix: Add type check before accessing call.parameters.CallSid
-          const callSid = call.parameters && call.parameters.CallSid ? call.parameters.CallSid : undefined;
+          // Ensure we have a proper call object with a status method
+          const callSid = call && call.parameters && call.parameters.CallSid 
+            ? call.parameters.CallSid 
+            : 'browser-call';
+            
           if (callSid && leadId) {
             this.activeCallSids.set(leadId, callSid);
           }
           
           return { 
             success: true, 
-            callSid: callSid || 'browser-call' 
+            callSid: callSid
           };
         } catch (browserError: any) {
           console.error('Browser-based call failed:', browserError);
