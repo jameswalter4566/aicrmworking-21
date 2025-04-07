@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -33,8 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import TwilioScript from "@/components/TwilioScript";
 import { twilioService } from "@/services/twilio";
 import { useTwilio } from "@/hooks/use-twilio";
-import { TwilioDevice } from "@/types/twilio";
-import CallControls from "@/components/CallControls";
+import { CallControls } from "@/components/CallControls";
 import AudioDeviceSelector from "@/components/AudioDeviceSelector";
 
 type Lead = {
@@ -154,27 +152,27 @@ const PowerDialer = () => {
   const [isSpeakerOn, setIsSpeakerOn] = useState(true);
   
   // Twilio integration
-  const { twilioClient, device } = useTwilio();
-  const [twilioDevice, setTwilioDevice] = useState<TwilioDevice | null>(null);
+  const twilio = useTwilio();
+  const [twilioDevice, setTwilioDevice] = useState<any>(null);
   const [activeCall, setActiveCall] = useState<any>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [twilioReady, setTwilioReady] = useState(false);
   
   useEffect(() => {
-    if (device) {
-      console.log("Twilio device available:", device);
-      setTwilioDevice(device);
+    if (twilio && twilio.twilioDevice) {
+      console.log("Twilio device available:", twilio.twilioDevice);
+      setTwilioDevice(twilio.twilioDevice);
       setTwilioReady(true);
       
       // Set up event listeners
-      device.on("ready", () => console.log("Twilio device is ready"));
+      twilio.twilioDevice.on("ready", () => console.log("Twilio device is ready"));
       
       // Clean up event listeners
       return () => {
-        device.removeAllListeners();
+        twilio.twilioDevice.removeAllListeners();
       };
     }
-  }, [device]);
+  }, [twilio]);
   
   const startTimer = () => {
     if (timer) clearInterval(timer);
@@ -228,7 +226,7 @@ const PowerDialer = () => {
     
     try {
       // Generate a Twilio token
-      const token = await twilioService.getToken();
+      const token = await twilioService.generateToken();
       console.log("Got Twilio token:", token);
       
       // Initialize the dialing session
@@ -424,7 +422,7 @@ const PowerDialer = () => {
   return (
     <MainLayout>
       <div className="flex flex-col h-full">
-        <div className="flex-1 p-6 mb-4 overflow-y-auto">
+        <div className="flex-1 p-6 overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">Power Dialer</h1>
             <div>
@@ -866,7 +864,13 @@ const PowerDialer = () => {
             <DialogTitle>Audio Settings</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <AudioDeviceSelector />
+            <AudioDeviceSelector 
+              onDeviceChange={() => {}}
+              onRefreshDevices={() => {}}
+              onTestAudio={() => {}}
+              devices={[]}
+              currentDeviceId=""
+            />
           </div>
           <DialogFooter>
             <Button onClick={() => setIsSettingsOpen(false)}>
