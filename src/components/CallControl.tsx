@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones, RefreshCcw } from 'lucide-react';
@@ -14,6 +13,7 @@ import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { audioProcessing } from '@/services/audioProcessing';
 import { twilioAudioService } from '@/services/twilio-audio';
+import { forceUnmuteCallAudio } from '@/utils/twilioCallHelpers';
 
 interface CallControlProps {
   isMuted: boolean;
@@ -24,6 +24,7 @@ interface CallControlProps {
   audioStreaming?: boolean;
   className?: string;
   onAudioDeviceChange?: (deviceId: string) => void;
+  callSid?: string;
 }
 
 const CallControl: React.FC<CallControlProps> = ({
@@ -34,7 +35,8 @@ const CallControl: React.FC<CallControlProps> = ({
   onEndCall,
   audioStreaming = false,
   className,
-  onAudioDeviceChange
+  onAudioDeviceChange,
+  callSid
 }) => {
   const [audioLevel, setAudioLevel] = useState<number>(0);
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
@@ -44,11 +46,9 @@ const CallControl: React.FC<CallControlProps> = ({
   const volumeListenerRef = useRef<((volume: number) => void) | null>(null);
   const deviceChangeListenerRef = useRef<(() => void) | null>(null);
   
-  // Initialize audio devices and connection
   useEffect(() => {
     loadAudioDevices();
     
-    // Connect to the audio processing service with correct callbacks
     audioProcessing.connect({
       onConnectionStatus: (connected) => {
         setIsConnected(connected);
@@ -66,6 +66,10 @@ const CallControl: React.FC<CallControlProps> = ({
           title: "Audio Stream Started",
           description: "Bidirectional audio stream is now active.",
         });
+        
+        setTimeout(() => {
+          forceUnmuteCallAudio();
+        }, 1000);
       },
       onStreamEnded: (streamSid) => {
         console.log(`Audio stream ended: ${streamSid}`);
@@ -73,33 +77,26 @@ const CallControl: React.FC<CallControlProps> = ({
       }
     });
     
-    // Set up Twilio audio volume listener if available
     volumeListenerRef.current = (volume: number) => {
       setAudioLevel(volume);
     };
     
     twilioAudioService.addInputVolumeListener(volumeListenerRef.current);
     
-    // Set up device change listener
     deviceChangeListenerRef.current = () => {
       loadAudioDevices();
     };
     
     twilioAudioService.addDeviceChangeListener(deviceChangeListenerRef.current);
     
-    // Fallback to audio level simulation if Twilio audio service is not ready
-    const interval = setInterval(() => {
-      if (audioStreaming && audioLevel === 0) {
-        setAudioLevel(prev => {
-          const change = (Math.random() - 0.5) * 0.3;
-          const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
-          return newLevel;
-        });
+    const forceUnmuteInterval = setInterval(() => {
+      if (audioStreaming && callSid) {
+        forceUnmuteCallAudio();
       }
-    }, 200);
+    }, 5000);
     
     return () => {
-      clearInterval(interval);
+      clearInterval(forceUnmuteInterval);
       if (volumeListenerRef.current) {
         twilioAudioService.removeInputVolumeListener(volumeListenerRef.current);
       }
@@ -107,21 +104,18 @@ const CallControl: React.FC<CallControlProps> = ({
         twilioAudioService.removeDeviceChangeListener(deviceChangeListenerRef.current);
       }
     };
-  }, [audioStreaming]);
+  }, [audioStreaming, callSid]);
   
   const loadAudioDevices = async () => {
     try {
       setIsRefreshing(true);
       
-      // Try to use Twilio's audio service first
       let devices: MediaDeviceInfo[] = [];
       
-      // Get devices from Twilio if available
       if (twilioAudioService) {
         devices = await twilioAudioService.getOutputDevices() as MediaDeviceInfo[];
       }
       
-      // Fall back to browser API if needed
       if (devices.length === 0) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
           console.warn("This browser doesn't support device enumeration");
@@ -175,33 +169,38 @@ const CallControl: React.FC<CallControlProps> = ({
     }
   };
   
-  const handleDeviceChange = (deviceId: string) => {
+  const handleDeviceChange = async (deviceId: string) => {
     console.log(`Selecting audio device: ${deviceId}`);
     setSelectedDeviceId(deviceId);
     
     if (onAudioDeviceChange) {
       onAudioDeviceChange(deviceId);
       
-      // Test the selected audio device
       if (twilioAudioService) {
-        twilioAudioService.testSpeakerDevice(deviceId).then(success => {
-          if (success) {
-            toast({
-              title: "Audio Device Selected",
-              description: "Test tone played through the selected device.",
-            });
-          }
-        });
+        const success = await twilioAudioService.setSpeakerDevice(deviceId);
+        if (success) {
+          toast({
+            title: "Audio Device Selected",
+            description: "Test tone played through the selected device.",
+          });
+          
+          twilioAudioService.testSpeakerDevice(deviceId);
+        }
       } else {
-        audioProcessing.testAudio(deviceId).then(success => {
-          if (success) {
-            toast({
-              title: "Audio Device Selected",
-              description: "Test tone played through the selected device.",
-            });
-          }
-        });
+        const success = await audioProcessing.testAudio(deviceId);
+        if (success) {
+          toast({
+            title: "Audio Device Selected",
+            description: "Test tone played through the selected device.",
+          });
+        }
       }
+    }
+    
+    if (audioStreaming && callSid) {
+      setTimeout(() => {
+        forceUnmuteCallAudio();
+      }, 500);
     }
   };
   
