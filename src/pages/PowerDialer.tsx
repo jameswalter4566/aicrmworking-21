@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -159,18 +160,19 @@ const PowerDialer = () => {
   const [twilioReady, setTwilioReady] = useState(false);
   
   useEffect(() => {
-    if (twilioState && twilioState.device) {
-      console.log("Twilio device available:", twilioState.device);
-      setTwilioDevice(twilioState.device);
+    // Fix: Use the twilioService directly since useTwilio() doesn't have a device property
+    if (window.Twilio && window.Twilio.Device) {
+      console.log("Twilio device available:", window.Twilio.Device);
+      setTwilioDevice(window.Twilio.Device);
       setTwilioReady(true);
       
       // Set up event listeners
-      twilioState.device.on("ready", () => console.log("Twilio device is ready"));
+      window.Twilio.Device.on("ready", () => console.log("Twilio device is ready"));
       
       // Clean up event listeners
       return () => {
-        if (twilioState.device) {
-          twilioState.device.removeAllListeners();
+        if (window.Twilio && window.Twilio.Device) {
+          window.Twilio.Device.removeAllListeners();
         }
       };
     }
@@ -227,9 +229,9 @@ const PowerDialer = () => {
     }
     
     try {
-      // Generate a Twilio token
-      const token = await twilioService.fetchToken();
-      console.log("Got Twilio token:", token);
+      // Fix: initializeTwilioDevice is public and can be used instead of fetchToken which is private
+      const initialized = await twilioService.initializeTwilioDevice();
+      console.log("Twilio initialization:", initialized ? "successful" : "failed");
       
       // Initialize the dialing session
       setIsDialing(true);
@@ -868,12 +870,15 @@ const PowerDialer = () => {
           <div className="py-4">
             <AudioDeviceSelector 
               onDeviceChange={async () => {
+                // Fix: Return correct Promise type
                 return Promise.resolve([]);
               }}
               onRefreshDevices={async () => {
+                // Fix: Return correct Promise type
                 return Promise.resolve([]);
               }}
               onTestAudio={async () => {
+                // Fix: Return correct Promise type
                 return Promise.resolve(true);
               }}
               devices={[]}
