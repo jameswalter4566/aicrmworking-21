@@ -92,17 +92,6 @@ serve(async (req) => {
     
     console.log("Action from URL params:", url.searchParams.get('action'));
     console.log("Action from request body:", requestData.action);
-    
-    // Check for Twilio callback data
-    const callSid = requestData.CallSid;
-    const callStatus = requestData.CallStatus;
-    
-    // If this is a Twilio status callback (has CallSid but no action)
-    if (callSid && !action) {
-      console.log(`Detected Twilio status callback for call ${callSid} with status: ${callStatus}`);
-      action = 'statusCallback';
-    }
-    
     console.log("Final action being used:", action || requestData.action);
 
     // If no action in URL, try to get it from the request body
@@ -130,25 +119,42 @@ serve(async (req) => {
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
 
+    // If no action is specified at all, return an error
+    if (!action) {
+      console.error("No action specified in request");
+      return new Response(
+        JSON.stringify({ success: false, error: 'No action specified' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // If requesting configuration
+    if (action === 'getConfig') {
+      console.log('Returning Twilio configuration');
+      return new Response(
+        JSON.stringify({ 
+          twilioPhoneNumber: TWILIO_PHONE_NUMBER,
+          success: true
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Check for required credentials for token generation
+    console.log("Checking for required Twilio credentials...");
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
+      console.error("Missing required Twilio credentials:", {
+        accountSidMissing: !TWILIO_ACCOUNT_SID,
+        authTokenMissing: !TWILIO_AUTH_TOKEN
+      });
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing required Twilio credentials' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Initialize Twilio client
     const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-    
-    // If this appears to be a Twilio webhook request with no action specified,
-    // return a valid TwiML response
-    if (callSid && !action) {
-      console.log("Handling Twilio webhook with no action specified");
-      
-      // Create a TwiML response using the Voice Response object
-      const twiml = new twilio.twiml.VoiceResponse();
-      
-      // Add some welcome message
-      twiml.say("Thank you for calling. This is an automated response.");
-      
-      // Return the TwiML as XML with the correct content type
-      return new Response(twiml.toString(), {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-      });
-    }
     
     // Handle different actions
     if (action === 'makeCall') {
@@ -256,6 +262,7 @@ serve(async (req) => {
     }
     else if (action === 'statusCallback' || (!action && requestData.CallSid)) {
       // Handle call status callbacks with improved error handling
+      // This will also catch requests without an action parameter but with CallSid
       console.log("Status callback received");
       
       let callbackData: Record<string, any> = {};
@@ -277,7 +284,6 @@ serve(async (req) => {
       // Return a valid TwiML response (properly formatted XML)
       const twimlResponse = new twilio.twiml.VoiceResponse();
       return new Response(twimlResponse.toString(), {
-        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
       });
     }
@@ -337,37 +343,18 @@ serve(async (req) => {
         );
       }
     }
-    else if (action === 'getConfig') {
-      // Return Twilio configuration
-      console.log('Returning Twilio configuration');
-      return new Response(
-        JSON.stringify({ 
-          twilioPhoneNumber: TWILIO_PHONE_NUMBER,
-          success: true
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
     else {
-      // Default TwiML response - Always return valid TwiML for Twilio callbacks
-      // even when the action is unknown
-      console.log("No specific action matched, returning default TwiML response");
-      
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("This is a default response from your application.");
-      
-      return new Response(twiml.toString(), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-      });
+      // Default response for unknown actions
+      return new Response(
+        JSON.stringify({ success: false, error: `Unknown action: ${action}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
   } catch (error) {
     console.error('Error in function:', error);
     
     // Return a simple valid TwiML response for error cases to avoid Twilio errors
     const errorTwiml = new twilio.twiml.VoiceResponse();
-    errorTwiml.say("We're sorry, an error occurred with this call.");
-    
     return new Response(errorTwiml.toString(), {
       status: 200, // Return 200 even on error to prevent Twilio error loops
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
