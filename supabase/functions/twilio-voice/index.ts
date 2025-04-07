@@ -167,10 +167,14 @@ serve(async (req) => {
         accountSidMissing: !TWILIO_ACCOUNT_SID,
         authTokenMissing: !TWILIO_AUTH_TOKEN
       });
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing required Twilio credentials' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      
+      // Return a TwiML response even for this error
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("There was a configuration error with the Twilio credentials.");
+      
+      return new Response(twiml.toString(), { 
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+      });
     }
 
     // Initialize Twilio client
@@ -182,10 +186,13 @@ serve(async (req) => {
       const { phoneNumber } = requestData;
       
       if (!phoneNumber) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Phone number is required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Return a TwiML response even for this error
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("A phone number is required to make a call.");
+        
+        return new Response(twiml.toString(), { 
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+        });
       }
       
       try {
@@ -223,10 +230,14 @@ serve(async (req) => {
         );
       } catch (error) {
         console.error("Error making call:", error);
-        return new Response(
-          JSON.stringify({ success: false, error: error.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        
+        // Return a TwiML response for errors too
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say(`Error making call: ${error.message || "Unknown error"}`);
+        
+        return new Response(twiml.toString(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+        });
       }
     } 
     else if (action === 'handleVoice') {
@@ -239,10 +250,14 @@ serve(async (req) => {
       
       if (!streamUrl) {
         console.error("No stream URL provided in handleVoice action");
-        return new Response(
-          JSON.stringify({ success: false, error: 'Stream URL is required' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        
+        // Return a TwiML response even for this error
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("Stream URL is required for handling voice calls.");
+        
+        return new Response(twiml.toString(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+        });
       }
       
       // Create TwiML for the call using the Voice Response object
@@ -303,6 +318,14 @@ serve(async (req) => {
       
       // Return a valid TwiML response (properly formatted XML)
       const twimlResponse = new twilio.twiml.VoiceResponse();
+      
+      // Add a specific message based on call status
+      if (callStatus) {
+        twimlResponse.say(`Call status is ${callStatus}. Thank you for calling.`);
+      } else {
+        twimlResponse.say("Call status callback received.");
+      }
+      
       return new Response(twimlResponse.toString(), {
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
       });
@@ -312,10 +335,13 @@ serve(async (req) => {
       const { callSid } = requestData;
       
       if (!callSid) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Call SID is required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Return a TwiML response even for this error
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("Call SID is required to check call status.");
+        
+        return new Response(twiml.toString(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+        });
       }
       
       try {
@@ -323,15 +349,18 @@ serve(async (req) => {
         
         const call = await client.calls(callSid).fetch();
         
+        // For checkStatus, it's OK to return JSON since this is an API call, not a Twilio webhook
         return new Response(
           JSON.stringify({ success: true, status: call.status }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } catch (error) {
         console.error(`Error checking status for call ${callSid}:`, error);
+        
+        // For checkStatus, it's OK to return JSON since this is an API call, not a Twilio webhook
         return new Response(
           JSON.stringify({ success: false, error: error.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }
@@ -340,10 +369,13 @@ serve(async (req) => {
       const { callSid } = requestData;
       
       if (!callSid) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Call SID is required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Return a TwiML response even for this error
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("Call SID is required to end a call.");
+        
+        return new Response(twiml.toString(), {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+        });
       }
       
       try {
@@ -351,15 +383,18 @@ serve(async (req) => {
         
         await client.calls(callSid).update({ status: 'completed' });
         
+        // For endCall, it's OK to return JSON since this is an API call, not a Twilio webhook
         return new Response(
           JSON.stringify({ success: true, message: 'Call ended' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       } catch (error) {
         console.error(`Error ending call ${callSid}:`, error);
+        
+        // For endCall, it's OK to return JSON since this is an API call, not a Twilio webhook
         return new Response(
           JSON.stringify({ success: false, error: error.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
     }

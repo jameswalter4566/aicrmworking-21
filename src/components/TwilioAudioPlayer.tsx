@@ -31,22 +31,67 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
       }
       
       // Fallback: Try directly with Audio API
-      const audio = new Audio(`/sounds/${soundName}.mp3`);
-      audio.volume = volume;
-      
-      // If we have a selected audio device, try to use it
-      if (audioDevice && 'setSinkId' in audio) {
+      try {
+        const audio = new Audio(`/sounds/${soundName}.mp3`);
+        audio.volume = volume;
+        
+        // If we have a selected audio device, try to use it
+        if (audioDevice && 'setSinkId' in audio) {
+          try {
+            await (audio as any).setSinkId(audioDevice);
+            console.log(`🔊 Set audio device to ${audioDevice} for sound: ${soundName}`);
+          } catch (err) {
+            console.warn(`Could not set sink ID for ${soundName}:`, err);
+          }
+        }
+        
+        await audio.play();
+        console.log(`🔊 Played sound via fallback: ${soundName}`);
+        return true;
+      } catch (audioErr) {
+        console.warn(`Failed to play sound from URL: ${soundName}`, audioErr);
+        
+        // Last resort: Generate a tone programmatically
         try {
-          await (audio as any).setSinkId(audioDevice);
-          console.log(`🔊 Set audio device to ${audioDevice} for sound: ${soundName}`);
-        } catch (err) {
-          console.warn(`Could not set sink ID for ${soundName}:`, err);
+          const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContext) {
+            const context = new AudioContext();
+            const oscillator = context.createOscillator();
+            const gain = context.createGain();
+            
+            // Configure the tone based on the sound type
+            if (soundName === 'incoming') {
+              oscillator.frequency.value = 880; // Higher pitch for incoming
+              gain.gain.value = 0.2;
+            } else if (soundName === 'outgoing') {
+              oscillator.frequency.value = 660; // Medium pitch for outgoing
+              gain.gain.value = 0.2;
+            } else if (soundName === 'disconnect') {
+              oscillator.frequency.value = 220; // Lower pitch for disconnect
+              gain.gain.value = 0.2;
+            } else {
+              oscillator.frequency.value = 440; // Default A4 note
+              gain.gain.value = 0.2;
+            }
+            
+            oscillator.connect(gain);
+            gain.connect(context.destination);
+            
+            oscillator.start();
+            setTimeout(() => {
+              oscillator.stop();
+              context.close();
+            }, 500); // Half second tone
+            
+            console.log(`🔊 Played generated tone for: ${soundName}`);
+            return true;
+          }
+        } catch (toneErr) {
+          console.error(`Failed to generate tone for ${soundName}:`, toneErr);
         }
       }
       
-      await audio.play();
-      console.log(`🔊 Played sound via fallback: ${soundName}`);
-      return true;
+      return false;
     } catch (err) {
       console.warn(`Failed to play sound: ${soundName}`, err);
       return false;
@@ -117,6 +162,26 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
       return false;
     }
   };
+
+  // Handle Twilio connection errors gracefully
+  const handleTwilioConnectionError = (error: any) => {
+    // Log the error for debugging
+    console.warn("Twilio connection error:", error);
+    
+    // Check if this is an expected hangup error (31005)
+    if (error?.code === 31005) {
+      console.log("Call disconnected from gateway - this is normal during hangup");
+      // This is a normal part of call termination, no need to alert the user
+      return;
+    }
+    
+    // For other errors, notify the user
+    toast({
+      title: "Call Connection Issue",
+      description: "There was a problem with the call connection. The call may have ended unexpectedly.",
+      variant: "destructive"
+    });
+  };
   
   useEffect(() => {
     // Initialize audio context and element on component mount
@@ -135,6 +200,20 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
       const setupTwilioAudioHandlers = () => {
         try {
           const twilioDevice = window.Twilio.Device;
+          
+          // Handle device errors
+          twilioDevice.on('error', (deviceError: any) => {
+            console.error("Twilio Device error:", deviceError);
+            
+            // Only show toast for unexpected errors
+            if (deviceError?.code !== 31005) {
+              toast({
+                title: "Twilio Device Error",
+                description: deviceError?.message || "An unexpected error occurred with the phone system.",
+                variant: "destructive"
+              });
+            }
+          });
           
           // For Twilio Device 2.x
           if (twilioDevice.audio && twilioDevice.audio.on) {
@@ -166,6 +245,12 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
                   audioElement.play()
                     .then(() => console.log("🔊 Twilio audio playback started"))
                     .catch(err => console.warn("🔊 Could not auto-start Twilio audio:", err));
+                });
+                
+                // Handle call errors
+                call.on('error', (callError: any) => {
+                  console.error("Call error:", callError);
+                  handleTwilioConnectionError(callError);
                 });
                 
                 // Also hook into volume events for visualization
@@ -206,6 +291,26 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
             audioElement.play()
               .catch(err => console.warn("🔊 Could not auto-play incoming call audio:", err));
           });
+          
+          // Handle call errors
+          call.on('error', (callError: any) => {
+            console.error("Call error:", callError);
+            handleTwilioConnectionError(callError);
+          });
+        });
+        
+        // Add error handler for the device
+        window.Twilio.Device.on('error', (deviceError: any) => {
+          console.error("Twilio Device error:", deviceError);
+          
+          // Only show toast for unexpected errors
+          if (deviceError?.code !== 31005) {
+            toast({
+              title: "Twilio Device Error",
+              description: deviceError?.message || "An unexpected error occurred with the phone system.",
+              variant: "destructive"
+            });
+          }
         });
       }
     }

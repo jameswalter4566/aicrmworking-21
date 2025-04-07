@@ -33,11 +33,66 @@ const audioAssets: AudioAsset[] = [
 // Cache of preloaded audio elements
 const audioCache: Record<string, HTMLAudioElement> = {};
 
+// Fallback audio - generate programmatically if files are missing
+function createFallbackAudioElement(frequency = 440, duration = 1, volume = 0.3): HTMLAudioElement {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioElement = new Audio();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    const destination = audioContext.createMediaStreamDestination();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency; 
+    gainNode.gain.value = volume;
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(destination);
+    
+    const mediaRecorder = new MediaRecorder(destination.stream);
+    const audioChunks: BlobPart[] = [];
+    
+    mediaRecorder.ondataavailable = (event) => {
+      audioChunks.push(event.data);
+    };
+    
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+      const audioUrl = URL.createObjectURL(audioBlob);
+      audioElement.src = audioUrl;
+    };
+    
+    oscillator.start();
+    mediaRecorder.start();
+    
+    setTimeout(() => {
+      oscillator.stop();
+      mediaRecorder.stop();
+      audioContext.close();
+    }, duration * 1000);
+    
+    return audioElement;
+  } catch (err) {
+    console.warn('Failed to create fallback audio:', err);
+    const audio = new Audio();
+    return audio;
+  }
+}
+
 /**
  * Preloads all audio files needed for the application
  */
-export const preloadAudioAssets = (): Promise<void[]> => {
+export const preloadAudioAssets = async (): Promise<void[]> => {
   console.log('Preloading audio assets...');
+  
+  // Create a default tone for fallbacks
+  let defaultTone: HTMLAudioElement | null = null;
+  try {
+    defaultTone = createFallbackAudioElement(440, 0.5, 0.3);
+    audioCache['_fallback_'] = defaultTone;
+  } catch (err) {
+    console.warn('Could not create fallback tone:', err);
+  }
   
   const preloadPromises = audioAssets.map(asset => {
     return new Promise<void>((resolve, reject) => {
@@ -55,19 +110,41 @@ export const preloadAudioAssets = (): Promise<void[]> => {
         audio.addEventListener('error', (err) => {
           if (asset.required) {
             console.warn(`Failed to load required audio asset: ${asset.name}`, err);
-          } else {
-            console.warn(`Failed to load audio asset: ${asset.name}`, err);
-          }
-          
-          // For non-required assets, use a default tone
-          if (!asset.required) {
+            
+            // Create a fallback for required assets
             try {
-              // Try to use dialtone as fallback for dtmf tones
-              if (asset.name.startsWith('dtmf') && audioCache['dialtone']) {
-                audioCache[asset.name] = audioCache['dialtone'].cloneNode(true) as HTMLAudioElement;
+              console.log(`Creating fallback for required asset: ${asset.name}`);
+              let fallbackAudio: HTMLAudioElement;
+              
+              if (asset.name === 'dialtone') {
+                fallbackAudio = createFallbackAudioElement(440, 1, 0.2);
+              } else if (asset.name === 'incoming') {
+                fallbackAudio = createFallbackAudioElement(880, 0.3, 0.2);
+              } else if (asset.name === 'outgoing') {
+                fallbackAudio = createFallbackAudioElement(660, 0.5, 0.2);
+              } else if (asset.name === 'disconnect') {
+                fallbackAudio = createFallbackAudioElement(220, 0.5, 0.2);
+              } else {
+                fallbackAudio = defaultTone?.cloneNode(true) as HTMLAudioElement || new Audio();
               }
+              
+              audioCache[asset.name] = fallbackAudio;
             } catch (e) {
               console.error(`Error creating fallback for ${asset.name}:`, e);
+            }
+          } else {
+            console.warn(`Failed to load audio asset: ${asset.name}`, err);
+            
+            // For non-required assets, use a default tone
+            if (defaultTone) {
+              try {
+                // Use dialtone as fallback for dtmf tones
+                if (asset.name.startsWith('dtmf') && defaultTone) {
+                  audioCache[asset.name] = defaultTone.cloneNode(true) as HTMLAudioElement;
+                }
+              } catch (e) {
+                console.error(`Error creating fallback for ${asset.name}:`, e);
+              }
             }
           }
           
@@ -78,10 +155,24 @@ export const preloadAudioAssets = (): Promise<void[]> => {
         // Set audio properties
         audio.preload = 'auto';
         audio.volume = 0;  // Silent preloading
-        audio.src = asset.url;
         
-        // Start loading
+        // Attempt to load the asset
+        audio.src = asset.url;
         audio.load();
+        
+        // Set a timeout in case loading hangs
+        setTimeout(() => {
+          if (!audioCache[asset.name]) {
+            console.warn(`Audio asset loading timed out: ${asset.name}`);
+            
+            // For required assets, create a fallback
+            if (asset.required && defaultTone) {
+              audioCache[asset.name] = defaultTone.cloneNode(true) as HTMLAudioElement;
+            }
+            resolve();
+          }
+        }, 3000);
+        
       } catch (error) {
         console.error(`Error preloading audio asset: ${asset.name}`, error);
         // Resolve anyway to not block other assets
@@ -90,7 +181,9 @@ export const preloadAudioAssets = (): Promise<void[]> => {
     });
   });
   
-  return Promise.all(preloadPromises);
+  await Promise.all(preloadPromises);
+  console.log('🔊 Audio assets preloaded successfully');
+  return preloadPromises;
 };
 
 /**
@@ -99,7 +192,8 @@ export const preloadAudioAssets = (): Promise<void[]> => {
  * @returns The audio element if found, or null if not preloaded
  */
 export const getPreloadedAudio = (name: string): HTMLAudioElement | null => {
-  return audioCache[name] || null;
+  // Return the cached audio or fallback if available
+  return audioCache[name] || audioCache['_fallback_'] || null;
 };
 
 /**
@@ -111,8 +205,24 @@ export const getPreloadedAudio = (name: string): HTMLAudioElement | null => {
 export const playAudio = async (name: string, volume: number = 0.5): Promise<boolean> => {
   try {
     const audio = audioCache[name];
+    
     if (!audio) {
       console.warn(`Audio asset not preloaded: ${name}`);
+      
+      // Try fallback
+      if (audioCache['_fallback_']) {
+        const fallbackAudio = audioCache['_fallback_'].cloneNode(true) as HTMLAudioElement;
+        fallbackAudio.volume = volume;
+        
+        try {
+          await fallbackAudio.play();
+          return true;
+        } catch (error) {
+          console.error(`Error playing fallback audio for: ${name}`, error);
+          return false;
+        }
+      }
+      
       return false;
     }
     
@@ -125,6 +235,20 @@ export const playAudio = async (name: string, volume: number = 0.5): Promise<boo
       return true;
     } catch (error) {
       console.error(`Error playing audio: ${name}`, error);
+      
+      // Try fallback if available
+      if (audioCache['_fallback_']) {
+        try {
+          const fallbackAudio = audioCache['_fallback_'].cloneNode(true) as HTMLAudioElement;
+          fallbackAudio.volume = volume;
+          await fallbackAudio.play();
+          return true;
+        } catch (err) {
+          console.error(`Error playing fallback audio for: ${name}`, err);
+          return false;
+        }
+      }
+      
       return false;
     }
   } catch (error) {
