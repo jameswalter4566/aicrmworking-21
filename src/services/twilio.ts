@@ -1,3 +1,4 @@
+
 // src/services/twilio.ts
 import { twilioAudioService } from './twilio-audio';
 
@@ -14,10 +15,10 @@ class TwilioService {
   private tokenRefreshInterval: number | null = null;
   private useBrowserCallingOnly: boolean = true; // Always use browser calling
 
-  // Initialize the Twilio device with enhanced options for Client SDK 1.x
+  // Initialize the Twilio device with options for Voice SDK 2.x
   async initializeTwilioDevice(): Promise<boolean> {
     try {
-      console.log("Initializing Twilio Voice SDK Device...");
+      console.log("Initializing Twilio Voice SDK 2.x Device...");
       const tokenResponse = await this.fetchToken();
       
       if (!tokenResponse?.token) {
@@ -43,21 +44,37 @@ class TwilioService {
         }
       }
 
-      // Create a new Twilio.Device with Client SDK 1.x options
+      // Create a new Twilio.Device with Voice SDK 2.x options
+      // In 2.x, Device is a constructor, not a singleton
       this.device = new window.Twilio.Device(this.token, {
-        // Client SDK 1.x options
-        debug: true,
+        // Voice SDK 2.x options
+        edge: 'ashburn',
         enableRingingState: true,
-        audioConstraints: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        }
+        disableAudioContextSounds: false,
+        codecPreferences: ['opus', 'pcmu'],
+        sounds: {
+          incoming: '/sounds/incoming.mp3',
+          outgoing: '/sounds/outgoing.mp3',
+          disconnect: '/sounds/disconnect.mp3',
+          dtmf1: '/sounds/dtmf-1.mp3',
+          dtmf2: '/sounds/dtmf-2.mp3',
+          dtmf3: '/sounds/dtmf-3.mp3',
+          dtmf4: '/sounds/dtmf-4.mp3',
+          dtmf5: '/sounds/dtmf-5.mp3',
+          dtmf6: '/sounds/dtmf-6.mp3',
+          dtmf7: '/sounds/dtmf-7.mp3',
+          dtmf8: '/sounds/dtmf-8.mp3',
+          dtmf9: '/sounds/dtmf-9.mp3',
+          dtmf0: '/sounds/dtmf-0.mp3',
+          dtmfs: '/sounds/dtmf-star.mp3',
+          dtmfh: '/sounds/dtmf-pound.mp3'
+        },
+        logLevel: 'debug',
       });
       
       console.log("Twilio device created with token:", this.token ? this.token.substring(0, 10) + "..." : "no token");
       
-      // Set up event listeners with Client SDK 1.x syntax
+      // Set up event listeners with Voice SDK 2.x syntax
       this.setupDeviceEvents();
       
       // Initialize audio service
@@ -89,8 +106,8 @@ class TwilioService {
   private setupDeviceEvents(): void {
     if (!this.device) return;
     
-    // Client SDK 1.x uses event emitter pattern
-    this.device.on('ready', () => {
+    // Voice SDK 2.x uses event emitter pattern
+    this.device.on('registered', () => {
       console.log("Twilio Device is registered and ready for calls");
     });
     
@@ -108,13 +125,18 @@ class TwilioService {
       console.log("Incoming call from:", call.parameters.From);
     });
     
-    this.device.on('offline', () => {
-      console.log("Twilio Device is offline");
+    this.device.on('unregistered', () => {
+      console.log("Twilio Device is unregistered");
+      this.isInitialized = false;
+    });
+    
+    this.device.on('destroyed', () => {
+      console.log("Twilio Device has been destroyed");
       this.isInitialized = false;
     });
     
     // Add enhanced audio event handlers
-    this.device.on('ready', () => {
+    this.device.on('registered', () => {
       console.log("Audio is ready for the device");
       // Apply the selected audio device if we have one
       if (this.currentAudioDeviceId) {
@@ -316,18 +338,15 @@ class TwilioService {
       if ('setSinkId' in audio) {
         this.currentAudioDeviceId = deviceId;
         
-        // If we have an active call, update it - different method in Client SDK 1.x
+        // If we have an active call, update it - different method in Voice SDK 2.x
         if (this.call) {
           console.log("Active call detected, updating output device for call audio");
           
           try {
-            // Twilio Client SDK 1.x uses different audio elements
-            if (this.call._mediaHandler && this.call._mediaHandler._remoteStream) {
-              const audioEl = this.call._mediaHandler._remoteStream.audio;
-              if (audioEl && audioEl._element && 'setSinkId' in audioEl._element) {
-                await audioEl._element.setSinkId(deviceId);
-                console.log("Updated call audio element to use device:", deviceId);
-              }
+            // Voice SDK 2.x handles audio output through the Device's audio object
+            if (this.device && this.device.audio && this.device.audio.speakerDevices) {
+              await this.device.audio.speakerDevices.set(deviceId);
+              console.log("Updated call audio output to use device:", deviceId);
             }
           } catch (err) {
             console.error("Error setting audio device for call:", err);
@@ -425,7 +444,7 @@ class TwilioService {
     }
   }
 
-  // Make a call - EXCLUSIVELY using the Twilio Client SDK for calling
+  // Make a call using the Twilio Voice SDK 2.x
   async makeCall(phoneNumber: string): Promise<{
     success: boolean;
     callSid?: string;
@@ -464,23 +483,25 @@ class TwilioService {
         }
       }
       
-      // EXCLUSIVELY use the Twilio Client SDK for in-browser calling
+      // Use the Twilio Voice SDK 2.x for calling
       if (this.isInitialized && this.device) {
-        console.log(`Making browser call to ${phoneNumber} with Client SDK 1.x`);
+        console.log(`Making browser call to ${phoneNumber} with Voice SDK 2.x`);
         
         try {
-          // Client SDK 1.x connect params 
-          const params = {
-            To: phoneNumber,
-            // These parameters will be available in the TwiML app
-            useStream: 'true',
-            streamWebhookUrl: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream'
+          // Voice SDK 2.x connect options 
+          const connectOptions = {
+            params: {
+              To: phoneNumber,
+              // These parameters will be available in the TwiML app
+              useStream: 'true',
+              streamWebhookUrl: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream'
+            }
           };
           
-          // Client SDK 1.x connect method
-          this.call = this.device.connect(params);
+          // Voice SDK 2.x connect method returns a Promise with a Call object
+          this.call = await this.device.connect(connectOptions);
           
-          // Set up call event handlers with Client SDK 1.x events
+          // Set up call event handlers with Voice SDK 2.x events
           this.call.on('accept', () => {
             console.log('Call accepted - setting up audio channels');
             this.hasActiveCall = true;
@@ -536,12 +557,8 @@ class TwilioService {
   toggleMute(mute: boolean): boolean {
     try {
       if (this.call) {
-        // Client SDK 1.x muting
-        if (mute) {
-          this.call.mute(true);
-        } else {
-          this.call.mute(false);
-        }
+        // Voice SDK 2.x muting
+        this.call.mute(mute);
         return true;
       }
       return false;
@@ -683,9 +700,9 @@ class TwilioService {
       return 'completed';
     }
     
-    const status = this.call.status;
+    const status = this.call.status();
     
-    // Map Client SDK 1.x call status to our status format
+    // Map Voice SDK 2.x call status to our status format
     switch (status) {
       case 'pending':
         return 'connecting';
@@ -719,7 +736,7 @@ class TwilioService {
       // Clean up audio service first
       twilioAudioService.cleanup();
       
-      // Client SDK 1.x uses destroy() method
+      // Voice SDK 2.x uses destroy() method
       this.device.destroy();
       this.device = null;
     }

@@ -1,4 +1,6 @@
 
+// Updated type definitions for Twilio Voice SDK 2.x
+
 interface OutputDeviceCollection {
   delete(device: MediaDeviceInfo): boolean;
   get(): Set<MediaDeviceInfo>;
@@ -45,6 +47,32 @@ interface AudioHelper {
   setMaxListeners(n: number): this;
 }
 
+interface TwilioCall {
+  parameters: Record<string, string>;
+  customParameters: Map<string, string>;
+  direction: 'INCOMING' | 'OUTGOING';
+  codec: string;
+  status(): string;
+  connectToken?: string;
+  callerInfo?: { isVerified: boolean } | null;
+  
+  accept(options?: any): void;
+  disconnect(): void;
+  getLocalStream(): MediaStream;
+  getRemoteStream(): MediaStream;
+  ignore(): void;
+  isMuted(): boolean;
+  mute(shouldMute?: boolean): void;
+  postFeedback(score?: number, issue?: string): Promise<void>;
+  reject(): void;
+  sendDigits(digits: string): void;
+  sendMessage(message: any): void;
+
+  on(event: string, handler: Function): this;
+  once(event: string, handler: Function): this;
+  off(event: string, handler: Function): this;
+}
+
 interface TwilioDevice {
   audio: AudioHelper;
   edge: string | null;
@@ -53,8 +81,9 @@ interface TwilioDevice {
   isBusy: boolean;
   state: 'unregistered' | 'registering' | 'registered' | 'destroyed';
   token: string;
+  calls: TwilioCall[];
 
-  connect(options?: any): Promise<any>;
+  connect(options?: any): Promise<TwilioCall>;
   destroy(): void;
   disconnectAll(): void;
   register(): Promise<void>;
@@ -71,7 +100,6 @@ interface TwilioDevice {
 interface Twilio {
   Device: {
     new(token: string, options?: any): TwilioDevice;
-    audio?: AudioHelper;
     isSupported: boolean;
     packageName: string;
     version: string;

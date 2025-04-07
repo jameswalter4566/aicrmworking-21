@@ -7,11 +7,11 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
-// Use multiple CDNs for better reliability - focusing on Twilio Client SDK 1.x
+// Use multiple CDNs for better reliability - using Voice SDK 2.x
 const TWILIO_SDK_URLS = [
-  'https://cdn.jsdelivr.net/npm/twilio-client@1.14.0/dist/twilio.min.js',
-  'https://media.twiliocdn.com/sdk/js/client/releases/1.14.0/twilio.js',
-  'https://sdk.twilio.com/js/client/releases/1.14.0/twilio.js'
+  'https://sdk.twilio.com/js/voice/2.7.3/twilio.min.js',
+  'https://media.twiliocdn.com/sdk/js/voice/releases/2.7.3/twilio.min.js',
+  'https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.7.3/dist/twilio.min.js'
 ];
 
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
@@ -30,21 +30,23 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     
     // Check if Twilio is already loaded
     if (window.Twilio && window.Twilio.Device) {
-      console.log("🔶 Twilio Client SDK already loaded", { 
+      console.log("🔶 Twilio Voice SDK already loaded", { 
         version: window.Twilio.VERSION || 'unknown',
         deviceAvailable: !!window.Twilio.Device,
-        audioAvailable: !!window.Twilio.Device.audio
+        isSupported: window.Twilio.Device.isSupported
       });
       
-      // Test if audio works with this instance
+      // Test if Device constructor works with this instance
       try {
-        if (window.Twilio.Device.audio) {
-          console.log("🔶 Twilio Device audio is available");
-        } else {
-          console.warn("🔶 Twilio Device audio is not available, may need to reload SDK");
+        const deviceConstructor = window.Twilio.Device;
+        console.log("🔶 Twilio Device constructor is available");
+        
+        // Device in 2.x is not a singleton but a constructor
+        if (typeof deviceConstructor === 'function') {
+          console.log("🔶 Twilio Device is a constructor as expected in SDK 2.x");
         }
       } catch (e) {
-        console.error("🔶 Error checking Twilio.Device.audio:", e);
+        console.error("🔶 Error checking Twilio.Device:", e);
       }
       
       setLoaded(true);
@@ -64,7 +66,7 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
       }
       
       const url = urls[index];
-      console.log(`🔶 Attempting to load Twilio Client SDK from: ${url}`);
+      console.log(`🔶 Attempting to load Twilio Voice SDK (2.x) from: ${url}`);
       
       return new Promise((resolve, reject) => {
         const script = document.createElement('script');
@@ -75,36 +77,27 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         script.crossOrigin = "anonymous";
         
         script.onload = () => {
-          console.log("🔶 Twilio Client SDK loaded successfully", {
+          console.log("🔶 Twilio Voice SDK 2.x loaded successfully", {
             version: window.Twilio?.VERSION || 'unknown',
             deviceAvailable: !!window.Twilio?.Device,
-            audioEnabled: typeof window.AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined',
-            navigator: {
-              userAgent: navigator.userAgent,
-              platform: navigator.platform,
-              mediaDevicesAvailable: !!navigator.mediaDevices
-            }
+            isSupported: window.Twilio?.Device?.isSupported
           });
 
-          // Immediately test if Twilio.Device can be instantiated
+          // Test the Device constructor in SDK 2.x
           try {
-            const deviceTest = window.Twilio?.Device;
-            console.log("🔶 Twilio Device constructor available:", !!deviceTest);
-            
-            // Check if Audio features are available
-            if (window.Twilio?.Device?.audio) {
-              console.log("🔶 Twilio Device audio features available");
+            const deviceConstructor = window.Twilio?.Device;
+            if (typeof deviceConstructor === 'function') {
+              console.log("🔶 Twilio Device constructor is available in SDK 2.x");
             } else {
-              console.warn("🔶 Twilio Device audio features NOT available");
+              console.warn("🔶 Twilio Device is not a constructor, might not be SDK 2.x");
             }
           } catch (e) {
             console.error("🔶 Error accessing Twilio.Device constructor:", e);
-            // Even if there's an error, we'll continue and let the application try to use it
           }
 
           setLoaded(true);
           toast({
-            title: "Twilio SDK Loaded",
+            title: "Twilio Voice SDK 2.x Loaded",
             description: "Call functionality is now available."
           });
           
@@ -135,8 +128,8 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     };
     
     loadScript(TWILIO_SDK_URLS).catch((err) => {
-      const errorMessage = new Error("Failed to load Twilio Client SDK");
-      console.error("🔶 Error loading Twilio Client SDK:", errorMessage, err);
+      const errorMessage = new Error("Failed to load Twilio Voice SDK 2.x");
+      console.error("🔶 Error loading Twilio Voice SDK:", errorMessage, err);
       
       // Additional diagnostic information
       console.log("🔶 SDK Load Diagnostics:", {
