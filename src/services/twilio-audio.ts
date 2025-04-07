@@ -1,4 +1,3 @@
-
 /**
  * TwilioAudioService - Handles Twilio Device audio management
  * 

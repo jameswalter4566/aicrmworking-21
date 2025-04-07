@@ -590,6 +590,59 @@ class TwilioService {
     }
   }
 
+  // Toggle speaker mode
+  toggleSpeaker(speakerOn: boolean): boolean {
+    try {
+      // In browser context, "speaker mode" typically means changing the audio output device
+      // to either the default speakers or a specifically designated speaker device
+      
+      // If we have the twilioAudioService and the device is initialized
+      if (twilioAudioService && this.device) {
+        // Get currently available output devices
+        const outputDevices = twilioAudioService.getOutputDevices();
+        
+        if (outputDevices && outputDevices.length > 0) {
+          // If speaker is turned on, try to find a device labeled as "speaker" or use default
+          if (speakerOn) {
+            // Look for a device that might be a speaker (contains "speaker" or "output" in the name)
+            const speakerDevice = outputDevices.find(device => 
+              device.label.toLowerCase().includes('speaker') || 
+              device.label.toLowerCase().includes('output')
+            );
+            
+            // If found a speaker device, use it, otherwise use default
+            const deviceId = speakerDevice ? speakerDevice.deviceId : 'default';
+            twilioAudioService.setSpeakerDevice(deviceId);
+            console.log(`Speaker mode ON: set to device ${deviceId}`);
+            return true;
+          } else {
+            // If speaker is turned off, try to find a device that might be headphones
+            const headphoneDevice = outputDevices.find(device => 
+              device.label.toLowerCase().includes('headphone') || 
+              device.label.toLowerCase().includes('earphone') ||
+              device.label.toLowerCase().includes('headset')
+            );
+            
+            // If found headphones, use them, otherwise use default
+            const deviceId = headphoneDevice ? headphoneDevice.deviceId : 'default';
+            twilioAudioService.setSpeakerDevice(deviceId);
+            console.log(`Speaker mode OFF: set to device ${deviceId}`);
+            return true;
+          }
+        } else {
+          console.log("No audio output devices available for speaker toggle");
+          return false;
+        }
+      }
+      
+      console.log("Unable to toggle speaker mode - audio service not initialized");
+      return false;
+    } catch (error) {
+      console.error("Error toggling speaker:", error);
+      return false;
+    }
+  }
+
   // Check if microphone is active
   isMicrophoneActive(): boolean {
     return this.isAudioContextInitialized;
