@@ -1,7 +1,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Create Supabase client with direct URL and key since @/lib/supabase can't be found
+// Create Supabase client with direct URL and key
 const supabaseUrl = 'https://imrmboyczebjlbnkgjns.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imltcm1ib3ljemViamxibmtnam5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2Njg1MDQsImV4cCI6MjA1OTI0NDUwNH0.scafe8itFDyN5mFcCiyS1uugV5-7s9xhaKoqYuXGJwQ';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -109,39 +109,14 @@ class TwilioService {
 
   // Preload audio files to avoid decoding errors
   private async preloadAudioFiles(): Promise<void> {
-    const preloadPromises = Object.values(this.customSounds).map(url => {
-      return new Promise<void>((resolve) => {
-        const audio = new Audio();
-        audio.preload = 'auto';
-        
-        const onLoad = () => {
-          console.log(`Audio file loaded: ${url}`);
-          resolve();
-        };
-        
-        const onError = () => {
-          console.warn(`Failed to preload audio file: ${url}`);
-          resolve(); // Resolve anyway to continue with initialization
-        };
-        
-        audio.addEventListener('canplaythrough', onLoad, { once: true });
-        audio.addEventListener('error', onError, { once: true });
-        
-        // Set timeout in case loading takes too long
-        setTimeout(() => {
-          audio.removeEventListener('canplaythrough', onLoad);
-          audio.removeEventListener('error', onError);
-          console.warn(`Audio preload timed out: ${url}`);
-          resolve();
-        }, 3000);
-        
-        audio.src = url;
-        audio.load();
-      });
-    });
-    
-    await Promise.all(preloadPromises);
-    console.log('Audio files preloaded');
+    try {
+      // Import the audio preloader dynamically to avoid circular dependencies
+      const { preloadAudioAssets } = await import('@/utils/audioPreloader');
+      await preloadAudioAssets();
+      console.log('Audio files preloaded for Twilio service');
+    } catch (err) {
+      console.warn('Error preloading audio files:', err);
+    }
   }
 
   private setupDeviceListeners() {
@@ -262,18 +237,23 @@ class TwilioService {
           },
         });
 
-        if (response.data?.success) {
-          const callSid = response.data.callSid;
-          console.log(`Call initiated with SID: ${callSid}`);
-          
-          // Store the callSid for this lead
-          if (leadId) {
-            this.activeCallSids.set(leadId, callSid);
+        // Check if the response has data and success property
+        if (response.data && typeof response.data === 'object' && 'success' in response.data) {
+          if (response.data.success) {
+            const callSid = response.data.callSid;
+            console.log(`Call initiated with SID: ${callSid}`);
+            
+            // Store the callSid for this lead
+            if (leadId) {
+              this.activeCallSids.set(leadId, callSid);
+            }
+            
+            return { success: true, callSid };
+          } else {
+            throw new Error(response.data.error || 'Failed to make call through REST API');
           }
-          
-          return { success: true, callSid };
         } else {
-          throw new Error(response.error?.message || 'Failed to make call through REST API');
+          throw new Error('Invalid response format from REST API');
         }
       } catch (error: any) {
         console.error('Error making call via REST API:', error);
@@ -439,6 +419,7 @@ class TwilioService {
     return this.initialized;
   }
 
+  // Audio context and device management
   async initializeAudioContext(): Promise<boolean> {
     try {
       if (!window.AudioContext && !(window as any).webkitAudioContext) {
@@ -532,21 +513,11 @@ class TwilioService {
 
   async testAudioOutput(deviceId: string): Promise<boolean> {
     try {
-      const audio = new Audio('/sounds/outgoing.mp3');
-      
-      // Check if the browser supports setSinkId
-      if ('setSinkId' in audio) {
-        try {
-          await (audio as any).setSinkId(deviceId);
-        } catch (e) {
-          console.warn('Could not set sink ID:', e);
-        }
-      }
-      
-      audio.volume = 0.3;
+      // Import the audio player dynamically
+      const { playAudio } = await import('@/utils/audioPreloader');
       
       try {
-        await audio.play();
+        await playAudio('/sounds/test-tone.mp3', 0.3);
         console.log('Playing test audio to device:', deviceId);
         return true;
       } catch (e) {

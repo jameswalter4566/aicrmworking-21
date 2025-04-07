@@ -1,181 +1,142 @@
 
-/**
- * Audio asset preloader
- * Preloads audio files to prevent encoding errors during calls
- */
+// Cache for preloaded audio files
+const audioCache: Map<string, HTMLAudioElement> = new Map();
 
-interface AudioAsset {
-  key: string;
-  url: string;
-  required: boolean;
-  loaded: boolean;
-}
-
-// Define all the audio assets we need to preload
-const AUDIO_ASSETS: AudioAsset[] = [
-  { key: 'incoming', url: '/sounds/incoming.mp3', required: true, loaded: false },
-  { key: 'outgoing', url: '/sounds/outgoing.mp3', required: true, loaded: false },
-  { key: 'disconnect', url: '/sounds/disconnect.mp3', required: true, loaded: false },
-  { key: 'dialtone', url: '/sounds/outgoing.mp3', required: true, loaded: false }, // Reuse outgoing as dialtone
-  { key: 'dtmf1', url: '/sounds/dtmf-1.mp3', required: false, loaded: false },
-  { key: 'dtmf2', url: '/sounds/dtmf-2.mp3', required: false, loaded: false },
-  { key: 'dtmf3', url: '/sounds/dtmf-3.mp3', required: false, loaded: false },
-  { key: 'dtmf4', url: '/sounds/dtmf-4.mp3', required: false, loaded: false },
-  { key: 'dtmf5', url: '/sounds/dtmf-5.mp3', required: false, loaded: false },
-  { key: 'dtmf6', url: '/sounds/dtmf-6.mp3', required: false, loaded: false },
-  { key: 'dtmf7', url: '/sounds/dtmf-7.mp3', required: false, loaded: false },
-  { key: 'dtmf8', url: '/sounds/dtmf-8.mp3', required: false, loaded: false },
-  { key: 'dtmf9', url: '/sounds/dtmf-9.mp3', required: false, loaded: false },
-  { key: 'dtmf0', url: '/sounds/dtmf-0.mp3', required: false, loaded: false },
-  { key: 'dtmfstar', url: '/sounds/dtmf-star.mp3', required: false, loaded: false },
-  { key: 'dtmfpound', url: '/sounds/dtmf-pound.mp3', required: false, loaded: false },
-  { key: 'test-tone', url: '/sounds/outgoing.mp3', required: true, loaded: false }, // Reuse outgoing as test tone
+// List of audio files to preload
+const audioFiles = [
+  '/sounds/incoming.mp3',
+  '/sounds/outgoing.mp3',
+  '/sounds/disconnect.mp3',
+  '/sounds/dtmf-0.mp3',
+  '/sounds/dtmf-1.mp3',
+  '/sounds/dtmf-2.mp3',
+  '/sounds/dtmf-3.mp3',
+  '/sounds/dtmf-4.mp3',
+  '/sounds/dtmf-5.mp3',
+  '/sounds/dtmf-6.mp3',
+  '/sounds/dtmf-7.mp3',
+  '/sounds/dtmf-8.mp3',
+  '/sounds/dtmf-9.mp3',
+  '/sounds/dtmf-star.mp3',
+  '/sounds/dtmf-pound.mp3',
 ];
 
-// Cache for loaded audio elements
-const audioCache: Record<string, HTMLAudioElement> = {};
-
 /**
- * Create a simple audio fallback for browsers that have issues loading audio files
- * This generates a short beep sound
+ * Preload all audio assets
+ * @returns Promise that resolves when all audio files are preloaded
  */
-const createAudioFallback = (frequency = 440, duration = 1, volume = 0.2): HTMLAudioElement => {
-  // Create a new AudioContext
-  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+export const preloadAudioAssets = async (): Promise<boolean> => {
+  const preloadPromises = audioFiles.map(url => preloadAudioFile(url));
   
-  // Create an oscillator
-  const oscillator = audioContext.createOscillator();
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
-  
-  // Create a gain node for volume control
-  const gainNode = audioContext.createGain();
-  gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
-  
-  // Connect oscillator to gain node and gain node to destination
-  oscillator.connect(gainNode);
-  gainNode.connect(audioContext.destination);
-  
-  // Create an audio element to mimic the interface of a normal audio element
-  const audioElement = document.createElement('audio');
-  
-  // Override the play method
-  const originalPlay = audioElement.play;
-  audioElement.play = () => {
-    oscillator.start();
-    oscillator.stop(audioContext.currentTime + duration);
-    return new Promise(resolve => {
-      setTimeout(resolve, duration * 1000);
-    });
-  };
-  
-  return audioElement;
+  try {
+    await Promise.all(preloadPromises);
+    console.log('All audio files preloaded successfully');
+    return true;
+  } catch (err) {
+    console.warn('Some audio files failed to preload:', err);
+    return false;
+  }
 };
 
 /**
  * Preload a single audio file
+ * @param url URL of the audio file
+ * @returns Promise that resolves when the audio file is preloaded
  */
-const preloadAudio = (asset: AudioAsset): Promise<void> => {
-  return new Promise((resolve) => {
-    const audio = new Audio();
-    audio.preload = 'auto';
-    
-    // For required assets, we need to ensure they load or create a fallback
-    if (asset.required) {
-      const onSuccess = () => {
-        asset.loaded = true;
-        audioCache[asset.key] = audio;
-        resolve();
-      };
+export const preloadAudioFile = (url: string): Promise<HTMLAudioElement> => {
+  return new Promise((resolve, reject) => {
+    try {
+      // Check if the audio is already in the cache
+      if (audioCache.has(url)) {
+        return resolve(audioCache.get(url) as HTMLAudioElement);
+      }
       
-      const onError = (e: Event) => {
-        console.warn(`Failed to load required audio asset: ${asset.key}`, e);
+      const audio = new Audio();
+      audio.preload = 'auto';
+      
+      // Set up event handlers
+      audio.addEventListener('canplaythrough', () => {
+        audioCache.set(url, audio);
+        resolve(audio);
+      }, { once: true });
+      
+      audio.addEventListener('error', (e) => {
+        console.warn(`Failed to preload audio file: ${url}`, e);
+        reject(e);
+      }, { once: true });
+      
+      // Set timeout in case loading takes too long
+      const timeout = setTimeout(() => {
+        audio.removeEventListener('canplaythrough', () => {});
+        audio.removeEventListener('error', () => {});
+        console.warn(`Audio preload timed out: ${url}`);
         
-        // Create a fallback audio element
-        console.info(`Creating fallback for required asset: ${asset.key}`);
-        audioCache[asset.key] = createAudioFallback(
-          asset.key === 'incoming' ? 880 : 440, // Higher pitch for incoming calls
-          asset.key === 'disconnect' ? 0.5 : 1, // Shorter for disconnect
-          0.2
-        );
-        
-        asset.loaded = true;
-        resolve();
-      };
-      
-      audio.addEventListener('canplaythrough', onSuccess, { once: true });
-      audio.addEventListener('error', onError, { once: true });
-      
-      // Set a timeout in case the audio takes too long to load
-      setTimeout(() => {
-        console.warn(`Audio asset loading timed out: ${asset.key}`);
-        audio.removeEventListener('canplaythrough', onSuccess);
-        audio.removeEventListener('error', onError);
-        onError(new Event('timeout'));
+        // Create a fallback audio element with an empty source
+        const fallbackAudio = new Audio();
+        audioCache.set(url, fallbackAudio);
+        resolve(fallbackAudio);
       }, 5000);
-    } else {
-      // For non-required assets, just mark as loaded if there's an error
-      const onSuccess = () => {
-        asset.loaded = true;
-        audioCache[asset.key] = audio;
-        resolve();
-      };
       
-      const onError = (e: Event) => {
-        console.warn(`Failed to load audio asset: ${asset.key}`, e);
-        asset.loaded = true;
-        resolve();
-      };
+      // Set the source and start loading
+      audio.src = url;
+      audio.load();
       
-      audio.addEventListener('canplaythrough', onSuccess, { once: true });
-      audio.addEventListener('error', onError, { once: true });
-      
-      // Set a shorter timeout for non-required assets
-      setTimeout(() => {
-        console.warn(`Audio asset loading timed out: ${asset.key}`);
-        audio.removeEventListener('canplaythrough', onSuccess);
-        audio.removeEventListener('error', onError);
-        onError(new Event('timeout'));
-      }, 3000);
+    } catch (err) {
+      console.error(`Error preloading audio: ${url}`, err);
+      reject(err);
     }
-    
-    // Start loading the audio
-    audio.src = asset.url;
-    audio.load();
   });
 };
 
 /**
- * Preload all audio assets
+ * Get a preloaded audio file from cache
+ * @param url URL of the audio file
+ * @returns The preloaded audio element, or a new audio element if not preloaded
  */
-export const preloadAudioAssets = async (): Promise<void> => {
-  // Preload all assets in parallel
-  await Promise.all(AUDIO_ASSETS.map(preloadAudio));
-  console.log('🔊 Audio assets preloaded successfully');
-};
-
-/**
- * Get a preloaded audio element
- */
-export const getAudio = (key: string): HTMLAudioElement | null => {
-  return audioCache[key] || null;
-};
-
-/**
- * Play a preloaded audio asset
- */
-export const playAudio = async (key: string): Promise<void> => {
-  const audio = audioCache[key];
-  if (!audio) {
-    console.warn(`Audio asset not found: ${key}`);
-    return;
+export const getPreloadedAudio = (url: string): HTMLAudioElement => {
+  // Check if the audio is in the cache
+  if (audioCache.has(url)) {
+    // Clone the audio element to allow multiple plays
+    const cached = audioCache.get(url) as HTMLAudioElement;
+    const cloned = cached.cloneNode(true) as HTMLAudioElement;
+    return cloned;
   }
   
+  // If not in cache, create a new audio element and start preloading for next time
+  console.warn(`Audio file not preloaded: ${url}, loading now`);
+  const audio = new Audio(url);
+  audio.load();
+  
+  // Preload for next time
+  preloadAudioFile(url).catch(() => {
+    // Silent catch - we already logged in the preload function
+  });
+  
+  return audio;
+};
+
+/**
+ * Play an audio file from the preloaded cache
+ * @param url URL of the audio file
+ * @param volume Optional volume level (0-1)
+ * @returns Promise that resolves when the audio starts playing, or rejects on error
+ */
+export const playAudio = async (url: string, volume = 0.5): Promise<void> => {
   try {
-    // Clone the audio to allow for multiple simultaneous playbacks
-    const audioClone = audio.cloneNode() as HTMLAudioElement;
-    await audioClone.play();
-  } catch (error) {
-    console.warn(`Failed to play audio: ${key}`, error);
+    const audio = getPreloadedAudio(url);
+    audio.volume = volume;
+    
+    try {
+      await audio.play();
+    } catch (err) {
+      console.warn(`Failed to play audio: ${url}`, err);
+      
+      // If autoplay was prevented, try again with user interaction
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        console.warn('Autoplay prevented. Will try again on next user interaction.');
+      }
+    }
+  } catch (err) {
+    console.error(`Error playing audio: ${url}`, err);
   }
 };
