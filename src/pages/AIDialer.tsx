@@ -527,8 +527,8 @@ const AIDialer = () => {
 
   return (
     <MainLayout>
-      <div className="flex flex-col h-[calc(100vh-64px)]">
-        <div className="flex-1 p-6 overflow-hidden">
+      <div className="flex flex-col h-full">
+        <div className="flex-1 p-6 mb-4 overflow-y-auto">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-2xl font-bold">AI Dialer</h1>
             <div className="flex gap-2">
@@ -562,7 +562,7 @@ const AIDialer = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 h-full">
+          <div className="grid grid-cols-1 gap-6 mb-6">
             <Card className="shadow-sm">
               <CardHeader className="bg-crm-blue/5 border-b pb-3">
                 <CardTitle className="text-lg font-medium flex items-center gap-2">
@@ -742,7 +742,7 @@ const AIDialer = () => {
             </div>
           </div>
           
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden max-h-[300px] overflow-y-auto">
             <Table>
               <TableHeader className="bg-crm-blue/10">
                 <TableRow>
