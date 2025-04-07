@@ -1,4 +1,5 @@
 // src/services/twilio.ts
+import { twilioAudioService } from './twilio-audio';
 
 class TwilioService {
   private device: any = null;
@@ -47,6 +48,9 @@ class TwilioService {
       // Set up event listeners with Voice SDK 2.x syntax
       this.setupDeviceEvents();
       
+      // Initialize audio service
+      twilioAudioService.initialize(this.device);
+      
       // Register to receive incoming calls
       this.device.register();
       
@@ -92,7 +96,7 @@ class TwilioService {
       console.log("Audio is ready for the device");
       // Apply the selected audio device if we have one
       if (this.currentAudioDeviceId) {
-        setTimeout(() => this.setAudioOutputDevice(this.currentAudioDeviceId), 500);
+        twilioAudioService.setSpeakerDevice(this.currentAudioDeviceId);
       }
     });
   }
@@ -167,7 +171,7 @@ class TwilioService {
       
       this.isAudioContextInitialized = true;
       
-      // Get available audio output devices
+      // Get available audio output devices using the audio service
       await this.getAudioOutputDevices();
       
       return true;
@@ -180,29 +184,52 @@ class TwilioService {
   // Get available audio output devices with enhanced logging
   async getAudioOutputDevices(): Promise<MediaDeviceInfo[]> {
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        console.error("MediaDevices API not supported");
-        return [];
+      // Use Twilio audio service if available
+      if (twilioAudioService && this.device) {
+        const devices = await twilioAudioService.getOutputDevices();
+        this.audioOutputDevices = devices as MediaDeviceInfo[];
+        
+        console.log("Available audio output devices:", 
+          this.audioOutputDevices.map(d => ({ 
+            deviceId: d.deviceId, 
+            label: d.label || 'Unlabeled device' 
+          }))
+        );
+        
+        // Set default device if not already set
+        if (this.audioOutputDevices.length > 0 && !this.currentAudioDeviceId) {
+          const defaultDevice = this.audioOutputDevices.find(d => d.deviceId === 'default') || this.audioOutputDevices[0];
+          this.currentAudioDeviceId = defaultDevice.deviceId;
+          console.log(`Selected default audio output device: ${defaultDevice.label || 'Unlabeled device'}`);
+        }
+        
+        return this.audioOutputDevices;
+      } else {
+        // Fallback to browser API if Twilio is not initialized
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          console.error("MediaDevices API not supported");
+          return [];
+        }
+        
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        this.audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
+        
+        console.log("Available audio output devices:", 
+          this.audioOutputDevices.map(d => ({ 
+            deviceId: d.deviceId, 
+            label: d.label || 'Unlabeled device' 
+          }))
+        );
+        
+        // Set default device if not already set
+        if (this.audioOutputDevices.length > 0 && !this.currentAudioDeviceId) {
+          const defaultDevice = this.audioOutputDevices.find(d => d.deviceId === 'default') || this.audioOutputDevices[0];
+          this.currentAudioDeviceId = defaultDevice.deviceId;
+          console.log(`Selected default audio output device: ${defaultDevice.label || 'Unlabeled device'}`);
+        }
+        
+        return this.audioOutputDevices;
       }
-      
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      this.audioOutputDevices = devices.filter(device => device.kind === 'audiooutput');
-      
-      console.log("Available audio output devices:", 
-        this.audioOutputDevices.map(d => ({ 
-          deviceId: d.deviceId, 
-          label: d.label || 'Unlabeled device' 
-        }))
-      );
-      
-      // Set default device if not already set
-      if (this.audioOutputDevices.length > 0 && !this.currentAudioDeviceId) {
-        const defaultDevice = this.audioOutputDevices.find(d => d.deviceId === 'default') || this.audioOutputDevices[0];
-        this.currentAudioDeviceId = defaultDevice.deviceId;
-        console.log(`Selected default audio output device: ${defaultDevice.label || 'Unlabeled device'}`);
-      }
-      
-      return this.audioOutputDevices;
     } catch (error) {
       console.error("Error getting audio output devices:", error);
       return [];
@@ -216,7 +243,16 @@ class TwilioService {
     try {
       console.log(`Setting audio output device to: ${deviceId}`);
       
-      // Check if the setSinkId function is available
+      // Use Twilio audio service if available
+      if (twilioAudioService && this.device) {
+        const success = await twilioAudioService.setSpeakerDevice(deviceId);
+        if (success) {
+          this.currentAudioDeviceId = deviceId;
+          return true;
+        }
+      }
+      
+      // Fallback to browser API
       const audio = new Audio();
       
       if ('setSinkId' in audio) {
@@ -279,6 +315,12 @@ class TwilioService {
 
   // Test audio output with enhanced error handling
   async testAudioOutput(deviceId?: string): Promise<boolean> {
+    // Use Twilio audio service if available
+    if (twilioAudioService && this.device) {
+      return twilioAudioService.testSpeakerDevice(deviceId);
+    }
+    
+    // Fallback to manual audio testing
     try {
       console.log(`Testing audio output${deviceId ? ` on device: ${deviceId}` : ''}`);
       
@@ -382,14 +424,7 @@ class TwilioService {
             // Set the audio output device for this call if we have one selected
             if (this.currentAudioDeviceId) {
               setTimeout(() => {
-                this.setAudioOutputDevice(this.currentAudioDeviceId)
-                  .then(success => {
-                    if (success) {
-                      console.log(`Set call audio output to device: ${this.currentAudioDeviceId}`);
-                    } else {
-                      console.warn('Could not set audio output device for call');
-                    }
-                  });
+                twilioAudioService.setSpeakerDevice(this.currentAudioDeviceId);
               }, 500);
             }
           });
@@ -544,8 +579,8 @@ class TwilioService {
   toggleMute(mute: boolean): boolean {
     try {
       if (this.call) {
-        // Voice SDK 2.x uses mute() and unmute() methods
-        mute ? this.call.mute() : this.call.unmute();
+        // Voice SDK 2.x uses mute() method with parameter
+        this.call.mute(mute);
         return true;
       }
       return false;
@@ -553,12 +588,6 @@ class TwilioService {
       console.error("Error toggling mute:", error);
       return false;
     }
-  }
-
-  // Toggle speaker
-  toggleSpeaker(speakerOn: boolean): boolean {
-    // This is handled through the audio output device selection
-    return true;
   }
 
   // Check if microphone is active
@@ -569,6 +598,9 @@ class TwilioService {
   // Clean up resources
   cleanup(): void {
     if (this.device) {
+      // Clean up audio service first
+      twilioAudioService.cleanup();
+      
       // Voice SDK 2.x uses destroy() method
       this.device.destroy();
       this.device = null;

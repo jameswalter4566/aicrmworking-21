@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones, RefreshCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,6 +13,7 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { audioProcessing } from '@/services/audioProcessing';
+import { twilioAudioService } from '@/services/twilio-audio';
 
 interface CallControlProps {
   isMuted: boolean;
@@ -40,6 +41,8 @@ const CallControl: React.FC<CallControlProps> = ({
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(false);
+  const volumeListenerRef = useRef<((volume: number) => void) | null>(null);
+  const deviceChangeListenerRef = useRef<(() => void) | null>(null);
   
   // Initialize audio devices and connection
   useEffect(() => {
@@ -70,21 +73,39 @@ const CallControl: React.FC<CallControlProps> = ({
       }
     });
     
-    // Set up audio level simulation for connected calls
+    // Set up Twilio audio volume listener if available
+    volumeListenerRef.current = (volume: number) => {
+      setAudioLevel(volume);
+    };
+    
+    twilioAudioService.addInputVolumeListener(volumeListenerRef.current);
+    
+    // Set up device change listener
+    deviceChangeListenerRef.current = () => {
+      loadAudioDevices();
+    };
+    
+    twilioAudioService.addDeviceChangeListener(deviceChangeListenerRef.current);
+    
+    // Fallback to audio level simulation if Twilio audio service is not ready
     const interval = setInterval(() => {
-      if (audioStreaming) {
+      if (audioStreaming && audioLevel === 0) {
         setAudioLevel(prev => {
           const change = (Math.random() - 0.5) * 0.3;
           const newLevel = Math.max(0.05, Math.min(0.95, prev + change));
           return newLevel;
         });
-      } else {
-        setAudioLevel(0);
       }
     }, 200);
     
     return () => {
       clearInterval(interval);
+      if (volumeListenerRef.current) {
+        twilioAudioService.removeInputVolumeListener(volumeListenerRef.current);
+      }
+      if (deviceChangeListenerRef.current) {
+        twilioAudioService.removeDeviceChangeListener(deviceChangeListenerRef.current);
+      }
     };
   }, [audioStreaming]);
   
@@ -92,25 +113,36 @@ const CallControl: React.FC<CallControlProps> = ({
     try {
       setIsRefreshing(true);
       
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        console.warn("This browser doesn't support device enumeration");
-        toast({
-          title: "Audio Device Error",
-          description: "This browser doesn't support audio device selection.",
-          variant: "destructive"
-        });
-        return;
+      // Try to use Twilio's audio service first
+      let devices: MediaDeviceInfo[] = [];
+      
+      // Get devices from Twilio if available
+      if (twilioAudioService) {
+        devices = await twilioAudioService.getOutputDevices() as MediaDeviceInfo[];
       }
       
-      await navigator.mediaDevices.getUserMedia({ audio: true })
-        .catch(err => {
-          console.warn("Could not get microphone access:", err);
-        });
+      // Fall back to browser API if needed
+      if (devices.length === 0) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+          console.warn("This browser doesn't support device enumeration");
+          toast({
+            title: "Audio Device Error",
+            description: "This browser doesn't support audio device selection.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        await navigator.mediaDevices.getUserMedia({ audio: true })
+          .catch(err => {
+            console.warn("Could not get microphone access:", err);
+          });
+        
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        devices = allDevices.filter(device => device.kind === 'audiooutput') as MediaDeviceInfo[];
+      }
       
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioOutputs = devices.filter(device => device.kind === 'audiooutput');
-      
-      if (audioOutputs.length === 0) {
+      if (devices.length === 0) {
         toast({
           title: "No Audio Devices",
           description: "No audio output devices detected. Please check your system settings.",
@@ -118,15 +150,15 @@ const CallControl: React.FC<CallControlProps> = ({
         });
       }
       
-      setAudioDevices(audioOutputs);
+      setAudioDevices(devices);
       
-      if (audioOutputs.length > 0 && !selectedDeviceId) {
-        const defaultDevice = audioOutputs.find(d => d.deviceId === 'default') || audioOutputs[0];
+      if (devices.length > 0 && !selectedDeviceId) {
+        const defaultDevice = devices.find(d => d.deviceId === 'default') || devices[0];
         setSelectedDeviceId(defaultDevice.deviceId);
         if (onAudioDeviceChange) onAudioDeviceChange(defaultDevice.deviceId);
       }
       
-      console.log("Available audio output devices:", audioOutputs.map(d => ({ 
+      console.log("Available audio output devices:", devices.map(d => ({ 
         label: d.label || 'Unknown Device', 
         deviceId: d.deviceId
       })));
@@ -151,14 +183,25 @@ const CallControl: React.FC<CallControlProps> = ({
       onAudioDeviceChange(deviceId);
       
       // Test the selected audio device
-      audioProcessing.testAudio(deviceId).then(success => {
-        if (success) {
-          toast({
-            title: "Audio Device Selected",
-            description: "Test tone played through the selected device.",
-          });
-        }
-      });
+      if (twilioAudioService) {
+        twilioAudioService.testSpeakerDevice(deviceId).then(success => {
+          if (success) {
+            toast({
+              title: "Audio Device Selected",
+              description: "Test tone played through the selected device.",
+            });
+          }
+        });
+      } else {
+        audioProcessing.testAudio(deviceId).then(success => {
+          if (success) {
+            toast({
+              title: "Audio Device Selected",
+              description: "Test tone played through the selected device.",
+            });
+          }
+        });
+      }
     }
   };
   
