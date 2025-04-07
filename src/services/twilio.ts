@@ -1,3 +1,4 @@
+
 // src/services/twilio.ts
 import { twilioAudioService } from './twilio-audio';
 
@@ -11,6 +12,7 @@ class TwilioService {
   private audioOutputDevices: MediaDeviceInfo[] = [];
   private currentAudioDeviceId: string = '';
   private hasActiveCall: boolean = false;
+  private tokenRefreshInterval: number | null = null;
 
   // Initialize the Twilio device with enhanced options for Voice SDK 2.x
   async initializeTwilioDevice(): Promise<boolean> {
@@ -31,6 +33,16 @@ class TwilioService {
         return false;
       }
 
+      // Clean up any existing device before creating a new one
+      if (this.device) {
+        try {
+          this.device.destroy();
+          this.device = null;
+        } catch (e) {
+          console.warn("Error cleaning up previous device", e);
+        }
+      }
+
       // Create a new Twilio.Device with Voice SDK 2.x options
       this.device = new window.Twilio.Device(this.token, {
         // Voice SDK 2.x options
@@ -45,6 +57,8 @@ class TwilioService {
         }
       });
       
+      console.log("Twilio device created with token:", this.token ? this.token.substring(0, 10) + "..." : "no token");
+      
       // Set up event listeners with Voice SDK 2.x syntax
       this.setupDeviceEvents();
       
@@ -52,7 +66,16 @@ class TwilioService {
       twilioAudioService.initialize(this.device);
       
       // Register to receive incoming calls
-      this.device.register();
+      try {
+        await this.device.register();
+        console.log("Device registered successfully");
+      } catch (err) {
+        console.error("Error registering device:", err);
+        // Continue even if registration fails, as outgoing calls might still work
+      }
+      
+      // Set up automatic token refreshing every 10 minutes
+      this.setupTokenRefresh();
       
       this.isInitialized = true;
       console.log("Twilio Device initialized successfully with Voice SDK 2.x");
@@ -75,6 +98,12 @@ class TwilioService {
     
     this.device.on('error', (error: any) => {
       console.error("Twilio Device error:", error);
+      
+      // If we get a token error, try to refresh the token
+      if (error.code === 31102 || error.message.includes('token')) {
+        console.log("Token error detected, attempting to refresh token");
+        this.refreshToken();
+      }
     });
     
     this.device.on('incoming', (call: any) => {
@@ -101,23 +130,49 @@ class TwilioService {
     });
   }
 
+  // Set up automatic token refreshing
+  private setupTokenRefresh(): void {
+    // Clear any existing interval
+    if (this.tokenRefreshInterval) {
+      window.clearInterval(this.tokenRefreshInterval);
+    }
+    
+    // Refresh token every 10 minutes
+    // Twilio tokens typically last for 1 hour, so refreshing every 10 minutes gives us plenty of buffer
+    this.tokenRefreshInterval = window.setInterval(() => {
+      console.log("Automatic token refresh triggered");
+      this.refreshToken();
+    }, 10 * 60 * 1000); // 10 minutes
+  }
+
   // Fetch a new token from the server
   private async fetchToken(): Promise<{ token: string; identity: string; } | null> {
     try {
+      console.log("Fetching fresh Twilio token...");
+      
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({ 
+          timestamp: new Date().toISOString(),
+          refreshRequest: true 
+        })
       });
+      
+      if (!response.ok) {
+        throw new Error(`Server responded with status: ${response.status}`);
+      }
       
       const data = await response.json();
       
       if (!data.token) {
-        console.error("No token received from server");
+        console.error("No token received from server", data);
         return null;
       }
       
+      console.log("Successfully received new token:", data.token.substring(0, 10) + "...");
       return {
         token: data.token,
         identity: data.identity
@@ -140,8 +195,17 @@ class TwilioService {
     this.token = tokenData.token;
     
     if (this.device) {
-      this.device.updateToken(this.token);
-      return true;
+      try {
+        console.log("Updating device with new token");
+        this.device.updateToken(this.token);
+        return true;
+      } catch (err) {
+        console.error("Error updating device token:", err);
+        
+        // If updating the token fails, try to reinitialize the device
+        console.log("Attempting to reinitialize device with new token");
+        return this.initializeTwilioDevice();
+      }
     }
     
     return false;
@@ -398,6 +462,18 @@ class TwilioService {
       
       if (!connected) {
         console.warn('Failed to establish WebSocket connection for audio streaming');
+      }
+      
+      // Make sure we have a valid token before making a call
+      if (!this.token || !this.isInitialized) {
+        console.log("Token missing or device not initialized, reinitializing...");
+        const initialized = await this.initializeTwilioDevice();
+        if (!initialized) {
+          return { 
+            success: false, 
+            error: 'Failed to initialize Twilio device. Please check your connection and try again.'
+          };
+        }
       }
       
       // Try to use the Twilio Device for in-browser calling if available
@@ -661,6 +737,12 @@ class TwilioService {
 
   // Clean up resources
   cleanup(): void {
+    // Clear token refresh interval
+    if (this.tokenRefreshInterval) {
+      window.clearInterval(this.tokenRefreshInterval);
+      this.tokenRefreshInterval = null;
+    }
+    
     if (this.device) {
       // Clean up audio service first
       twilioAudioService.cleanup();

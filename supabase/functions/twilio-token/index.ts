@@ -60,7 +60,10 @@ serve(async (req) => {
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
 
-    const { action } = requestData as { action?: string };
+    const { action, refreshRequest } = requestData as { 
+      action?: string;
+      refreshRequest?: boolean;
+    };
 
     // If requesting configuration
     if (action === 'getConfig') {
@@ -89,7 +92,9 @@ serve(async (req) => {
     }
 
     // Create a unique ID for this client
-    const identity = `browser-${crypto.randomUUID()}`;
+    // If it's a refresh request, add a timestamp to ensure it's unique
+    const uniqueId = refreshRequest ? `refresh-${Date.now()}` : crypto.randomUUID();
+    const identity = `browser-${uniqueId}`;
     console.log(`Generating token for identity: ${identity}`);
 
     try {
@@ -130,7 +135,8 @@ serve(async (req) => {
           success: true,
           ttl: 86400,
           timestamp: new Date().toISOString(),
-          voiceSdkVersion: '2.x'
+          voiceSdkVersion: '2.x',
+          refreshRequest: !!refreshRequest,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
