@@ -8,7 +8,7 @@ import { AudioDebugModal } from "./AudioDebugModal";
 import { AudioInitializer } from "./AudioInitializer";
 import AudioDeviceDropdown from "./AudioDeviceDropdown";
 
-interface CallControlsProps {
+export interface CallControlsProps {
   phoneNumber?: string;
   leadId?: string | number;
   activeCall?: ActiveCall;
