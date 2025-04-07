@@ -1,4 +1,3 @@
-
 /**
  * Utility to preload audio files to ensure they play immediately when needed
  */
@@ -82,7 +81,7 @@ function createFallbackAudioElement(frequency = 440, duration = 1, volume = 0.3)
 /**
  * Preloads all audio files needed for the application
  */
-export const preloadAudioAssets = async (): Promise<void[]> => {
+export const preloadAudioAssets = async (): Promise<void> => {
   console.log('Preloading audio assets...');
   
   // Create a default tone for fallbacks
@@ -183,7 +182,6 @@ export const preloadAudioAssets = async (): Promise<void[]> => {
   
   await Promise.all(preloadPromises);
   console.log('🔊 Audio assets preloaded successfully');
-  return preloadPromises;
 };
 
 /**
