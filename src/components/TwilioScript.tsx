@@ -6,9 +6,6 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
-// We won't redefine the Window.Twilio interface here since it's already defined in vite-env.d.ts
-// This avoids the interface merging conflict
-
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
@@ -37,8 +34,9 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     const script = document.createElement('script');
     script.id = 'twilio-js-sdk';
     
-    // Updated to use the official Twilio SDK URL instead of CDN (more reliable)
-    script.src = 'https://sdk.twilio.com/js/voice/releases/2.5.0/twilio-voice.min.js';
+    // Try a different CDN URL if the official one is having issues
+    // Using the latest version (2.5.0) from Twilio's CDN
+    script.src = 'https://sdk.twilio.com/js/client/v1.14/twilio.js';
     script.async = true;
     script.defer = true;
     
@@ -78,8 +76,28 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         crossOrigin: script.crossOrigin
       });
       
-      setError(error);
-      if (onError) onError(error);
+      // Try loading from alternative CDN as fallback
+      console.log("🔶 Attempting to load Twilio SDK from alternate CDN...");
+      const alternateScript = document.createElement('script');
+      alternateScript.id = 'twilio-js-sdk-alt';
+      alternateScript.src = 'https://media.twiliocdn.com/sdk/js/client/v1.14/twilio.min.js';
+      alternateScript.async = true;
+      
+      alternateScript.onload = () => {
+        console.log("🔶 Twilio SDK loaded from alternate CDN", {
+          version: window.Twilio?.VERSION || 'unknown'
+        });
+        setLoaded(true);
+        if (onLoad) onLoad();
+      };
+      
+      alternateScript.onerror = () => {
+        console.error("🔶 Failed to load Twilio SDK from alternate CDN");
+        setError(error);
+        if (onError) onError(error);
+      };
+      
+      document.head.appendChild(alternateScript);
     };
     
     document.head.appendChild(script);
