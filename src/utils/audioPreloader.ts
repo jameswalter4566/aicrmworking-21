@@ -6,14 +6,15 @@
 interface AudioAsset {
   name: string;
   url: string;
+  required?: boolean;
 }
 
 // List of audio assets to preload
 const audioAssets: AudioAsset[] = [
-  { name: 'incoming', url: '/sounds/incoming.mp3' },
-  { name: 'outgoing', url: '/sounds/outgoing.mp3' },
-  { name: 'disconnect', url: '/sounds/disconnect.mp3' },
-  { name: 'dialtone', url: '/sounds/dialtone.mp3' },
+  { name: 'incoming', url: '/sounds/incoming.mp3', required: true },
+  { name: 'outgoing', url: '/sounds/outgoing.mp3', required: true },
+  { name: 'disconnect', url: '/sounds/disconnect.mp3', required: true },
+  { name: 'dialtone', url: '/sounds/dialtone.mp3', required: true },
   { name: 'dtmf0', url: '/sounds/dtmf-0.mp3' },
   { name: 'dtmf1', url: '/sounds/dtmf-1.mp3' },
   { name: 'dtmf2', url: '/sounds/dtmf-2.mp3' },
@@ -26,7 +27,7 @@ const audioAssets: AudioAsset[] = [
   { name: 'dtmf9', url: '/sounds/dtmf-9.mp3' },
   { name: 'dtmfstar', url: '/sounds/dtmf-star.mp3' },
   { name: 'dtmfpound', url: '/sounds/dtmf-pound.mp3' },
-  { name: 'test-tone', url: '/sounds/test-tone.mp3' }
+  { name: 'test-tone', url: '/sounds/test-tone.mp3', required: true }
 ];
 
 // Cache of preloaded audio elements
@@ -52,7 +53,24 @@ export const preloadAudioAssets = (): Promise<void[]> => {
         }, { once: true });
         
         audio.addEventListener('error', (err) => {
-          console.warn(`Failed to load audio asset: ${asset.name}`, err);
+          if (asset.required) {
+            console.warn(`Failed to load required audio asset: ${asset.name}`, err);
+          } else {
+            console.warn(`Failed to load audio asset: ${asset.name}`, err);
+          }
+          
+          // For non-required assets, use a default tone
+          if (!asset.required) {
+            try {
+              // Try to use dialtone as fallback for dtmf tones
+              if (asset.name.startsWith('dtmf') && audioCache['dialtone']) {
+                audioCache[asset.name] = audioCache['dialtone'].cloneNode(true) as HTMLAudioElement;
+              }
+            } catch (e) {
+              console.error(`Error creating fallback for ${asset.name}:`, e);
+            }
+          }
+          
           // Resolve anyway to not block other assets
           resolve();
         }, { once: true });

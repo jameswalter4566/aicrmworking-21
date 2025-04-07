@@ -2,6 +2,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { twilioAudioService } from '@/services/twilio-audio';
 import { toast } from './ui/use-toast';
+import { getPreloadedAudio, playAudio } from '@/utils/audioPreloader';
 
 interface TwilioAudioPlayerProps {
   callActive?: boolean;
@@ -17,6 +18,24 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
   const volumeListenerRef = useRef<((volume: number) => void) | null>(null);
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  
+  // Function to play a sound using either our preloader or direct Audio API
+  const playSound = async (soundName: string, volume: number = 0.3) => {
+    try {
+      // Try using preloaded audio first
+      const played = await playAudio(soundName, volume);
+      if (played) return true;
+      
+      // Fallback: Try directly with Audio API
+      const audio = new Audio(`/sounds/${soundName}.mp3`);
+      audio.volume = volume;
+      await audio.play();
+      return true;
+    } catch (err) {
+      console.warn(`Failed to play sound: ${soundName}`, err);
+      return false;
+    }
+  };
   
   useEffect(() => {
     // Initialize audio context and element on component mount
@@ -46,7 +65,11 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
           audioElementRef.current = audioEl;
           
           // Set a test sound to ensure audio system is ready
-          audioEl.src = '/sounds/dialtone.mp3';
+          const dialtoneSrc = getPreloadedAudio('dialtone') ? 
+            getPreloadedAudio('dialtone')?.src :
+            '/sounds/dialtone.mp3';
+          
+          audioEl.src = dialtoneSrc || '/sounds/dialtone.mp3';
           
           audioEl.addEventListener('canplaythrough', () => {
             console.log("🔊 Audio element can play through");
@@ -99,7 +122,7 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
       console.log(`🔊 TwilioAudioPlayer: Active call ${callSid}`);
       
       // Play outgoing sound to the selected device
-      twilioAudioService.toggleSound('outgoing', true);
+      playSound('outgoing', 0.3);
       
       // Check current device
       const currentDevice = twilioAudioService.getCurrentOutputDevice();
@@ -134,7 +157,7 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
         });
     } else if (callSid) {
       // If we have a callSid but call is no longer active, play disconnect sound
-      twilioAudioService.toggleSound('disconnect', true);
+      playSound('disconnect', 0.3);
     }
     
     return () => {
