@@ -221,6 +221,13 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
             twilioDevice.audio.on('deviceChange', (devices: any) => {
               console.log("🔊 Twilio audio devices changed:", devices);
             });
+            
+            // Make sure we're using the right speaker device
+            if (audioDevice && twilioDevice.audio.speakerDevices && twilioDevice.audio.speakerDevices.set) {
+              twilioDevice.audio.speakerDevices.set(audioDevice)
+                .then(() => console.log("🔊 Set Twilio speaker device to:", audioDevice))
+                .catch((err: any) => console.warn("🔊 Error setting Twilio speaker device:", err));
+            }
           }
           
           // For calls - both 1.x and 2.x versions
@@ -365,6 +372,13 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
             }
           });
         }
+        
+        // For Device 2.x - set the speaker devices
+        if (window.Twilio?.Device?.audio?.speakerDevices?.set) {
+          window.Twilio.Device.audio.speakerDevices.set(currentDevice)
+            .then(() => console.log(`🔊 Set Twilio 2.x speaker device to: ${currentDevice}`))
+            .catch((err: any) => console.warn("🔊 Error setting Twilio 2.x speaker device:", err));
+        }
       }
       
       // Force-release microphone audio to ensure it's available
@@ -420,6 +434,13 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
               }
             }
           });
+        }
+        
+        // For Device 2.x - set the speaker devices
+        if (window.Twilio?.Device?.audio?.speakerDevices?.set) {
+          window.Twilio.Device.audio.speakerDevices.set(newDevice)
+            .then(() => console.log(`🔊 Set Twilio 2.x speaker device to: ${newDevice}`))
+            .catch((err: any) => console.warn("🔊 Error setting Twilio 2.x speaker device:", err));
         }
       }
     };

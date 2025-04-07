@@ -1,3 +1,4 @@
+
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import twilio from 'npm:twilio@4.23.0';
 
@@ -9,7 +10,7 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 };
 
-console.log("Twilio Token function loaded and ready");
+console.log("Twilio Voice function loaded and ready");
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Voice function`);
@@ -182,7 +183,7 @@ serve(async (req) => {
     // Handle different actions
     if (action === 'makeCall') {
       // Make an outbound call
-      const { phoneNumber } = requestData;
+      const { phoneNumber, browserClientName, callBack } = requestData;
       
       if (!phoneNumber) {
         // Return a TwiML response even for this error
@@ -196,6 +197,7 @@ serve(async (req) => {
       
       try {
         console.log(`Making call to ${phoneNumber} using phone number ${TWILIO_PHONE_NUMBER}`);
+        console.log(`Browser client name: ${browserClientName || 'not provided'}`);
         
         // Format phone number to ensure it has + and only digits
         let formattedPhoneNumber = phoneNumber;
@@ -212,20 +214,60 @@ serve(async (req) => {
         const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
         console.log(`Using stream URL: ${streamUrl}`);
         
+        // Create a conference call to connect both the browser and the phone
+        const conferenceOptions = {
+          maxParticipants: 2,
+          statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
+          statusCallbackEvent: ['join', 'leave', 'end', 'start', 'spoken'],
+          recordingStatusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
+          record: 'record-from-start',
+          recordingStatusCallbackEvent: ['completed'],
+          endConferenceOnExit: true,
+        };
+
+        // First make the outbound call to the phone number
         const call = await client.calls.create({
-          to: formattedPhoneNumber, // Use the formatted phone number
+          to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          url: `${PUBLIC_URL}/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(formattedPhoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
+          twiml: new twilio.twiml.VoiceResponse()
+            .say("Hello! You're receiving a call from the Power Dialer. Please wait while we connect you.")
+            .conference('power-dialer-conference', conferenceOptions)
+            .toString(),
           statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
           machineDetection: 'DetectMessageEnd',
           machineDetectionTimeout: 30,
           timeout: 30,
-          record: true,
-          trim: 'trim-silence',
-          transcribe: false,
         });
+        
+        // Now if we have a browser client, make a second call to connect that client
+        if (browserClientName) {
+          console.log(`Connecting browser client: ${browserClientName}`);
+          const browserCall = await client.calls.create({
+            to: `client:${browserClientName}`,
+            from: TWILIO_PHONE_NUMBER,
+            twiml: new twilio.twiml.VoiceResponse()
+              .say("Connecting you to the call...")
+              .conference('power-dialer-conference', conferenceOptions)
+              .toString(),
+            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
+            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+            statusCallbackMethod: 'POST',
+          });
+          
+          console.log(`Browser call initiated with SID: ${browserCall.sid}`);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              callSid: call.sid,
+              browserCallSid: browserCall.sid,
+              conferenceEnabled: true
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         
         console.log(`Call initiated with SID: ${call.sid}`);
         

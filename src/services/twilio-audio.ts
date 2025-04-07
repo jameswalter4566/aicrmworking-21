@@ -1,5 +1,4 @@
 
-// src/services/twilio-audio.ts
 interface InputVolumeCallback {
   (volume: number): void;
 }
@@ -90,6 +89,62 @@ class TwilioAudioService {
         this.refreshOutputDevices();
         this.notifyDeviceChangeListeners();
       });
+      
+      // Set up volume monitoring through Twilio's built-in mechanism
+      if (typeof this.device.audio.on === 'function') {
+        try {
+          this.device.audio.on('inputVolume', (volume: number) => {
+            this.notifyVolumeListeners(volume);
+          });
+          console.log('Set up Twilio inputVolume monitoring');
+        } catch (err) {
+          console.warn('Could not set up Twilio inputVolume monitoring:', err);
+        }
+      }
+    }
+    
+    // Set up call audio handling
+    if (this.device.on) {
+      // Handle incoming calls 
+      this.device.on('incoming', (call: any) => {
+        console.log('Incoming call, setting up audio');
+        
+        // Set up audio handlers for this call
+        call.on('audio', (audioElement: HTMLAudioElement) => {
+          // Make sure we're using the right output device
+          if ('setSinkId' in audioElement && this.currentOutputDevice) {
+            try {
+              (audioElement as any).setSinkId(this.currentOutputDevice);
+            } catch (err) {
+              console.warn('Could not set sink ID for incoming call:', err);
+            }
+          }
+        });
+      });
+      
+      // Also handle any new calls made through the device
+      this.device.on('connect', (call: any) => {
+        console.log('Call connected, setting up audio');
+        
+        // Set up audio handlers for this call
+        call.on('audio', (audioElement: HTMLAudioElement) => {
+          // Make sure we're using the right output device
+          if ('setSinkId' in audioElement && this.currentOutputDevice) {
+            try {
+              (audioElement as any).setSinkId(this.currentOutputDevice);
+              console.log('Set sink ID for connected call:', this.currentOutputDevice);
+            } catch (err) {
+              console.warn('Could not set sink ID for connected call:', err);
+            }
+          }
+        });
+        
+        // Listen for volume events on this call
+        call.on('volume', (inputVolume: number, outputVolume: number) => {
+          // Use output volume to indicate when audio is coming through
+          this.notifyVolumeListeners(outputVolume);
+        });
+      });
     }
   }
   
@@ -99,12 +154,15 @@ class TwilioAudioService {
       window.clearInterval(this.volumeInterval);
     }
     
-    // Start new monitoring
+    // Start new monitoring - this is a fallback in case Twilio's volume events aren't working
     this.volumeInterval = window.setInterval(() => {
       if (this.inputVolumeListeners.length > 0) {
-        // Simulate volume levels for testing when no real audio
-        const simulatedVolume = Math.random() * 0.2;
-        this.notifyVolumeListeners(simulatedVolume);
+        // Only use simulated volume if we have no active calls
+        if (!this.device || !this.device.calls || this.device.calls.length === 0) {
+          // Simulate volume levels for testing when no real audio
+          const simulatedVolume = Math.random() * 0.2;
+          this.notifyVolumeListeners(simulatedVolume);
+        }
       }
     }, 200);
   }
@@ -207,6 +265,36 @@ class TwilioAudioService {
             await (audio as any).setSinkId(deviceId);
           } catch (err) {
             // Ignore errors for elements we can't control
+          }
+        }
+      }
+      
+      // Update Twilio's audio output device if possible
+      if (this.device && this.device.audio) {
+        if (this.device.audio.speakerDevices && this.device.audio.speakerDevices.set) {
+          try {
+            await this.device.audio.speakerDevices.set(deviceId);
+            console.log('Set Twilio speaker device to:', deviceId);
+          } catch (err) {
+            console.warn('Error setting Twilio speaker device:', err);
+          }
+        }
+      }
+      
+      // Also check for active calls and update their audio elements
+      if (this.device && this.device.calls) {
+        for (const call of this.device.calls) {
+          try {
+            // For Device 2.x
+            if (call._mediaHandler && call._mediaHandler._remoteStream && call._mediaHandler._remoteStream.audio) {
+              const audioEl = call._mediaHandler._remoteStream.audio._element;
+              if (audioEl && 'setSinkId' in audioEl) {
+                await audioEl.setSinkId(deviceId);
+                console.log('Updated active call audio output device');
+              }
+            }
+          } catch (err) {
+            console.warn('Error updating call audio output device:', err);
           }
         }
       }
