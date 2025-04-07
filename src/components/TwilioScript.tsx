@@ -6,12 +6,13 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
-// Add interface for the global Voice SDK
+// Update the interface for the global Voice SDK to match the expected type
 declare global {
   interface Window {
     Twilio: {
       Device: any;
       VERSION?: string;
+      [key: string]: any; // Add this index signature to match the expected type
     };
   }
 }
