@@ -707,7 +707,7 @@ export const useTwilio = () => {
     }
     
     return success;
-  }, [activeCalls]);
+  }, []);
 
   const refreshAudioDevices = useCallback(async () => {
     try {

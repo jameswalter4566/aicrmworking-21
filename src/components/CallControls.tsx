@@ -6,6 +6,7 @@ import { ActiveCall } from "@/hooks/use-twilio";
 import AudioDeviceSelector from "./AudioDeviceSelector";
 import { AudioDebugModal } from "./AudioDebugModal";
 import { AudioInitializer } from "./AudioInitializer";
+import AudioDeviceDropdown from "./AudioDeviceDropdown";
 
 interface CallControlsProps {
   phoneNumber?: string;
@@ -115,14 +116,14 @@ export function CallControls({
                 {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
               </Button>
               
-              <Button
-                variant={isSpeakerOn ? "default" : "outline"}
-                size="icon"
-                onClick={toggleDeviceSelector}
-                title="Audio device settings"
-              >
-                {isSpeakerOn ? <Volume2 size={18} /> : <Volume size={18} />}
-              </Button>
+              {/* Audio device dropdown instead of speaker toggle button */}
+              <AudioDeviceDropdown
+                devices={audioOutputDevices}
+                currentDeviceId={currentAudioDevice}
+                onDeviceChange={onChangeAudioDevice}
+                onRefreshDevices={onRefreshDevices}
+                disabled={disabled}
+              />
               
               {/* Add audio debug modal if in active call */}
               <AudioDebugModal />

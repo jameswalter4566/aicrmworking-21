@@ -17,6 +17,8 @@ interface AudioDebugInfo {
   lastProcessedAudio: string;
   audioQueueLength: number;
   isPlaying: boolean;
+  selectedDevice?: string;
+  availableDevices?: number;
 }
 
 export function AudioDebugModal() {
@@ -32,7 +34,9 @@ export function AudioDebugModal() {
     reconnectAttempts: 0,
     lastProcessedAudio: 'never',
     audioQueueLength: 0,
-    isPlaying: false
+    isPlaying: false,
+    selectedDevice: 'unknown',
+    availableDevices: 0
   });
   
   const [isOpen, setIsOpen] = useState(false);
@@ -121,6 +125,12 @@ export function AudioDebugModal() {
             
             <div className="font-medium">Audio Queue:</div>
             <div>{debugInfo.audioQueueLength} chunks {debugInfo.isPlaying ? '(playing)' : ''}</div>
+            
+            <div className="font-medium">Selected Device:</div>
+            <div className="truncate">{debugInfo.selectedDevice || 'default'}</div>
+            
+            <div className="font-medium">Available Devices:</div>
+            <div>{debugInfo.availableDevices || 0} devices</div>
           </div>
           
           <div className="flex justify-end space-x-2">
