@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // Create Supabase client with direct URL and key
@@ -275,7 +274,8 @@ class TwilioService {
           
           console.log('Browser-based call connected:', call);
           
-          const callSid = call.parameters?.CallSid;
+          // Fix: Add type check before accessing call.parameters.CallSid
+          const callSid = call.parameters && call.parameters.CallSid ? call.parameters.CallSid : undefined;
           if (callSid && leadId) {
             this.activeCallSids.set(leadId, callSid);
           }

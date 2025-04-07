@@ -567,7 +567,7 @@ export default function PowerDialer() {
           </TabsContent>
         </Tabs>
         
-        <TwilioAudioPlayer />
+        <TwilioAudioPlayer sound="/sounds/test-tone.mp3" />
       </div>
     </MainLayout>
   );
