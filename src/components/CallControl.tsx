@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones, RefreshCcw } from 'lucide-react';
@@ -44,7 +45,7 @@ const CallControl: React.FC<CallControlProps> = ({
   useEffect(() => {
     loadAudioDevices();
     
-    // Connect to the audio processing service
+    // Connect to the audio processing service with correct callbacks
     audioProcessing.connect({
       onConnectionStatus: (connected) => {
         setIsConnected(connected);
@@ -55,14 +56,16 @@ const CallControl: React.FC<CallControlProps> = ({
           });
         }
       },
-      onStreamStarted: () => {
+      onStreamStarted: (streamSid, callSid) => {
+        console.log(`Audio stream started: ${streamSid}, CallSid: ${callSid}`);
         setIsConnected(true);
         toast({
           title: "Audio Stream Started",
           description: "Bidirectional audio stream is now active.",
         });
       },
-      onStreamEnded: () => {
+      onStreamEnded: (streamSid) => {
+        console.log(`Audio stream ended: ${streamSid}`);
         setIsConnected(false);
       }
     });

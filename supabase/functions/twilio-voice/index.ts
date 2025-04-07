@@ -39,7 +39,16 @@ function generateCallTwiML(phoneNumber: string, streamUrl: string): string {
     
     const twimlResponse = new twilio.twiml.VoiceResponse();
     
-    // Setup the stream connector FIRST to ensure it's established before dial
+    // Add initial greeting
+    twimlResponse.say({ 
+      voice: 'alice',
+      language: 'en-US' 
+    }, 'Call connected. Audio streaming is active.');
+    
+    // Add a short pause
+    twimlResponse.pause({ length: 1 });
+    
+    // Setup the stream connector with explicit parameters
     twimlResponse.stream({
       url: streamUrl,
       track: 'both_tracks', // Capture both inbound and outbound audio
@@ -49,15 +58,6 @@ function generateCallTwiML(phoneNumber: string, streamUrl: string): string {
       maxRetries: 3,
       connectTimeout: 10
     });
-    
-    // Add a small pause to give the stream time to connect
-    twimlResponse.pause({ length: 1 });
-    
-    // Add initial greeting after pause
-    twimlResponse.say({ 
-      voice: 'alice',
-      language: 'en-US' 
-    }, 'Connecting your call now.');
     
     // Then set up the dial - this order is crucial for audio flow
     if (phoneNumber) {
@@ -233,8 +233,9 @@ serve(async (req) => {
         );
       }
       
-      // Set WebSocket URL for audio stream
+      // Set WebSocket URL for audio stream - CRITICAL FOR AUDIO
       const streamUrl = `wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream`;
+      console.log(`Using stream URL: ${streamUrl}`);
       
       const callOptions = {
         to: formattedPhoneNumber,
@@ -294,10 +295,10 @@ serve(async (req) => {
         
         console.log(`Handling voice with streamUrl=${streamUrl} and phoneNumber=${phoneNumberParam}`);
         
-        // Generate TwiML directly rather than using the function that was causing issues
+        // Generate TwiML response with streaming
         const twiml = generateCallTwiML(phoneNumberParam, streamUrl);
         
-        console.log("Returning TwiML response");
+        console.log("Returning TwiML response with streaming enabled");
         return new Response(twiml, { 
           headers: { 
             ...corsHeaders, 
