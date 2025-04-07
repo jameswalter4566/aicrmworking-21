@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -359,7 +360,7 @@ export const useTwilio = () => {
     };
   }, [checkPermissions, setupWebSocket, stopCapturingMicrophone]);
 
-  const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = false) => {
+  const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = true) => {
     const leadIdStr = String(leadId);
     
     if (statusCheckIntervals.current[leadIdStr]) {
@@ -458,10 +459,10 @@ export const useTwilio = () => {
           
           toast({
             title: "Call Connected",
-            description: `Call is now in progress. ${usingBrowser ? "Audio should be streaming through your browser." : ""}`,
+            description: `Call is now in progress. Audio should be streaming through your browser.`,
           });
           
-          if (usingBrowser && !microphoneActive) {
+          if (!microphoneActive) {
             toast({
               title: "Audio Check",
               description: "Your microphone appears to be inactive. Check browser permissions.",
@@ -531,6 +532,7 @@ export const useTwilio = () => {
     
     setupWebSocket();
     
+    // Always use browser dialing - never fall back to REST API
     const result = await twilioService.makeCall(phoneNumber);
     
     if (result.success && result.callSid) {
@@ -545,7 +547,7 @@ export const useTwilio = () => {
           leadId,
           isMuted: false,
           speakerOn: false,
-          usingBrowser: result.usingBrowser,
+          usingBrowser: true, // Always using browser calling
           audioActive: microphoneActive,
           audioStreaming: audioStreaming
         }
@@ -556,7 +558,7 @@ export const useTwilio = () => {
         description: `Calling ${phoneNumber}... Audio will stream through your browser when connected.`,
       });
       
-      monitorCallStatus(leadId, result.callSid, result.usingBrowser);
+      monitorCallStatus(leadId, result.callSid, true);
     } else {
       toast({
         title: "Call Failed",

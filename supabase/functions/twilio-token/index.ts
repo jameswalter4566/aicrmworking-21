@@ -118,11 +118,13 @@ serve(async (req) => {
       const voiceGrant = new VoiceGrant({
         outgoingApplicationSid: TWILIO_TWIML_APP_SID,
         incomingAllow: true, // Allow incoming calls
+        // Add explicit permissions for browser calling
+        pushCredentialSid: null // No push notifications - browser only
       });
 
       accessToken.addGrant(voiceGrant);
       const token = accessToken.toJwt();
-      console.log("Token generated successfully with 24-hour TTL for Voice SDK 2.x");
+      console.log(`Token generated successfully with 24-hour TTL for Voice SDK 2.x (Identity: ${identity})`);
 
       // Return additional debug information to help with troubleshooting
       return new Response(
@@ -137,6 +139,7 @@ serve(async (req) => {
           timestamp: new Date().toISOString(),
           voiceSdkVersion: '2.x',
           refreshRequest: !!refreshRequest,
+          forceWebRTC: true // Indicate that we're forcing WebRTC browser calling
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

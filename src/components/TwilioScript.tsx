@@ -34,11 +34,11 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     const script = document.createElement('script');
     script.id = 'twilio-js-sdk';
     
-    // Try a different CDN URL if the official one is having issues
-    // Using Twilio Voice SDK 2.x
-    script.src = 'https://sdk.twilio.com/js/client/v2.0.0/twilio.min.js';
+    // Use a specific version of Twilio Voice SDK known to work well with browser calling
+    script.src = 'https://media.twiliocdn.com/sdk/js/client/v2.0.0/twilio.min.js';
     script.async = true;
     script.defer = true;
+    script.crossOrigin = "anonymous"; // Add cross-origin attribute
     
     script.onload = () => {
       console.log("🔶 Twilio Voice SDK loaded successfully", {
@@ -76,12 +76,13 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         crossOrigin: script.crossOrigin
       });
       
-      // Try loading from alternative CDN as fallback
+      // Try loading from alternative CDN as fallback - use the official CDN as backup
       console.log("🔶 Attempting to load Twilio SDK from alternate CDN...");
       const alternateScript = document.createElement('script');
       alternateScript.id = 'twilio-js-sdk-alt';
-      alternateScript.src = 'https://media.twiliocdn.com/sdk/js/client/v2.0.0/twilio.min.js';
+      alternateScript.src = 'https://sdk.twilio.com/js/client/v2.0.0/twilio.min.js';
       alternateScript.async = true;
+      alternateScript.crossOrigin = "anonymous"; // Add cross-origin attribute
       
       alternateScript.onload = () => {
         console.log("🔶 Twilio SDK loaded from alternate CDN", {

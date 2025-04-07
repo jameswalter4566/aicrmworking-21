@@ -1,4 +1,3 @@
-
 // src/services/twilio.ts
 import { twilioAudioService } from './twilio-audio';
 
@@ -13,6 +12,7 @@ class TwilioService {
   private currentAudioDeviceId: string = '';
   private hasActiveCall: boolean = false;
   private tokenRefreshInterval: number | null = null;
+  private useBrowserCallingOnly: boolean = true; // Always use browser calling
 
   // Initialize the Twilio device with enhanced options for Voice SDK 2.x
   async initializeTwilioDevice(): Promise<boolean> {
@@ -157,7 +157,8 @@ class TwilioService {
         },
         body: JSON.stringify({ 
           timestamp: new Date().toISOString(),
-          refreshRequest: true 
+          refreshRequest: true,
+          authorization: `Bearer ${this.token || ''}` 
         })
       });
       
@@ -436,7 +437,7 @@ class TwilioService {
     }
   }
 
-  // Make a call using Twilio Voice SDK 2.x
+  // Make a call - EXCLUSIVELY using the Twilio Browser SDK for calling
   async makeCall(phoneNumber: string): Promise<{
     success: boolean;
     callSid?: string;
@@ -476,7 +477,7 @@ class TwilioService {
         }
       }
       
-      // Try to use the Twilio Device for in-browser calling if available
+      // EXCLUSIVELY use the Twilio Device for in-browser calling
       if (this.isInitialized && this.device) {
         console.log(`Making browser call to ${phoneNumber} with Voice SDK 2.x`);
         
@@ -522,39 +523,22 @@ class TwilioService {
           };
         } catch (deviceError) {
           console.error('Error making call with Twilio Device:', deviceError);
-          // Fall back to REST API call
+          
+          // For now, we don't want to fall back to REST API - return the error
+          return {
+            success: false,
+            error: `Browser calling failed: ${deviceError.message || 'Unknown error'}`,
+            usingBrowser: false
+          };
         }
-      }
-      
-      // Fall back to making a call via the Edge Function
-      console.log(`Making REST API call to ${phoneNumber}`);
-      
-      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'makeCall',
-          phoneNumber
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (!data.success) {
+      } else {
+        // Device not initialized or not available
         return {
           success: false,
-          error: data.error || 'Call failed',
+          error: 'Browser calling not available - Twilio Device not initialized',
           usingBrowser: false
         };
       }
-      
-      return {
-        success: true,
-        callSid: data.callSid,
-        usingBrowser: false
-      };
     } catch (error: any) {
       console.error(`Error making call to ${phoneNumber}:`, error);
       return {
@@ -562,6 +546,85 @@ class TwilioService {
         error: error.message || 'Unknown error',
         usingBrowser: false
       };
+    }
+  }
+
+  // Toggle mute
+  toggleMute(mute: boolean): boolean {
+    try {
+      if (this.call) {
+        // Voice SDK 2.x uses mute() method with parameter
+        this.call.mute(mute);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error("Error toggling mute:", error);
+      return false;
+    }
+  }
+
+  // Toggle speaker mode
+  toggleSpeaker(speakerOn: boolean): boolean {
+    try {
+      // In browser context, "speaker mode" typically means changing the audio output device
+      // to either the default speakers or a specifically designated speaker device
+      
+      // If we have the twilioAudioService and the device is initialized
+      if (twilioAudioService && this.device) {
+        // We'll handle this asynchronously but return success immediately
+        // since the toggleSpeaker method is expected to return a boolean
+        this.toggleSpeakerAsync(speakerOn);
+        return true;
+      }
+      
+      console.log("Unable to toggle speaker mode - audio service not initialized");
+      return false;
+    } catch (error) {
+      console.error("Error toggling speaker:", error);
+      return false;
+    }
+  }
+  
+  // Private async method to handle the speaker toggle
+  private async toggleSpeakerAsync(speakerOn: boolean): Promise<void> {
+    try {
+      if (!twilioAudioService || !this.device) return;
+      
+      // Get currently available output devices
+      const outputDevices = await twilioAudioService.getOutputDevices();
+      
+      if (outputDevices && outputDevices.length > 0) {
+        // If speaker is turned on, try to find a device labeled as "speaker" or use default
+        if (speakerOn) {
+          // Look for a device that might be a speaker (contains "speaker" or "output" in the name)
+          const speakerDevice = outputDevices.find(device => 
+            device.label.toLowerCase().includes('speaker') || 
+            device.label.toLowerCase().includes('output')
+          );
+          
+          // If found a speaker device, use it, otherwise use default
+          const deviceId = speakerDevice ? speakerDevice.deviceId : 'default';
+          await twilioAudioService.setSpeakerDevice(deviceId);
+          console.log(`Speaker mode ON: set to device ${deviceId}`);
+        } else {
+          // If speaker is turned off, try to find a device that might be headphones
+          const headphoneDevice = outputDevices.find(device => 
+            device.label.toLowerCase().includes('headphone') || 
+            device.label.toLowerCase().includes('earphone') ||
+            device.label.toLowerCase().includes('headset')
+          );
+          
+          // If found headphones, use them, otherwise use default
+          const deviceId = headphoneDevice ? headphoneDevice.deviceId : 'default';
+          await twilioAudioService.setSpeakerDevice(deviceId);
+          console.log(`Speaker mode OFF: set to device ${deviceId}`);
+        }
+      } else {
+        console.log("No audio output devices available for speaker toggle");
+      }
+    } catch (error) {
+      console.error("Error in toggleSpeakerAsync:", error);
     }
   }
 
@@ -648,85 +711,6 @@ class TwilioService {
         return 'completed';
       default:
         return status;
-    }
-  }
-
-  // Toggle mute
-  toggleMute(mute: boolean): boolean {
-    try {
-      if (this.call) {
-        // Voice SDK 2.x uses mute() method with parameter
-        this.call.mute(mute);
-        return true;
-      }
-      return false;
-    } catch (error) {
-      console.error("Error toggling mute:", error);
-      return false;
-    }
-  }
-
-  // Toggle speaker mode
-  toggleSpeaker(speakerOn: boolean): boolean {
-    try {
-      // In browser context, "speaker mode" typically means changing the audio output device
-      // to either the default speakers or a specifically designated speaker device
-      
-      // If we have the twilioAudioService and the device is initialized
-      if (twilioAudioService && this.device) {
-        // We'll handle this asynchronously but return success immediately
-        // since the toggleSpeaker method is expected to return a boolean
-        this.toggleSpeakerAsync(speakerOn);
-        return true;
-      }
-      
-      console.log("Unable to toggle speaker mode - audio service not initialized");
-      return false;
-    } catch (error) {
-      console.error("Error toggling speaker:", error);
-      return false;
-    }
-  }
-  
-  // Private async method to handle the speaker toggle
-  private async toggleSpeakerAsync(speakerOn: boolean): Promise<void> {
-    try {
-      if (!twilioAudioService || !this.device) return;
-      
-      // Get currently available output devices
-      const outputDevices = await twilioAudioService.getOutputDevices();
-      
-      if (outputDevices && outputDevices.length > 0) {
-        // If speaker is turned on, try to find a device labeled as "speaker" or use default
-        if (speakerOn) {
-          // Look for a device that might be a speaker (contains "speaker" or "output" in the name)
-          const speakerDevice = outputDevices.find(device => 
-            device.label.toLowerCase().includes('speaker') || 
-            device.label.toLowerCase().includes('output')
-          );
-          
-          // If found a speaker device, use it, otherwise use default
-          const deviceId = speakerDevice ? speakerDevice.deviceId : 'default';
-          await twilioAudioService.setSpeakerDevice(deviceId);
-          console.log(`Speaker mode ON: set to device ${deviceId}`);
-        } else {
-          // If speaker is turned off, try to find a device that might be headphones
-          const headphoneDevice = outputDevices.find(device => 
-            device.label.toLowerCase().includes('headphone') || 
-            device.label.toLowerCase().includes('earphone') ||
-            device.label.toLowerCase().includes('headset')
-          );
-          
-          // If found headphones, use them, otherwise use default
-          const deviceId = headphoneDevice ? headphoneDevice.deviceId : 'default';
-          await twilioAudioService.setSpeakerDevice(deviceId);
-          console.log(`Speaker mode OFF: set to device ${deviceId}`);
-        }
-      } else {
-        console.log("No audio output devices available for speaker toggle");
-      }
-    } catch (error) {
-      console.error("Error in toggleSpeakerAsync:", error);
     }
   }
 
