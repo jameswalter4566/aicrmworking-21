@@ -220,13 +220,15 @@ serve(async (req) => {
         };
 
         // First make the outbound call to the phone number
+        // Fix: Creating the TwiML response properly without chaining methods
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("Hello! You're receiving a call from the Power Dialer. Please wait while we connect you.");
+        twiml.conference('power-dialer-conference', conferenceOptions);
+        
         const call = await client.calls.create({
           to: formattedPhoneNumber,
           from: TWILIO_PHONE_NUMBER,
-          twiml: new twilio.twiml.VoiceResponse()
-            .say("Hello! You're receiving a call from the Power Dialer. Please wait while we connect you.")
-            .conference('power-dialer-conference', conferenceOptions)
-            .toString(),
+          twiml: twiml.toString(),
           statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
@@ -235,13 +237,16 @@ serve(async (req) => {
         // Now if we have a browser client, make a second call to connect that client
         if (browserClientName) {
           console.log(`Connecting browser client: ${browserClientName}`);
+          
+          // Fix: Creating the browser TwiML response properly without chaining methods
+          const browserTwiml = new twilio.twiml.VoiceResponse();
+          browserTwiml.say("Connecting you to the call...");
+          browserTwiml.conference('power-dialer-conference', conferenceOptions);
+          
           const browserCall = await client.calls.create({
             to: `client:${browserClientName}`,
             from: TWILIO_PHONE_NUMBER,
-            twiml: new twilio.twiml.VoiceResponse()
-              .say("Connecting you to the call...")
-              .conference('power-dialer-conference', conferenceOptions)
-              .toString(),
+            twiml: browserTwiml.toString(),
             statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
