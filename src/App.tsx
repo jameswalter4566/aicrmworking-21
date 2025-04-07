@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -14,6 +15,7 @@ import TwilioScript from "./components/TwilioScript";
 import { useEffect, useState } from "react";
 import { audioProcessing } from "./services/audioProcessing";
 import { twilioService } from "./services/twilio";
+import { GlobalAudioSettings } from "./components/GlobalAudioSettings";
 
 const queryClient = new QueryClient();
 
@@ -174,6 +176,9 @@ const App = () => (
         onError={(error) => console.error("❌ Error loading Twilio SDK:", error)}
       />
       <AudioDiagnosticLogger />
+      <div className="fixed top-16 right-4 z-50">
+        <GlobalAudioSettings />
+      </div>
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />

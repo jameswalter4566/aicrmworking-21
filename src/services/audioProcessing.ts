@@ -1,6 +1,14 @@
-
 // Create a simple audio processing service to handle audio streaming
 // This is a placeholder - in a real app, this would be more complex
+
+interface AudioProcessingOptions {
+  onConnectionStatus?: (connected: boolean) => void;
+  onConnected?: () => void;
+  onDisconnected?: () => void;
+  onError?: (error: any) => void;
+  onStreamStarted?: (streamSid: string, callSid: string) => void;
+  onStreamEnded?: (streamSid: string) => void;
+}
 
 class AudioProcessingService {
   private webSocket: WebSocket | null = null;
@@ -22,7 +30,7 @@ class AudioProcessingService {
   private audioProcessor: ScriptProcessorNode | null = null;
 
   // Connect to the audio stream
-  async connect(options: any = {}): Promise<boolean> {
+  async connect(options: AudioProcessingOptions = {}): Promise<boolean> {
     try {
       if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
         console.log("WebSocket already connected");
@@ -403,7 +411,7 @@ class AudioProcessingService {
   }
   
   // Clean up resources
-  async cleanup(closeAudioContext: boolean = true): Promise<void> {
+  async cleanup(): Promise<void> {
     try {
       // Close WebSocket if open
       if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
@@ -417,7 +425,7 @@ class AudioProcessingService {
       this.stopCapturingMicrophone();
       
       // Close AudioContext if exists and requested
-      if (closeAudioContext && this.audioContext && this.audioContext.state !== 'closed') {
+      if (this.audioContext && this.audioContext.state !== 'closed') {
         await this.audioContext.close();
         this.audioContext = null;
       }
@@ -432,7 +440,7 @@ class AudioProcessingService {
   }
   
   // Get diagnostics for debugging
-  getDiagnostics(): object {
+  getDiagnostics(): AudioDiagnostics {
     // Get a label for the current device
     let selectedDeviceLabel = 'default';
     const device = this.availableDevices.find(d => d.deviceId === this.currentAudioDevice);
@@ -457,6 +465,23 @@ class AudioProcessingService {
       availableDevices: this.availableDevices.length
     };
   }
+}
+
+interface AudioDiagnostics {
+  isWebSocketConnected: boolean;
+  webSocketState: string;
+  activeStreamSid: string | null;
+  isProcessing: boolean;
+  inboundAudioCount: number;
+  outboundAudioCount: number;
+  microphoneActive: boolean;
+  audioContextState: string;
+  reconnectAttempts: number;
+  lastProcessedAudio: string;
+  audioQueueLength: number;
+  isPlaying: boolean;
+  selectedDevice?: string;
+  availableDevices?: number;
 }
 
 export const audioProcessing = new AudioProcessingService();
