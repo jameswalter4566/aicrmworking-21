@@ -43,7 +43,7 @@ serve(async (req) => {
     }
 
     // Get Twilio credentials
-    console.log("Attempting to retrieve Twilio credentials from environment");
+    console.log("Retrieving Twilio credentials from environment");
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
     const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY');
@@ -79,11 +79,12 @@ serve(async (req) => {
     
     // Check for required credentials for token generation
     console.log("Checking for required Twilio credentials...");
-    if (!TWILIO_ACCOUNT_SID || !TWILIO_API_KEY || !TWILIO_API_SECRET) {
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_API_KEY || !TWILIO_API_SECRET || !TWILIO_TWIML_APP_SID) {
       console.error("Missing required Twilio credentials:", {
         accountSidMissing: !TWILIO_ACCOUNT_SID,
         apiKeyMissing: !TWILIO_API_KEY,
-        apiSecretMissing: !TWILIO_API_SECRET
+        apiSecretMissing: !TWILIO_API_SECRET,
+        twimlAppSidMissing: !TWILIO_TWIML_APP_SID
       });
       return new Response(
         JSON.stringify({ error: 'Missing required Twilio credentials' }),
@@ -126,14 +127,14 @@ serve(async (req) => {
       const token = accessToken.toJwt();
       console.log(`Token generated successfully with 24-hour TTL for Voice SDK 2.x (Identity: ${identity})`);
 
-      // Return additional debug information to help with troubleshooting
+      // Return token with additional debug information
       return new Response(
         JSON.stringify({ 
           token, 
           identity,
           twilioAppSid: TWILIO_TWIML_APP_SID,
           twilioPhoneNumber: TWILIO_PHONE_NUMBER,
-          accountSid: TWILIO_ACCOUNT_SID, // Safe to share the account SID (not a secret)
+          accountSid: TWILIO_ACCOUNT_SID, 
           success: true,
           ttl: 86400,
           timestamp: new Date().toISOString(),

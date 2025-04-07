@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -532,8 +531,8 @@ export const useTwilio = () => {
     
     setupWebSocket();
     
-    // Always use browser dialing - never fall back to REST API
-    const result = await twilioService.makeCall(phoneNumber);
+    // Always use browser dialing - explicitly enforced for Power Dialer
+    const result = await twilioService.makeCall(phoneNumber, true); // Force browser calling
     
     if (result.success && result.callSid) {
       const leadIdStr = String(leadId);
@@ -547,7 +546,7 @@ export const useTwilio = () => {
           leadId,
           isMuted: false,
           speakerOn: false,
-          usingBrowser: true, // Always using browser calling
+          usingBrowser: true, // Explicitly set to true
           audioActive: microphoneActive,
           audioStreaming: audioStreaming
         }
@@ -558,7 +557,7 @@ export const useTwilio = () => {
         description: `Calling ${phoneNumber}... Audio will stream through your browser when connected.`,
       });
       
-      monitorCallStatus(leadId, result.callSid, true);
+      monitorCallStatus(leadId, result.callSid, true); // Always monitor as browser call
     } else {
       toast({
         title: "Call Failed",
