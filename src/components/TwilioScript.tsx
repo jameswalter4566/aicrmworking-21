@@ -8,9 +8,9 @@ interface TwilioScriptProps {
 
 // Use multiple CDNs for better reliability - focusing on Twilio Client SDK which is more widely available
 const TWILIO_SDK_URLS = [
+  'https://cdn.jsdelivr.net/npm/twilio-client@1.14.0/dist/twilio.min.js',
   'https://sdk.twilio.com/js/client/v1.14.0/twilio.js',
-  'https://media.twiliocdn.com/sdk/js/client/v1.14.0/twilio.js',
-  'https://cdn.jsdelivr.net/npm/twilio-client@1.14.0/dist/twilio.min.js'
+  'https://media.twiliocdn.com/sdk/js/client/v1.14.0/twilio.js'
 ];
 
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
