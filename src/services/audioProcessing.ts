@@ -14,9 +14,6 @@ class AudioProcessingService {
   private activeStreamSid: string | null = null;
   private activeCallSid: string | null = null;
   private pendingAudioChunks: number = 0;
-  private microphoneStream: MediaStream | null = null;
-  private audioDevices: MediaDeviceInfo[] = [];
-  private currentDeviceId: string = 'default';
   private callbacks = {
     onConnectionStatus: (connected: boolean) => {},
     onStreamStarted: (streamSid: string, callSid: string) => {},
@@ -44,7 +41,7 @@ class AudioProcessingService {
     }
     
     try {
-      console.log("Connecting to audio streaming WebSocket...");
+      console.log("Connecting to audio WebSocket...");
       
       // Create WebSocket connection to Supabase Edge Function
       this.socket = new WebSocket('wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream');
@@ -64,128 +61,7 @@ class AudioProcessingService {
       return false;
     }
   }
-
-  /**
-   * Get available audio output devices
-   */
-  public async getAudioDevices(): Promise<MediaDeviceInfo[]> {
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        console.warn('MediaDevices API not supported in this browser');
-        return [];
-      }
-      
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      this.audioDevices = devices.filter(device => device.kind === 'audiooutput');
-      console.log("Available audio devices:", this.audioDevices);
-      return this.audioDevices;
-    } catch (error) {
-      console.error("Failed to enumerate audio devices:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Set audio output device
-   */
-  public async setAudioDevice(deviceId: string): Promise<boolean> {
-    try {
-      this.currentDeviceId = deviceId;
-      
-      // Find audio elements to update
-      const audioElements = document.querySelectorAll('audio');
-      if (audioElements.length === 0) {
-        console.log("No audio elements found to update device");
-      }
-      
-      // Update each audio element to use the selected device
-      for (const audioEl of audioElements) {
-        if ('setSinkId' in audioEl) {
-          try {
-            await (audioEl as any).setSinkId(deviceId);
-            console.log(`Set audio element to device: ${deviceId}`);
-          } catch (err) {
-            console.error(`Could not set sink ID for audio element:`, err);
-          }
-        }
-      }
-      
-      return true;
-    } catch (error) {
-      console.error("Failed to set audio device:", error);
-      return false;
-    }
-  }
-
-  /**
-   * Start capturing microphone audio for bidirectional streaming
-   */
-  public async startCapturingMicrophone(): Promise<boolean> {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      console.error("getUserMedia not supported in this browser");
-      return false;
-    }
-    
-    try {
-      if (this.microphoneStream) {
-        // Already capturing
-        return true;
-      }
-      
-      // Get microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-      
-      this.microphoneStream = stream;
-      console.log("Microphone access granted for audio capture");
-      return true;
-    } catch (error) {
-      console.error("Failed to access microphone:", error);
-      return false;
-    }
-  }
-
-  /**
-   * Stop capturing microphone audio
-   */
-  public stopCapturingMicrophone(): void {
-    if (this.microphoneStream) {
-      this.microphoneStream.getTracks().forEach(track => {
-        track.stop();
-      });
-      
-      this.microphoneStream = null;
-      console.log("Microphone capture stopped");
-    }
-  }
-
-  /**
-   * Get diagnostic information about audio processing
-   */
-  public getDiagnostics(): object {
-    return {
-      isWebSocketConnected: this.connected,
-      webSocketState: this.socket ? this.socket.readyState : 'disconnected',
-      activeStreamSid: this.activeStreamSid,
-      isProcessing: this.isProcessingQueue,
-      inboundAudioCount: this.pendingAudioChunks,
-      outboundAudioCount: 0,  // Placeholder
-      microphoneActive: !!this.microphoneStream,
-      audioContextState: this.audioContext ? this.audioContext.state : 'closed',
-      reconnectAttempts: this.reconnectAttempts,
-      lastProcessedAudio: this.pendingAudioChunks > 0 ? new Date().toISOString() : 'never',
-      audioQueueLength: this.audioQueue.length,
-      isPlaying: this.isProcessingQueue,
-      selectedDevice: this.currentDeviceId,
-      availableDevices: this.audioDevices.length
-    };
-  }
-
+  
   /**
    * Initialize the AudioContext for processing audio
    */
@@ -467,10 +343,9 @@ class AudioProcessingService {
     
     this.reconnectAttempts++;
     const delay = this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1);
-    console.log(`Will attempt to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
+    console.log(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
     
     setTimeout(() => {
-      console.log("Attempting to reconnect WebSocket...");
       this.connect();
     }, delay);
   }
@@ -481,7 +356,6 @@ class AudioProcessingService {
   private startHeartbeat(): void {
     const interval = setInterval(() => {
       if (this.socket && this.connected) {
-        console.log("Ping sent to server");
         this.socket.send(JSON.stringify({
           event: 'ping',
           timestamp: Date.now()
@@ -533,9 +407,6 @@ class AudioProcessingService {
     this.activeCallSid = null;
     this.audioQueue = [];
     this.pendingAudioChunks = 0;
-    
-    // Stop microphone capture if active
-    this.stopCapturingMicrophone();
     
     if (this.audioContext && this.audioContext.state !== 'closed') {
       this.audioContext.close().catch(err => {
