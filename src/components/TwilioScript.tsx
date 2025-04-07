@@ -6,16 +6,8 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
-// Update the interface for the global Voice SDK to match the expected type
-declare global {
-  interface Window {
-    Twilio: {
-      Device: any;
-      VERSION?: string;
-      [key: string]: any; // Add this index signature to match the expected type
-    };
-  }
-}
+// We won't redefine the Window.Twilio interface here since it's already defined in vite-env.d.ts
+// This avoids the interface merging conflict
 
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   const [loaded, setLoaded] = useState(false);
