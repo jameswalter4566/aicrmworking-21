@@ -6,7 +6,15 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
-// No need to redeclare global interfaces since they're in vite-env.d.ts
+// Add interface for the global Voice SDK
+declare global {
+  interface Window {
+    Twilio: {
+      Device: any;
+      VERSION?: string;
+    };
+  }
+}
 
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   const [loaded, setLoaded] = useState(false);
@@ -17,11 +25,9 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     
     // Check if Twilio is already loaded
     if (window.Twilio) {
-      console.log("🔶 Twilio already loaded", { 
+      console.log("🔶 Twilio Voice SDK already loaded", { 
         version: window.Twilio.VERSION || 'unknown',
         deviceAvailable: !!window.Twilio.Device,
-        audioEnabled: typeof window.AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined',
-        deviceDeviceInfo: window.Twilio.Device?.info?.toString() || 'not available'
       });
       setLoaded(true);
       if (onLoad) onLoad();
@@ -34,16 +40,16 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
       return;
     }
     
-    console.log("🔶 Loading Twilio Client JS SDK...");
+    console.log("🔶 Loading Twilio Voice JavaScript SDK...");
     const script = document.createElement('script');
     script.id = 'twilio-js-sdk';
-    // Use the latest stable version of Twilio Client JS SDK
-    script.src = 'https://sdk.twilio.com/js/client/v1.14/twilio.min.js';
+    // Use the NPM package via CDN for the latest 2.x version
+    script.src = 'https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.5.0/dist/voice.min.js';
     script.async = true;
     script.defer = true;
     
     script.onload = () => {
-      console.log("🔶 Twilio JS SDK loaded successfully", {
+      console.log("🔶 Twilio Voice SDK loaded successfully", {
         version: window.Twilio?.VERSION || 'unknown',
         deviceAvailable: !!window.Twilio?.Device,
         audioEnabled: typeof window.AudioContext !== 'undefined' || typeof window.webkitAudioContext !== 'undefined',
@@ -67,8 +73,8 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     };
     
     script.onerror = (e) => {
-      const error = new Error("Failed to load Twilio script");
-      console.error("🔶 Error loading Twilio script:", error, e);
+      const error = new Error("Failed to load Twilio Voice SDK");
+      console.error("🔶 Error loading Twilio Voice SDK:", error, e);
       setError(error);
       if (onError) onError(error);
     };

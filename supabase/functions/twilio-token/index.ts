@@ -93,7 +93,7 @@ serve(async (req) => {
     console.log(`Generating token for identity: ${identity}`);
 
     try {
-      // Create JWT token for Twilio Client with enhanced permissions
+      // Create JWT token for Twilio Voice SDK 2.x
       const AccessToken = twilio.jwt.AccessToken;
       const VoiceGrant = AccessToken.VoiceGrant;
 
@@ -109,15 +109,15 @@ serve(async (req) => {
       );
 
       // Create Voice Grant with explicit permissions for media streaming
+      // Voice SDK 2.x requires these specific parameters
       const voiceGrant = new VoiceGrant({
         outgoingApplicationSid: TWILIO_TWIML_APP_SID,
         incomingAllow: true, // Allow incoming calls
-        pushCredentialSid: null // No push credentials needed for browser
       });
 
       accessToken.addGrant(voiceGrant);
       const token = accessToken.toJwt();
-      console.log("Token generated successfully with 24-hour TTL");
+      console.log("Token generated successfully with 24-hour TTL for Voice SDK 2.x");
 
       // Return additional debug information to help with troubleshooting
       return new Response(
@@ -130,7 +130,7 @@ serve(async (req) => {
           success: true,
           ttl: 86400,
           timestamp: new Date().toISOString(),
-          mediaStreamsEnabled: true // Indicate that media streams are enabled
+          voiceSdkVersion: '2.x'
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
