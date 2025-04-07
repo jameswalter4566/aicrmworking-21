@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { MicOff, Mic, PhoneOff, Volume2, Volume1, Wifi, WifiOff, Headphones, RefreshCcw } from 'lucide-react';
@@ -148,19 +147,15 @@ const CallControl: React.FC<CallControlProps> = ({
     if (onAudioDeviceChange) {
       onAudioDeviceChange(deviceId);
       
-      const audio = new Audio('/sounds/dialtone.mp3');
-      if ('setSinkId' in audio && typeof (audio as any).setSinkId === 'function') {
-        (audio as any).setSinkId(deviceId)
-          .then(() => {
-            audio.volume = 0.3;
-            audio.play()
-              .then(() => {
-                setTimeout(() => audio.pause(), 500);
-              })
-              .catch(err => console.warn("Could not play test tone:", err));
-          })
-          .catch((err: Error) => console.warn("Could not set audio device:", err));
-      }
+      // Test the selected audio device
+      audioProcessing.testAudio(deviceId).then(success => {
+        if (success) {
+          toast({
+            title: "Audio Device Selected",
+            description: "Test tone played through the selected device.",
+          });
+        }
+      });
     }
   };
   

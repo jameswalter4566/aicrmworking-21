@@ -32,14 +32,14 @@ function normalizePhoneNumber(phoneNumber: string): string {
   return digitsOnly ? `+${digitsOnly}` : '';
 }
 
-// Enhanced error handling wrapper for TwiML generation
-function safeGenerateCallTwiML(phoneNumber: string, streamUrl: string): string {
+// Generate TwiML for call with bidirectional audio streaming
+function generateCallTwiML(phoneNumber: string, streamUrl: string): string {
   try {
     console.log(`Generating TwiML for call to ${phoneNumber} with stream URL ${streamUrl}`);
     
     const twimlResponse = new twilio.twiml.VoiceResponse();
     
-    // CRITICAL FIX: Setup the stream connector FIRST to ensure it's established before dial
+    // Setup the stream connector FIRST to ensure it's established before dial
     twimlResponse.stream({
       url: streamUrl,
       track: 'both_tracks', // Capture both inbound and outbound audio
@@ -294,8 +294,8 @@ serve(async (req) => {
         
         console.log(`Handling voice with streamUrl=${streamUrl} and phoneNumber=${phoneNumberParam}`);
         
-        // Generate TwiML with fallback handling
-        const twiml = safeGenerateCallTwiML(phoneNumberParam, streamUrl);
+        // Generate TwiML directly rather than using the function that was causing issues
+        const twiml = generateCallTwiML(phoneNumberParam, streamUrl);
         
         console.log("Returning TwiML response");
         return new Response(twiml, { 

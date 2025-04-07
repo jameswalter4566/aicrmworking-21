@@ -29,7 +29,7 @@ class AudioProcessingService {
   private microphoneStream: MediaStream | null = null;
   private audioProcessor: ScriptProcessorNode | null = null;
 
-  // Connect to the audio stream
+  // Connect to the audio stream - making this more reliable
   async connect(options: AudioProcessingOptions = {}): Promise<boolean> {
     try {
       if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
@@ -52,18 +52,44 @@ class AudioProcessingService {
         }));
 
         // If there are callbacks provided, call them
+        if (options.onConnectionStatus) {
+          options.onConnectionStatus(true);
+        }
+        
         if (options.onConnected) {
           options.onConnected();
         }
+        
+        // Send a ping to verify the connection is working
+        setTimeout(() => {
+          if (this.webSocket && this.webSocket.readyState === WebSocket.OPEN) {
+            this.webSocket.send(JSON.stringify({
+              event: 'ping',
+              timestamp: Date.now()
+            }));
+          }
+        }, 1000);
       };
       
       this.webSocket.onclose = () => {
         console.log("WebSocket connection closed");
         this.isConnected = false;
         
+        if (options.onConnectionStatus) {
+          options.onConnectionStatus(false);
+        }
+        
         if (options.onDisconnected) {
           options.onDisconnected();
         }
+        
+        // Auto-reconnect after a delay
+        setTimeout(() => {
+          if (!this.isConnected) {
+            console.log("Attempting to reconnect WebSocket...");
+            this.connect(options);
+          }
+        }, 5000);
       };
       
       this.webSocket.onerror = (error) => {
@@ -113,6 +139,10 @@ class AudioProcessingService {
               }
               break;
               
+            case 'pong':
+              console.log("Received pong from server, connection is alive");
+              break;
+              
             default:
               // Handle any other event types
               console.log(`Received event: ${data.event}`);
@@ -132,6 +162,15 @@ class AudioProcessingService {
       return true;
     } catch (error) {
       console.error("Error connecting to WebSocket:", error);
+      
+      if (options.onConnectionStatus) {
+        options.onConnectionStatus(false);
+      }
+      
+      if (options.onError) {
+        options.onError(error);
+      }
+      
       return false;
     }
   }
@@ -276,7 +315,7 @@ class AudioProcessingService {
     }
   }
   
-  // Play audio from base64 string
+  // Play audio from base64 string - improved handling
   async playAudioFromBase64(base64Audio: string): Promise<void> {
     try {
       if (!this.audioContext) {
@@ -284,11 +323,25 @@ class AudioProcessingService {
         this.audioDestination = this.audioContext.destination;
       }
       
+      // Make sure audioContext is running
+      if (this.audioContext.state !== 'running') {
+        await this.audioContext.resume();
+      }
+      
       // Convert base64 to ArrayBuffer
       const binary = atob(base64Audio);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
+      }
+      
+      // Log first successful audio packet
+      if (this.inboundAudioCount === 1) {
+        console.log("First audio packet received and processed", bytes.length, "bytes");
+      }
+      
+      if (this.inboundAudioCount % 100 === 0) {
+        console.log(`Processed ${this.inboundAudioCount} audio packets`);
       }
       
       // Add to queue
@@ -303,7 +356,7 @@ class AudioProcessingService {
     }
   }
   
-  // Play next audio in queue
+  // Private method to play the next audio in queue - with better error handling
   private async playNextInQueue(): Promise<void> {
     if (this.audioQueue.length === 0) {
       this.isPlaying = false;
@@ -320,17 +373,31 @@ class AudioProcessingService {
         return;
       }
       
+      // Apply the current device before playing
+      if (this.currentAudioDevice && this.currentAudioDevice !== 'default') {
+        try {
+          await this.setAudioDevice(this.currentAudioDevice);
+        } catch (err) {
+          console.warn("Could not set audio device before playback:", err);
+        }
+      }
+      
       this.audioContext.decodeAudioData(
         audioBuffer,
         (decodedData) => {
-          const source = this.audioContext!.createBufferSource();
-          source.buffer = decodedData;
-          source.connect(this.audioDestination!);
-          source.start(0);
-          
-          source.onended = () => {
+          try {
+            const source = this.audioContext!.createBufferSource();
+            source.buffer = decodedData;
+            source.connect(this.audioDestination!);
+            source.start(0);
+            
+            source.onended = () => {
+              this.playNextInQueue();
+            };
+          } catch (playError) {
+            console.error("Error starting audio playback:", playError);
             this.playNextInQueue();
-          };
+          }
         },
         (error) => {
           console.error("Error decoding audio data:", error);
