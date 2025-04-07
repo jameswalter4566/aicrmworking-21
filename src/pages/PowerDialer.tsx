@@ -4,8 +4,8 @@ import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { useTwilio } from "@/hooks/use-twilio";
 import { twilioService } from "@/services/twilio";
-import GlobalAudioSettings from "@/components/GlobalAudioSettings";
-import CallControls from "@/components/CallControls";
+import { GlobalAudioSettings } from "@/components/GlobalAudioSettings";
+import { CallControls } from "@/components/CallControls";
 import TwilioAudioPlayer from "@/components/TwilioAudioPlayer";
 import AudioDeviceSelector from "@/components/AudioDeviceSelector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -32,8 +32,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InfoCircledIcon, Cross2Icon, PhoneIcon } from "@radix-ui/react-icons";
 import TwilioScript from "@/components/TwilioScript";
-import AudioDebugModal from "@/components/AudioDebugModal";
-import AudioInitializer from "@/components/AudioInitializer";
+import { AudioDebugModal } from "@/components/AudioDebugModal";
+import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "@/components/ui/use-toast";
 
 // Placeholder data
@@ -95,7 +95,7 @@ export default function PowerDialer() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [isAudioDebugOpen, setIsAudioDebugOpen] = useState(false);
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
-  const [twilioDevice, setTwilioDevice] = useState<any>(null);
+  const [twilioReady, setTwilioReady] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
 
@@ -103,15 +103,10 @@ export default function PowerDialer() {
   const twilioState = useTwilio();
 
   useEffect(() => {
-    // Fix: Use the window.Twilio.Device directly since useTwilio() doesn't have a device property
     if (window.Twilio && window.Twilio.Device) {
       console.log("Twilio device available:", window.Twilio.Device);
-      setTwilioDevice(window.Twilio.Device);
       setTwilioReady(true);
       
-      // No need to set up event listeners here since we're not creating a device
-      // The actual device object will be created when making a call via twilioService
-
       // Clean up function not needed
       return () => {};
     }
@@ -210,7 +205,6 @@ export default function PowerDialer() {
 
   // Components for the different tabs
   const [isDialing, setIsDialing] = useState(false);
-  const [twilioReady, setTwilioReady] = useState(false);
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
@@ -267,7 +261,7 @@ export default function PowerDialer() {
                     />
                     
                     {!call.audioActive && call.status === 'in-progress' && (
-                      <Alert variant="warning" className="mt-2">
+                      <Alert variant="destructive" className="mt-2">
                         <AlertTitle>Audio Warning</AlertTitle>
                         <AlertDescription>
                           Microphone appears to be inactive. Check your browser permissions.
@@ -400,15 +394,13 @@ export default function PowerDialer() {
                 return success;
               }}
               onRefreshDevices={async () => {
-                // Fix: Return correct Promise type
                 return twilioState.refreshAudioDevices();
               }}
               onTestAudio={async (deviceId) => {
-                // Fix: Return correct Promise type
                 return twilioState.testAudio(deviceId);
               }}
               devices={twilioState.audioOutputDevices}
-              currentDevice={twilioState.currentAudioDevice}
+              currentDeviceId={twilioState.currentAudioDevice}
             />
             
             <div className="flex justify-between">
@@ -446,10 +438,7 @@ export default function PowerDialer() {
         </CardContent>
       </Card>
 
-      <GlobalAudioSettings 
-        isLoading={twilioState.isLoading}
-        initialized={twilioState.initialized}
-      />
+      <GlobalAudioSettings />
 
       {!twilioState.initialized && (
         <Card className="bg-muted/50">
@@ -461,26 +450,7 @@ export default function PowerDialer() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <AudioInitializer 
-                isLoading={twilioState.isLoading}
-                initialized={twilioState.initialized}
-                onInitialize={async () => {
-                  const success = await twilioService.initializeTwilioDevice();
-                  if (success) {
-                    toast({
-                      title: "Phone System Initialized",
-                      description: "You can now make and receive calls.",
-                    });
-                  } else {
-                    toast({
-                      title: "Initialization Failed",
-                      description: "Could not initialize phone system. Please try again.",
-                      variant: "destructive",
-                    });
-                  }
-                  return success;
-                }}
-              />
+              <AudioInitializer />
             </div>
           </CardContent>
         </Card>
@@ -551,10 +521,7 @@ export default function PowerDialer() {
         onError={(err) => console.error("TwilioScript error:", err)}
       />
       
-      <AudioDebugModal
-        open={isAudioDebugOpen}
-        onOpenChange={setIsAudioDebugOpen}
-      />
+      <AudioDebugModal />
       
       <div className="container py-4 px-4 md:px-6">
         <div className="flex flex-col space-y-2 mb-4">
