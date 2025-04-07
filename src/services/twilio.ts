@@ -29,6 +29,23 @@ class TwilioService {
   private audioContext: AudioContext | null = null;
   private currentAudioDevice: string = 'default';
   private audioOutputDevices: MediaDeviceInfo[] = [];
+  private customSounds: Record<string, string> = {
+    incoming: '/sounds/incoming.mp3',
+    outgoing: '/sounds/outgoing.mp3',
+    disconnect: '/sounds/disconnect.mp3',
+    dtmf1: '/sounds/dtmf-1.mp3',
+    dtmf2: '/sounds/dtmf-2.mp3',
+    dtmf3: '/sounds/dtmf-3.mp3',
+    dtmf4: '/sounds/dtmf-4.mp3',
+    dtmf5: '/sounds/dtmf-5.mp3',
+    dtmf6: '/sounds/dtmf-6.mp3',
+    dtmf7: '/sounds/dtmf-7.mp3',
+    dtmf8: '/sounds/dtmf-8.mp3',
+    dtmf9: '/sounds/dtmf-9.mp3',
+    dtmf0: '/sounds/dtmf-0.mp3',
+    'dtmf*': '/sounds/dtmf-star.mp3',
+    'dtmf#': '/sounds/dtmf-pound.mp3',
+  };
 
   constructor() {
     // Initialize in browser environment only
@@ -53,6 +70,9 @@ class TwilioService {
 
       console.log('Initializing Twilio device');
 
+      // Preload required audio files to avoid encoding errors
+      await this.preloadAudioFiles();
+
       // Get configuration from the server
       await this.getConfig();
 
@@ -65,8 +85,9 @@ class TwilioService {
         debug: true,
         closeProtection: true,
         codecPreferences: ['opus', 'pcmu'],
-        disableAudioContextSounds: false,
+        disableAudioContextSounds: true, // Disable built-in sounds to use our own
         maxCallSignalingTimeoutMs: 30000,
+        sounds: this.customSounds
       });
 
       // Set up device event handlers
@@ -84,6 +105,43 @@ class TwilioService {
       console.error('Error initializing Twilio device:', error);
       return false;
     }
+  }
+
+  // Preload audio files to avoid decoding errors
+  private async preloadAudioFiles(): Promise<void> {
+    const preloadPromises = Object.values(this.customSounds).map(url => {
+      return new Promise<void>((resolve) => {
+        const audio = new Audio();
+        audio.preload = 'auto';
+        
+        const onLoad = () => {
+          console.log(`Audio file loaded: ${url}`);
+          resolve();
+        };
+        
+        const onError = () => {
+          console.warn(`Failed to preload audio file: ${url}`);
+          resolve(); // Resolve anyway to continue with initialization
+        };
+        
+        audio.addEventListener('canplaythrough', onLoad, { once: true });
+        audio.addEventListener('error', onError, { once: true });
+        
+        // Set timeout in case loading takes too long
+        setTimeout(() => {
+          audio.removeEventListener('canplaythrough', onLoad);
+          audio.removeEventListener('error', onError);
+          console.warn(`Audio preload timed out: ${url}`);
+          resolve();
+        }, 3000);
+        
+        audio.src = url;
+        audio.load();
+      });
+    });
+    
+    await Promise.all(preloadPromises);
+    console.log('Audio files preloaded');
   }
 
   private setupDeviceListeners() {
@@ -192,29 +250,68 @@ class TwilioService {
       // Get current identity from token
       const identity = this.getIdentityFromToken();
       
-      // Use our edge function to make the call
-      const response = await supabase.functions.invoke('twilio-voice', {
-        body: {
-          action: 'makeCall',
-          phoneNumber: formattedNumber,
-          browserClientName: identity || undefined, // Send the browser client name for conference
-        },
-      });
+      try {
+        // First try using server-side call via REST API
+        console.log('Attempting to make call via REST API...');
+        
+        const response = await supabase.functions.invoke('twilio-voice', {
+          body: {
+            action: 'makeCall',
+            phoneNumber: formattedNumber,
+            browserClientName: identity || undefined,
+          },
+        });
 
-      if (!response.data?.success) {
-        console.error('Failed to make call:', response);
-        return { success: false, error: response.error?.message || 'Failed to make call' };
+        if (response.data?.success) {
+          const callSid = response.data.callSid;
+          console.log(`Call initiated with SID: ${callSid}`);
+          
+          // Store the callSid for this lead
+          if (leadId) {
+            this.activeCallSids.set(leadId, callSid);
+          }
+          
+          return { success: true, callSid };
+        } else {
+          throw new Error(response.error?.message || 'Failed to make call through REST API');
+        }
+      } catch (error: any) {
+        console.error('Error making call via REST API:', error);
+        
+        // Fallback to browser-based calling if REST API fails
+        console.log('Falling back to browser-based calling...');
+        
+        if (!this.device) {
+          return { success: false, error: 'Twilio device not initialized' };
+        }
+        
+        try {
+          const call = await this.device.connect({
+            params: {
+              To: formattedNumber,
+              From: this.twilioPhoneNumber
+            }
+          });
+          
+          console.log('Browser-based call connected:', call);
+          
+          const callSid = call.parameters?.CallSid;
+          if (callSid && leadId) {
+            this.activeCallSids.set(leadId, callSid);
+          }
+          
+          return { 
+            success: true, 
+            callSid: callSid || 'browser-call' 
+          };
+        } catch (browserError: any) {
+          console.error('Browser-based call failed:', browserError);
+          return { 
+            success: false, 
+            error: browserError.message || 'Browser-based call failed'
+          };
+        }
       }
-
-      const callSid = response.data.callSid;
-      console.log(`Call initiated with SID: ${callSid}`);
-
-      // Store the callSid for this lead
-      if (leadId) {
-        this.activeCallSids.set(leadId, callSid);
-      }
-
-      return { success: true, callSid };
     } catch (error: any) {
       console.error('Error making call:', error);
       return { success: false, error: error.message || 'Unknown error making call' };
@@ -225,6 +322,16 @@ class TwilioService {
     try {
       const callSid = this.activeCallSids.get(leadId) || 'pending-sid';
       
+      if (callSid === 'browser-call') {
+        // For browser-based calls, check device status
+        if (this.device?.calls?.size > 0) {
+          const firstCall = Array.from(this.device.calls.values())[0];
+          return firstCall?.status() || 'unknown';
+        }
+        return 'unknown';
+      }
+      
+      // For REST API calls, check status from server
       const response = await supabase.functions.invoke('twilio-voice', {
         body: {
           action: 'checkStatus',
@@ -252,7 +359,17 @@ class TwilioService {
           console.warn(`No active call found for lead ${leadId}`);
           return false;
         }
+        
+        // For browser-based calls
+        if (callSid === 'browser-call') {
+          if (this.device && this.device.calls && this.device.calls.size > 0) {
+            this.device.disconnectAll();
+            this.activeCallSids.delete(leadId);
+            return true;
+          }
+        }
 
+        // For REST API calls
         const response = await supabase.functions.invoke('twilio-voice', {
           body: {
             action: 'endCall',
@@ -322,7 +439,6 @@ class TwilioService {
     return this.initialized;
   }
 
-  // Added methods to fix type errors
   async initializeAudioContext(): Promise<boolean> {
     try {
       if (!window.AudioContext && !(window as any).webkitAudioContext) {

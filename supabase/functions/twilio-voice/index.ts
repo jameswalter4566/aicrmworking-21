@@ -183,16 +183,13 @@ serve(async (req) => {
     // Handle different actions
     if (action === 'makeCall') {
       // Make an outbound call
-      const { phoneNumber, browserClientName, callBack } = requestData;
+      const { phoneNumber, browserClientName } = requestData;
       
       if (!phoneNumber) {
-        // Return a TwiML response even for this error
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say("A phone number is required to make a call.");
-        
-        return new Response(twiml.toString(), { 
-          headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
-        });
+        return new Response(
+          JSON.stringify({ success: false, error: 'Phone number is required' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
       try {
@@ -217,11 +214,8 @@ serve(async (req) => {
         // Create a conference call to connect both the browser and the phone
         const conferenceOptions = {
           maxParticipants: 2,
-          statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
-          statusCallbackEvent: ['join', 'leave', 'end', 'start', 'spoken'],
-          recordingStatusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
-          record: 'record-from-start',
-          recordingStatusCallbackEvent: ['completed'],
+          statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
+          statusCallbackEvent: ['join', 'leave', 'end', 'start'],
           endConferenceOnExit: true,
         };
 
@@ -233,12 +227,9 @@ serve(async (req) => {
             .say("Hello! You're receiving a call from the Power Dialer. Please wait while we connect you.")
             .conference('power-dialer-conference', conferenceOptions)
             .toString(),
-          statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
+          statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
-          machineDetection: 'DetectMessageEnd',
-          machineDetectionTimeout: 30,
-          timeout: 30,
         });
         
         // Now if we have a browser client, make a second call to connect that client
@@ -251,7 +242,7 @@ serve(async (req) => {
               .say("Connecting you to the call...")
               .conference('power-dialer-conference', conferenceOptions)
               .toString(),
-            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
+            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
@@ -278,73 +269,14 @@ serve(async (req) => {
       } catch (error) {
         console.error("Error making call:", error);
         
-        // Return a TwiML response for errors too
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say(`Error making call: ${error.message || "Unknown error"}`);
-        
-        return new Response(twiml.toString(), {
-          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-        });
+        return new Response(
+          JSON.stringify({ success: false, error: error.message || "Failed to make call" }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
     } 
-    else if (action === 'handleVoice') {
-      // Handle TwiML generation for voice call
-      const phoneNumber = url.searchParams.get('phoneNumber');
-      const streamUrl = url.searchParams.get('streamUrl');
-      
-      console.log(`Generating TwiML for call to ${phoneNumber}`);
-      console.log(`Stream URL: ${streamUrl}`);
-      
-      if (!streamUrl) {
-        console.error("No stream URL provided in handleVoice action");
-        
-        // Return a TwiML response even for this error
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say("Stream URL is required for handling voice calls.");
-        
-        return new Response(twiml.toString(), {
-          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-        });
-      }
-      
-      // Create TwiML for the call using the Voice Response object
-      const twiml = new twilio.twiml.VoiceResponse();
-      
-      // Add some initial audio playback
-      twiml.say("Hello! This is an outbound call from your Power Dialer system. Please wait while we connect you.");
-      
-      // Add a pause to keep the call open
-      twiml.pause({ length: 2 });
-      
-      // Using Connect with a Stream for bidirectional audio
-      const connect = twiml.connect();
-      connect.stream({
-        url: streamUrl,
-        track: "both_tracks"
-      });
-      
-      // Add a pause to keep the call open if needed
-      twiml.pause({ length: 30 });
-      
-      // Add another message
-      twiml.say("Still connected. The audio stream should be active.");
-      
-      // Add another long pause to keep the call open
-      twiml.pause({ length: 60 });
-      
-      // Final message before hanging up
-      twiml.say("Thank you for testing the audio streaming. Goodbye!");
-      
-      const generatedTwiML = twiml.toString();
-      console.log("Generated TwiML:", generatedTwiML);
-      
-      return new Response(generatedTwiML, {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-      });
-    }
     else if (action === 'statusCallback' || (!action && requestData.CallSid)) {
-      // Handle call status callbacks with improved error handling
-      // This will also catch requests without an action parameter but with CallSid
+      // Handle call status callbacks
       console.log("Status callback received");
       
       let callbackData: Record<string, any> = {};
@@ -411,7 +343,6 @@ serve(async (req) => {
       } catch (error) {
         console.error(`Error checking status for call ${callSid}:`, error);
         
-        // For checkStatus, it's OK to return JSON since this is an API call, not a Twilio webhook
         return new Response(
           JSON.stringify({ success: false, error: error.message }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -423,13 +354,10 @@ serve(async (req) => {
       const { callSid } = requestData;
       
       if (!callSid) {
-        // Return a TwiML response even for this error
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say("Call SID is required to end a call.");
-        
-        return new Response(twiml.toString(), {
-          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-        });
+        return new Response(
+          JSON.stringify({ success: false, error: "Call SID is required to end a call" }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
       try {
@@ -437,7 +365,6 @@ serve(async (req) => {
         
         await client.calls(callSid).update({ status: 'completed' });
         
-        // For endCall, it's OK to return JSON since this is an API call, not a Twilio webhook
         return new Response(
           JSON.stringify({ success: true, message: 'Call ended' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -445,7 +372,6 @@ serve(async (req) => {
       } catch (error) {
         console.error(`Error ending call ${callSid}:`, error);
         
-        // For endCall, it's OK to return JSON since this is an API call, not a Twilio webhook
         return new Response(
           JSON.stringify({ success: false, error: error.message }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -453,26 +379,23 @@ serve(async (req) => {
       }
     }
     else {
-      // Default response for unknown actions - return a simple TwiML
-      console.log(`Unknown action: ${action}, returning default TwiML response`);
+      // Default response for unknown actions
+      console.log(`Unknown action: ${action}, returning JSON error response`);
       
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say(`The requested action ${action} is not supported.`);
-      
-      return new Response(twiml.toString(), {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-      });
+      return new Response(
+        JSON.stringify({ success: false, error: `The requested action ${action} is not supported.` }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
   } catch (error) {
     console.error('Error in function:', error);
     
-    // Return a simple valid TwiML response for error cases to avoid Twilio errors
-    const errorTwiml = new twilio.twiml.VoiceResponse();
-    errorTwiml.say("Sorry, an error occurred while processing this request.");
-    
-    return new Response(errorTwiml.toString(), {
-      status: 200, // Return 200 even on error to prevent Twilio error loops
-      headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-    });
+    return new Response(
+      JSON.stringify({ success: false, error: error.message || 'An unexpected error occurred' }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 });
