@@ -233,14 +233,13 @@ class TwilioService {
       const identity = this.getIdentityFromToken();
       
       try {
-        // First try using server-side call via REST API
-        console.log('Attempting to make call via REST API...');
+        // Try using the direct call method first, which is more reliable
+        console.log('Attempting to make call via directCall API...');
         
         const response = await supabase.functions.invoke('twilio-voice', {
           body: {
-            action: 'makeCall',
-            phoneNumber: formattedNumber,
-            browserClientName: identity || undefined,
+            action: 'directCall', // Use the new directCall action
+            phoneNumber: formattedNumber
           },
         });
 
@@ -248,7 +247,7 @@ class TwilioService {
         if (response.data && typeof response.data === 'object' && 'success' in response.data) {
           if (response.data.success) {
             const callSid = response.data.callSid;
-            console.log(`Call initiated with SID: ${callSid}`);
+            console.log(`Direct call initiated with SID: ${callSid}`);
             
             // Store the callSid for this lead
             if (leadId) {
@@ -257,55 +256,93 @@ class TwilioService {
             
             return { success: true, callSid };
           } else {
-            throw new Error(response.data.error || 'Failed to make call through REST API');
+            // If directCall fails, fall back to the makeCall implementation
+            console.log('DirectCall failed, falling back to makeCall...');
+            return this.fallbackToMakeCall(formattedNumber, identity, leadId);
           }
         } else {
-          throw new Error('Invalid response format from REST API');
+          // If directCall response is invalid, fall back to makeCall
+          console.log('Invalid response from directCall, falling back to makeCall...');
+          return this.fallbackToMakeCall(formattedNumber, identity, leadId);
         }
       } catch (error: any) {
-        console.error('Error making call via REST API:', error);
+        console.error('Error making direct call:', error);
         
-        // Fallback to browser-based calling if REST API fails
-        console.log('Falling back to browser-based calling...');
-        
-        if (!this.device) {
-          return { success: false, error: 'Twilio device not initialized' };
-        }
-        
-        try {
-          const call = await this.device.connect({
-            params: {
-              To: formattedNumber,
-              From: this.twilioPhoneNumber
-            }
-          });
-          
-          console.log('Browser-based call connected:', call);
-          
-          // Ensure we have a proper call object with a status method
-          const callSid = call && call.parameters && call.parameters.CallSid 
-            ? call.parameters.CallSid 
-            : 'browser-call';
-            
-          if (callSid && leadId) {
-            this.activeCallSids.set(leadId, callSid);
-          }
-          
-          return { 
-            success: true, 
-            callSid: callSid
-          };
-        } catch (browserError: any) {
-          console.error('Browser-based call failed:', browserError);
-          return { 
-            success: false, 
-            error: browserError.message || 'Browser-based call failed'
-          };
-        }
+        // Fall back to makeCall if directCall fails
+        console.log('Error with directCall, falling back to makeCall...');
+        return this.fallbackToMakeCall(formattedNumber, identity, leadId);
       }
     } catch (error: any) {
       console.error('Error making call:', error);
       return { success: false, error: error.message || 'Unknown error making call' };
+    }
+  }
+
+  private async fallbackToMakeCall(formattedNumber: string, identity: string | null, leadId: string): Promise<TwilioCallResult> {
+    try {
+      console.log('Using REST API makeCall as fallback...');
+      
+      const response = await supabase.functions.invoke('twilio-voice', {
+        body: {
+          action: 'makeCall',
+          phoneNumber: formattedNumber,
+          browserClientName: identity || undefined,
+        },
+      });
+      
+      if (response.data?.success) {
+        const callSid = response.data.callSid;
+        console.log(`Call initiated with SID: ${callSid}`);
+        
+        // Store the callSid for this lead
+        if (leadId) {
+          this.activeCallSids.set(leadId, callSid);
+        }
+        
+        return { success: true, callSid };
+      } else {
+        throw new Error(response.data?.error || 'Failed to make call through REST API');
+      }
+    } catch (error: any) {
+      console.error('Error making call via REST API:', error);
+      
+      // Fallback to browser-based calling if REST API fails
+      console.log('Falling back to browser-based calling...');
+      
+      if (!this.device) {
+        return { success: false, error: 'Twilio device not initialized' };
+      }
+      
+      try {
+        const call = await this.device.connect({
+          params: {
+            To: formattedNumber,
+            From: this.twilioPhoneNumber
+          }
+        });
+        
+        console.log('Browser-based call connected:', call);
+        
+        // Ensure we have a proper call object with a status method
+        const callSid = call && call.parameters && call.parameters.CallSid 
+          ? call.parameters.CallSid 
+          : 'browser-call';
+          
+        if (callSid && leadId) {
+          this.activeCallSids.set(leadId, callSid);
+        }
+        
+        return { 
+          success: true, 
+          callSid: callSid
+        };
+      } catch (browserError: any) {
+        console.error('Browser-based call failed:', browserError);
+        return { 
+          success: false, 
+          error: browserError.message || 'Browser-based call failed'
+        };
+      }
     }
   }
 
