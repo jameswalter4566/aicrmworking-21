@@ -21,7 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, RefreshCw, AlertCircle } from "lucide-react";
+import { Phone, PhoneCall, PhoneIncoming, PhoneOff, Clock, MessageSquare, User, Bot, RefreshCw, AlertCircle, Speaker } from "lucide-react";
 import Phone2 from "@/components/icons/Phone2";
 import Phone3 from "@/components/icons/Phone3";
 import {
@@ -32,6 +32,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
 import { audioProcessing } from "@/services/audioProcessing";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const activityLogsData = {
   1: [
@@ -101,9 +108,13 @@ const PowerDialer = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [noLeadsSelectedError, setNoLeadsSelectedError] = useState(false);
   const [audioWebSocketReady, setAudioWebSocketReady] = useState(false);
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [currentAudioDevice, setCurrentAudioDevice] = useState<string>('default');
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
 
   useEffect(() => {
     fetchLeads();
+    loadAudioDevices();
   }, []);
 
   const fetchLeads = async () => {
@@ -126,6 +137,94 @@ const PowerDialer = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const loadAudioDevices = async () => {
+    setIsLoadingDevices(true);
+    try {
+      const devices = await audioProcessing.getAudioDevices();
+      setAudioDevices(devices);
+      
+      let savedDevice;
+      try {
+        savedDevice = localStorage.getItem('preferredAudioDevice');
+      } catch (err) {
+        console.warn('Could not access localStorage:', err);
+      }
+      
+      if (savedDevice) {
+        setCurrentAudioDevice(savedDevice);
+      } else {
+        const defaultDevice = devices.find(d => d.deviceId === 'default')?.deviceId || 
+                             (devices.length > 0 ? devices[0].deviceId : 'default');
+        setCurrentAudioDevice(defaultDevice);
+      }
+    } catch (err) {
+      console.error('Error loading audio devices:', err);
+    } finally {
+      setIsLoadingDevices(false);
+    }
+  };
+
+  const handleAudioDeviceChange = async (deviceId: string) => {
+    try {
+      const success = await audioProcessing.setAudioDevice(deviceId);
+      if (success) {
+        setCurrentAudioDevice(deviceId);
+        
+        try {
+          localStorage.setItem('preferredAudioDevice', deviceId);
+        } catch (err) {
+          console.warn('Could not save audio device preference:', err);
+        }
+        
+        toast({
+          title: "Audio Device Changed",
+          description: "Audio output device has been updated.",
+        });
+      }
+    } catch (err) {
+      console.error('Error changing audio device:', err);
+      toast({
+        title: "Error",
+        description: "Failed to change audio device.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const testSelectedAudio = async () => {
+    try {
+      await audioProcessing.testAudio(currentAudioDevice);
+      toast({
+        title: "Audio Test",
+        description: "Playing test sound on selected device.",
+      });
+    } catch (err) {
+      console.error('Error testing audio:', err);
+      toast({
+        title: "Audio Test Failed",
+        description: "Could not play test sound.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatDeviceName = (device: MediaDeviceInfo): string => {
+    if (!device.label) {
+      return device.deviceId === 'default' ? 'System Default' : `Device ${device.deviceId.substring(0, 4)}`;
+    }
+    
+    let label = device.label;
+    if (label.length > 30) {
+      label = `${label.substring(0, 27)}...`;
+    }
+    
+    if (device.deviceId === 'default') {
+      label += ' (Default)';
+    }
+    
+    return label;
   };
 
   const handleRefreshLeads = () => {
@@ -867,6 +966,58 @@ const PowerDialer = () => {
                   <span>3 Lines</span>
                 </ToggleGroupItem>
               </ToggleGroup>
+            </div>
+            
+            <div>
+              <h3 className="text-sm font-medium mb-2">Audio Output Device</h3>
+              <div className="space-y-2">
+                <Select
+                  value={currentAudioDevice}
+                  onValueChange={handleAudioDeviceChange}
+                  disabled={isLoadingDevices}
+                >
+                  <SelectTrigger className="w-full">
+                    <div className="flex items-center gap-2">
+                      <Speaker className="h-4 w-4" />
+                      <SelectValue placeholder="Select audio device" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {audioDevices.length === 0 ? (
+                      <SelectItem value="default" disabled>No audio devices found</SelectItem>
+                    ) : (
+                      audioDevices.map(device => (
+                        <SelectItem key={device.deviceId} value={device.deviceId}>
+                          {formatDeviceName(device)}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={loadAudioDevices}
+                    disabled={isLoadingDevices}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingDevices ? 'animate-spin' : ''}`} />
+                    {isLoadingDevices ? 'Refreshing...' : 'Refresh Devices'}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={testSelectedAudio}
+                  >
+                    <Speaker className="h-4 w-4 mr-2" />
+                    Test Audio
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
           
