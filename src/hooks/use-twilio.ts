@@ -396,7 +396,7 @@ export const useTwilio = () => {
           }
         }
         
-        const status = await twilioService.checkCallStatus(callSid);
+        const status = await twilioService.checkCallStatus(String(leadId));
         
         if (["completed", "busy", "no-answer", "failed", "canceled"].includes(status)) {
           clearInterval(statusCheckIntervals.current[leadIdStr]);
@@ -531,7 +531,7 @@ export const useTwilio = () => {
     
     setupWebSocket();
     
-    const result = await twilioService.makeCall(phoneNumber);
+    const result = await twilioService.makeCall(phoneNumber, String(leadId));
     
     if (result.success && result.callSid) {
       const leadIdStr = String(leadId);
@@ -577,7 +577,7 @@ export const useTwilio = () => {
         delete statusCheckIntervals.current[leadIdStr];
       }
       
-      await twilioService.endCall();
+      await twilioService.endCall(leadIdStr);
       
       if (Object.keys(activeCalls).length <= 1) {
         stopCapturingMicrophone();
@@ -768,6 +768,6 @@ export const useTwilio = () => {
     toggleSpeaker,
     setAudioOutputDevice,
     refreshAudioDevices,
-    testAudio: twilioService.testAudioOutput
+    testAudio: (deviceId: string) => twilioService.testAudioOutput(deviceId)
   };
 };
