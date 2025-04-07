@@ -12,7 +12,7 @@ class TwilioService {
   private currentAudioDeviceId: string = '';
   private hasActiveCall: boolean = false;
   private tokenRefreshInterval: number | null = null;
-  private useBrowserCallingOnly: boolean = true; // Always use browser calling
+  private useBrowserCallingOnly: boolean = false; // Allow REST API calls
   private errorHandlers: Array<(error: any) => void> = [];
 
   // Initialize the Twilio device with options for Voice SDK 2.x
@@ -85,7 +85,7 @@ class TwilioService {
         await this.device.register();
         console.log("Device registered successfully");
       } catch (err) {
-        console.error("Error registering device:", err);
+        console.warn("Error registering device:", err);
         // Continue even if registration fails, as outgoing calls might still work
       }
       
@@ -318,98 +318,151 @@ class TwilioService {
     return this.currentAudioDeviceId;
   }
 
-  // Make a call using the Twilio device
+  // Make a call using the Twilio device or the REST API
   async makeCall(phoneNumber: string): Promise<{ success: boolean; callSid?: string; error?: string }> {
     try {
-      if (!this.device) {
-        console.error("Twilio device not initialized");
-        const deviceInitialized = await this.initializeTwilioDevice();
-        
-        if (!deviceInitialized) {
-          return { success: false, error: "Failed to initialize Twilio device" };
-        }
+      if (!phoneNumber) {
+        return { success: false, error: "Phone number is required" };
+      }
+
+      // Format phone number to ensure it has + if not using client:
+      let formattedNumber = phoneNumber;
+      if (!phoneNumber.startsWith('+') && !phoneNumber.startsWith('client:') && phoneNumber !== 'test') {
+        formattedNumber = '+' + phoneNumber.replace(/\D/g, '');
       }
       
-      // Check if we already have an active call
-      if (this.call) {
-        console.warn("Call already in progress");
-        return { success: false, error: "Call already in progress" };
-      }
-      
-      // Ensure we have microphone access
-      if (!this.isAudioContextInitialized) {
-        const micAccess = await this.initializeAudioContext();
-        if (!micAccess) {
-          return { success: false, error: "Failed to access microphone" };
-        }
-      }
-      
-      // Make the call using the Twilio device
-      try {
-        console.log(`Making call to ${phoneNumber}`);
-        
-        // Add the country code if not present and not a test number
-        let formattedNumber = phoneNumber;
-        if (!phoneNumber.startsWith('+') && !phoneNumber.startsWith('client:') && phoneNumber !== 'test') {
-          formattedNumber = '+' + phoneNumber.replace(/\D/g, '');
-        }
-        
-        // Connect with the formatted number
-        this.call = await this.device.connect({
-          params: {
-            To: formattedNumber,
-            useStream: 'true', // Enable bidirectional audio stream
-            streamWebhookUrl: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream'
+      // Using REST API for outbound calls (more reliable for dialing actual phone numbers)
+      // This ensures the call actually dials out to a phone number
+      if (!this.useBrowserCallingOnly) {
+        try {
+          console.log(`Making outbound call to ${formattedNumber} using Twilio REST API`);
+          
+          const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              action: 'makeCall',
+              phoneNumber: formattedNumber
+            })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Server responded with status: ${response.status}`);
           }
-        });
-        
-        console.log("Call connected:", this.call);
-        this.hasActiveCall = true;
-        
-        // Handle call events
-        this.call.on('accept', () => {
-          console.log("Call accepted");
-        });
-        
-        this.call.on('disconnect', () => {
-          console.log("Call disconnected - cleaning up audio resources");
-          this.call = null;
-          this.hasActiveCall = false;
-        });
-        
-        // Handle call errors - filter out normal 31005 errors
-        this.call.on('error', (callError: any) => {
-          if (callError.code === 31005) {
-            console.log("Normal call hangup from gateway");
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            console.log(`Outbound call initiated with SID: ${data.callSid}`);
+            this.hasActiveCall = true;
+            return {
+              success: true,
+              callSid: data.callSid
+            };
           } else {
-            console.error("Call error:", callError);
-            
-            // Notify any registered error handlers
-            this.errorHandlers.forEach(handler => {
-              try {
-                handler(callError);
-              } catch (handlerError) {
-                console.error("Error in call error handler:", handlerError);
-              }
-            });
+            throw new Error(data.error || 'Unknown error making call');
           }
-        });
-        
-        // Return the call SID if available
-        return { 
-          success: true, 
-          callSid: this.call.parameters.CallSid || 'pending-sid'
-        };
-      } catch (callError: any) {
-        console.error("Error making call:", callError);
-        return { 
-          success: false, 
-          error: callError.message || "Failed to initiate call" 
-        };
+        } catch (restError) {
+          console.error("Error making call via REST API:", restError);
+          
+          // If REST API fails, try to fall back to browser-based calling
+          console.log("Falling back to browser-based calling...");
+          
+          return this.makeBrowserCall(formattedNumber);
+        }
+      } else {
+        // Using browser-based calling
+        return this.makeBrowserCall(formattedNumber);
       }
     } catch (error: any) {
       console.error("Error in makeCall:", error);
       return { success: false, error: error.message || "Unknown error making call" };
+    }
+  }
+  
+  // Make a call using the browser Twilio Device
+  private async makeBrowserCall(phoneNumber: string): Promise<{ success: boolean; callSid?: string; error?: string }> {
+    // Ensure we have a device initialized
+    if (!this.device) {
+      console.error("Twilio device not initialized");
+      const deviceInitialized = await this.initializeTwilioDevice();
+      
+      if (!deviceInitialized) {
+        return { success: false, error: "Failed to initialize Twilio device" };
+      }
+    }
+    
+    // Check if we already have an active call
+    if (this.call) {
+      console.warn("Call already in progress");
+      return { success: false, error: "Call already in progress" };
+    }
+    
+    // Ensure we have microphone access
+    if (!this.isAudioContextInitialized) {
+      const micAccess = await this.initializeAudioContext();
+      if (!micAccess) {
+        return { success: false, error: "Failed to access microphone" };
+      }
+    }
+    
+    // Make the call using the Twilio device
+    try {
+      console.log(`Making browser-based call to ${phoneNumber}`);
+      
+      this.call = await this.device.connect({
+        params: {
+          To: phoneNumber,
+          useStream: 'true', // Enable bidirectional audio stream
+          streamWebhookUrl: 'wss://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-stream'
+        }
+      });
+      
+      console.log("Browser call connected:", this.call);
+      this.hasActiveCall = true;
+      
+      // Handle call events
+      this.call.on('accept', () => {
+        console.log("Call accepted");
+      });
+      
+      this.call.on('disconnect', () => {
+        console.log("Call disconnected - cleaning up audio resources");
+        this.call = null;
+        this.hasActiveCall = false;
+      });
+      
+      // Handle call errors - filter out normal 31005 errors
+      this.call.on('error', (callError: any) => {
+        if (callError.code === 31005) {
+          console.log("Normal call hangup from gateway");
+        } else {
+          console.error("Call error:", callError);
+          
+          // Notify any registered error handlers
+          this.errorHandlers.forEach(handler => {
+            try {
+              handler(callError);
+            } catch (handlerError) {
+              console.error("Error in call error handler:", handlerError);
+            }
+          });
+        }
+      });
+      
+      // Return the call SID if available
+      return { 
+        success: true, 
+        callSid: this.call.parameters.CallSid || 'pending-sid'
+      };
+    } catch (callError: any) {
+      console.error("Error making browser call:", callError);
+      return { 
+        success: false, 
+        error: callError.message || "Failed to initiate call" 
+      };
     }
   }
 
@@ -521,6 +574,11 @@ class TwilioService {
       // If it's a browser call, check the local status
       if (this.call && this.call.parameters.CallSid === callSid) {
         return this.getBrowserCallStatus();
+      }
+      
+      // Special case for pending-sid
+      if (callSid === 'pending-sid') {
+        return this.hasActiveCall ? 'pending' : 'completed';
       }
       
       // Otherwise check with the Twilio API

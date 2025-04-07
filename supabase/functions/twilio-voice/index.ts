@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import twilio from 'npm:twilio@4.23.0';
 
@@ -196,7 +195,14 @@ serve(async (req) => {
       }
       
       try {
-        console.log(`Making call to ${phoneNumber}`);
+        console.log(`Making call to ${phoneNumber} using phone number ${TWILIO_PHONE_NUMBER}`);
+        
+        // Format phone number to ensure it has + and only digits
+        let formattedPhoneNumber = phoneNumber;
+        if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
+          formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
+          console.log(`Formatted phone number: ${formattedPhoneNumber}`);
+        }
         
         // We need to use a PUBLIC URL for both TwiML and WebSocket
         // Using a proper public URL ensures Twilio can reach our functions
@@ -207,10 +213,9 @@ serve(async (req) => {
         console.log(`Using stream URL: ${streamUrl}`);
         
         const call = await client.calls.create({
-          to: phoneNumber,
+          to: formattedPhoneNumber, // Use the formatted phone number
           from: TWILIO_PHONE_NUMBER,
-          url: `${PUBLIC_URL}/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(phoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
-          // NO SPECIAL PARAMS IN THE STATUS CALLBACK URL - keeping it simple:
+          url: `${PUBLIC_URL}/functions/v1/twilio-voice?action=handleVoice&phoneNumber=${encodeURIComponent(formattedPhoneNumber)}&streamUrl=${encodeURIComponent(streamUrl)}`,
           statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice`,
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
@@ -264,12 +269,12 @@ serve(async (req) => {
       const twiml = new twilio.twiml.VoiceResponse();
       
       // Add some initial audio playback
-      twiml.say("Hello! This call is being processed by our system. Please wait while we connect you.");
+      twiml.say("Hello! This is an outbound call from your Power Dialer system. Please wait while we connect you.");
       
       // Add a pause to keep the call open
       twiml.pause({ length: 2 });
       
-      // Using Connect with a Stream
+      // Using Connect with a Stream for bidirectional audio
       const connect = twiml.connect();
       connect.stream({
         url: streamUrl,
@@ -335,21 +340,28 @@ serve(async (req) => {
       const { callSid } = requestData;
       
       if (!callSid) {
-        // Return a TwiML response even for this error
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say("Call SID is required to check call status.");
-        
-        return new Response(twiml.toString(), {
-          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-        });
+        // Return a JSON response for this error
+        return new Response(
+          JSON.stringify({ success: false, error: "Call SID is required to check call status" }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
       
       try {
         console.log(`Checking status for call ${callSid}`);
         
-        const call = await client.calls(callSid).fetch();
+        // Handle the case where callSid is "pending-sid"
+        if (callSid === 'pending-sid') {
+          console.log("Handling pending-sid special case");
+          return new Response(
+            JSON.stringify({ success: true, status: "pending" }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
         
-        // For checkStatus, it's OK to return JSON since this is an API call, not a Twilio webhook
+        const call = await client.calls(callSid).fetch();
+        console.log(`Call status retrieved: ${call.status} for SID: ${callSid}`);
+        
         return new Response(
           JSON.stringify({ success: true, status: call.status }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
