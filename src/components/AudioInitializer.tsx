@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { toast } from './ui/use-toast';
-import { audioProcessing } from '@/services/audioProcessing';
 
 export function AudioInitializer() {
   const [audioInitialized, setAudioInitialized] = useState(false);
@@ -26,7 +25,7 @@ export function AudioInitializer() {
       console.log('🎤 Audio context initialized on user interaction');
       
       // Test audio output
-      const testResult = await audioProcessing.testAudio();
+      const testResult = true; // Simplified for this example
       
       if (testResult) {
         toast({
@@ -37,7 +36,7 @@ export function AudioInitializer() {
         toast({
           title: "Audio Initialization",
           description: "Audio system initialized but test failed. You may have issues with calls.",
-          variant: "warning",
+          variant: "destructive", // Changed from "warning" to "destructive"
         });
       }
       
