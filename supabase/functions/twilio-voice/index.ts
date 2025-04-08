@@ -165,8 +165,13 @@ serve(async (req) => {
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
 
-    // If no action is specified at all, handle as a direct client call
-    // This is crucial for browser client initiated calls
+    // If this is an incoming call from browser client with a phoneNumber to call
+    if (!action && (requestData.CallSid && requestData.phoneNumber)) {
+      console.log("This appears to be a browser client call with phone number parameter");
+      action = 'incomingCall';
+    }
+    
+    // If no action is specified at all, check if it's a direct call from the browser client
     if (!action) {
       console.log("No action specified, handling as a potential client-initiated call");
       
@@ -176,8 +181,9 @@ serve(async (req) => {
       
       console.log(`Extracted phoneNumber: ${phoneNumber}, leadId: ${leadId}`);
       
+      // Check if we have a phone number to call
       if (phoneNumber) {
-        console.log(`Will dial out to: ${phoneNumber}`);
+        console.log(`Will attempt to dial out to: ${phoneNumber}`);
         
         // Format phone number if needed
         let formattedPhoneNumber = phoneNumber;
@@ -186,16 +192,23 @@ serve(async (req) => {
           console.log(`Formatted phone number: ${formattedPhoneNumber}`);
         }
         
+        // Create TwiML to make the call
         const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say("Please wait while we connect your call.");
         
+        // First add greeting
+        twiml.say("Please wait while we connect your call.");
+        twiml.pause({ length: 1 });
+        
+        // Then dial out to the destination number
         const dial = twiml.dial({
           callerId: TWILIO_PHONE_NUMBER,
-          timeout: 20,
+          timeout: 30,
           action: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=dialStatus&leadId=${leadId || ''}`,
-          method: 'POST'
+          method: 'POST',
+          answerOnBridge: true  // This ensures the call quality is better
         });
         
+        // Add the destination number to the dial verb
         dial.number({
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallback: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId || ''}`,
@@ -277,7 +290,8 @@ serve(async (req) => {
           callerId: TWILIO_PHONE_NUMBER,
           timeout: 30,
           action: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=dialStatus&leadId=${leadId || ''}`,
-          method: 'POST'
+          method: 'POST',
+          answerOnBridge: true  // This ensures the call quality is better
         });
         
         dial.number({
@@ -517,7 +531,7 @@ serve(async (req) => {
       if (dialCallStatus === 'completed') {
         twiml.say("The call has ended. Thank you for using our service.");
       } else {
-        twiml.say(`The call status is ${dialCallStatus || 'unknown'}. Goodbye.`);
+        twiml.say(`Call status is ${dialCallStatus || 'unknown'}. Goodbye.`);
       }
       
       return new Response(twiml.toString(), {

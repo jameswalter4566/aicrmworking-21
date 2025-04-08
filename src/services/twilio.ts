@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -58,8 +59,7 @@ const createTwilioService = (): TwilioService => {
 
   const initializeTwilioDevice = async (): Promise<boolean> => {
     try {
-      // Using Supabase Edge Function URL directly instead of relative path
-      // This avoids getting HTML error pages when the relative path is misinterpreted
+      // Using the full Supabase URL to avoid HTML error pages
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
         method: 'POST',
         headers: {
@@ -72,28 +72,31 @@ const createTwilioService = (): TwilioService => {
         console.error(`Failed to fetch Twilio token: ${response.status} ${response.statusText}`);
         const text = await response.text();
         console.error("Response body:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
-        return false;
+        throw new Error(`Failed to fetch Twilio token: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
 
       if (!data.token) {
-        console.error("Failed to retrieve Twilio token:", data.error);
-        return false;
+        console.error("Failed to retrieve Twilio token:", data.error || "No token in response");
+        throw new Error(data.error || "No token in response");
       }
 
+      // Make sure we have the Twilio Device constructor available
       if (window.Twilio && window.Twilio.Device) {
-        // Store Device instance without type checking
+        // Store Device instance
         device = new window.Twilio.Device(data.token, {
-          // Set Opus as our preferred codec. Opus generally performs better, even
-          // at low bitrates, than other codecs.
+          // Codec preferences - Opus generally performs better
           codecPreferences: ["opus", "pcmu"],
-          // Max call signaling timeout for reconnection
+          // Increase call signaling timeout for reconnection attempts
           maxCallSignalingTimeoutMs: 30000,
-          // Add logs for debugging
-          logLevel: 'debug'
+          // Enable logging for debugging
+          logLevel: 'debug',
+          // Enable ICE aggressive nomination for faster call setup
+          forceAggressiveIceNomination: true
         });
 
+        // Set up event handlers
         device.on("error", (error: any) => {
           console.error("Twilio Device Error:", error);
           toast({
@@ -109,24 +112,26 @@ const createTwilioService = (): TwilioService => {
 
         device.on("incoming", (call: any) => {
           console.log(`Incoming call from: ${call.from || 'unknown'}`);
+          // Reject incoming calls by default - this app is for outbound calling
           call.reject();
         });
 
+        // Register the device to enable incoming calls
         try {
           await device.register();
           console.log("Twilio device registered successfully.");
           return true;
         } catch (registerError) {
           console.error("Error registering Twilio device:", registerError);
-          return false;
+          throw registerError;
         }
       } else {
         console.error("Twilio.Device is not supported in this browser.");
-        return false;
+        throw new Error("Twilio.Device is not supported in this browser.");
       }
     } catch (error) {
       console.error("Error initializing Twilio device:", error);
-      return false;
+      throw error;
     }
   };
 
@@ -198,7 +203,7 @@ const createTwilioService = (): TwilioService => {
       console.log(`Attempting to call ${formattedPhoneNumber} via browser client`);
       
       try {
-        // Try browser-based call first - it should pass phoneNumber and leadId as params
+        // Try browser-based call first
         const call = await device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
@@ -208,13 +213,31 @@ const createTwilioService = (): TwilioService => {
         
         console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
         
-        // Set up call event listeners for error handling
+        // Set up call event listeners
         call.on('error', (error: any) => {
           console.error('Call error:', error);
           toast({
             title: "Call Error",
             description: `Error during call: ${error.message || error}`,
             variant: "destructive",
+          });
+        });
+        
+        // Listen for accepted event
+        call.on('accept', () => {
+          console.log('Call accepted, audio connection established');
+          toast({
+            title: "Call Connected",
+            description: "You're now connected to the call.",
+          });
+        });
+        
+        // Listen for disconnect event
+        call.on('disconnect', () => {
+          console.log('Call disconnected');
+          toast({
+            title: "Call Ended",
+            description: "The call has been disconnected.",
           });
         });
         
