@@ -12,6 +12,7 @@ interface StreamConnection {
   socket: WebSocket;
   streamSid: string | null;
   callSid: string | null;
+  conferenceName: string | null; // Added to track conference name
   lastActivity: number;
   inboundAudioCount: number;
   outboundAudioCount: number;
@@ -53,18 +54,21 @@ setInterval(() => {
   if (activeConnections.size > 0) {
     const now = Date.now();
     activeConnections.forEach((conn, id) => {
-      console.log(`🔌 Connection ${id}: streamSid=${conn.streamSid || 'none'}, callSid=${conn.callSid || 'none'}, type=${conn.clientType}, connected=${conn.connected}, inbound=${conn.inboundAudioCount}, outbound=${conn.outboundAudioCount}, age=${((now - conn.lastActivity)/1000).toFixed(1)}s`);
+      console.log(`🔌 Connection ${id}: streamSid=${conn.streamSid || 'none'}, callSid=${conn.callSid || 'none'}, conference=${conn.conferenceName || 'none'}, type=${conn.clientType}, connected=${conn.connected}, inbound=${conn.inboundAudioCount}, outbound=${conn.outboundAudioCount}, age=${((now - conn.lastActivity)/1000).toFixed(1)}s`);
     });
   }
 }, 10000);
 
-// New function to forward audio between connections
-function forwardAudioToMatchingConnections(senderConnId: string, streamSid: string, audioData: any) {
+// Enhanced function to forward audio between connections
+function forwardAudioToMatchingConnections(senderConnId: string, streamSid: string | null, conferenceName: string | null, audioData: any) {
   let forwardCount = 0;
   
   activeConnections.forEach((conn, connId) => {
     // Don't send back to the sender
-    if (connId !== senderConnId && conn.streamSid === streamSid && conn.connected) {
+    // Forward if: same streamSid OR same conferenceName (when conferenceName is available)
+    if (connId !== senderConnId && conn.connected && 
+        ((streamSid && conn.streamSid === streamSid) || 
+         (conferenceName && conn.conferenceName === conferenceName))) {
       try {
         conn.socket.send(JSON.stringify({
           event: 'audio',
@@ -72,6 +76,7 @@ function forwardAudioToMatchingConnections(senderConnId: string, streamSid: stri
           payload: audioData.payload || audioData.media?.payload,
           timestamp: Date.now(),
           streamSid: streamSid,
+          conferenceName: conferenceName,
           forwardedFrom: senderConnId
         }));
         forwardCount++;
@@ -107,6 +112,7 @@ serve(async (req) => {
       socket,
       streamSid: null,
       callSid: null,
+      conferenceName: null,
       lastActivity: Date.now(),
       inboundAudioCount: 0,
       outboundAudioCount: 0,
@@ -136,6 +142,11 @@ serve(async (req) => {
         
         const data = JSON.parse(event.data);
         
+        // Only log non-ping/pong events which happen frequently
+        if (data.event !== 'ping' && data.event !== 'pong') {
+          console.log(`📩 Connection ${connId} received ${data.event} event`);
+        }
+        
         switch (data.event) {
           case 'ping':
           case 'pong':
@@ -146,8 +157,13 @@ serve(async (req) => {
             connectionState.outboundAudioCount++;
             connectionState.clientType = 'twilio';
             if (data.media?.payload) {
-              // Forward Twilio audio to all browser clients with matching streamSid
-              const forwardCount = forwardAudioToMatchingConnections(connId, data.streamSid, data.media);
+              // Forward Twilio audio to all browser clients with matching streamSid or conferenceName
+              const forwardCount = forwardAudioToMatchingConnections(
+                connId, 
+                data.streamSid, 
+                connectionState.conferenceName,
+                data.media
+              );
               
               if (connectionState.outboundAudioCount % 100 === 0) {
                 console.log(`📤 Forwarded Twilio audio chunk #${connectionState.outboundAudioCount} to ${forwardCount} recipients`);
@@ -160,42 +176,38 @@ serve(async (req) => {
             connectionState.inboundAudioCount++;
             
             if (data.payload) {
-              // Forward browser audio to Twilio
-              if (connectionState.streamSid) {
-                // Find the Twilio connection with matching streamSid
-                let twilioConnId: string | null = null;
-                activeConnections.forEach((conn, id) => {
-                  if (conn.clientType === 'twilio' && conn.streamSid === connectionState.streamSid) {
-                    twilioConnId = id;
+              // Forward browser audio to Twilio connections with matching streamSid or conferenceName
+              let twilioConn: StreamConnection | null = null;
+              
+              activeConnections.forEach((conn) => {
+                if (conn.clientType === 'twilio' && 
+                    ((connectionState.streamSid && conn.streamSid === connectionState.streamSid) ||
+                     (connectionState.conferenceName && conn.conferenceName === connectionState.conferenceName))) {
+                  twilioConn = conn;
+                }
+              });
+              
+              if (twilioConn && twilioConn.connected) {
+                twilioConn.socket.send(JSON.stringify({
+                  event: 'media',
+                  streamSid: connectionState.streamSid,
+                  conferenceName: connectionState.conferenceName,
+                  media: {
+                    payload: data.payload
                   }
-                });
+                }));
                 
-                if (twilioConnId) {
-                  const twilioConn = activeConnections.get(twilioConnId);
-                  if (twilioConn && twilioConn.connected) {
-                    twilioConn.socket.send(JSON.stringify({
-                      event: 'media',
-                      streamSid: connectionState.streamSid,
-                      media: {
-                        payload: data.payload
-                      }
-                    }));
-                    
-                    if (connectionState.inboundAudioCount % 100 === 0) {
-                      console.log(`📤 Forwarded browser audio chunk #${connectionState.inboundAudioCount} to Twilio connection ${twilioConnId}`);
-                    }
-                  }
-                } else {
-                  console.warn(`⚠️ No Twilio connection found for streamSid ${connectionState.streamSid}`);
+                if (connectionState.inboundAudioCount % 100 === 0) {
+                  console.log(`📤 Forwarded browser audio chunk #${connectionState.inboundAudioCount} to Twilio`);
                 }
               } else {
-                console.warn(`⚠️ Received browser audio but no streamSid is set yet`);
+                console.warn(`⚠️ No matching Twilio connection found for forwarding audio`);
               }
             }
             break;
             
           default:
-            console.log(`📩 Connection ${connId} received ${data.event} event`);
+            // For other events, just log that we received them
         }
 
         if (data.event === 'connected') {
@@ -214,6 +226,12 @@ serve(async (req) => {
             connectionState.callSid = data.callSid;
             connectionState.inboundAudioCount = 0;
             connectionState.outboundAudioCount = 0;
+            
+            // Check if this is part of a conference call
+            if (data.start?.friendlyName && data.start.friendlyName.includes('Conference')) {
+              connectionState.conferenceName = data.start.friendlyName;
+              console.log(`📞 Conference call detected: ${connectionState.conferenceName}`);
+            }
           }
           
           // Broadcast to all connections that might be waiting for this stream
@@ -223,6 +241,7 @@ serve(async (req) => {
                 event: 'streamStart',
                 streamSid: data.streamSid,
                 callSid: data.callSid,
+                conferenceName: data.start?.friendlyName,
                 timestamp: Date.now()
               }));
             }
@@ -232,6 +251,7 @@ serve(async (req) => {
             event: 'streamStart',
             streamSid: data.streamSid,
             callSid: data.callSid,
+            conferenceName: data.start?.friendlyName,
             timestamp: Date.now()
           }));
 
@@ -239,14 +259,15 @@ serve(async (req) => {
 🔊 Stream details:
 - Stream SID: ${data.streamSid}
 - Call SID: ${data.callSid}
+- Conference Name: ${data.start?.friendlyName || 'N/A'}
 - Tracks: ${data.start?.tracks?.join(', ') || 'unknown'}
 - Media Format: ${JSON.stringify(data.start?.mediaFormat || {})}
 - Account SID: ${data.start?.accountSid || 'unknown'}
           `);
         }
         else if (data.event === 'media' && data.media?.payload) {
-          if (!connectionState.streamSid) {
-            console.warn('⚠️ Received media before stream start');
+          if (!connectionState.streamSid && !connectionState.conferenceName) {
+            console.warn('⚠️ Received media before stream start or conference identification');
             return;
           }
 
@@ -259,23 +280,29 @@ serve(async (req) => {
             payload: data.media.payload,
             timestamp: Date.now(),
             streamSid: connectionState.streamSid,
+            conferenceName: connectionState.conferenceName,
             chunk: data.media.chunk || 0,
             sequence: data.sequenceNumber || 0
           }));
           
-          // Also forward to all other connections with matching streamSid
-          forwardAudioToMatchingConnections(connId, connectionState.streamSid, data.media);
+          // Also forward to all other connections with matching streamSid or conferenceName
+          forwardAudioToMatchingConnections(
+            connId, 
+            connectionState.streamSid, 
+            connectionState.conferenceName, 
+            data.media
+          );
           
           if (track === 'inbound') {
             connectionState.inboundAudioCount++;
             // Log periodically to confirm we're receiving audio
             if (connectionState.inboundAudioCount % 50 === 0) {
-              console.log(`📥 Forwarded ${connectionState.inboundAudioCount} inbound audio chunks for stream ${connectionState.streamSid}`);
+              console.log(`📥 Forwarded ${connectionState.inboundAudioCount} inbound audio chunks for stream ${connectionState.streamSid || ''} / conference ${connectionState.conferenceName || ''}`);
             }
           } else {
             connectionState.outboundAudioCount++;
             if (connectionState.outboundAudioCount % 50 === 0) {
-              console.log(`📤 Forwarded ${connectionState.outboundAudioCount} outbound audio chunks for stream ${connectionState.streamSid}`);
+              console.log(`📤 Forwarded ${connectionState.outboundAudioCount} outbound audio chunks for stream ${connectionState.streamSid || ''} / conference ${connectionState.conferenceName || ''}`);
             }
           }
         }
@@ -284,11 +311,14 @@ serve(async (req) => {
           
           // Notify all connections about stream stop
           activeConnections.forEach((conn, id) => {
-            if (conn.streamSid === connectionState.streamSid && conn.connected) {
+            if ((conn.streamSid === connectionState.streamSid || 
+                conn.conferenceName === connectionState.conferenceName) && 
+                conn.connected) {
               conn.socket.send(JSON.stringify({
                 event: 'streamStop',
                 streamSid: data.streamSid,
                 callSid: data.callSid || connectionState.callSid,
+                conferenceName: connectionState.conferenceName,
                 timestamp: Date.now()
               }));
             }
@@ -299,6 +329,7 @@ serve(async (req) => {
           if (activeConnections.has(connId)) {
             connectionState.streamSid = null;
             connectionState.callSid = null;
+            connectionState.conferenceName = null;
           }
         }
         else if (data.event === 'mark') {
@@ -308,6 +339,7 @@ serve(async (req) => {
             event: 'mark',
             name: data.mark?.name || '',
             streamSid: data.streamSid,
+            conferenceName: connectionState.conferenceName,
             timestamp: Date.now()
           }));
         }
@@ -318,27 +350,30 @@ serve(async (req) => {
             event: 'dtmf',
             digit: data.dtmf?.digit || '',
             streamSid: data.streamSid,
+            conferenceName: connectionState.conferenceName,
             timestamp: Date.now()
           }));
         }
         else if (data.event === 'browser_audio' && data.payload) {
-          if (!connectionState.streamSid) {
-            // If we don't have a streamSid yet for this browser connection,
+          if (!connectionState.streamSid && !connectionState.conferenceName) {
+            // If we don't have a streamSid or conferenceName yet for this browser connection,
             // see if there's an active Twilio stream we can attach to
             let foundTwilioStream = false;
             activeConnections.forEach((conn) => {
-              if (conn.clientType === 'twilio' && conn.streamSid) {
+              if (conn.clientType === 'twilio' && (conn.streamSid || conn.conferenceName)) {
                 connectionState.streamSid = conn.streamSid;
                 connectionState.callSid = conn.callSid;
+                connectionState.conferenceName = conn.conferenceName;
                 foundTwilioStream = true;
                 
-                console.log(`🔗 Auto-associated browser connection ${connId} with existing stream ${conn.streamSid}`);
+                console.log(`🔗 Auto-associated browser connection ${connId} with existing stream/conference`);
                 
-                // Notify the browser client about the stream
+                // Notify the browser client about the stream/conference
                 socket.send(JSON.stringify({
                   event: 'streamStart',
                   streamSid: conn.streamSid,
                   callSid: conn.callSid,
+                  conferenceName: conn.conferenceName,
                   timestamp: Date.now(),
                   autoAssociated: true
                 }));
@@ -346,15 +381,16 @@ serve(async (req) => {
             });
             
             if (!foundTwilioStream) {
-              console.warn('⚠️ Received browser audio before stream start and no active streams available');
+              console.warn('⚠️ Received browser audio before stream/conference assignment and no active streams available');
               return;
             }
           }
           
-          // This is critical - forward browser audio to Twilio stream
+          // Forward browser audio to Twilio stream
           socket.send(JSON.stringify({
             event: 'media',
             streamSid: connectionState.streamSid,
+            conferenceName: connectionState.conferenceName,
             media: {
               payload: data.payload
             }
@@ -365,6 +401,7 @@ serve(async (req) => {
           socket.send(JSON.stringify({
             event: 'mark',
             streamSid: connectionState.streamSid,
+            conferenceName: connectionState.conferenceName,
             mark: {
               name: markId
             }
@@ -385,13 +422,31 @@ serve(async (req) => {
           console.log(`🖥️ Browser client connected: ${connId}`);
           connectionState.clientType = 'browser';
           
+          // Get existing active streams and conferences to send to the browser
+          const activeStreams = Array.from(activeConnections.values())
+            .filter(conn => conn.clientType === 'twilio' && (conn.streamSid || conn.conferenceName))
+            .map(conn => ({ 
+              streamSid: conn.streamSid, 
+              callSid: conn.callSid,
+              conferenceName: conn.conferenceName
+            }));
+          
           socket.send(JSON.stringify({
             event: 'browser_connected',
             connId: connId,
             timestamp: Date.now(),
-            activeStreams: Array.from(activeConnections.values())
-              .filter(conn => conn.clientType === 'twilio' && conn.streamSid)
-              .map(conn => ({ streamSid: conn.streamSid, callSid: conn.callSid }))
+            activeStreams: activeStreams
+          }));
+        }
+        else if (data.event === 'conference_join') {
+          // Browser client wants to join a specific conference
+          console.log(`🎙️ Browser client ${connId} joining conference: ${data.conferenceName}`);
+          connectionState.conferenceName = data.conferenceName;
+          
+          socket.send(JSON.stringify({
+            event: 'conference_joined',
+            conferenceName: data.conferenceName,
+            timestamp: Date.now()
           }));
         }
       } catch (err) {

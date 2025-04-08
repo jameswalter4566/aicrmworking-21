@@ -50,6 +50,9 @@ export function CallControls({
 
   const handleCall = () => {
     if (!phoneNumber || isDisabled) return;
+    
+    // Ensure we're passing both the phone number and leadId
+    console.log(`Initiating call to ${phoneNumber} with leadId ${leadId}`);
     onCall(phoneNumber, leadId);
   };
 
@@ -157,6 +160,12 @@ export function CallControls({
                 <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
                 Audio streaming
               </span>
+            )}
+            
+            {activeCall.conferenceName && (
+              <div className="mt-1 text-xs text-green-500">
+                <span>Conference: {activeCall.conferenceName.substring(0, 10)}...</span>
+              </div>
             )}
           </div>
         )}

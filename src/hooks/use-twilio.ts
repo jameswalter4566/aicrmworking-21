@@ -13,12 +13,14 @@ export interface ActiveCall {
   usingBrowser?: boolean;
   audioActive?: boolean;
   audioStreaming?: boolean;
+  conferenceName?: string; // Added to track conference calls
 }
 
 interface AudioChunk {
   track: string;
   timestamp: number;
   payload: string;
+  conferenceName?: string; // Added to support conference calls
 }
 
 export const useTwilio = () => {
@@ -38,6 +40,7 @@ export const useTwilio = () => {
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const microphoneStreamRef = useRef<MediaStream | null>(null);
   const activeStreamSidRef = useRef<string | null>(null);
+  const activeConferenceNameRef = useRef<string | null>(null);
 
   const checkPermissions = useCallback(async () => {
     try {
@@ -78,12 +81,17 @@ export const useTwilio = () => {
       socket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("WebSocket received message type:", data.event);
+          
+          // Only log non-audio events to avoid console spam
+          if (data.event !== 'audio') {
+            console.log("WebSocket received message type:", data.event);
+          }
           
           if (data.event === 'streamStart') {
             activeStreamSidRef.current = data.streamSid;
+            activeConferenceNameRef.current = data.conferenceName;
             setAudioStreaming(true);
-            console.log(`Stream started with SID: ${data.streamSid}, Call SID: ${data.callSid}`);
+            console.log(`Stream started with SID: ${data.streamSid}, Call SID: ${data.callSid}, Conference: ${data.conferenceName || 'N/A'}`);
             
             startCapturingMicrophone();
             
@@ -97,25 +105,49 @@ export const useTwilio = () => {
                 twilioService.setAudioOutputDevice(currentAudioDevice);
               }, 500);
             }
+            
+            // If this is part of an active call, update the call with conference info
+            if (data.conferenceName) {
+              setActiveCalls(prev => {
+                const updated = {...prev};
+                Object.keys(updated).forEach(leadId => {
+                  updated[leadId].conferenceName = data.conferenceName;
+                });
+                return updated;
+              });
+            }
           }
           else if (data.event === 'streamStop') {
             activeStreamSidRef.current = null;
+            activeConferenceNameRef.current = null;
             setAudioStreaming(false);
             console.log("Stream stopped");
             
             stopCapturingMicrophone();
           }
           else if (data.event === 'audio') {
-            console.log(`Receiving audio on track: ${data.track}`);
+            // Audio data received - handle silently
+            if (data.conferenceName && !activeConferenceNameRef.current) {
+              activeConferenceNameRef.current = data.conferenceName;
+            }
           }
           else if (data.event === 'connected_ack' || data.event === 'connection_established') {
             console.log("WebSocket connection acknowledged by server");
           }
           else if (data.event === 'mark') {
-            console.log("Mark event received:", data.mark?.name);
+            console.log("Mark event received:", data.name);
           }
           else if (data.event === 'dtmf') {
-            console.log("DTMF received:", data.dtmf?.digit);
+            console.log("DTMF received:", data.digit);
+          }
+          else if (data.event === 'conference_joined') {
+            console.log("Joined conference:", data.conferenceName);
+            activeConferenceNameRef.current = data.conferenceName;
+            
+            toast({
+              title: "Conference Joined",
+              description: `Successfully joined conference: ${data.conferenceName}`,
+            });
           }
         } catch (err) {
           console.error("Error processing WebSocket message:", err);
@@ -132,13 +164,49 @@ export const useTwilio = () => {
         webSocketRef.current = null;
         setAudioStreaming(false);
         activeStreamSidRef.current = null;
+        activeConferenceNameRef.current = null;
         
         stopCapturingMicrophone();
+        
+        // Attempt to reconnect after a short delay
+        setTimeout(() => {
+          if (Object.keys(activeCalls).length > 0) {
+            console.log("Active calls exist, attempting to reconnect WebSocket...");
+            setupWebSocket();
+          }
+        }, 1000);
       };
     } catch (err) {
       console.error("Failed to set up WebSocket:", err);
     }
   }, [currentAudioDevice]);
+
+  // Function to join a specific conference
+  const joinConference = useCallback((conferenceName: string) => {
+    if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
+      console.error("WebSocket not connected, cannot join conference");
+      return false;
+    }
+    
+    try {
+      webSocketRef.current.send(JSON.stringify({
+        event: 'conference_join',
+        conferenceName: conferenceName,
+        timestamp: Date.now()
+      }));
+      
+      activeConferenceNameRef.current = conferenceName;
+      console.log(`Requested to join conference: ${conferenceName}`);
+      
+      // Start capturing microphone audio for the conference
+      startCapturingMicrophone();
+      
+      return true;
+    } catch (err) {
+      console.error("Error joining conference:", err);
+      return false;
+    }
+  }, []);
 
   const startCapturingMicrophone = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -168,7 +236,8 @@ export const useTwilio = () => {
       audioProcessorRef.current = processor;
       
       processor.onaudioprocess = (e) => {
-        if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN && activeStreamSidRef.current) {
+        if (webSocketRef.current && webSocketRef.current.readyState === WebSocket.OPEN && 
+            (activeStreamSidRef.current || activeConferenceNameRef.current)) {
           const inputData = e.inputBuffer.getChannelData(0);
           
           let sum = 0;
@@ -177,7 +246,7 @@ export const useTwilio = () => {
           }
           const rms = Math.sqrt(sum / inputData.length);
           
-          if (rms > 0.005) {
+          if (rms > 0.005) {  // Only send audio when there's sound above this threshold
             const buffer = new ArrayBuffer(inputData.length * 2);
             const view = new DataView(buffer);
             
@@ -189,23 +258,11 @@ export const useTwilio = () => {
             const base64Audio = btoa(String.fromCharCode.apply(null, new Uint8Array(buffer)));
             
             webSocketRef.current.send(JSON.stringify({
-              event: 'media',
+              event: 'browser_audio',
               streamSid: activeStreamSidRef.current,
-              media: {
-                payload: base64Audio
-              }
+              conferenceName: activeConferenceNameRef.current,
+              payload: base64Audio
             }));
-            
-            const markId = `browser-audio-${Date.now()}`;
-            webSocketRef.current.send(JSON.stringify({
-              event: 'mark',
-              streamSid: activeStreamSidRef.current,
-              mark: {
-                name: markId
-              }
-            }));
-            
-            console.log("Sent microphone audio chunk to Twilio");
           }
         }
       };
@@ -325,7 +382,8 @@ export const useTwilio = () => {
       const isActive = twilioService.isMicrophoneActive();
       setMicrophoneActive(isActive);
       
-      const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && activeStreamSidRef.current !== null;
+      const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && 
+                         (activeStreamSidRef.current !== null || activeConferenceNameRef.current !== null);
       setAudioStreaming(isStreaming);
       
       if (Object.keys(activeCalls).length > 0) {
@@ -360,7 +418,7 @@ export const useTwilio = () => {
     };
   }, [checkPermissions, setupWebSocket, stopCapturingMicrophone]);
 
-  const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = true) => {
+  const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = true, conferenceName?: string) => {
     const leadIdStr = String(leadId);
     
     if (statusCheckIntervals.current[leadIdStr]) {
@@ -369,11 +427,17 @@ export const useTwilio = () => {
     
     console.log(`Setting up call monitoring for ${usingBrowser ? 'browser' : 'REST API'} call: ${callSid}`);
     
+    // If this is a conference call, store the conference name ref
+    if (conferenceName) {
+      activeConferenceNameRef.current = conferenceName;
+    }
+    
     const intervalId = window.setInterval(async () => {
       try {
         if (usingBrowser) {
           const isAudioActive = twilioService.isMicrophoneActive();
-          const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && activeStreamSidRef.current !== null;
+          const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && 
+                             (activeStreamSidRef.current !== null || activeConferenceNameRef.current !== null);
           
           setActiveCalls(prev => {
             if (!prev[leadIdStr]) return prev;
@@ -418,6 +482,7 @@ export const useTwilio = () => {
           if (Object.keys(activeCalls).length <= 1) {
             stopCapturingMicrophone();
             activeStreamSidRef.current = null;
+            activeConferenceNameRef.current = null;
           }
           
           switch(status) {
@@ -532,23 +597,29 @@ export const useTwilio = () => {
     
     setupWebSocket();
     
+    // Always include the leadId when making calls
     const result = await twilioService.makeCall(phoneNumber, String(leadId));
     
-    if (result.success && result.callSid) {
+    if (result.success && (result.callSid || result.browserCallSid)) {
       const leadIdStr = String(leadId);
+      
+      // Use the result data to determine if this is a conference call
+      const isConferenceCall = result.conferenceName && result.phoneCallSid && result.browserCallSid;
+      const callSidToUse = result.callSid || result.browserCallSid || 'browser-call';
       
       setActiveCalls(prev => ({
         ...prev,
         [leadIdStr]: { 
-          callSid: result.callSid!,
+          callSid: callSidToUse,
           phoneNumber,
           status: 'connecting',
           leadId,
           isMuted: false,
           speakerOn: false,
-          usingBrowser: true, // Explicitly set to true
+          usingBrowser: true,
           audioActive: microphoneActive,
-          audioStreaming: audioStreaming
+          audioStreaming: audioStreaming,
+          conferenceName: result.conferenceName
         }
       }));
       
@@ -557,7 +628,12 @@ export const useTwilio = () => {
         description: `Calling ${phoneNumber}... Audio will stream through your browser when connected.`,
       });
       
-      monitorCallStatus(leadId, result.callSid, true); // Always monitor as browser call
+      // If this is a conference call, join the conference
+      if (isConferenceCall && result.conferenceName) {
+        joinConference(result.conferenceName);
+      }
+      
+      monitorCallStatus(leadId, callSidToUse, true, result.conferenceName);
     } else {
       toast({
         title: "Call Failed",
@@ -567,7 +643,7 @@ export const useTwilio = () => {
     }
 
     return result;
-  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket]);
+  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket, joinConference]);
 
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
@@ -583,6 +659,7 @@ export const useTwilio = () => {
       if (Object.keys(activeCalls).length <= 1) {
         stopCapturingMicrophone();
         activeStreamSidRef.current = null;
+        activeConferenceNameRef.current = null;
       }
       
       setActiveCalls(prev => {
@@ -612,6 +689,7 @@ export const useTwilio = () => {
     
     stopCapturingMicrophone();
     activeStreamSidRef.current = null;
+    activeConferenceNameRef.current = null;
     
     setActiveCalls({});
     
@@ -769,6 +847,7 @@ export const useTwilio = () => {
     toggleSpeaker,
     setAudioOutputDevice,
     refreshAudioDevices,
+    joinConference,
     testAudio: (deviceId: string) => twilioService.testAudioOutput(deviceId)
   };
 };
