@@ -28,11 +28,11 @@ const GlowingCard = ({
         className
       )}
     >
-      {/* Light ray effect */}
-      <div className="light-ray"></div>
-      
       {/* Diagonal beam of light effect - animated */}
       <div className="beam-of-light"></div>
+      
+      {/* Light ray effect */}
+      <div className="light-ray"></div>
       
       {/* Shine effect - only activates on hover */}
       <div className="shine-overlay"></div>
