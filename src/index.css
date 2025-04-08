@@ -77,6 +77,21 @@
   }
 }
 
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .metric-card {
   @apply bg-white rounded-2xl p-4 border border-gray-200 shadow-sm;
 }

@@ -212,17 +212,41 @@ const LandingPage = () => {
               {/* Transparent border container with blue glow */}
               <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
               
-              {/* Enhanced glowing snake loading indicator */}
+              {/* Enhanced glowing light trail along the border */}
               <div 
-                className="absolute rounded-full w-3 h-3 bg-crm-blue shadow-[0_0_15px_6px_rgba(51,195,240,0.8)] z-20"
+                className="absolute z-20"
                 style={{ 
                   left: `${loadingPos.x}px`, 
                   top: `${loadingPos.y}px`,
                   transition: "left 0.03s linear, top 0.03s linear",
-                  boxShadow: "0 0 15px 6px rgba(51,195,240,0.8), 0 0 20px 12px rgba(51,195,240,0.4)",
-                  background: "linear-gradient(to right, #33C3F0, #1EAEDB)"
                 }}
-              ></div>
+              >
+                {/* Main bright point of the traveling light */}
+                <div 
+                  className="absolute top-0 left-0 rounded-full w-4 h-4 -ml-2 -mt-2"
+                  style={{
+                    background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 40%, rgba(51,195,240,0) 70%)",
+                    boxShadow: "0 0 20px 6px rgba(51,195,240,0.9), 0 0 40px 20px rgba(51,195,240,0.5)",
+                    animation: "pulse 1.5s ease-in-out infinite"
+                  }}
+                ></div>
+                
+                {/* Light trail segments that follow the main point */}
+                {[...Array(8)].map((_, i) => (
+                  <div 
+                    key={i}
+                    className="absolute top-0 left-0 rounded-full" 
+                    style={{
+                      width: `${4 - i * 0.4}px`,
+                      height: `${4 - i * 0.4}px`,
+                      opacity: `${1 - i * 0.12}`,
+                      transform: `translate(-50%, -50%) translateX(${-i * 3}px)`,
+                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.5) 50%, rgba(51,195,240,0) 100%)",
+                      boxShadow: `0 0 ${15 - i * 1.5}px ${5 - i * 0.5}px rgba(51,195,240,${0.8 - i * 0.1})`,
+                    }}
+                  ></div>
+                ))}
+              </div>
 
               <Button 
                 onClick={() => navigate("/auth")}
