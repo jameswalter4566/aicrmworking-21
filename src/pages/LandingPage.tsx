@@ -96,11 +96,13 @@ const LandingPage = () => {
   ];
 
   const getLoadingPosition = (progress) => {
-    const width = 240;
+    const width = 300;
     const height = 56;
     const borderRadius = 10;
     
-    const perimeter = 2 * (width + height - 4 * borderRadius) + 2 * Math.PI * borderRadius;
+    const straightEdgesLength = 2 * (width - 2 * borderRadius) + 2 * (height - 2 * borderRadius);
+    const cornerLength = 2 * Math.PI * borderRadius;
+    const perimeter = straightEdgesLength + cornerLength;
     
     const p = (progress / 400) * perimeter;
     
@@ -210,7 +212,7 @@ const LandingPage = () => {
           </p>
           
           <div className="pt-6">
-            <div className="relative mx-auto w-60">
+            <div className="relative mx-auto w-[300px]">
               <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
               
               {[...Array(50)].map((_, i) => {
