@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           avatar: string | null
           created_at: string | null
+          created_by: string | null
           disposition: string | null
           email: string | null
           first_name: string | null
@@ -28,6 +29,7 @@ export type Database = {
         Insert: {
           avatar?: string | null
           created_at?: string | null
+          created_by?: string | null
           disposition?: string | null
           email?: string | null
           first_name?: string | null
@@ -43,6 +45,7 @@ export type Database = {
         Update: {
           avatar?: string | null
           created_at?: string | null
+          created_by?: string | null
           disposition?: string | null
           email?: string | null
           first_name?: string | null
