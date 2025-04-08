@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -188,9 +189,34 @@ const createTwilioService = (): TwilioService => {
           activeCalls = activeCalls.filter(c => c.sid !== call.sid);
         });
 
+        device.on("cancel", (call: any) => {
+          console.log(`Call canceled: ${call.sid || 'unknown'}`);
+          // This is important to handle 'no-answer' scenarios
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+          
+          toast({
+            title: "Call Canceled",
+            description: "The call was canceled or not answered.",
+          });
+        });
+
         device.on("incoming", (call: any) => {
           console.log(`Incoming call from: ${call.from || 'unknown'}`);
-          call.reject(); // Automatically reject incoming calls for this app
+          
+          // For direct browser calls, we'll pass through to our edge function with 
+          // the target phone number instead of rejecting
+          const params = call.customParameters || new Map();
+          const phoneNumber = params.get('phoneNumber');
+          const leadId = params.get('leadId') || 'unknown';
+          
+          if (phoneNumber) {
+            console.log(`Incoming call includes target phone: ${phoneNumber}, leadId: ${leadId}`);
+            // The call will be handled by the TwiML in the edge function
+            call.accept();
+          } else {
+            // For calls without a target phone, reject
+            call.reject();
+          }
         });
 
         try {
@@ -624,3 +650,4 @@ const createTwilioService = (): TwilioService => {
 };
 
 export const twilioService: TwilioService = createTwilioService();
+
