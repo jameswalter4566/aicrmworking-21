@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -121,7 +122,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: 750,
-      initialY: 380,
+      initialY: -20, // Adjusted from 380 to -20 to align with other containers
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
