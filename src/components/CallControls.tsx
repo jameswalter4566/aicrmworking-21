@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff, Mic, MicOff, Volume, Volume2, RefreshCw } from "lucide-react";
@@ -57,20 +56,13 @@ export function CallControls({
     if (!phoneNumber || isDisabled || callInitiated) return;
     
     try {
-      // Set flag to prevent multiple rapid call attempts
       setCallInitiated(true);
-      
-      // Ensure we're passing both the phone number and leadId
       console.log(`Initiating call to ${phoneNumber} with leadId ${leadId}`);
       onCall(phoneNumber, leadId);
-      
-      // Show toast to indicate call is being placed
       toast({
         title: "Placing Call",
         description: `Calling ${phoneNumber}...`,
       });
-      
-      // Reset call initiated flag after 5 seconds to prevent multiple calls
       setTimeout(() => {
         setCallInitiated(false);
       }, 5000);
@@ -102,15 +94,9 @@ export function CallControls({
   const handleResetCall = async () => {
     setIsResettingCall(true);
     try {
-      // Force hangup any existing call
       await onHangup(leadId);
-      
-      // Wait a moment for systems to clear
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Reset call initiated flag
       setCallInitiated(false);
-      
       toast({
         title: "Call Reset",
         description: "Call state has been reset. You can try calling again.",
@@ -138,14 +124,12 @@ export function CallControls({
     setShowDeviceSelector(!showDeviceSelector);
   };
   
-  // Reset call initiated flag when component unmounts or call status changes
   useEffect(() => {
     if (activeCall && (activeCall.status === 'completed' || isCallFailing)) {
       setCallInitiated(false);
     }
   }, [activeCall, isCallFailing]);
 
-  // Force call cleanup when component unmounts
   useEffect(() => {
     return () => {
       if (isInCall) {
@@ -156,20 +140,18 @@ export function CallControls({
     };
   }, [isInCall, leadId, onHangup]);
 
-  // Show helpful message for no-answer status
   useEffect(() => {
     if (activeCall && activeCall.status === 'no-answer') {
       toast({
         title: "No Answer",
         description: "The call was not answered. The recipient may be unavailable.",
-        variant: "warning",
+        variant: "default",
       });
     }
   }, [activeCall]);
 
   return (
     <>
-      {/* Always render the AudioInitializer component to ensure audio permissions */}
       <AudioInitializer />
       
       <div className="flex flex-col gap-2">
@@ -212,7 +194,6 @@ export function CallControls({
                 {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
               </Button>
               
-              {/* Audio device dropdown instead of speaker toggle button */}
               <AudioDeviceDropdown
                 devices={audioOutputDevices}
                 currentDeviceId={currentAudioDevice}
@@ -221,7 +202,6 @@ export function CallControls({
                 disabled={disabled || isResettingCall}
               />
               
-              {/* Add reset call button */}
               {isCallFailing && (
                 <Button
                   variant="outline"
@@ -235,7 +215,6 @@ export function CallControls({
                 </Button>
               )}
               
-              {/* Add audio debug modal if in active call */}
               <AudioDebugModal />
             </>
           )}
