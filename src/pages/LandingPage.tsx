@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
@@ -9,6 +9,16 @@ import { Phone, Bot, LineChart } from "lucide-react";
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  const [featuresVisible, setFeaturesVisible] = useState(false);
+  
+  // Show the features with animation after component mounts
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFeaturesVisible(true);
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, []);
   
   const rotatingTexts = [
     "Mortgage Loan Officers",
@@ -123,7 +133,17 @@ const LandingPage = () => {
           <div className="pt-12">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {["Integrated Dialer", "AI Assistance", "Sales Analytics"].map((feature, i) => (
-                <div key={i} className="bg-white/10 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-white/20">
+                <div 
+                  key={i} 
+                  className={`bg-white/10 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-white/20 transition-all duration-700 ease-out transform ${
+                    featuresVisible 
+                      ? 'opacity-100 scale-100' 
+                      : 'opacity-0 scale-0'
+                  }`}
+                  style={{ 
+                    transitionDelay: `${i * 200}ms` 
+                  }}
+                >
                   <h3 className="text-xl font-semibold mb-3 text-white">{feature}</h3>
                   <p className="text-gray-300">
                     Streamline your workflow and increase productivity with our powerful features.
