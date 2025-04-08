@@ -20,7 +20,7 @@ export const FeatureCard = ({
         </div>
         <div className="ml-3">
           <div className="text-sm opacity-80">{title}</div>
-          <div className="text-xl font-bold">{value}</div>
+          <div className="text-xl font-extrabold">{value}</div>
         </div>
       </div>
     </div>
@@ -62,7 +62,7 @@ export const StatsCard = ({
           {icon}
         </div>
         <div className="ml-3">
-          <div className="text-xl font-bold">{value}</div>
+          <div className="text-xl font-extrabold">{value}</div>
           <div className="text-xs opacity-80">{title}</div>
         </div>
       </div>
@@ -80,7 +80,7 @@ export const PayoutCard = ({ className = "" }: { className?: string }) => {
         </svg>
       </div>
       <div className="text-xs opacity-80 mb-2">Requesting amount to be withdrawn</div>
-      <div className="text-2xl font-bold mb-3">$10,000</div>
+      <div className="text-2xl font-extrabold mb-3">$10,000</div>
       <button className="bg-blue-500 hover:bg-blue-600 transition-colors w-full text-white py-1.5 rounded text-sm">
         Request Payout
       </button>

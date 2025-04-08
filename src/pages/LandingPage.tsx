@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
-import { Phone, Bot, LineChart, MessageSquare, Calendar, FileCheck } from "lucide-react";
+import { Phone, Bot, LineChart, MessageSquare, Calendar, FileCheck, Zap, Inbox } from "lucide-react";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -130,6 +129,42 @@ const LandingPage = () => {
       delay: 150,
       zIndex: 10,
     },
+    {
+      id: 6,
+      component: (
+        <FeatureCard 
+          title="Power Dialer" 
+          value="10-to-1 Calling" 
+          icon={
+            <Zap size={20} className="text-yellow-400" />
+          } 
+        />
+      ),
+      initialX: 300,
+      initialY: -40,
+      floatRadius: 25,
+      floatSpeed: 0.002,
+      delay: 250,
+      zIndex: 10,
+    },
+    {
+      id: 7,
+      component: (
+        <FeatureCard 
+          title="Lead Manager" 
+          value="Organize Contacts" 
+          icon={
+            <Inbox size={20} className="text-purple-500" />
+          } 
+        />
+      ),
+      initialX: -350,
+      initialY: -80,
+      floatRadius: 22,
+      floatSpeed: 0.0018,
+      delay: 200,
+      zIndex: 10,
+    },
   ];
 
   const getLoadingPosition = (progress) => {
@@ -189,7 +224,7 @@ const LandingPage = () => {
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.12)_0%,rgba(30,58,138,0)_70%)] z-0"></div>
+          <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.2)_0%,rgba(30,58,138,0)_70%)] z-0"></div>
           <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-slate-900 to-transparent z-10"></div>
           <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-slate-900 to-transparent z-10"></div>
         </div>
@@ -218,7 +253,7 @@ const LandingPage = () => {
           
           <div className="pt-6">
             <div className="relative mx-auto w-[300px]">
-              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm shadow-[0_0_15px_5px_rgba(51,195,240,0.3)]"></div>
+              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_8px_rgba(51,195,240,0.4)]"></div>
               
               {[...Array(50)].map((_, i) => {
                 const trailSegmentOffset = i * 4;
@@ -231,12 +266,12 @@ const LandingPage = () => {
                     style={{
                       left: `${trailPos.x}px`,
                       top: `${trailPos.y}px`,
-                      width: `${Math.max(4.5 - i * 0.07, 1)}px`,
-                      height: `${Math.max(4.5 - i * 0.07, 1)}px`,
-                      opacity: `${Math.max(1 - i * 0.02, 0)}`,
+                      width: `${Math.max(5 - i * 0.07, 1.2)}px`,
+                      height: `${Math.max(5 - i * 0.07, 1.2)}px`,
+                      opacity: `${Math.max(1 - i * 0.015, 0)}`,
                       transform: `translate(-50%, -50%)`,
-                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.6) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: `0 0 ${20 - i * 0.3}px ${8 - i * 0.1}px rgba(51,195,240,${Math.max(0.9 - i * 0.015, 0)})`,
+                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 50%, rgba(51,195,240,0) 100%)",
+                      boxShadow: `0 0 ${25 - i * 0.3}px ${12 - i * 0.1}px rgba(51,195,240,${Math.max(0.95 - i * 0.015, 0)})`,
                     }}
                   ></div>
                 );
@@ -244,7 +279,7 @@ const LandingPage = () => {
 
               <Button 
                 onClick={() => navigate("/auth")}
-                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-bold tracking-wide shadow-[inset_0_0_12px_rgba(255,255,255,0.6),0_0_15px_rgba(51,195,240,0.7)]"
+                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)]"
               >
                 Start Calling
               </Button>
