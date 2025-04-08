@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
   BarChart2, Settings, Home, DollarSign, 
@@ -77,6 +78,11 @@ const Sidebar = () => {
     { name: "Settings", icon: Settings, path: "/settings" },
   ];
   
+  // Debug current path
+  useEffect(() => {
+    console.log("Current location:", location.pathname);
+  }, [location.pathname]);
+  
   const getIndustryDisplayName = () => {
     switch (activeIndustry) {
       case "mortgage":
@@ -108,12 +114,20 @@ const Sidebar = () => {
   };
 
   const isActive = (path: string) => {
+    // Debug specific path checks
+    if (path === "/power-dialer") {
+      const isPowerDialer = location.pathname === "/power-dialer";
+      console.log(`Checking power-dialer: ${isPowerDialer}, current path: ${location.pathname}`);
+      return isPowerDialer;
+    }
+    
     if (path === "/") {
       return location.pathname === path;
     }
-    return location.pathname === path || 
-           (path !== "#" && location.pathname.startsWith(path)) ||
-           (path === "/power-dialer" && location.pathname === "/power-dialer");
+    
+    // For other paths
+    return (path !== "#" && location.pathname === path) || 
+           (path !== "#" && path !== "/" && location.pathname.startsWith(path));
   };
 
   const toggleMobileMenu = () => {
