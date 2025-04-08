@@ -54,6 +54,7 @@ interface TwilioCall {
   codec: string;
   status(): string;
   connectToken?: string;
+  sid?: string;
   callerInfo?: { isVerified: boolean } | null;
   
   accept(options?: any): void;
@@ -73,7 +74,16 @@ interface TwilioCall {
   off(event: string, handler: Function): this;
 }
 
-interface TwilioDevice {
+interface TwilioDeviceOptions {
+  codecPreferences?: string[];
+  fakeLocalDtmf?: boolean;
+  maxAverageBitrate?: number;
+  maxCallSignalingTimeoutMs?: number;
+  enableRingingState?: boolean;
+  // Add any other options that might be used
+}
+
+interface TwilioDeviceInstance {
   audio: AudioHelper;
   edge: string | null;
   home: string | null;
@@ -97,14 +107,16 @@ interface TwilioDevice {
   off(event: string, listener: Function): this;
 }
 
+interface TwilioDeviceConstructor {
+  new(token: string, options?: TwilioDeviceOptions): TwilioDeviceInstance;
+  isSupported: boolean;
+  packageName: string;
+  version: string;
+  runPreflight(token: string, options?: any): any;
+}
+
 interface Twilio {
-  Device: {
-    new(token: string, options?: any): TwilioDevice;
-    isSupported: boolean;
-    packageName: string;
-    version: string;
-    runPreflight(token: string, options?: any): any;
-  };
+  Device: TwilioDeviceConstructor;
   VERSION?: string;
 }
 

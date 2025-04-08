@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -28,7 +29,7 @@ interface TwilioService {
 }
 
 const createTwilioService = (): TwilioService => {
-  let device: Twilio.Device | null = null;
+  let device: any = null; // Changed from 'Twilio.Device | null' to 'any'
   let audioContext: AudioContext | null = null;
   let preferredAudioDevice: string | null = null;
 
@@ -67,6 +68,7 @@ const createTwilioService = (): TwilioService => {
       }
 
       if (window.Twilio && window.Twilio.Device) {
+        // Store Device instance without type checking
         device = new window.Twilio.Device(data.token, {
           // Set Opus as our preferred codec. Opus generally performs better, even
           // at low bitrates, than other codecs.
@@ -126,13 +128,13 @@ const createTwilioService = (): TwilioService => {
 
   const setAudioOutputDevice = async (deviceId: string): Promise<boolean> => {
     try {
-      if (device) {
+      if (device && device.audio) { // Check for device.audio existence
         await device.audio.speakerDevices.set(deviceId);
         preferredAudioDevice = deviceId;
         console.log(`Set audio output device to: ${deviceId}`);
         return true;
       } else {
-        console.warn("Twilio device not initialized.");
+        console.warn("Twilio device not initialized or audio not available.");
         return false;
       }
     } catch (error) {
@@ -143,8 +145,8 @@ const createTwilioService = (): TwilioService => {
 
   const testAudioOutput = async (deviceId?: string): Promise<boolean> => {
     try {
-      if (!device) {
-        console.warn("Twilio device not initialized, cannot test audio.");
+      if (!device || !device.audio) { // Check for device and device.audio
+        console.warn("Twilio device not initialized or audio not available, cannot test audio.");
         return false;
       }
 
@@ -169,13 +171,19 @@ const createTwilioService = (): TwilioService => {
       }
 
       const call = await device.connect({
-        phoneNumber: phoneNumber,
-        leadId: leadId
+        params: {
+          phoneNumber: phoneNumber,
+          leadId: leadId
+        }
       });
 
       console.log(`Attempting to call ${phoneNumber}`);
 
-      return { success: true, callSid: call.sid };
+      return { 
+        success: true, 
+        callSid: call.sid,
+        leadId: leadId
+      };
     } catch (error: any) {
       console.error("Error making call:", error);
       return { success: false, error: error.message || "Failed to make call" };
@@ -190,8 +198,14 @@ const createTwilioService = (): TwilioService => {
         } else {
           console.log("Ending all calls");
         }
-        device.disconnectAll();
-        return true;
+        
+        if (typeof device.disconnectAll === 'function') {
+          device.disconnectAll();
+          return true;
+        } else {
+          console.warn("disconnectAll method not available on device");
+          return false;
+        }
       } else {
         console.warn("Twilio device not initialized.");
         return false;
@@ -215,7 +229,7 @@ const createTwilioService = (): TwilioService => {
 
   const toggleMute = (mute: boolean): boolean => {
     try {
-      if (device) {
+      if (device && device.calls && device.calls.length > 0) {
         const call = device.calls[0];
         if (call) {
           call.mute(mute);
@@ -226,7 +240,7 @@ const createTwilioService = (): TwilioService => {
           return false;
         }
       } else {
-        console.warn("Twilio device not initialized.");
+        console.warn("Twilio device not initialized or no calls available.");
         return false;
       }
     } catch (error) {
@@ -237,12 +251,12 @@ const createTwilioService = (): TwilioService => {
 
   const toggleSpeaker = (speakerOn: boolean): boolean => {
     try {
-      if (device) {
+      if (device && device.audio) { // Check for device.audio existence
         device.audio.speakerDevices.set(speakerOn ? 'default' : 'none');
         console.log(`Speaker ${speakerOn ? 'enabled' : 'disabled'}`);
         return true;
       } else {
-        console.warn("Twilio device not initialized.");
+        console.warn("Twilio device not initialized or audio not available.");
         return false;
       }
     } catch (error) {
@@ -253,7 +267,9 @@ const createTwilioService = (): TwilioService => {
 
   const cleanup = () => {
     if (device) {
-      device.destroy();
+      if (typeof device.destroy === 'function') {
+        device.destroy();
+      }
       device = null;
       console.log("Twilio device destroyed.");
     }
