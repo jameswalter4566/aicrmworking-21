@@ -10,6 +10,7 @@ import { Phone, Bot, LineChart } from "lucide-react";
 const LandingPage = () => {
   const navigate = useNavigate();
   const [featuresVisible, setFeaturesVisible] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
   
   // Show the features with animation after component mounts
   useEffect(() => {
@@ -18,6 +19,18 @@ const LandingPage = () => {
     }, 300);
     
     return () => clearTimeout(timer);
+  }, []);
+  
+  // Animate the loading progress around the button
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setLoadingProgress(prev => {
+        const newProgress = prev + 1;
+        return newProgress > 400 ? 0 : newProgress;
+      });
+    }, 30);
+    
+    return () => clearInterval(interval);
   }, []);
   
   const rotatingTexts = [
@@ -29,7 +42,7 @@ const LandingPage = () => {
   // Define custom colors for each text
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
   
-  // Define floating feature cards
+  // Define floating feature cards positioned on the sides
   const floatingFeatureCards = [
     {
       id: 1,
@@ -42,8 +55,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -220,
-      initialY: 40,
+      initialX: -380, // Moved to the left side
+      initialY: 150,
       floatRadius: 20,
       floatSpeed: 0.002,
       delay: 0,
@@ -60,8 +73,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 0,
-      initialY: 0,
+      initialX: 380, // Moved to the right side
+      initialY: 80,
       floatRadius: 25,
       floatSpeed: 0.0015,
       delay: 200,
@@ -78,14 +91,87 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 220,
-      initialY: 40,
+      initialX: 380, // Moved to the right side
+      initialY: 220,
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
       zIndex: 10,
     },
   ];
+
+  // Calculate the position of the loading animation based on progress
+  const getLoadingPosition = (progress) => {
+    const totalLength = 400; // Total length of the animation
+    const width = 240; // Button width
+    const height = 56;  // Button height
+    const borderRadius = 10; // Border radius
+    
+    // Perimeter segments
+    const topSide = width - 2 * borderRadius; // Top straight segment
+    const rightSide = height - 2 * borderRadius; // Right straight segment
+    const bottomSide = width - 2 * borderRadius; // Bottom straight segment
+    const leftSide = height - 2 * borderRadius; // Left straight segment
+    
+    // Corner arcs (approximate as 1/4 of circle perimeter)
+    const cornerLength = Math.PI * borderRadius / 2;
+    
+    // Total perimeter (all sides + all corners)
+    const perimeter = topSide + rightSide + bottomSide + leftSide + 4 * cornerLength;
+    
+    // Scale progress to match perimeter
+    const scaledProgress = (progress / totalLength) * perimeter;
+    
+    // Calculate coordinates based on progress along the perimeter
+    let x = 0, y = 0;
+    
+    if (scaledProgress < topSide / 2) {
+      // Top-left to center-top
+      x = borderRadius + scaledProgress;
+      y = 0;
+    } else if (scaledProgress < topSide) {
+      // Center-top to top-right
+      x = borderRadius + scaledProgress;
+      y = 0;
+    } else if (scaledProgress < topSide + cornerLength) {
+      // Top-right corner
+      const angle = (scaledProgress - topSide) / cornerLength * Math.PI / 2;
+      x = width - borderRadius + borderRadius * Math.sin(angle);
+      y = borderRadius - borderRadius * Math.cos(angle);
+    } else if (scaledProgress < topSide + cornerLength + rightSide) {
+      // Right side
+      x = width;
+      y = borderRadius + (scaledProgress - topSide - cornerLength);
+    } else if (scaledProgress < topSide + 2 * cornerLength + rightSide) {
+      // Bottom-right corner
+      const angle = (scaledProgress - topSide - cornerLength - rightSide) / cornerLength * Math.PI / 2;
+      x = width - borderRadius + borderRadius * Math.cos(angle);
+      y = height - borderRadius + borderRadius * Math.sin(angle);
+    } else if (scaledProgress < topSide + 2 * cornerLength + rightSide + bottomSide) {
+      // Bottom side
+      x = width - (scaledProgress - topSide - 2 * cornerLength - rightSide);
+      y = height;
+    } else if (scaledProgress < topSide + 3 * cornerLength + rightSide + bottomSide) {
+      // Bottom-left corner
+      const angle = (scaledProgress - topSide - 2 * cornerLength - rightSide - bottomSide) / cornerLength * Math.PI / 2;
+      x = borderRadius - borderRadius * Math.sin(angle);
+      y = height - borderRadius + borderRadius * Math.cos(angle);
+    } else if (scaledProgress < topSide + 3 * cornerLength + rightSide + bottomSide + leftSide) {
+      // Left side
+      x = 0;
+      y = height - (scaledProgress - topSide - 3 * cornerLength - rightSide - bottomSide);
+    } else {
+      // Top-left corner (completing the loop)
+      const angle = (scaledProgress - topSide - 3 * cornerLength - rightSide - bottomSide - leftSide) / cornerLength * Math.PI / 2;
+      x = borderRadius - borderRadius * Math.cos(angle);
+      y = borderRadius - borderRadius * Math.sin(angle);
+    }
+    
+    return { x, y };
+  };
+  
+  // Get the current position of the loading indicator
+  const loadingPos = getLoadingPosition(loadingProgress);
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -122,12 +208,27 @@ const LandingPage = () => {
           </p>
           
           <div className="pt-6">
-            <Button 
-              onClick={() => navigate("/auth")}
-              className="text-lg px-8 py-6 h-auto bg-crm-blue hover:bg-crm-blue/90"
-            >
-              Get Started
-            </Button>
+            <div className="relative mx-auto w-60">
+              {/* Transparent border container */}
+              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
+              
+              {/* Glowing snake loading indicator */}
+              <div 
+                className="absolute rounded-full w-3 h-3 bg-crm-blue shadow-[0_0_10px_4px_rgba(51,195,240,0.5)] z-20"
+                style={{ 
+                  left: `${loadingPos.x}px`, 
+                  top: `${loadingPos.y}px`,
+                  transition: "left 0.03s linear, top 0.03s linear"
+                }}
+              ></div>
+
+              <Button 
+                onClick={() => navigate("/auth")}
+                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10"
+              >
+                Start Calling
+              </Button>
+            </div>
           </div>
           
           <div className="pt-12">
