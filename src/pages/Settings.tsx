@@ -1,16 +1,14 @@
 
-import React, { useState } from "react";
+import React from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon, Home, Building, DollarSign } from "lucide-react";
 import { ColoredSwitch } from "@/components/ui/colored-switch";
-
-type IndustryType = "mortgage" | "realEstate" | "debtSettlement" | null;
+import { useIndustry, IndustryType } from "@/context/IndustryContext";
 
 const Settings = () => {
-  // Use a single state variable to track the currently active industry
-  const [activeIndustry, setActiveIndustry] = useState<IndustryType>(null);
+  const { activeIndustry, setActiveIndustry } = useIndustry();
 
   // Handler that ensures only one industry can be active at a time
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {

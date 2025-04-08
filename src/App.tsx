@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +10,7 @@ import { twilioService } from "./services/twilio";
 import { twilioAudioService } from "./services/twilio-audio";
 import { GlobalAudioSettings } from "./components/GlobalAudioSettings";
 import { AuthProvider } from "./context/AuthContext";
+import { IndustryProvider } from "./context/IndustryContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import Index from "./pages/Index";
@@ -191,54 +191,56 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <TwilioScript 
-            onLoad={() => {
-              console.log("🎉 Twilio SDK loaded and ready!");
-              setTwilioLoaded(true);
-              if (window.Twilio?.Device) {
-                twilioService.initializeTwilioDevice().then(success => {
-                  if (success && window.Twilio.Device.audio) {
-                    console.log("🎤 Twilio Device audio is available");
-                  }
-                });
-              }
-              audioProcessing.connect({
-                onConnectionStatus: (connected) => {
-                  console.log(`🔌 Audio WebSocket connection status: ${connected ? 'connected' : 'disconnected'}`);
+          <IndustryProvider>
+            <Toaster />
+            <Sonner />
+            <TwilioScript 
+              onLoad={() => {
+                console.log("🎉 Twilio SDK loaded and ready!");
+                setTwilioLoaded(true);
+                if (window.Twilio?.Device) {
+                  twilioService.initializeTwilioDevice().then(success => {
+                    if (success && window.Twilio.Device.audio) {
+                      console.log("🎤 Twilio Device audio is available");
+                    }
+                  });
                 }
-              }).then(success => {
-                console.log(`🎤 WebSocket initialization ${success ? 'successful' : 'failed'}`);
-              }).catch(err => {
-                console.error('🎤 WebSocket initialization error:', err);
-              });
-            }}
-            onError={(error) => console.error("❌ Error loading Twilio SDK:", error)}
-          />
-          <AudioDiagnosticLogger />
-          <div className="fixed top-16 right-4 z-50">
-            <GlobalAudioSettings />
-          </div>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
-              <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              
-              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
-              <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
-              <Route path="/power-dialer" element={<ProtectedRoute><PowerDialer /></ProtectedRoute>} />
-              <Route path="/ai-dialer" element={<ProtectedRoute><AIDialer /></ProtectedRoute>} />
-              <Route path="/sms-campaign" element={<ProtectedRoute><SMSCampaign /></ProtectedRoute>} />
-              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              
-              <Route path="/" element={<Navigate to="/landing" replace />} />
-              
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+                audioProcessing.connect({
+                  onConnectionStatus: (connected) => {
+                    console.log(`🔌 Audio WebSocket connection status: ${connected ? 'connected' : 'disconnected'}`);
+                  }
+                }).then(success => {
+                  console.log(`🎤 WebSocket initialization ${success ? 'successful' : 'failed'}`);
+                }).catch(err => {
+                  console.error('🎤 WebSocket initialization error:', err);
+                });
+              }}
+              onError={(error) => console.error("❌ Error loading Twilio SDK:", error)}
+            />
+            <AudioDiagnosticLogger />
+            <div className="fixed top-16 right-4 z-50">
+              <GlobalAudioSettings />
+            </div>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
+                <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                
+                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+                <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
+                <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
+                <Route path="/power-dialer" element={<ProtectedRoute><PowerDialer /></ProtectedRoute>} />
+                <Route path="/ai-dialer" element={<ProtectedRoute><AIDialer /></ProtectedRoute>} />
+                <Route path="/sms-campaign" element={<ProtectedRoute><SMSCampaign /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                
+                <Route path="/" element={<Navigate to="/landing" replace />} />
+                
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </IndustryProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

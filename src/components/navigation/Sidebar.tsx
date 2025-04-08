@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -7,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
+import { useIndustry } from "@/context/IndustryContext";
 
 const itemColors = [
   "bg-blue-600", // Dashboard
@@ -41,7 +43,38 @@ const Sidebar = () => {
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
+  const { activeIndustry } = useIndustry();
   
+  const getIndustryDisplayName = () => {
+    switch (activeIndustry) {
+      case "mortgage":
+        return "Mortgage";
+      case "realEstate":
+        return "Real Estate";
+      case "debtSettlement":
+        return "Debt Settlement";
+      default:
+        return "";
+    }
+  };
+
+  const getIndustryColor = () => {
+    switch (activeIndustry) {
+      case "mortgage":
+        return "bg-blue-600";
+      case "realEstate":
+        return "bg-green-600";
+      case "debtSettlement":
+        return "bg-purple-600";
+      default:
+        return "bg-crm-blue";
+    }
+  };
+  
+  const getIndustryTextColor = () => {
+    return "text-white";
+  };
+
   const isActive = (path: string) => {
     if (path === "/") {
       return location.pathname === path;
@@ -56,13 +89,15 @@ const Sidebar = () => {
 
   if (isMobile) {
     return (
-      <div className="w-full bg-crm-blue">
+      <div className={`w-full ${getIndustryColor()}`}>
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center">
             <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
               <span className="font-bold text-sm">CRM</span>
             </div>
-            <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>
+            <span className="ml-2 text-lg font-semibold text-white">
+              {getIndustryDisplayName()} SalesPro
+            </span>
           </div>
           <button 
             onClick={toggleMobileMenu}
@@ -115,7 +150,8 @@ const Sidebar = () => {
   return (
     <div 
       className={cn(
-        "hidden md:block bg-crm-blue h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl",
+        "hidden md:block h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl",
+        getIndustryColor(),
         expanded ? "w-72" : "w-20"
       )}
       onMouseEnter={() => setExpanded(true)}
@@ -127,7 +163,11 @@ const Sidebar = () => {
             <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
               <span className="font-bold text-sm">CRM</span>
             </div>
-            {expanded && <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>}
+            {expanded && (
+              <span className="ml-2 text-lg font-semibold text-white">
+                {getIndustryDisplayName()} SalesPro
+              </span>
+            )}
           </div>
         </div>
         <div className="space-y-2">
