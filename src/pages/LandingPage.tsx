@@ -295,9 +295,10 @@ const LandingPage = () => {
         
         <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-20 flex flex-col items-center justify-center">
           <div className="flex justify-center mb-6">
-            <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl">
+            <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl flex-shrink-0">
               <span className="font-bold text-2xl">CRM</span>
             </div>
+            <span className="ml-2 self-center text-xl font-semibold text-white">SalesPro</span>
           </div>
           
           <div className="flex flex-col items-center space-y-4">
