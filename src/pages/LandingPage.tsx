@@ -5,6 +5,7 @@ import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
 import { Phone, Bot, LineChart, MessageSquare, Calendar, FileCheck, Zap, Inbox } from "lucide-react";
+import GlowingCard from "@/components/GlowingCard";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ const LandingPage = () => {
   ];
   
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
-  
+
   const floatingFeatureCards = [
     {
       id: 1,
@@ -288,24 +289,27 @@ const LandingPage = () => {
           
           <div className="pt-12">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {["Integrated Dialer", "AI Assistance", "Sales Analytics"].map((feature, i) => (
-                <div 
-                  key={i} 
-                  className={`bg-white/10 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-white/20 transition-all duration-700 ease-out transform ${
-                    featuresVisible 
-                      ? 'opacity-100 scale-100' 
-                      : 'opacity-0 scale-0'
-                  }`}
-                  style={{ 
-                    transitionDelay: `${i * 200}ms` 
-                  }}
-                >
-                  <h3 className="text-xl font-semibold mb-3 text-white">{feature}</h3>
-                  <p className="text-gray-300">
-                    Streamline your workflow and increase productivity with our powerful features.
-                  </p>
-                </div>
-              ))}
+              <GlowingCard
+                title="Integrated Dialer"
+                description="Streamline your workflow with our powerful auto-dialing system that increases productivity."
+                icon={<Phone size={28} className="text-white" />}
+                gradient="bg-gradient-to-br from-purple-600 via-indigo-500 to-black"
+                delay="delay-1"
+              />
+              <GlowingCard
+                title="AI Assistance"
+                description="Leverage cutting-edge AI to automate tasks and gain valuable insights from customer interactions."
+                icon={<Bot size={28} className="text-white" />}
+                gradient="bg-gradient-to-br from-emerald-600 via-teal-500 to-black"
+                delay="delay-2"
+              />
+              <GlowingCard
+                title="Sales Analytics"
+                description="Track performance metrics and visualize your sales pipeline with comprehensive analytics."
+                icon={<LineChart size={28} className="text-white" />}
+                gradient="bg-gradient-to-br from-blue-600 via-sky-500 to-black"
+                delay="delay-3"
+              />
             </div>
           </div>
         </div>
