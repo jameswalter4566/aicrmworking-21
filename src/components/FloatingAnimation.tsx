@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from "react";
 import FloatingCard from "./FloatingCard";
 
@@ -38,9 +39,9 @@ const FloatingAnimation: React.FC<FloatingAnimationProps> = ({
           key={item.id}
           initialX={item.initialX}
           initialY={item.initialY}
-          floatRadius={item.floatRadius}
-          floatSpeed={item.floatSpeed}
-          delay={item.delay}
+          floatRadius={item.floatRadius || 10} // Default to smaller radius
+          floatSpeed={item.floatSpeed || 0.0005} // Default to slower speed
+          delay={item.delay || (item.id * 150)} // Stagger the animations by default
           rotateAmount={item.rotateAmount}
           className={item.className}
           zIndex={item.zIndex}
