@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
 import { Phone, Bot, LineChart, MessageSquare, FileCheck, Zap, Inbox } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
+import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -110,7 +112,7 @@ const LandingPage = () => {
         />
       ),
       initialX: 750,
-      initialY: 450,
+      initialY: 380,
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
@@ -146,7 +148,7 @@ const LandingPage = () => {
         />
       ),
       initialX: 750,
-      initialY: -450,
+      initialY: -380,
       floatRadius: 25,
       floatSpeed: 0.002,
       delay: 250,
@@ -164,7 +166,7 @@ const LandingPage = () => {
         />
       ),
       initialX: -750,
-      initialY: -450,
+      initialY: -380,
       floatRadius: 22,
       floatSpeed: 0.0018,
       delay: 200,
@@ -230,6 +232,56 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
+        {/* Navigation at the top */}
+        <div className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4 px-6">
+          <div className="container mx-auto flex justify-between items-center">
+            <div className="flex items-center">
+              <div className="h-10 w-10 flex items-center justify-center bg-crm-blue text-white rounded">
+                <span className="font-bold text-sm">CRM</span>
+              </div>
+              <span className="ml-2 text-lg font-semibold text-white glow-text">SalesPro</span>
+            </div>
+            
+            <NavigationMenu className="hidden md:flex">
+              <NavigationMenuList>
+                <NavigationMenuItem className="mr-6">
+                  <NavigationMenuLink 
+                    className="text-white hover:text-blue-200 transition-colors nav-link glow-text"
+                    href="#features"
+                  >
+                    Features
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem className="mr-6">
+                  <NavigationMenuLink 
+                    className="text-white hover:text-blue-200 transition-colors nav-link glow-text"
+                    href="#pricing"
+                  >
+                    Pricing
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem className="mr-6">
+                  <NavigationMenuLink 
+                    className="text-white hover:text-blue-200 transition-colors nav-link glow-text"
+                    href="#about"
+                  >
+                    About
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <Button 
+                    onClick={() => navigate("/auth")} 
+                    variant="outline" 
+                    className="bg-transparent text-white border-white hover:bg-white/10"
+                  >
+                    Sign In
+                  </Button>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+          </div>
+        </div>
+
         <div className="absolute inset-0 z-0">
           <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.2)_0%,rgba(30,58,138,0)_70%)] z-0"></div>
           <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-slate-900 to-transparent z-10"></div>
@@ -240,7 +292,7 @@ const LandingPage = () => {
           {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
         </div>
         
-        <div className="w-full max-w-4xl text-center space-y-8 relative z-20">
+        <div className="w-full max-w-4xl text-center space-y-8 relative z-20 mt-16">
           <div className="flex justify-center mb-6">
             <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl">
               <span className="font-bold text-2xl">CRM</span>
@@ -294,7 +346,7 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <div className="pt-12">
+          <div className="pt-12" id="features">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <GlowingCard
                 title="Integrated Dialer"
