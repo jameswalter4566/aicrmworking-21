@@ -62,17 +62,23 @@ const LandingPage = () => {
   
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
 
+  const navigateToAuth = () => {
+    navigate("/auth");
+  };
+
   const floatingFeatureCards = React.useMemo(() => [
     {
       id: 1,
       component: (
-        <FeatureCard 
-          title="Integrated Dialer" 
-          value="Make Calls" 
-          icon={
-            <Phone size={20} className="text-blue-400" />
-          } 
-        />
+        <div onClick={navigateToAuth} className="cursor-pointer">
+          <FeatureCard 
+            title="Integrated Dialer" 
+            value="Make Calls" 
+            icon={
+              <Phone size={20} className="text-blue-400" />
+            } 
+          />
+        </div>
       ),
       initialX: -750,
       initialY: 280,
@@ -84,13 +90,15 @@ const LandingPage = () => {
     {
       id: 2,
       component: (
-        <FeatureCard 
-          title="AI Assistance" 
-          value="Smart Support" 
-          icon={
-            <Bot size={20} className="text-purple-400" />
-          } 
-        />
+        <div onClick={navigateToAuth} className="cursor-pointer">
+          <FeatureCard 
+            title="AI Assistance" 
+            value="Smart Support" 
+            icon={
+              <Bot size={20} className="text-purple-400" />
+            } 
+          />
+        </div>
       ),
       initialX: 750,
       initialY: -220,
@@ -102,13 +110,15 @@ const LandingPage = () => {
     {
       id: 3,
       component: (
-        <FeatureCard 
-          title="Sales Analytics" 
-          value="Data Insights" 
-          icon={
-            <LineChart size={20} className="text-green-400" />
-          } 
-        />
+        <div onClick={navigateToAuth} className="cursor-pointer">
+          <FeatureCard 
+            title="Sales Analytics" 
+            value="Data Insights" 
+            icon={
+              <LineChart size={20} className="text-green-400" />
+            } 
+          />
+        </div>
       ),
       initialX: 750,
       initialY: 380,
@@ -120,13 +130,15 @@ const LandingPage = () => {
     {
       id: 4,
       component: (
-        <FeatureCard 
-          title="SMS Campaigns" 
-          value="Bulk Messaging" 
-          icon={
-            <MessageSquare size={20} className="text-orange-400" />
-          } 
-        />
+        <div onClick={navigateToAuth} className="cursor-pointer">
+          <FeatureCard 
+            title="SMS Campaigns" 
+            value="Bulk Messaging" 
+            icon={
+              <MessageSquare size={20} className="text-orange-400" />
+            } 
+          />
+        </div>
       ),
       initialX: -750,
       initialY: -220,
@@ -138,13 +150,15 @@ const LandingPage = () => {
     {
       id: 6,
       component: (
-        <FeatureCard 
-          title="Power Dialer" 
-          value="10-to-1 Calling" 
-          icon={
-            <Zap size={20} className="text-yellow-400" />
-          } 
-        />
+        <div onClick={navigateToAuth} className="cursor-pointer">
+          <FeatureCard 
+            title="Power Dialer" 
+            value="10-to-1 Calling" 
+            icon={
+              <Zap size={20} className="text-yellow-400" />
+            } 
+          />
+        </div>
       ),
       initialX: 750,
       initialY: -380,
@@ -156,13 +170,15 @@ const LandingPage = () => {
     {
       id: 7,
       component: (
-        <FeatureCard 
-          title="Lead Manager" 
-          value="Organize Contacts" 
-          icon={
-            <Inbox size={20} className="text-purple-500" />
-          } 
-        />
+        <div onClick={navigateToAuth} className="cursor-pointer">
+          <FeatureCard 
+            title="Lead Manager" 
+            value="Organize Contacts" 
+            icon={
+              <Inbox size={20} className="text-purple-500" />
+            } 
+          />
+        </div>
       ),
       initialX: -750,
       initialY: -380,
@@ -231,69 +247,30 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
-        {/* Navigation at the top */}
         <div className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4 px-6">
           <div className="container mx-auto flex justify-center items-center">
-            <div className="flex items-center absolute left-6">
-              <div className="h-10 w-10 flex items-center justify-center bg-crm-blue text-white rounded">
+            <div className="flex items-center absolute left-6" onClick={navigateToAuth}>
+              <div className="h-10 w-10 flex items-center justify-center bg-crm-blue text-white rounded cursor-pointer">
                 <span className="font-bold text-sm">CRM</span>
               </div>
-              <span className="ml-2 text-lg font-semibold text-white enhanced-glow-text">SalesPro</span>
+              <span className="ml-2 text-lg font-semibold text-white enhanced-glow-text cursor-pointer">SalesPro</span>
             </div>
             
             <NavigationMenu className="hidden md:flex">
               <NavigationMenuList className="space-x-8">
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
-                    href="#how-it-works"
-                  >
-                    How It Works
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
-                    href="#features"
-                  >
-                    Features
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
-                    href="#plans"
-                  >
-                    Plans
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
-                    href="#mortgage"
-                  >
-                    Mortgage
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
-                    href="#real-estate"
-                  >
-                    Real Estate
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
-                    href="#debt-settlement"
-                  >
-                    Debt Settlement
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
+                {["How It Works", "Features", "Plans", "Mortgage", "Real Estate", "Debt Settlement"].map((text) => (
+                  <NavigationMenuItem key={text}>
+                    <NavigationMenuLink 
+                      onClick={navigateToAuth}
+                      className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text cursor-pointer"
+                    >
+                      {text}
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                ))}
                 <NavigationMenuItem>
                   <Button 
-                    onClick={() => navigate("/auth")} 
+                    onClick={navigateToAuth} 
                     variant="outline" 
                     className="bg-transparent text-white border-white hover:bg-white/10"
                   >
@@ -361,7 +338,7 @@ const LandingPage = () => {
               })}
 
               <Button 
-                onClick={() => navigate("/auth")}
+                onClick={navigateToAuth}
                 className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)]"
               >
                 Start Calling
@@ -371,27 +348,39 @@ const LandingPage = () => {
           
           <div className="pt-16" id="features">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <GlowingCard
-                title="Integrated Dialer"
-                description="Streamline your workflow with our powerful auto-dialing system that increases productivity."
-                icon={<Phone size={28} className="text-white" />}
-                gradient="bg-purple-glow"
-                delay="delay-1"
-              />
-              <GlowingCard
-                title="AI Assistance"
-                description="Leverage cutting-edge AI to automate tasks and gain valuable insights from customer interactions."
-                icon={<Bot size={28} className="text-white" />}
-                gradient="bg-green-glow"
-                delay="delay-2"
-              />
-              <GlowingCard
-                title="Sales Analytics"
-                description="Track performance metrics and visualize your sales pipeline with comprehensive analytics."
-                icon={<LineChart size={28} className="text-white" />}
-                gradient="bg-blue-glow"
-                delay="delay-3"
-              />
+              {[
+                {
+                  title: "Integrated Dialer",
+                  description: "Streamline your workflow with our powerful auto-dialing system that increases productivity.",
+                  icon: <Phone size={28} className="text-white" />,
+                  gradient: "bg-purple-glow",
+                  delay: "delay-1"
+                },
+                {
+                  title: "AI Assistance",
+                  description: "Leverage cutting-edge AI to automate tasks and gain valuable insights from customer interactions.",
+                  icon: <Bot size={28} className="text-white" />,
+                  gradient: "bg-green-glow",
+                  delay: "delay-2"
+                },
+                {
+                  title: "Sales Analytics",
+                  description: "Track performance metrics and visualize your sales pipeline with comprehensive analytics.",
+                  icon: <LineChart size={28} className="text-white" />,
+                  gradient: "bg-blue-glow",
+                  delay: "delay-3"
+                }
+              ].map((card) => (
+                <div key={card.title} onClick={navigateToAuth} className="cursor-pointer">
+                  <GlowingCard
+                    title={card.title}
+                    description={card.description}
+                    icon={card.icon}
+                    gradient={card.gradient}
+                    delay={card.delay}
+                  />
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -400,11 +389,11 @@ const LandingPage = () => {
       <footer className="bg-gray-900 text-white py-8 px-4">
         <div className="container mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center mb-4 md:mb-0">
-              <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
+            <div className="flex items-center mb-4 md:mb-0" onClick={navigateToAuth}>
+              <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded cursor-pointer">
                 <span className="font-bold text-sm">CRM</span>
               </div>
-              <span className="ml-2 text-lg font-semibold">SalesPro</span>
+              <span className="ml-2 text-lg font-semibold cursor-pointer">SalesPro</span>
             </div>
             <div className="text-sm text-gray-400">
               © {new Date().getFullYear()} SalesPro CRM. All rights reserved.
