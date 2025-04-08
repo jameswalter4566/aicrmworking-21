@@ -209,16 +209,18 @@ const LandingPage = () => {
           
           <div className="pt-6">
             <div className="relative mx-auto w-60">
-              {/* Transparent border container */}
+              {/* Transparent border container with blue glow */}
               <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
               
-              {/* Glowing snake loading indicator */}
+              {/* Enhanced glowing snake loading indicator */}
               <div 
-                className="absolute rounded-full w-3 h-3 bg-crm-blue shadow-[0_0_10px_4px_rgba(51,195,240,0.5)] z-20"
+                className="absolute rounded-full w-3 h-3 bg-crm-blue shadow-[0_0_15px_6px_rgba(51,195,240,0.8)] z-20"
                 style={{ 
                   left: `${loadingPos.x}px`, 
                   top: `${loadingPos.y}px`,
-                  transition: "left 0.03s linear, top 0.03s linear"
+                  transition: "left 0.03s linear, top 0.03s linear",
+                  boxShadow: "0 0 15px 6px rgba(51,195,240,0.8), 0 0 20px 12px rgba(51,195,240,0.4)",
+                  background: "linear-gradient(to right, #33C3F0, #1EAEDB)"
                 }}
               ></div>
 
