@@ -22,7 +22,27 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Completely disable authentication requirements
+    // Extract JWT token from Authorization header to identify the user
+    const authHeader = req.headers.get('Authorization');
+    let userId = null;
+    
+    if (authHeader) {
+      // Extract token from Bearer token format
+      const token = authHeader.replace('Bearer ', '');
+      
+      // Verify the token and get user information
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError) {
+        console.error('Auth error:', authError.message);
+      } else if (user) {
+        userId = user.id;
+        console.log(`Request authenticated from user: ${userId}`);
+      }
+    } else {
+      console.log('No Authorization header present, proceeding as anonymous upload');
+    }
+    
     // Log detailed request information for debugging
     console.log('Request path:', req.url);
     console.log('Request method:', req.method);
@@ -40,10 +60,10 @@ Deno.serve(async (req) => {
       throw new Error('No valid leads data provided');
     }
     
-    console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'}`);
+    console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'} for user: ${userId || 'anonymous'}`);
     
     // Store leads directly in Supabase database
-    const result = await storeLeadsInSupabase(leads);
+    const result = await storeLeadsInSupabase(leads, userId);
     
     return new Response(
       JSON.stringify({ 
@@ -63,6 +83,7 @@ Deno.serve(async (req) => {
     // Determine appropriate status code based on error type
     let statusCode = 500;
     if (error.message === 'No valid leads data provided') statusCode = 400;
+    if (error.message.includes('Unauthorized')) statusCode = 401;
     
     return new Response(
       JSON.stringify({ 
@@ -78,7 +99,7 @@ Deno.serve(async (req) => {
 });
 
 // Function to store leads in Supabase
-async function storeLeadsInSupabase(leads) {
+async function storeLeadsInSupabase(leads, userId) {
   try {
     // Process the leads to ensure they have the correct format for our database
     const processedLeads = leads.map(lead => ({
@@ -94,7 +115,9 @@ async function storeLeadsInSupabase(leads) {
       property_address: lead.propertyAddress || '',
       tags: lead.tags || [],
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      // Track which user created this lead
+      created_by: userId || null
     }));
     
     // Insert leads into the leads table in Supabase database
@@ -109,7 +132,7 @@ async function storeLeadsInSupabase(leads) {
       throw new Error(`Failed to store leads in Supabase database: ${error.message}`);
     }
     
-    console.log(`Successfully stored ${processedLeads.length} leads in Supabase database`);
+    console.log(`Successfully stored ${processedLeads.length} leads in Supabase database for user: ${userId || 'anonymous'}`);
     
     return data || processedLeads;
   } catch (error) {

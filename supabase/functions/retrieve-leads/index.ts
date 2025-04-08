@@ -22,13 +22,38 @@ Deno.serve(async (req) => {
   }
   
   try {
+    // Extract JWT token from Authorization header to identify the user
+    const authHeader = req.headers.get('Authorization');
+    let userId = null;
+    
+    if (authHeader) {
+      // Extract token from Bearer token format
+      const token = authHeader.replace('Bearer ', '');
+      
+      // Verify the token and get user information
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError) {
+        console.error('Auth error:', authError.message);
+        throw new Error('Unauthorized: Invalid authentication token');
+      } else if (user) {
+        userId = user.id;
+        console.log(`Request authenticated from user: ${userId}`);
+      } else {
+        throw new Error('Unauthorized: User not found');
+      }
+    } else {
+      console.log('No Authorization header present');
+      throw new Error('Unauthorized: Authentication required');
+    }
+    
     const { source } = await req.json() || { source: 'all' };
-    console.log(`Retrieving leads from source: ${source || 'all'}`);
+    console.log(`Retrieving leads from source: ${source || 'all'} for user: ${userId}`);
     
-    // Fetch leads from Supabase database directly
-    const leads = await fetchLeadsFromSupabase();
+    // Fetch leads from Supabase database directly, filtered by user
+    const leads = await fetchLeadsFromSupabase(userId);
     
-    console.log(`Successfully retrieved ${leads.length} leads`);
+    console.log(`Successfully retrieved ${leads.length} leads for user: ${userId}`);
     
     return new Response(
       JSON.stringify({ 
@@ -43,6 +68,10 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error(`Error in retrieve-leads function: ${error.message}`);
     
+    // Determine appropriate status code based on error type
+    let statusCode = 500;
+    if (error.message.includes('Unauthorized')) statusCode = 401;
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -50,19 +79,24 @@ Deno.serve(async (req) => {
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: statusCode,
       }
     );
   }
 });
 
 // Function to fetch leads from Supabase
-async function fetchLeadsFromSupabase() {
+async function fetchLeadsFromSupabase(userId) {
   try {
-    // Query the leads table in Supabase
+    if (!userId) {
+      throw new Error('User ID is required to fetch leads');
+    }
+    
+    // Query the leads table in Supabase, filtering by created_by
     const { data, error } = await supabase
       .from('leads')
       .select('*')
+      .eq('created_by', userId)  // Only fetch leads created by this user
       .order('created_at', { ascending: false });
     
     if (error) {
@@ -83,14 +117,15 @@ async function fetchLeadsFromSupabase() {
       propertyAddress: lead.property_address,
       tags: lead.tags,
       createdAt: lead.created_at,
-      updatedAt: lead.updated_at
+      updatedAt: lead.updated_at,
+      createdBy: lead.created_by
     }));
     
-    console.log(`Retrieved ${transformedLeads.length} leads from Supabase database`);
+    console.log(`Retrieved ${transformedLeads.length} leads from Supabase database for user: ${userId}`);
     
     return transformedLeads;
   } catch (error) {
     console.error(`Error fetching leads from Supabase database: ${error.message}`);
-    return [];
+    throw error;
   }
 }

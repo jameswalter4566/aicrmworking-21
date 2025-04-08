@@ -1,4 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 export interface ThoughtlyContact {
   id?: number;
@@ -14,6 +16,7 @@ export interface ThoughtlyContact {
   avatar?: string;
   mailingAddress?: string;
   propertyAddress?: string;
+  createdBy?: string;
 }
 
 export const thoughtlyService = {
@@ -202,8 +205,20 @@ export const thoughtlyService = {
     try {
       console.log('Retrieving leads from Supabase');
       
+      // Get auth token from the current session
+      const { session } = supabase.auth.getSession();
+      const authToken = session?.then(res => res.data.session?.access_token);
+      
+      let headers = {};
+      if (authToken) {
+        headers = {
+          Authorization: `Bearer ${authToken}`
+        };
+      }
+      
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { source: 'all' }
+        body: { source: 'all' },
+        headers
       });
 
       if (error) {
