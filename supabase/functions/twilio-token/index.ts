@@ -114,7 +114,6 @@ serve(async (req) => {
       const voiceGrant = new VoiceGrant({
         outgoingApplicationSid: TWILIO_TWIML_APP_SID,
         incomingAllow: true, // Allow incoming calls
-        pushCredentialSid: null // No push notifications - browser only
       });
 
       accessToken.addGrant(voiceGrant);

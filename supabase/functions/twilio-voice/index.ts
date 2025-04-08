@@ -120,6 +120,12 @@ serve(async (req) => {
     if (!action && requestData.action) {
       action = requestData.action;
     }
+
+    // Special handling for browser client call request
+    if (!action && requestData.phoneNumber) {
+      action = 'incomingCall';
+      console.log("Detected browser client call request with phoneNumber:", requestData.phoneNumber);
+    }
     
     // Check for Twilio status callback (which doesn't include an action parameter)
     const isStatusCallback = requestData.CallSid && (
@@ -212,71 +218,51 @@ serve(async (req) => {
       
       // Extract the desired phone number to call (likely passed as a parameter)
       const phoneNumber = requestData.phoneNumber || requestData.To || requestData.Digits;
+      const params = requestData.params || {};
+      const leadId = params.leadId || requestData.leadId;
       
-      const twiml = new twilio.twiml.VoiceResponse();
-      
-      // If a phone number was provided
       if (phoneNumber) {
-        console.log(`Will dial out to: ${phoneNumber}`);
+        console.log(`Will dial out to: ${phoneNumber}, Lead ID: ${leadId || 'none'}`);
         
-        // Add the browser client to the conference
+        // Format phone number if needed
+        let formattedPhoneNumber = phoneNumber;
+        if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
+          formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
+          console.log(`Formatted phone number: ${formattedPhoneNumber}`);
+        }
+        
+        const twiml = new twilio.twiml.VoiceResponse();
         twiml.say("Please wait while we connect your call.");
         
-        // Create conference for the browser client
-        const conf = twiml.dial().conference(
-          conferenceName,
-          {
-            statusCallback: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=conferenceStatus`,
-            statusCallbackEvent: ['start', 'end', 'join', 'leave'],
-            startConferenceOnEnter: true,
-            endConferenceOnExit: false,
-            waitUrl: DEFAULT_HOLD_MUSIC,
-            beep: true
-          }
-        );
+        const dial = twiml.dial({
+          callerId: TWILIO_PHONE_NUMBER,
+          timeout: 30,
+          action: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=dialStatus&leadId=${leadId || ''}`,
+          method: 'POST'
+        });
         
-        // Now make a second call to the target phone number
-        try {
-          console.log(`Initiating outbound call to ${phoneNumber}`);
-          
-          // Format phone number if needed
-          let formattedPhoneNumber = phoneNumber;
-          if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
-            formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
-            console.log(`Formatted phone number: ${formattedPhoneNumber}`);
-          }
-          
-          // Create a second call that joins the same conference
-          const call = await client.calls.create({
-            to: formattedPhoneNumber,
-            from: TWILIO_PHONE_NUMBER,
-            twiml: `
-              <Response>
-                <Say>You're being connected to a call.</Say>
-                <Dial>
-                  <Conference startConferenceOnEnter="true" endConferenceOnExit="true">${conferenceName}</Conference>
-                </Dial>
-              </Response>
-            `,
-            statusCallback: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=statusCallback`,
-            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-            statusCallbackMethod: 'POST',
-          });
-          
-          console.log(`Outbound call initiated with SID: ${call.sid}`);
-        } catch (error) {
-          console.error("Error initiating outbound call:", error);
-          // If outbound call fails, we'll still return the conference TwiML
-        }
+        dial.number({
+          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+          statusCallback: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId || ''}`,
+          statusCallbackMethod: 'POST'
+        }, formattedPhoneNumber);
+        
+        console.log("Returning TwiML response for browser client");
+        const twimlString = debugTwiML(twiml);
+        
+        // Return TwiML response
+        return new Response(twimlString, { 
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+        });
       } else {
         // If no phone number given, just add the user to a waiting state
+        const twiml = new twilio.twiml.VoiceResponse();
         twiml.say("No phone number was provided. Please try your call again.");
+        
+        return new Response(twiml.toString(), { 
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+        });
       }
-      
-      console.log("Returning TwiML response for browser client");
-      return new Response(debugTwiML(twiml), { 
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
-      });
     }
     
     // Handle different actions
@@ -534,11 +520,9 @@ serve(async (req) => {
       // Return a valid TwiML response (properly formatted XML)
       const twimlResponse = new twilio.twiml.VoiceResponse();
       
-      // Add a specific message based on call status
-      if (callStatus) {
-        twimlResponse.say(`Call status is ${callStatus}. Thank you for calling.`);
-      } else {
-        twimlResponse.say("Call status callback received.");
+      // Only add Say element for completed status - for other statuses, return empty response
+      if (callStatus === 'completed') {
+        twimlResponse.say("Thank you for using our service. Goodbye.");
       }
       
       return new Response(twimlResponse.toString(), {
@@ -549,8 +533,15 @@ serve(async (req) => {
       console.log("Dial status callback received:");
       console.log(JSON.stringify(requestData, null, 2));
       
+      const dialCallStatus = requestData.DialCallStatus;
+      
       const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("The call has ended. Thank you for using our service.");
+      
+      if (dialCallStatus === 'completed') {
+        twiml.say("The call has ended. Thank you for using our service.");
+      } else {
+        twiml.say(`The call status is ${dialCallStatus || 'unknown'}. Goodbye.`);
+      }
       
       return new Response(twiml.toString(), {
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' }

@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -190,8 +189,9 @@ const createTwilioService = (): TwilioService => {
         return { success: false, error: "Twilio device not initialized." };
       }
 
-      // First try using the Twilio JS SDK
+      // First try using the Twilio JS SDK directly for browser client call
       try {
+        console.log(`Attempting to call ${phoneNumber} via browser client`);
         const call = await device.connect({
           params: {
             phoneNumber: phoneNumber,
@@ -199,14 +199,15 @@ const createTwilioService = (): TwilioService => {
           }
         });
 
-        console.log(`Attempting to call ${phoneNumber} using browser client`);
+        console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
         return { 
           success: true, 
           callSid: call.sid,
           leadId: leadId
         };
       } catch (deviceError) {
-        console.warn("Browser-based call failed, trying server-side call:", deviceError);
+        console.warn("Browser-based call initiation failed. Error:", deviceError);
+        console.log("Falling back to server-side call initiation...");
         
         // If browser-based call fails, try making a call through the edge function
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
@@ -221,6 +222,12 @@ const createTwilioService = (): TwilioService => {
             browserClientName: 'browser-client'
           })
         });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Server response error:", response.status, errorText);
+          throw new Error(`Server returned ${response.status}: ${errorText.substring(0, 100)}`);
+        }
         
         const result = await response.json();
         
