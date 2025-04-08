@@ -11,7 +11,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
 import { useIndustry } from "@/context/IndustryContext";
 
-// Define a type for navigation items
 interface NavItem {
   name: string;
   icon: React.ElementType;
@@ -20,19 +19,19 @@ interface NavItem {
 }
 
 const itemColors = [
-  "bg-blue-600", // Dashboard
-  "bg-purple-600", // Leads
-  "bg-green-600", // Power Dialer
-  "bg-yellow-600", // Inbox
-  "bg-pink-600", // Tasks
-  "bg-orange-600", // Calendar
-  "bg-teal-600", // Pipeline/Deals
-  "bg-indigo-600", // Reporting
-  "bg-gray-600", // Settings
-  "bg-violet-600", // AI Dialer
-  "bg-emerald-600", // SMS Campaign
-  "bg-rose-600", // Start an Application
-  "bg-amber-600", // Quick Pricer
+  "bg-blue-600",
+  "bg-purple-600",
+  "bg-green-600",
+  "bg-yellow-600",
+  "bg-pink-600",
+  "bg-orange-600",
+  "bg-teal-600",
+  "bg-indigo-600",
+  "bg-gray-600",
+  "bg-violet-600",
+  "bg-emerald-600",
+  "bg-rose-600",
+  "bg-amber-600",
 ];
 
 const Sidebar = () => {
@@ -42,7 +41,6 @@ const Sidebar = () => {
   const location = useLocation();
   const { activeIndustry } = useIndustry();
   
-  // Base navigation items that appear for all industries
   const baseNavItems: NavItem[] = [
     { name: "Dashboard", icon: Home, path: "/" },
     { name: "Leads", icon: Users, path: "/people" },
@@ -54,7 +52,6 @@ const Sidebar = () => {
     { name: "Calendar", icon: Calendar, path: "#" },
   ];
 
-  // Conditional navigation items based on industry
   const getIndustrySpecificItems = (): NavItem[] => {
     if (activeIndustry === "mortgage") {
       return [
@@ -73,7 +70,6 @@ const Sidebar = () => {
     }
   };
 
-  // Final navigation items
   const finalNavItems: NavItem[] = [
     ...baseNavItems,
     ...getIndustrySpecificItems(),
@@ -116,7 +112,8 @@ const Sidebar = () => {
       return location.pathname === path;
     }
     return location.pathname === path || 
-           (path !== "#" && location.pathname.startsWith(path));
+           (path !== "#" && location.pathname.startsWith(path)) ||
+           (path === "/power-dialer" && location.pathname === "/power-dialer");
   };
 
   const toggleMobileMenu = () => {
