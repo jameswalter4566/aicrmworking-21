@@ -88,7 +88,7 @@ const SAMPLE_LEADS = [
 ];
 
 export default function PowerDialer() {
-  const [currentTab, setCurrentTab] = useState("settings");
+  const [currentTab, setCurrentTab] = useState("dialer");
   const [leads, setLeads] = useState(SAMPLE_LEADS);
   const [sortBy, setSortBy] = useState("priority");
   const [filterStatus, setFilterStatus] = useState("all");
