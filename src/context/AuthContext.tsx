@@ -9,6 +9,8 @@ type AuthContextType = {
   loading: boolean;
   signOut: () => Promise<void>;
   getAuthToken: () => Promise<string | null>;
+  userRole: string | null;
+  refreshUserRole: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -17,6 +19,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  const fetchUserRole = async (userId: string | undefined) => {
+    if (!userId) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching user role:", error);
+        return;
+      }
+
+      if (data && typeof data === 'object' && 'role' in data) {
+        setUserRole(data.role);
+      }
+    } catch (error) {
+      console.error("Error in fetchUserRole:", error);
+    }
+  };
+
+  const refreshUserRole = async () => {
+    if (user?.id) {
+      await fetchUserRole(user.id);
+    }
+  };
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -24,6 +56,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (event, currentSession) => {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
+        
+        // Fetch user role after auth state changes
+        if (currentSession?.user) {
+          fetchUserRole(currentSession.user.id);
+        } else {
+          setUserRole(null);
+        }
       }
     );
 
@@ -31,6 +70,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
+      
+      // Fetch user role for existing session
+      if (currentSession?.user) {
+        fetchUserRole(currentSession.user.id);
+      }
+      
       setLoading(false);
     });
 
@@ -39,6 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setUserRole(null);
   };
 
   // Helper function to get the authentication token
@@ -48,7 +94,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, loading, signOut, getAuthToken }}>
+    <AuthContext.Provider value={{ 
+      session, 
+      user, 
+      loading, 
+      signOut, 
+      getAuthToken, 
+      userRole,
+      refreshUserRole 
+    }}>
       {children}
     </AuthContext.Provider>
   );

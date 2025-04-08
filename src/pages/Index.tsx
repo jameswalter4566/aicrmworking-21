@@ -5,7 +5,10 @@ import MetricsGrid from "@/components/dashboard/MetricsGrid";
 import ActivityTable from "@/components/dashboard/ActivityTable";
 import FilterBar from "@/components/dashboard/FilterBar";
 import { Button } from "@/components/ui/button";
-import { FilterX } from "lucide-react";
+import { FilterX, Settings } from "lucide-react";
+import { useIndustry } from "@/context/IndustryContext";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Link } from "react-router-dom";
 
 // Sample data
 const contacts = [
@@ -22,8 +25,32 @@ const contacts = [
 ];
 
 const Index = () => {
+  const { activeIndustry } = useIndustry();
+  
   return (
     <MainLayout>
+      {!activeIndustry && (
+        <Alert className="mb-4 bg-blue-50 border-blue-200">
+          <AlertTitle className="flex items-center text-blue-700">
+            <Settings className="mr-2 h-4 w-4" />
+            Customize your CRM experience
+          </AlertTitle>
+          <AlertDescription className="text-blue-600">
+            Tailor fit your CRM based on your industry for a more personalized experience.
+            <div className="mt-2">
+              <Button 
+                variant="default" 
+                className="bg-blue-600 hover:bg-blue-700" 
+                size="sm"
+                asChild
+              >
+                <Link to="/settings">Get Started Now</Link>
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <FilterBar />
       <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-4">
         <MetricsGrid />
@@ -51,4 +78,3 @@ const Index = () => {
 };
 
 export default Index;
-

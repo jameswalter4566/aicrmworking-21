@@ -18,7 +18,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
           <Sidebar />
           <div className="flex-1 flex flex-col">
             <Navbar />
-            <main className="flex-1 bg-gray-50 overflow-y-auto h-[calc(100vh-64px)] px-4 md:px-6 lg:px-8">
+            <main className="flex-1 bg-gray-50 overflow-y-auto h-[calc(100vh-64px)] px-4 md:px-6 lg:px-8 pt-6">
               {children}
             </main>
           </div>
@@ -28,7 +28,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
           <Sidebar />
           <div className="flex-1 flex flex-col">
             <Navbar />
-            <main className="flex-1 bg-gray-50 overflow-y-auto h-[calc(100vh-64px)] px-4 md:px-6 lg:px-8">
+            <main className="flex-1 bg-gray-50 overflow-y-auto h-[calc(100vh-64px)] px-4 md:px-6 lg:px-8 pt-6">
               {children}
             </main>
           </div>
