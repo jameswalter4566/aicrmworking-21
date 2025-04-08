@@ -213,24 +213,6 @@ const LandingPage = () => {
             <div className="relative mx-auto w-60">
               <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
               
-              <div 
-                className="absolute z-20"
-                style={{ 
-                  left: `${loadingPos.x}px`, 
-                  top: `${loadingPos.y}px`,
-                  transition: "left 0.03s linear, top 0.03s linear",
-                }}
-              >
-                <div 
-                  className="absolute top-0 left-0 rounded-full w-4 h-4 -ml-2 -mt-2"
-                  style={{
-                    background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 40%, rgba(51,195,240,0) 70%)",
-                    boxShadow: "0 0 20px 6px rgba(51,195,240,0.9), 0 0 40px 20px rgba(51,195,240,0.5)",
-                    animation: "pulse 1.5s ease-in-out infinite"
-                  }}
-                ></div>
-              </div>
-              
               {[...Array(50)].map((_, i) => {
                 const trailSegmentOffset = i * 4;
                 const trailPos = getLoadingPosition((loadingProgress - trailSegmentOffset + 400) % 400);
