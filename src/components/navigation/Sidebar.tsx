@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
   BarChart2, Settings, Home, DollarSign, 
@@ -11,6 +11,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
 import { useIndustry } from "@/context/IndustryContext";
 
+// Define a type for navigation items
 interface NavItem {
   name: string;
   icon: React.ElementType;
@@ -19,19 +20,19 @@ interface NavItem {
 }
 
 const itemColors = [
-  "bg-blue-600",
-  "bg-purple-600",
-  "bg-green-600",
-  "bg-yellow-600",
-  "bg-pink-600",
-  "bg-orange-600",
-  "bg-teal-600",
-  "bg-indigo-600",
-  "bg-gray-600",
-  "bg-violet-600",
-  "bg-emerald-600",
-  "bg-rose-600",
-  "bg-amber-600",
+  "bg-blue-600", // Dashboard
+  "bg-purple-600", // Leads
+  "bg-green-600", // Power Dialer
+  "bg-yellow-600", // Inbox
+  "bg-pink-600", // Tasks
+  "bg-orange-600", // Calendar
+  "bg-teal-600", // Pipeline/Deals
+  "bg-indigo-600", // Reporting
+  "bg-gray-600", // Settings
+  "bg-violet-600", // AI Dialer
+  "bg-emerald-600", // SMS Campaign
+  "bg-rose-600", // Start an Application
+  "bg-amber-600", // Quick Pricer
 ];
 
 const Sidebar = () => {
@@ -41,6 +42,7 @@ const Sidebar = () => {
   const location = useLocation();
   const { activeIndustry } = useIndustry();
   
+  // Base navigation items that appear for all industries
   const baseNavItems: NavItem[] = [
     { name: "Dashboard", icon: Home, path: "/" },
     { name: "Leads", icon: Users, path: "/people" },
@@ -52,6 +54,7 @@ const Sidebar = () => {
     { name: "Calendar", icon: Calendar, path: "#" },
   ];
 
+  // Conditional navigation items based on industry
   const getIndustrySpecificItems = (): NavItem[] => {
     if (activeIndustry === "mortgage") {
       return [
@@ -70,16 +73,13 @@ const Sidebar = () => {
     }
   };
 
+  // Final navigation items
   const finalNavItems: NavItem[] = [
     ...baseNavItems,
     ...getIndustrySpecificItems(),
     { name: "Reporting", icon: BarChart2, path: "#" },
     { name: "Settings", icon: Settings, path: "/settings" },
   ];
-  
-  useEffect(() => {
-    console.log("Current location:", location.pathname);
-  }, [location.pathname]);
   
   const getIndustryDisplayName = () => {
     switch (activeIndustry) {
@@ -112,18 +112,11 @@ const Sidebar = () => {
   };
 
   const isActive = (path: string) => {
-    if (path === "/power-dialer") {
-      const isPowerDialer = location.pathname === "/power-dialer";
-      console.log(`Checking power-dialer: ${isPowerDialer}, current path: ${location.pathname}`);
-      return isPowerDialer;
-    }
-    
     if (path === "/") {
       return location.pathname === path;
     }
-    
-    return (path !== "#" && location.pathname === path) || 
-           (path !== "#" && path !== "/" && location.pathname.startsWith(path));
+    return location.pathname === path || 
+           (path !== "#" && location.pathname.startsWith(path));
   };
 
   const toggleMobileMenu = () => {
@@ -224,7 +217,7 @@ const Sidebar = () => {
                   "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                   active 
                     ? itemColors[index % itemColors.length]
-                    : "text-white hover:text-white hover:bg-white/10",
+                    : "text-white hover:text-white",
                   expanded ? "px-5" : "px-0 justify-center"
                 )}
               >
