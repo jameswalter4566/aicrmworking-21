@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
-import { Phone, Bot, LineChart, MessageSquare, Zap, Database, Users, CheckCheck } from "lucide-react";
+import { Phone, Bot, LineChart } from "lucide-react";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -40,7 +39,6 @@ const LandingPage = () => {
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
   
   const floatingFeatureCards = [
-    // Original feature cards
     {
       id: 1,
       component: (
@@ -93,117 +91,6 @@ const LandingPage = () => {
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
-      zIndex: 10,
-    },
-    // New feature cards - first pair
-    {
-      id: 4,
-      component: (
-        <FeatureCard 
-          title="Power Dialer" 
-          value="10:1 Ratio" 
-          icon={
-            <Phone size={20} className="text-orange-400" />
-          } 
-        />
-      ),
-      initialX: -300,
-      initialY: 40,
-      floatRadius: 22,
-      floatSpeed: 0.0018,
-      delay: 150,
-      zIndex: 10,
-    },
-    {
-      id: 5,
-      component: (
-        <FeatureCard 
-          title="Conversational AI" 
-          value="Smart Calling" 
-          icon={
-            <Bot size={20} className="text-cyan-400" />
-          } 
-        />
-      ),
-      initialX: 280,
-      initialY: -30,
-      floatRadius: 18,
-      floatSpeed: 0.0023,
-      delay: 350,
-      zIndex: 10,
-    },
-    // New feature cards - second pair
-    {
-      id: 6,
-      component: (
-        <FeatureCard 
-          title="Bulk SMS" 
-          value="Campaign Manager" 
-          icon={
-            <MessageSquare size={20} className="text-purple-500" />
-          } 
-        />
-      ),
-      initialX: -220,
-      initialY: -60,
-      floatRadius: 28,
-      floatSpeed: 0.0019,
-      delay: 250,
-      zIndex: 10,
-    },
-    {
-      id: 7,
-      component: (
-        <FeatureCard 
-          title="AI Automation" 
-          value="Task Handling" 
-          icon={
-            <Zap size={20} className="text-yellow-400" />
-          } 
-        />
-      ),
-      initialX: 180,
-      initialY: 140,
-      floatRadius: 24,
-      floatSpeed: 0.0017,
-      delay: 320,
-      zIndex: 10,
-    },
-    // New feature cards - third pair
-    {
-      id: 8,
-      component: (
-        <FeatureCard 
-          title="Lead Marketplace" 
-          value="Purchase Leads" 
-          icon={
-            <Database size={20} className="text-green-500" />
-          } 
-        />
-      ),
-      initialX: -140,
-      initialY: 200,
-      floatRadius: 26,
-      floatSpeed: 0.0021,
-      delay: 180,
-      zIndex: 10,
-    },
-    {
-      id: 9,
-      component: (
-        <FeatureCard 
-          title="Lead Management" 
-          value="Track & Convert" 
-          icon={
-            <Users size={20} className="text-blue-500" />
-          } 
-        />
-      ),
-      initialX: 140,
-      initialY: -80,
-      floatRadius: 22,
-      floatSpeed: 0.0022,
-      delay: 280,
       zIndex: 10,
     },
   ];
@@ -294,8 +181,7 @@ const LandingPage = () => {
           
           <div className="pt-6">
             <div className="relative mx-auto w-[300px]">
-              {/* Enhanced inner glow effect */}
-              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm bg-crm-blue/5 shadow-[inset_0_0_15px_2px_rgba(51,195,240,0.3)]"></div>
+              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
               
               {[...Array(50)].map((_, i) => {
                 const trailSegmentOffset = i * 4;
@@ -308,12 +194,12 @@ const LandingPage = () => {
                     style={{
                       left: `${trailPos.x}px`,
                       top: `${trailPos.y}px`,
-                      width: `${Math.max(4.5 - i * 0.07, 1)}px`,
-                      height: `${Math.max(4.5 - i * 0.07, 1)}px`,
+                      width: `${Math.max(3.5 - i * 0.07, 0.8)}px`,
+                      height: `${Math.max(3.5 - i * 0.07, 0.8)}px`,
                       opacity: `${Math.max(1 - i * 0.02, 0)}`,
                       transform: `translate(-50%, -50%)`,
-                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: `0 0 ${20 - i * 0.3}px ${8 - i * 0.1}px rgba(51,195,240,${Math.max(0.9 - i * 0.015, 0)})`,
+                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.5) 50%, rgba(51,195,240,0) 100%)",
+                      boxShadow: `0 0 ${15 - i * 0.3}px ${5 - i * 0.1}px rgba(51,195,240,${Math.max(0.8 - i * 0.015, 0)})`,
                     }}
                   ></div>
                 );
@@ -321,7 +207,7 @@ const LandingPage = () => {
 
               <Button 
                 onClick={() => navigate("/auth")}
-                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[0_0_15px_rgba(51,195,240,0.5)]"
+                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10"
               >
                 Start Calling
               </Button>
@@ -330,14 +216,7 @@ const LandingPage = () => {
           
           <div className="pt-12">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {title: "10:1 Power Dialer", description: "Maximize efficiency with our industry-leading power dialer that connects you with up to 10 leads at once", icon: <Phone size={18} className="text-blue-400" />},
-                {title: "AI Assistant", description: "Let our AI handle routine calls and qualify leads before they reach your team", icon: <Bot size={18} className="text-purple-400" />},
-                {title: "Bulk SMS Campaigns", description: "Reach thousands of leads instantly with personalized text message campaigns", icon: <MessageSquare size={18} className="text-green-400" />},
-                {title: "Task Automation", description: "Automate repetitive tasks and follow-ups with our intelligent workflow system", icon: <CheckCheck size={18} className="text-orange-400" />},
-                {title: "Lead Marketplace", description: "Grow your business with high-quality leads available for immediate purchase", icon: <Database size={18} className="text-cyan-400" />},
-                {title: "Analytics Dashboard", description: "Track performance metrics and optimize your sales process with real-time data", icon: <LineChart size={18} className="text-yellow-400" />},
-              ].map((feature, i) => (
+              {["Integrated Dialer", "AI Assistance", "Sales Analytics"].map((feature, i) => (
                 <div 
                   key={i} 
                   className={`bg-white/10 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-white/20 transition-all duration-700 ease-out transform ${
@@ -349,14 +228,9 @@ const LandingPage = () => {
                     transitionDelay: `${i * 200}ms` 
                   }}
                 >
-                  <div className="flex items-center mb-3">
-                    <div className="rounded-full bg-blue-500/20 p-2 mr-2">
-                      {feature.icon}
-                    </div>
-                    <h3 className="text-xl font-semibold text-white">{feature.title}</h3>
-                  </div>
+                  <h3 className="text-xl font-semibold mb-3 text-white">{feature}</h3>
                   <p className="text-gray-300">
-                    {feature.description}
+                    Streamline your workflow and increase productivity with our powerful features.
                   </p>
                 </div>
               ))}
