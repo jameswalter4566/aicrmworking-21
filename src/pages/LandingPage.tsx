@@ -231,18 +231,18 @@ const LandingPage = () => {
                   }}
                 ></div>
                 
-                {/* Light trail segments that follow the main point */}
-                {[...Array(8)].map((_, i) => (
+                {/* Longer snake-like light trail segments that follow the main point */}
+                {[...Array(18)].map((_, i) => (
                   <div 
                     key={i}
                     className="absolute top-0 left-0 rounded-full" 
                     style={{
-                      width: `${4 - i * 0.4}px`,
-                      height: `${4 - i * 0.4}px`,
-                      opacity: `${1 - i * 0.12}`,
-                      transform: `translate(-50%, -50%) translateX(${-i * 3}px)`,
+                      width: `${4 - i * 0.15}px`,
+                      height: `${4 - i * 0.15}px`,
+                      opacity: `${1 - i * 0.05}`,
+                      transform: `translate(-50%, -50%) translateX(${-i * 2}px)`,
                       background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.5) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: `0 0 ${15 - i * 1.5}px ${5 - i * 0.5}px rgba(51,195,240,${0.8 - i * 0.1})`,
+                      boxShadow: `0 0 ${15 - i * 0.6}px ${5 - i * 0.2}px rgba(51,195,240,${0.8 - i * 0.04})`,
                     }}
                   ></div>
                 ))}
