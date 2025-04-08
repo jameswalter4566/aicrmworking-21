@@ -44,8 +44,8 @@ const GlowingCard = ({
         </div>
       </div>
 
-      <h3 className="text-xl font-bold glow-text text-center">{title}</h3>
-      <p className="text-sm text-white/90 mt-3 text-center">{description}</p>
+      <h3 className="text-xl font-bold glow-text text-center z-10 relative">{title}</h3>
+      <p className="text-sm text-white/90 mt-3 text-center z-10 relative">{description}</p>
     </div>
   );
 };
