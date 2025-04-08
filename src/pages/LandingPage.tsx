@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
-import { Phone, Bot, LineChart, MessageSquare, Calendar, FileCheck, Zap, Inbox } from "lucide-react";
+import { Phone, Bot, LineChart, MessageSquare, FileCheck, Zap, Inbox } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
 
 const LandingPage = () => {
@@ -73,7 +73,7 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -680,
+      initialX: -750,
       initialY: 280,
       floatRadius: 20,
       floatSpeed: 0.002,
@@ -91,8 +91,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 680,
-      initialY: -170,
+      initialX: 750,
+      initialY: -220,
       floatRadius: 25,
       floatSpeed: 0.0015,
       delay: 200,
@@ -109,7 +109,7 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 680,
+      initialX: 750,
       initialY: 450,
       floatRadius: 30,
       floatSpeed: 0.0025,
@@ -127,29 +127,11 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -650,
+      initialX: -750,
       initialY: -220,
       floatRadius: 22,
       floatSpeed: 0.002,
       delay: 300,
-      zIndex: 10,
-    },
-    {
-      id: 5,
-      component: (
-        <FeatureCard 
-          title="Appointment Scheduling" 
-          value="Smart Calendar" 
-          icon={
-            <Calendar size={20} className="text-blue-500" />
-          } 
-        />
-      ),
-      initialX: -600,
-      initialY: 500,
-      floatRadius: 18,
-      floatSpeed: 0.0018,
-      delay: 150,
       zIndex: 10,
     },
     {
@@ -163,8 +145,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 620,
-      initialY: -380,
+      initialX: 750,
+      initialY: -450,
       floatRadius: 25,
       floatSpeed: 0.002,
       delay: 250,
@@ -181,8 +163,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -650,
-      initialY: -420,
+      initialX: -750,
+      initialY: -450,
       floatRadius: 22,
       floatSpeed: 0.0018,
       delay: 200,
