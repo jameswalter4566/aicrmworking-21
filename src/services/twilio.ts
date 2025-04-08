@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -26,12 +27,15 @@ interface TwilioService {
   toggleSpeaker: (speakerOn: boolean) => boolean;
   cleanup: () => void;
   hangupAllCalls: () => Promise<boolean>;
+  isDeviceRegistered: () => boolean;
+  getActiveCallCount: () => number;
 }
 
 const createTwilioService = (): TwilioService => {
   let device: any = null; // Using any to avoid TypeScript errors
   let audioContext: AudioContext | null = null;
   let preferredAudioDevice: string | null = null;
+  let activeCalls: any[] = []; // Track active calls for better management
 
   const initializeAudioContext = async (): Promise<boolean> => {
     try {
@@ -66,6 +70,7 @@ const createTwilioService = (): TwilioService => {
             await device.destroy();
           }
           device = null;
+          activeCalls = [];
         } catch (cleanupErr) {
           console.warn("Error during cleanup of existing device:", cleanupErr);
         }
@@ -94,24 +99,60 @@ const createTwilioService = (): TwilioService => {
       }
 
       if (window.Twilio && window.Twilio.Device) {
+        // First make sure we terminate any previous device
+        try {
+          await hangupAllCalls();
+        } catch (err) {
+          console.warn("Error cleaning up existing calls:", err);
+        }
+
         device = new window.Twilio.Device(data.token, {
           codecPreferences: ["opus", "pcmu"],
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
-          forceAggressiveIceNomination: true
+          forceAggressiveIceNomination: true,
+          // Add sound customization to help with debugging
+          sounds: {
+            incoming: 'https://cdn.jsdelivr.net/gh/twilio/twilio-voice.js@1.1.0/sounds/incoming.mp3',
+            outgoing: 'https://cdn.jsdelivr.net/gh/twilio/twilio-voice.js@1.1.0/sounds/outgoing.mp3',
+            disconnect: 'https://cdn.jsdelivr.net/gh/twilio/twilio-voice.js@1.1.0/sounds/disconnect.mp3',
+          }
         });
 
         device.on("error", (error: any) => {
           console.error("Twilio Device Error:", error);
+          
+          // More detailed error reporting
+          let errorMessage = error.message || error.toString();
+          let errorCode = error.code || "unknown";
+          
+          if (errorCode === '31005' && errorMessage.includes('HANGUP')) {
+            errorMessage = "Call terminated unexpectedly. The line may be busy or a previous call is still active.";
+          }
+          
           toast({
-            title: "Twilio Device Error",
-            description: `An error occurred with the phone system: ${error.message || error}`,
+            title: `Twilio Device Error (${errorCode})`,
+            description: errorMessage,
             variant: "destructive",
           });
+          
+          // Clean up any zombie calls when we get errors
+          try {
+            if (activeCalls.length > 0) {
+              console.log("Cleaning up calls after error");
+              device.disconnectAll();
+              activeCalls = [];
+            }
+          } catch (cleanupErr) {
+            console.warn("Error cleaning up after device error:", cleanupErr);
+          }
         });
 
         device.on("disconnect", (call: any) => {
           console.log(`Call disconnected: ${call.sid || 'unknown'}`);
+          
+          // Remove from active calls when disconnected
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
         });
 
         device.on("incoming", (call: any) => {
@@ -196,7 +237,11 @@ const createTwilioService = (): TwilioService => {
         return { success: false, error: "Twilio device not initialized." };
       }
 
-      await endCall();
+      // First clean up any existing calls
+      await hangupAllCalls();
+      
+      // Make sure we're starting fresh
+      activeCalls = [];
 
       let formattedPhoneNumber = phoneNumber;
       if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
@@ -206,12 +251,24 @@ const createTwilioService = (): TwilioService => {
       console.log(`Attempting to call ${formattedPhoneNumber} via browser client`);
       
       try {
+        // Make sure we're not already on a call
+        if (device.calls && device.calls.length > 0) {
+          console.warn("Device has active calls before making new call. Cleaning up...");
+          device.disconnectAll();
+          
+          // Small delay to ensure clean state
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
         const call = await device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
             leadId: leadId
           }
         });
+        
+        // Add to active calls tracking
+        activeCalls.push(call);
         
         console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
         
@@ -222,6 +279,9 @@ const createTwilioService = (): TwilioService => {
             description: `Error during call: ${error.message || error}`,
             variant: "destructive",
           });
+          
+          // Remove from active calls on error
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
         });
         
         call.on('accept', () => {
@@ -238,6 +298,9 @@ const createTwilioService = (): TwilioService => {
             title: "Call Ended",
             description: "The call has been disconnected.",
           });
+          
+          // Remove from active calls when disconnected
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
         });
         
         return { 
@@ -299,13 +362,31 @@ const createTwilioService = (): TwilioService => {
           console.log("Ending all calls");
         }
         
+        // First try the Twilio method
         if (typeof device.disconnectAll === 'function') {
           device.disconnectAll();
-          return true;
+          activeCalls = []; // Reset active calls tracking
         } else {
           console.warn("disconnectAll method not available on device");
           return false;
         }
+        
+        // Also try to hangup via server as a backup
+        try {
+          await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'hangupAll'
+            })
+          });
+        } catch (serverError) {
+          console.warn("Error ending call via server, but client-side hangup succeeded:", serverError);
+        }
+        
+        return true;
       } else {
         console.warn("Twilio device not initialized.");
         return false;
@@ -318,10 +399,13 @@ const createTwilioService = (): TwilioService => {
 
   const hangupAllCalls = async (): Promise<boolean> => {
     try {
+      // First try the client-side approach
       if (device && typeof device.disconnectAll === 'function') {
         device.disconnectAll();
+        activeCalls = []; // Reset active calls tracking
       }
       
+      // Always also try the server-side approach for thorough cleanup
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
         method: 'POST',
         headers: {
@@ -335,7 +419,7 @@ const createTwilioService = (): TwilioService => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Server hangup all response error:", response.status, errorText);
-        return true;
+        return true; // Still return true as we attempted client-side cleanup
       }
       
       const result = await response.json();
@@ -351,7 +435,18 @@ const createTwilioService = (): TwilioService => {
   const checkCallStatus = async (leadId: string): Promise<string> => {
     try {
       console.log(`Checking call status for lead ID: ${leadId} (browser-based)`);
-      return 'in-progress';
+      
+      // Check if we have any active device calls
+      if (device && device.calls && device.calls.length > 0) {
+        return 'in-progress';
+      }
+      
+      // Check our internal tracking
+      if (activeCalls.length > 0) {
+        return 'in-progress';
+      }
+      
+      return 'completed';
     } catch (error) {
       console.error("Error checking call status:", error);
       return 'unknown';
@@ -396,12 +491,23 @@ const createTwilioService = (): TwilioService => {
     }
   };
 
+  const isDeviceRegistered = (): boolean => {
+    return !!(device && device.state === 'registered');
+  };
+  
+  const getActiveCallCount = (): number => {
+    return activeCalls.length;
+  };
+
   const cleanup = () => {
     if (device) {
+      hangupAllCalls().catch(err => console.warn("Error in final hangup:", err));
+      
       if (typeof device.destroy === 'function') {
         device.destroy();
       }
       device = null;
+      activeCalls = [];
       console.log("Twilio device destroyed.");
     }
     if (audioContext && audioContext.state === 'running') {
@@ -426,7 +532,9 @@ const createTwilioService = (): TwilioService => {
     toggleMute,
     toggleSpeaker,
     cleanup,
-    hangupAllCalls
+    hangupAllCalls,
+    isDeviceRegistered,
+    getActiveCallCount
   };
 };
 

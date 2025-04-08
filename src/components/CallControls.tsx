@@ -1,12 +1,13 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff, Mic, MicOff, Volume, Volume2 } from "lucide-react";
+import { Phone, PhoneOff, Mic, MicOff, Volume, Volume2, RefreshCw } from "lucide-react";
 import { ActiveCall } from "@/hooks/use-twilio";
 import AudioDeviceSelector from "./AudioDeviceSelector";
 import { AudioDebugModal } from "./AudioDebugModal";
 import { AudioInitializer } from "./AudioInitializer";
 import AudioDeviceDropdown from "./AudioDeviceDropdown";
+import { toast } from "@/components/ui/use-toast";
 
 export interface CallControlsProps {
   phoneNumber?: string;
@@ -43,21 +44,62 @@ export function CallControls({
 }: CallControlsProps) {
   const [isCallButtonHovered, setIsCallButtonHovered] = useState(false);
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
+  const [isResettingCall, setIsResettingCall] = useState(false);
+  
   const isInCall = !!activeCall;
   const isMuted = activeCall?.isMuted || false;
   const isSpeakerOn = activeCall?.speakerOn || false;
   const isDisabled = disabled || !phoneNumber;
+  const isCallFailing = activeCall?.status === 'failed' || activeCall?.status === 'busy';
 
-  const handleCall = () => {
+  const handleCall = async () => {
     if (!phoneNumber || isDisabled) return;
     
-    // Ensure we're passing both the phone number and leadId
-    console.log(`Initiating call to ${phoneNumber} with leadId ${leadId}`);
-    onCall(phoneNumber, leadId);
+    try {
+      // Ensure we're passing both the phone number and leadId
+      console.log(`Initiating call to ${phoneNumber} with leadId ${leadId}`);
+      onCall(phoneNumber, leadId);
+    } catch (error) {
+      console.error("Error initiating call:", error);
+      toast({
+        title: "Call Failed",
+        description: "Unable to initiate call. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleHangup = () => {
-    onHangup(leadId);
+  const handleHangup = async () => {
+    try {
+      await onHangup(leadId);
+    } catch (error) {
+      console.error("Error hanging up call:", error);
+      toast({
+        title: "Hangup Error",
+        description: "Failed to properly terminate call. Please try resetting.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleResetCall = async () => {
+    setIsResettingCall(true);
+    try {
+      // Force hangup any existing call
+      await onHangup(leadId);
+      
+      // Wait a moment for systems to clear
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      toast({
+        title: "Call Reset",
+        description: "Call state has been reset. You can try calling again.",
+      });
+    } catch (error) {
+      console.error("Error resetting call:", error);
+    } finally {
+      setIsResettingCall(false);
+    }
   };
 
   const toggleMute = () => {
@@ -76,6 +118,16 @@ export function CallControls({
     setShowDeviceSelector(!showDeviceSelector);
   };
 
+  // Force call cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      if (isInCall) {
+        console.log("CallControls unmounting - cleaning up active call");
+        onHangup(leadId);
+      }
+    };
+  }, [isInCall, leadId, onHangup]);
+
   return (
     <>
       {/* Always render the AudioInitializer component to ensure audio permissions */}
@@ -89,7 +141,7 @@ export function CallControls({
               size="lg"
               className={`rounded-full w-12 h-12 p-0 bg-green-500 hover:bg-green-600 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={handleCall}
-              disabled={isDisabled}
+              disabled={isDisabled || isResettingCall}
               onMouseEnter={() => setIsCallButtonHovered(true)}
               onMouseLeave={() => setIsCallButtonHovered(false)}
               title={`Call ${phoneNumber || ''}`}
@@ -102,6 +154,7 @@ export function CallControls({
               size="lg"
               className="rounded-full w-12 h-12 p-0"
               onClick={handleHangup}
+              disabled={isResettingCall}
               title="End call"
             >
               <PhoneOff size={20} />
@@ -115,6 +168,7 @@ export function CallControls({
                 size="icon"
                 onClick={toggleMute}
                 title={isMuted ? "Unmute" : "Mute"}
+                disabled={isResettingCall}
               >
                 {isMuted ? <MicOff size={18} /> : <Mic size={18} />}
               </Button>
@@ -125,8 +179,22 @@ export function CallControls({
                 currentDeviceId={currentAudioDevice}
                 onDeviceChange={onChangeAudioDevice}
                 onRefreshDevices={onRefreshDevices}
-                disabled={disabled}
+                disabled={disabled || isResettingCall}
               />
+              
+              {/* Add reset call button */}
+              {(activeCall?.status === 'failed' || activeCall?.status === 'busy') && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleResetCall}
+                  title="Reset call state"
+                  disabled={isResettingCall}
+                  className={isResettingCall ? "animate-spin" : ""}
+                >
+                  <RefreshCw size={18} />
+                </Button>
+              )}
               
               {/* Add audio debug modal if in active call */}
               <AudioDebugModal />
@@ -151,14 +219,25 @@ export function CallControls({
             {activeCall.status === 'connecting' ? 'Connecting...' : 
              activeCall.status === 'in-progress' ? 'In call' :
              activeCall.status === 'completed' ? 'Call ended' :
-             activeCall.status === 'failed' ? 'Call failed' :
-             activeCall.status === 'busy' ? 'Line busy' : 
+             activeCall.status === 'failed' ? (
+               <span className="text-destructive font-medium">Call failed - click reset</span>
+             ) :
+             activeCall.status === 'busy' ? (
+               <span className="text-destructive font-medium">Line busy - click reset</span> 
+             ) :
              activeCall.status === 'no-answer' ? 'No answer' : ''}
              
             {activeCall.audioActive && activeCall.audioStreaming && (
               <span className="ml-1 inline-flex items-center">
                 <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse mr-1"></span>
                 Audio streaming
+              </span>
+            )}
+            
+            {!activeCall.audioActive && activeCall.status === 'in-progress' && (
+              <span className="ml-1 inline-flex items-center">
+                <span className="h-2 w-2 bg-amber-500 rounded-full animate-pulse mr-1"></span>
+                Audio inactive
               </span>
             )}
             
