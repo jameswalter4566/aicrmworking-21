@@ -29,7 +29,7 @@ interface TwilioService {
 }
 
 const createTwilioService = (): TwilioService => {
-  let device: any = null; // Changed from 'Twilio.Device | null' to 'any'
+  let device: any = null; // Using any to avoid TypeScript errors
   let audioContext: AudioContext | null = null;
   let preferredAudioDevice: string | null = null;
 
@@ -59,7 +59,23 @@ const createTwilioService = (): TwilioService => {
 
   const initializeTwilioDevice = async (): Promise<boolean> => {
     try {
-      const response = await fetch('/api/twilio/token');
+      // Using Supabase Edge Function URL directly instead of relative path
+      // This avoids getting HTML error pages when the relative path is misinterpreted
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+      });
+      
+      if (!response.ok) {
+        console.error(`Failed to fetch Twilio token: ${response.status} ${response.statusText}`);
+        const text = await response.text();
+        console.error("Response body:", text.substring(0, 500) + (text.length > 500 ? '...' : ''));
+        return false;
+      }
+
       const data = await response.json();
 
       if (!data.token) {
@@ -73,34 +89,38 @@ const createTwilioService = (): TwilioService => {
           // Set Opus as our preferred codec. Opus generally performs better, even
           // at low bitrates, than other codecs.
           codecPreferences: ["opus", "pcmu"],
-          // Use fake DTMF tones client-side.
-          // enableRingingState: true,
-          // Set maximum feedback delay to 3 seconds.
-          // maxAverageBitrate: 8000,
-          // maxCallSignalingTimeoutMs: 3000
+          // Max call signaling timeout for reconnection
+          maxCallSignalingTimeoutMs: 30000,
+          // Add logs for debugging
+          logLevel: 'debug'
         });
 
         device.on("error", (error: any) => {
           console.error("Twilio Device Error:", error);
           toast({
             title: "Twilio Device Error",
-            description: `An error occurred with the phone system: ${error.message}`,
+            description: `An error occurred with the phone system: ${error.message || error}`,
             variant: "destructive",
           });
         });
 
         device.on("disconnect", (call: any) => {
-          console.log(`Call disconnected: ${call.sid}`);
+          console.log(`Call disconnected: ${call.sid || 'unknown'}`);
         });
 
         device.on("incoming", (call: any) => {
-          console.log(`Incoming call from: ${call.from}`);
+          console.log(`Incoming call from: ${call.from || 'unknown'}`);
           call.reject();
         });
 
-        await device.register();
-        console.log("Twilio device registered successfully.");
-        return true;
+        try {
+          await device.register();
+          console.log("Twilio device registered successfully.");
+          return true;
+        } catch (registerError) {
+          console.error("Error registering Twilio device:", registerError);
+          return false;
+        }
       } else {
         console.error("Twilio.Device is not supported in this browser.");
         return false;
@@ -170,20 +190,54 @@ const createTwilioService = (): TwilioService => {
         return { success: false, error: "Twilio device not initialized." };
       }
 
-      const call = await device.connect({
-        params: {
-          phoneNumber: phoneNumber,
+      // First try using the Twilio JS SDK
+      try {
+        const call = await device.connect({
+          params: {
+            phoneNumber: phoneNumber,
+            leadId: leadId
+          }
+        });
+
+        console.log(`Attempting to call ${phoneNumber} using browser client`);
+        return { 
+          success: true, 
+          callSid: call.sid,
           leadId: leadId
+        };
+      } catch (deviceError) {
+        console.warn("Browser-based call failed, trying server-side call:", deviceError);
+        
+        // If browser-based call fails, try making a call through the edge function
+        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'makeCall',
+            phoneNumber: phoneNumber,
+            leadId: leadId,
+            browserClientName: 'browser-client'
+          })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          console.log("Server-side call initiated successfully:", result);
+          return {
+            success: true,
+            callSid: result.callSid || result.phoneCallSid,
+            browserCallSid: result.browserCallSid,
+            phoneCallSid: result.phoneCallSid,
+            conferenceName: result.conferenceName,
+            leadId: leadId
+          };
+        } else {
+          throw new Error(result.error || "Failed to make server-side call");
         }
-      });
-
-      console.log(`Attempting to call ${phoneNumber}`);
-
-      return { 
-        success: true, 
-        callSid: call.sid,
-        leadId: leadId
-      };
+      }
     } catch (error: any) {
       console.error("Error making call:", error);
       return { success: false, error: error.message || "Failed to make call" };

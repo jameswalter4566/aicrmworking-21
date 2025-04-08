@@ -8,17 +8,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'OPTIONS, POST, GET',
   'Access-Control-Max-Age': '86400',
+  'Content-Type': 'application/json'
 };
 
 console.log("Twilio Token function loaded and ready");
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Token function`);
-  console.log(`Request URL: ${req.url}`);
-  
-  // Log all headers for debugging
-  const headerEntries = [...req.headers.entries()];
-  console.log(`Request headers (${headerEntries.length}):`, JSON.stringify(headerEntries));
   
   // Handle preflight requests properly
   if (req.method === 'OPTIONS') {
@@ -73,7 +69,7 @@ serve(async (req) => {
           twilioPhoneNumber: TWILIO_PHONE_NUMBER,
           success: true
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: corsHeaders }
       );
     }
     
@@ -88,7 +84,7 @@ serve(async (req) => {
       });
       return new Response(
         JSON.stringify({ error: 'Missing required Twilio credentials' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: corsHeaders }
       );
     }
 
@@ -99,7 +95,7 @@ serve(async (req) => {
     console.log(`Generating token for identity: ${identity}`);
 
     try {
-      // Create JWT token for Twilio Client SDK 1.x (not Voice SDK 2.x)
+      // Create JWT token for Twilio Client SDK
       const AccessToken = twilio.jwt.AccessToken;
       const VoiceGrant = AccessToken.VoiceGrant;
 
@@ -114,7 +110,7 @@ serve(async (req) => {
         }
       );
 
-      // Create Voice Grant with explicit permissions for Client SDK 1.x
+      // Create Voice Grant with explicit permissions
       const voiceGrant = new VoiceGrant({
         outgoingApplicationSid: TWILIO_TWIML_APP_SID,
         incomingAllow: true, // Allow incoming calls
@@ -123,7 +119,7 @@ serve(async (req) => {
 
       accessToken.addGrant(voiceGrant);
       const token = accessToken.toJwt();
-      console.log(`Token generated successfully with 24-hour TTL for Client SDK 1.x (Identity: ${identity})`);
+      console.log(`Token generated successfully with 24-hour TTL (Identity: ${identity})`);
 
       // Return token with additional debug information
       return new Response(
@@ -136,10 +132,9 @@ serve(async (req) => {
           success: true,
           ttl: 86400,
           timestamp: new Date().toISOString(),
-          clientSdkVersion: '1.14.0',
           refreshRequest: !!refreshRequest
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { headers: corsHeaders }
       );
     } catch (tokenError) {
       console.error('Error generating token:', tokenError);
@@ -148,14 +143,14 @@ serve(async (req) => {
           error: 'Failed to generate token', 
           details: tokenError.message 
         }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: corsHeaders }
       );
     }
   } catch (error) {
     console.error('Error in function:', error);
     return new Response(
       JSON.stringify({ error: 'Failed to generate token' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { status: 500, headers: corsHeaders }
     );
   }
 });

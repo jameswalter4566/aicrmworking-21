@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { preloadAudioAssets } from "@/utils/audioPreloader";
 import { toast } from "./ui/use-toast";
@@ -9,14 +10,15 @@ interface TwilioScriptProps {
 
 // Use multiple CDNs for better reliability - using Voice SDK 2.x
 const TWILIO_SDK_URLS = [
-  'https://sdk.twilio.com/js/voice/2.7.3/twilio.min.js',
-  'https://media.twiliocdn.com/sdk/js/voice/releases/2.7.3/twilio.min.js',
-  'https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.7.3/dist/twilio.min.js'
+  'https://sdk.twilio.com/js/voice/2.8.0/twilio.min.js',
+  'https://media.twiliocdn.com/sdk/js/voice/releases/2.8.0/twilio.min.js',
+  'https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.8.0/dist/twilio.min.js'
 ];
 
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+  const [loadedUrl, setLoadedUrl] = useState<string>('');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -31,7 +33,7 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     // Check if Twilio is already loaded
     if (window.Twilio && window.Twilio.Device) {
       console.log("🔶 Twilio Voice SDK already loaded", { 
-        version: window.Twilio.VERSION || 'unknown',
+        version: window.Twilio.VERSION || window.Twilio.Device.version || 'unknown',
         deviceAvailable: !!window.Twilio.Device,
         isSupported: window.Twilio.Device.isSupported
       });
@@ -44,14 +46,14 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         // Device in 2.x is not a singleton but a constructor
         if (typeof deviceConstructor === 'function') {
           console.log("🔶 Twilio Device is a constructor as expected in SDK 2.x");
+          setLoaded(true);
+          setLoadedUrl('Already Loaded');
+          if (onLoad) onLoad();
+          return;
         }
       } catch (e) {
         console.error("🔶 Error checking Twilio.Device:", e);
       }
-      
-      setLoaded(true);
-      if (onLoad) onLoad();
-      return;
     }
     
     const existingScript = document.getElementById('twilio-js-sdk');
@@ -78,7 +80,7 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         
         script.onload = () => {
           console.log("🔶 Twilio Voice SDK 2.x loaded successfully", {
-            version: window.Twilio?.VERSION || 'unknown',
+            version: window.Twilio?.VERSION || window.Twilio?.Device?.version || 'unknown',
             deviceAvailable: !!window.Twilio?.Device,
             isSupported: window.Twilio?.Device?.isSupported
           });
@@ -88,21 +90,24 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
             const deviceConstructor = window.Twilio?.Device;
             if (typeof deviceConstructor === 'function') {
               console.log("🔶 Twilio Device constructor is available in SDK 2.x");
+              setLoaded(true);
+              setLoadedUrl(url);
+              
+              toast({
+                title: "Twilio Voice SDK 2.x Loaded",
+                description: "Call functionality is now available."
+              });
+              
+              if (onLoad) onLoad();
+              resolve();
             } else {
               console.warn("🔶 Twilio Device is not a constructor, might not be SDK 2.x");
+              reject(new Error("Loaded script is not SDK 2.x"));
             }
           } catch (e) {
             console.error("🔶 Error accessing Twilio.Device constructor:", e);
+            reject(e);
           }
-
-          setLoaded(true);
-          toast({
-            title: "Twilio Voice SDK 2.x Loaded",
-            description: "Call functionality is now available."
-          });
-          
-          if (onLoad) onLoad();
-          resolve();
         };
         
         script.onerror = () => {
@@ -112,7 +117,7 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
             // Clean up failed script
             if (script.parentNode) {
               script.parentNode.removeChild(script);
-            } else {
+            } else if (document.head.contains(script)) {
               document.head.removeChild(script);
             }
           } catch (e) {
