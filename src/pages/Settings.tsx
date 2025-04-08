@@ -13,41 +13,8 @@ import { toast } from "@/hooks/use-toast";
 
 const Settings = () => {
   const { activeIndustry, setActiveIndustry } = useIndustry();
-  const { user } = useAuth();
-  const [userRole, setUserRole] = useState<string | null>(null);
+  const { user, userRole } = useAuth();
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (user) {
-      fetchUserRole();
-    }
-  }, [user]);
-
-  const fetchUserRole = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user?.id)
-        .single();
-
-      if (error) {
-        throw error;
-      }
-
-      setUserRole(data.role);
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-      toast({
-        title: "Error",
-        description: "Could not fetch user account type",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Handler that ensures only one industry can be active at a time
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {

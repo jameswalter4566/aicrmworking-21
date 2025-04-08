@@ -36,7 +36,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      if (data) {
+      if (data && typeof data === 'object' && 'role' in data) {
         setUserRole(data.role);
       }
     } catch (error) {
