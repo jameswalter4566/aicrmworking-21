@@ -80,7 +80,7 @@ const LandingPage = () => {
           />
         </div>
       ),
-      initialX: -750,
+      initialX: -450,
       initialY: -380,
       floatRadius: 20,
       floatSpeed: 0.002,
@@ -100,7 +100,7 @@ const LandingPage = () => {
           />
         </div>
       ),
-      initialX: 750,
+      initialX: 450,
       initialY: -220,
       floatRadius: 25,
       floatSpeed: 0.0015,
@@ -121,7 +121,7 @@ const LandingPage = () => {
           />
         </div>
       ),
-      initialX: 750,
+      initialX: 450,
       initialY: -20,
       floatRadius: 30,
       floatSpeed: 0.0025,
@@ -141,7 +141,7 @@ const LandingPage = () => {
           />
         </div>
       ),
-      initialX: -750,
+      initialX: -450,
       initialY: -180,
       floatRadius: 22,
       floatSpeed: 0.002,
@@ -161,7 +161,7 @@ const LandingPage = () => {
           />
         </div>
       ),
-      initialX: 750,
+      initialX: 450,
       initialY: -380,
       floatRadius: 25,
       floatSpeed: 0.002,
@@ -181,7 +181,7 @@ const LandingPage = () => {
           />
         </div>
       ),
-      initialX: -750,
+      initialX: -450,
       initialY: -20,
       floatRadius: 22,
       floatSpeed: 0.0018,
@@ -314,7 +314,7 @@ const LandingPage = () => {
           
           <div className="pt-6">
             <div className="relative mx-auto w-[300px]">
-              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_8px_rgba(51,195,240,0.4)]"></div>
+              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
               
               {isActive && [...Array(trailSegments)].map((_, i) => {
                 const trailSegmentOffset = i * (400 / trailSegments);
