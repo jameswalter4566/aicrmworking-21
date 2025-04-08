@@ -112,24 +112,24 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 p-4">
       <div className="w-full max-w-lg text-center mb-6">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">
+        <h1 className="text-4xl font-bold text-white mb-2 enhanced-glow-text">
           {mode === "signup" ? "Try free for 7 days!" : "Welcome Back!"}
         </h1>
         {mode === "signup" && (
-          <p className="text-lg text-gray-600">
+          <p className="text-lg text-blue-300">
             No credit card required
           </p>
         )}
       </div>
       
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">
+      <Card className="w-full max-w-md bg-gray-800 border border-blue-500 shadow-[0_0_20px_rgba(66,153,225,0.5)] rounded-2xl overflow-hidden">
+        <CardHeader className="text-center border-b border-gray-700">
+          <CardTitle className="text-2xl font-bold text-white">
             {mode === "signin" ? "Sign In" : mode === "signup" ? "Sign Up" : "Reset Password"}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-blue-300">
             {mode === "signin" 
               ? "Enter your credentials to access your account" 
               : mode === "signup" 
@@ -138,7 +138,7 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         
-        <CardContent>
+        <CardContent className="p-6">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
               <FormField
@@ -146,11 +146,15 @@ const Auth = () => {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email</FormLabel>
+                    <FormLabel className="text-white">Email</FormLabel>
                     <FormControl>
-                      <Input placeholder="email@example.com" {...field} />
+                      <Input 
+                        placeholder="email@example.com" 
+                        {...field} 
+                        className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500"
+                      />
                     </FormControl>
-                    <FormMessage />
+                    <FormMessage className="text-red-400" />
                   </FormItem>
                 )}
               />
@@ -161,17 +165,26 @@ const Auth = () => {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Password</FormLabel>
+                      <FormLabel className="text-white">Password</FormLabel>
                       <FormControl>
-                        <Input type="password" placeholder="••••••••" {...field} />
+                        <Input 
+                          type="password" 
+                          placeholder="••••••••" 
+                          {...field} 
+                          className="bg-gray-700 border-gray-600 text-white placeholder:text-gray-400 focus:border-blue-500"
+                        />
                       </FormControl>
-                      <FormMessage />
+                      <FormMessage className="text-red-400" />
                     </FormItem>
                   )}
                 />
               )}
               
-              <Button className="w-full" type="submit" disabled={isLoading}>
+              <Button 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all duration-300 shadow-[0_0_10px_rgba(66,153,225,0.3)] hover:shadow-[0_0_15px_rgba(66,153,225,0.5)]" 
+                type="submit" 
+                disabled={isLoading}
+              >
                 {isLoading ? "Processing..." : mode === "signin" ? "Sign In" : mode === "signup" ? "Sign Up" : "Send Reset Link"}
               </Button>
             </form>
@@ -179,14 +192,14 @@ const Auth = () => {
           
           <div className="mt-4">
             <div className="relative flex items-center justify-center">
-              <Separator className="absolute w-full" />
-              <span className="relative bg-white px-2 text-xs text-gray-500">OR</span>
+              <Separator className="absolute w-full bg-gray-600" />
+              <span className="relative bg-gray-800 px-2 text-xs text-gray-400">OR</span>
             </div>
           </div>
           
           <Button 
             variant="outline" 
-            className="w-full mt-4 flex items-center justify-center gap-2"
+            className="w-full mt-4 flex items-center justify-center gap-2 bg-transparent border border-gray-600 text-white hover:bg-gray-700 rounded-xl transition-all duration-300"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
           >
@@ -208,26 +221,26 @@ const Auth = () => {
                 fill="#EA4335"
               />
             </svg>
-            {googleLoading ? "Connecting..." : "Continue with Google"}
+            <span>{googleLoading ? "Connecting..." : "Continue with Google"}</span>
           </Button>
           
           <div className="mt-6 text-center text-sm">
             {mode === "signin" ? (
               <>
-                <p className="text-muted-foreground mb-2">
+                <p className="text-gray-400 mb-2">
                   Don't have an account?{" "}
-                  <Button variant="link" className="p-0" onClick={() => setMode("signup")}>
+                  <Button variant="link" className="p-0 text-blue-400 hover:text-blue-300" onClick={() => setMode("signup")}>
                     Sign up
                   </Button>
                 </p>
-                <Button variant="link" className="p-0" onClick={() => setMode("reset")}>
+                <Button variant="link" className="p-0 text-blue-400 hover:text-blue-300" onClick={() => setMode("reset")}>
                   Forgot password?
                 </Button>
               </>
             ) : (
-              <p className="text-muted-foreground">
+              <p className="text-gray-400">
                 Already have an account?{" "}
-                <Button variant="link" className="p-0" onClick={() => setMode("signin")}>
+                <Button variant="link" className="p-0 text-blue-400 hover:text-blue-300" onClick={() => setMode("signin")}>
                   Sign in
                 </Button>
               </p>

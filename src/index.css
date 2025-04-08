@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -92,6 +91,15 @@
   }
 }
 
+@keyframes pulseGlow {
+  0% {
+    box-shadow: 0 0 15px rgba(66, 153, 225, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 30px rgba(66, 153, 225, 0.7);
+  }
+}
+
 .metric-card {
   @apply bg-white rounded-2xl p-4 border border-gray-200 shadow-sm;
 }
@@ -100,7 +108,6 @@
   @apply bg-gray-50;
 }
 
-/* Adding spacing between table rows */
 table tbody tr {
   @apply my-2 transition-all;
   margin-top: 0.5rem;
@@ -109,7 +116,6 @@ table tbody tr {
   overflow: hidden;
 }
 
-/* Adding rounded corners for each row */
 table tbody tr td:first-child {
   @apply rounded-l-lg;
 }
@@ -118,12 +124,10 @@ table tbody tr td:last-child {
   @apply rounded-r-lg;
 }
 
-/* Add some elevation on hover */
 table tbody tr:hover {
   @apply shadow-md scale-[1.01] bg-crm-lightBlue;
 }
 
-/* Disposition filter styles */
 .disposition-filters {
   @apply flex space-x-2 mb-4 overflow-x-auto pb-2;
 }
@@ -140,7 +144,6 @@ table tbody tr:hover {
   @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
 }
 
-/* Disposition badge styles */
 .disposition-badge {
   @apply text-xs font-semibold px-2.5 py-0.5 rounded-full;
 }
@@ -169,7 +172,6 @@ table tbody tr:hover {
   @apply bg-yellow-100 text-yellow-800;
 }
 
-/* Dropdown menu item color overrides */
 .dropdown-menu-item-not-contacted {
   @apply bg-gray-100 text-gray-800 hover:bg-gray-200;
 }
@@ -192,4 +194,12 @@ table tbody tr:hover {
 
 .dropdown-menu-item-dnc {
   @apply bg-yellow-100 text-yellow-800 hover:bg-yellow-200;
+}
+
+.enhanced-glow-text {
+  text-shadow: 0 0 15px rgba(66, 153, 225, 0.7), 0 0 30px rgba(66, 153, 225, 0.4);
+}
+
+.auth-container {
+  animation: pulseGlow 3s infinite alternate;
 }
