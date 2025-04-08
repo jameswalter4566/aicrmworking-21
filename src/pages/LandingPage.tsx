@@ -102,72 +102,95 @@ const LandingPage = () => {
 
   // Calculate the position of the loading animation based on progress
   const getLoadingPosition = (progress) => {
-    const totalLength = 400; // Total length of the animation
     const width = 240; // Button width
     const height = 56;  // Button height
     const borderRadius = 10; // Border radius
     
-    // Perimeter segments
-    const topSide = width - 2 * borderRadius; // Top straight segment
-    const rightSide = height - 2 * borderRadius; // Right straight segment
-    const bottomSide = width - 2 * borderRadius; // Bottom straight segment
-    const leftSide = height - 2 * borderRadius; // Left straight segment
+    // Calculate full perimeter
+    const perimeter = 2 * (width + height - 4 * borderRadius) + 2 * Math.PI * borderRadius;
     
-    // Corner arcs (approximate as 1/4 of circle perimeter)
-    const cornerLength = Math.PI * borderRadius / 2;
+    // Normalize progress to the perimeter
+    const p = (progress / 400) * perimeter;
     
-    // Total perimeter (all sides + all corners)
-    const perimeter = topSide + rightSide + bottomSide + leftSide + 4 * cornerLength;
-    
-    // Scale progress to match perimeter
-    const scaledProgress = (progress / totalLength) * perimeter;
-    
-    // Calculate coordinates based on progress along the perimeter
     let x = 0, y = 0;
     
-    if (scaledProgress < topSide / 2) {
-      // Top-left to center-top
-      x = borderRadius + scaledProgress;
+    // Top edge (starting after top-left corner)
+    const topEdgeLength = width - 2 * borderRadius;
+    if (p < topEdgeLength) {
+      x = borderRadius + p;
       y = 0;
-    } else if (scaledProgress < topSide) {
-      // Center-top to top-right
-      x = borderRadius + scaledProgress;
-      y = 0;
-    } else if (scaledProgress < topSide + cornerLength) {
-      // Top-right corner
-      const angle = (scaledProgress - topSide) / cornerLength * Math.PI / 2;
-      x = width - borderRadius + borderRadius * Math.sin(angle);
-      y = borderRadius - borderRadius * Math.cos(angle);
-    } else if (scaledProgress < topSide + cornerLength + rightSide) {
-      // Right side
-      x = width;
-      y = borderRadius + (scaledProgress - topSide - cornerLength);
-    } else if (scaledProgress < topSide + 2 * cornerLength + rightSide) {
-      // Bottom-right corner
-      const angle = (scaledProgress - topSide - cornerLength - rightSide) / cornerLength * Math.PI / 2;
-      x = width - borderRadius + borderRadius * Math.cos(angle);
-      y = height - borderRadius + borderRadius * Math.sin(angle);
-    } else if (scaledProgress < topSide + 2 * cornerLength + rightSide + bottomSide) {
-      // Bottom side
-      x = width - (scaledProgress - topSide - 2 * cornerLength - rightSide);
-      y = height;
-    } else if (scaledProgress < topSide + 3 * cornerLength + rightSide + bottomSide) {
-      // Bottom-left corner
-      const angle = (scaledProgress - topSide - 2 * cornerLength - rightSide - bottomSide) / cornerLength * Math.PI / 2;
-      x = borderRadius - borderRadius * Math.sin(angle);
-      y = height - borderRadius + borderRadius * Math.cos(angle);
-    } else if (scaledProgress < topSide + 3 * cornerLength + rightSide + bottomSide + leftSide) {
-      // Left side
-      x = 0;
-      y = height - (scaledProgress - topSide - 3 * cornerLength - rightSide - bottomSide);
-    } else {
-      // Top-left corner (completing the loop)
-      const angle = (scaledProgress - topSide - 3 * cornerLength - rightSide - bottomSide - leftSide) / cornerLength * Math.PI / 2;
-      x = borderRadius - borderRadius * Math.cos(angle);
-      y = borderRadius - borderRadius * Math.sin(angle);
+      return { x, y };
     }
     
-    return { x, y };
+    // Top-right corner
+    const trCornerStart = topEdgeLength;
+    const trCornerLength = Math.PI * borderRadius / 2;
+    if (p < trCornerStart + trCornerLength) {
+      const angle = (p - trCornerStart) / trCornerLength * (Math.PI / 2);
+      x = width - borderRadius + Math.sin(angle) * borderRadius;
+      y = borderRadius - Math.cos(angle) * borderRadius;
+      return { x, y };
+    }
+    
+    // Right edge
+    const rightEdgeStart = trCornerStart + trCornerLength;
+    const rightEdgeLength = height - 2 * borderRadius;
+    if (p < rightEdgeStart + rightEdgeLength) {
+      x = width;
+      y = borderRadius + (p - rightEdgeStart);
+      return { x, y };
+    }
+    
+    // Bottom-right corner
+    const brCornerStart = rightEdgeStart + rightEdgeLength;
+    const brCornerLength = Math.PI * borderRadius / 2;
+    if (p < brCornerStart + brCornerLength) {
+      const angle = (p - brCornerStart) / brCornerLength * (Math.PI / 2);
+      x = width - borderRadius + Math.cos(angle) * borderRadius;
+      y = height - borderRadius + Math.sin(angle) * borderRadius;
+      return { x, y };
+    }
+    
+    // Bottom edge
+    const bottomEdgeStart = brCornerStart + brCornerLength;
+    const bottomEdgeLength = width - 2 * borderRadius;
+    if (p < bottomEdgeStart + bottomEdgeLength) {
+      x = width - (p - bottomEdgeStart) - borderRadius;
+      y = height;
+      return { x, y };
+    }
+    
+    // Bottom-left corner
+    const blCornerStart = bottomEdgeStart + bottomEdgeLength;
+    const blCornerLength = Math.PI * borderRadius / 2;
+    if (p < blCornerStart + blCornerLength) {
+      const angle = (p - blCornerStart) / blCornerLength * (Math.PI / 2);
+      x = borderRadius - Math.sin(angle) * borderRadius;
+      y = height - borderRadius + Math.cos(angle) * borderRadius;
+      return { x, y };
+    }
+    
+    // Left edge
+    const leftEdgeStart = blCornerStart + blCornerLength;
+    const leftEdgeLength = height - 2 * borderRadius;
+    if (p < leftEdgeStart + leftEdgeLength) {
+      x = 0;
+      y = height - (p - leftEdgeStart) - borderRadius;
+      return { x, y };
+    }
+    
+    // Top-left corner
+    const tlCornerStart = leftEdgeStart + leftEdgeLength;
+    const tlCornerLength = Math.PI * borderRadius / 2;
+    if (p < tlCornerStart + tlCornerLength) {
+      const angle = (p - tlCornerStart) / tlCornerLength * (Math.PI / 2);
+      x = borderRadius - Math.cos(angle) * borderRadius;
+      y = borderRadius - Math.sin(angle) * borderRadius;
+      return { x, y };
+    }
+    
+    // Fallback (should never reach here)
+    return { x: 0, y: 0 };
   };
   
   // Get the current position of the loading indicator
@@ -212,7 +235,7 @@ const LandingPage = () => {
               {/* Transparent border container with blue glow */}
               <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
               
-              {/* Enhanced glowing light trail along the border */}
+              {/* Main bright point of the traveling light */}
               <div 
                 className="absolute z-20"
                 style={{ 
@@ -230,23 +253,31 @@ const LandingPage = () => {
                     animation: "pulse 1.5s ease-in-out infinite"
                   }}
                 ></div>
+              </div>
+              
+              {/* Trail segments that follow the main point with proper positioning */}
+              {[...Array(22)].map((_, i) => {
+                // Calculate position for each trail segment with offset
+                const trailSegmentOffset = i * 8;
+                const trailPos = getLoadingPosition((loadingProgress - trailSegmentOffset + 400) % 400);
                 
-                {/* Longer snake-like light trail segments that follow the main point */}
-                {[...Array(18)].map((_, i) => (
+                return (
                   <div 
                     key={i}
-                    className="absolute top-0 left-0 rounded-full" 
+                    className="absolute rounded-full z-20"
                     style={{
-                      width: `${4 - i * 0.15}px`,
-                      height: `${4 - i * 0.15}px`,
-                      opacity: `${1 - i * 0.05}`,
-                      transform: `translate(-50%, -50%) translateX(${-i * 2}px)`,
+                      left: `${trailPos.x}px`,
+                      top: `${trailPos.y}px`,
+                      width: `${4 - i * 0.13}px`,
+                      height: `${4 - i * 0.13}px`,
+                      opacity: `${1 - i * 0.04}`,
+                      transform: `translate(-50%, -50%)`,
                       background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.5) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: `0 0 ${15 - i * 0.6}px ${5 - i * 0.2}px rgba(51,195,240,${0.8 - i * 0.04})`,
+                      boxShadow: `0 0 ${15 - i * 0.5}px ${5 - i * 0.15}px rgba(51,195,240,${0.8 - i * 0.035})`,
                     }}
                   ></div>
-                ))}
-              </div>
+                );
+              })}
 
               <Button 
                 onClick={() => navigate("/auth")}
