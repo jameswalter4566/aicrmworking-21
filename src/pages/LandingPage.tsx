@@ -82,7 +82,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: -750,
-      initialY: -280, // Adjusted from 280 to -280 to move higher
+      initialY: -380, // Adjusted to match right side spacing
       floatRadius: 20,
       floatSpeed: 0.002,
       delay: 0,
@@ -142,7 +142,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: -750,
-      initialY: -220,
+      initialY: -180, // Adjusted to have equal spacing with left containers
       floatRadius: 22,
       floatSpeed: 0.002,
       delay: 300,
@@ -182,7 +182,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: -750,
-      initialY: -380,
+      initialY: -20, // Adjusted to have equal spacing with left containers
       floatRadius: 22,
       floatSpeed: 0.0018,
       delay: 200,
