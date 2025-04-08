@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -847,12 +848,14 @@ export default function PowerDialer() {
       <div className="container py-4 px-4 md:px-6">
         <DialerPreview />
         
-        <TabsContent value="dialer" className="space-y-4">
-          <DialerTab />
-        </TabsContent>
-        <TabsContent value="settings" className="space-y-4">
-          <SettingsTab />
-        </TabsContent>
+        <Tabs value={currentTab} onValueChange={setCurrentTab}>
+          <TabsContent value="dialer" className="space-y-4">
+            <DialerTab />
+          </TabsContent>
+          <TabsContent value="settings" className="space-y-4">
+            <SettingsTab />
+          </TabsContent>
+        </Tabs>
         
         <TwilioAudioPlayer sound="/sounds/test-tone.mp3" />
       </div>
