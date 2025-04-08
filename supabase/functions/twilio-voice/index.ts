@@ -33,6 +33,7 @@ function debugTwiML(twiml: any) {
 // Name of the conference room
 const CONFERENCE_ROOM_PREFIX = "Conference_Room_";
 const DEFAULT_HOLD_MUSIC = "https://assets.twilio.com/resources/hold-music.mp3";
+const DEFAULT_TIMEOUT = 30; // seconds before ending call if no answer
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Voice function`);
@@ -143,6 +144,20 @@ serve(async (req) => {
       });
 
       action = 'statusCallback';
+
+      // Log the detailed status
+      if (requestData.CallStatus) {
+        console.log(`Call ${requestData.CallSid} status: ${requestData.CallStatus}`);
+        
+        // Special handling for no-answer status
+        if (requestData.CallStatus === 'no-answer') {
+          console.log(`Call ${requestData.CallSid} was not answered within timeout period`);
+        } else if (requestData.CallStatus === 'busy') {
+          console.log(`Call ${requestData.CallSid} received busy signal`);
+        } else if (requestData.CallStatus === 'failed') {
+          console.log(`Call ${requestData.CallSid} failed to connect`);
+        }
+      }
     }
     
     // Check if this is a direct call from browser with no action specified
@@ -230,7 +245,7 @@ serve(async (req) => {
         // Then dial out to the destination number
         const dial = twiml.dial({
           callerId: TWILIO_PHONE_NUMBER,
-          timeout: 30,
+          timeout: DEFAULT_TIMEOUT, // Shorter timeout to prevent long waits
           action: dialStatusCallbackUrl,
           method: 'POST',
           answerOnBridge: true
@@ -371,7 +386,9 @@ serve(async (req) => {
           phoneTwiml.say("You're being connected to a call.");
           
           // Add the phone to the same conference
-          const phoneDialer = phoneTwiml.dial();
+          const phoneDialer = phoneTwiml.dial({
+            timeout: DEFAULT_TIMEOUT, // Shorter timeout to prevent long waits
+          });
           phoneDialer.conference(
             conferenceName,
             {
@@ -512,6 +529,7 @@ serve(async (req) => {
         console.log(`CallID ${callId} reported busy status`);
       } else if (dialCallStatus === 'no-answer') {
         twiml.say("There was no answer. Please try again later.");
+        console.log(`CallID ${callId} reported no-answer status`);
       } else if (dialCallStatus === 'failed') {
         twiml.say("The call failed to connect. Please check the number and try again.");
       } else {

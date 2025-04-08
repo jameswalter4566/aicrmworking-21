@@ -45,22 +45,38 @@ export function CallControls({
   const [isCallButtonHovered, setIsCallButtonHovered] = useState(false);
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
   const [isResettingCall, setIsResettingCall] = useState(false);
+  const [callInitiated, setCallInitiated] = useState(false);
   
   const isInCall = !!activeCall;
   const isMuted = activeCall?.isMuted || false;
   const isSpeakerOn = activeCall?.speakerOn || false;
   const isDisabled = disabled || !phoneNumber;
-  const isCallFailing = activeCall?.status === 'failed' || activeCall?.status === 'busy';
+  const isCallFailing = activeCall?.status === 'failed' || activeCall?.status === 'busy' || activeCall?.status === 'no-answer';
 
   const handleCall = async () => {
-    if (!phoneNumber || isDisabled) return;
+    if (!phoneNumber || isDisabled || callInitiated) return;
     
     try {
+      // Set flag to prevent multiple rapid call attempts
+      setCallInitiated(true);
+      
       // Ensure we're passing both the phone number and leadId
       console.log(`Initiating call to ${phoneNumber} with leadId ${leadId}`);
       onCall(phoneNumber, leadId);
+      
+      // Show toast to indicate call is being placed
+      toast({
+        title: "Placing Call",
+        description: `Calling ${phoneNumber}...`,
+      });
+      
+      // Reset call initiated flag after 5 seconds to prevent multiple calls
+      setTimeout(() => {
+        setCallInitiated(false);
+      }, 5000);
     } catch (error) {
       console.error("Error initiating call:", error);
+      setCallInitiated(false);
       toast({
         title: "Call Failed",
         description: "Unable to initiate call. Please try again.",
@@ -72,6 +88,7 @@ export function CallControls({
   const handleHangup = async () => {
     try {
       await onHangup(leadId);
+      setCallInitiated(false);
     } catch (error) {
       console.error("Error hanging up call:", error);
       toast({
@@ -90,6 +107,9 @@ export function CallControls({
       
       // Wait a moment for systems to clear
       await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Reset call initiated flag
+      setCallInitiated(false);
       
       toast({
         title: "Call Reset",
@@ -117,6 +137,13 @@ export function CallControls({
   const toggleDeviceSelector = () => {
     setShowDeviceSelector(!showDeviceSelector);
   };
+  
+  // Reset call initiated flag when component unmounts or call status changes
+  useEffect(() => {
+    if (activeCall && (activeCall.status === 'completed' || isCallFailing)) {
+      setCallInitiated(false);
+    }
+  }, [activeCall, isCallFailing]);
 
   // Force call cleanup when component unmounts
   useEffect(() => {
@@ -124,9 +151,21 @@ export function CallControls({
       if (isInCall) {
         console.log("CallControls unmounting - cleaning up active call");
         onHangup(leadId);
+        setCallInitiated(false);
       }
     };
   }, [isInCall, leadId, onHangup]);
+
+  // Show helpful message for no-answer status
+  useEffect(() => {
+    if (activeCall && activeCall.status === 'no-answer') {
+      toast({
+        title: "No Answer",
+        description: "The call was not answered. The recipient may be unavailable.",
+        variant: "warning",
+      });
+    }
+  }, [activeCall]);
 
   return (
     <>
@@ -139,14 +178,14 @@ export function CallControls({
             <Button
               variant="default"
               size="lg"
-              className={`rounded-full w-12 h-12 p-0 bg-green-500 hover:bg-green-600 ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+              className={`rounded-full w-12 h-12 p-0 bg-green-500 hover:bg-green-600 ${isDisabled || callInitiated ? 'opacity-50 cursor-not-allowed' : ''}`}
               onClick={handleCall}
-              disabled={isDisabled || isResettingCall}
+              disabled={isDisabled || isResettingCall || callInitiated}
               onMouseEnter={() => setIsCallButtonHovered(true)}
               onMouseLeave={() => setIsCallButtonHovered(false)}
               title={`Call ${phoneNumber || ''}`}
             >
-              <Phone size={20} className={isCallButtonHovered ? "animate-pulse" : ""} />
+              <Phone size={20} className={isCallButtonHovered && !callInitiated ? "animate-pulse" : ""} />
             </Button>
           ) : (
             <Button
@@ -183,7 +222,7 @@ export function CallControls({
               />
               
               {/* Add reset call button */}
-              {(activeCall?.status === 'failed' || activeCall?.status === 'busy') && (
+              {isCallFailing && (
                 <Button
                   variant="outline"
                   size="icon"
@@ -225,7 +264,9 @@ export function CallControls({
              activeCall.status === 'busy' ? (
                <span className="text-destructive font-medium">Line busy - click reset</span> 
              ) :
-             activeCall.status === 'no-answer' ? 'No answer' : ''}
+             activeCall.status === 'no-answer' ? (
+               <span className="text-amber-500 font-medium">No answer - click reset</span>
+             ) : ''}
              
             {activeCall.audioActive && activeCall.audioStreaming && (
               <span className="ml-1 inline-flex items-center">
