@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
-import { CouponCard, FeatureCard, StatsCard, PayoutCard } from "@/components/FloatingCards";
+import { FeatureCard } from "@/components/FloatingCards";
+import { Phone, Bot, LineChart } from "lucide-react";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -18,15 +19,21 @@ const LandingPage = () => {
   // Define custom colors for each text
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
   
-  // Define floating card items
-  const floatingItems = [
+  // Define floating feature cards
+  const floatingFeatureCards = [
     {
       id: 1,
       component: (
-        <CouponCard />
+        <FeatureCard 
+          title="Integrated Dialer" 
+          value="Make Calls" 
+          icon={
+            <Phone size={20} className="text-blue-400" />
+          } 
+        />
       ),
-      initialX: -300,
-      initialY: 100,
+      initialX: -220,
+      initialY: 40,
       floatRadius: 20,
       floatSpeed: 0.002,
       delay: 0,
@@ -36,17 +43,15 @@ const LandingPage = () => {
       id: 2,
       component: (
         <FeatureCard 
-          title="Total Sales" 
-          value="$340" 
+          title="AI Assistance" 
+          value="Smart Support" 
           icon={
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-              <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-            </svg>
+            <Bot size={20} className="text-purple-400" />
           } 
         />
       ),
-      initialX: 300,
-      initialY: 50,
+      initialX: 0,
+      initialY: 0,
       floatRadius: 25,
       floatSpeed: 0.0015,
       delay: 200,
@@ -55,34 +60,19 @@ const LandingPage = () => {
     {
       id: 3,
       component: (
-        <StatsCard 
-          title="Total Deals" 
-          value="$120" 
+        <FeatureCard 
+          title="Sales Analytics" 
+          value="Data Insights" 
           icon={
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="12 6 12 12 16 14"></polyline>
-            </svg>
+            <LineChart size={20} className="text-green-400" />
           } 
         />
       ),
-      initialX: -250,
-      initialY: -150,
+      initialX: 220,
+      initialY: 40,
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
-      zIndex: 10,
-    },
-    {
-      id: 4,
-      component: (
-        <PayoutCard />
-      ),
-      initialX: 250,
-      initialY: -120,
-      floatRadius: 15,
-      floatSpeed: 0.0018,
-      delay: 600,
       zIndex: 10,
     },
   ];
@@ -100,7 +90,7 @@ const LandingPage = () => {
         
         {/* Floating animations */}
         <div className="absolute inset-0 z-10 pointer-events-none">
-          <FloatingAnimation items={floatingItems} className="h-full" />
+          <FloatingAnimation items={floatingFeatureCards} className="h-full" />
         </div>
         
         <div className="w-full max-w-4xl text-center space-y-8 relative z-20">
