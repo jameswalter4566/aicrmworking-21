@@ -1,13 +1,53 @@
-import React from "react";
+
+import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Home, Building, DollarSign } from "lucide-react";
+import { Settings as SettingsIcon, Home, Building, DollarSign, UserRound } from "lucide-react";
 import { ColoredSwitch } from "@/components/ui/colored-switch";
 import { useIndustry, IndustryType } from "@/context/IndustryContext";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "@/hooks/use-toast";
 
 const Settings = () => {
   const { activeIndustry, setActiveIndustry } = useIndustry();
+  const { user } = useAuth();
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      fetchUserRole();
+    }
+  }, [user]);
+
+  const fetchUserRole = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user?.id)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      setUserRole(data.role);
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      toast({
+        title: "Error",
+        description: "Could not fetch user account type",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handler that ensures only one industry can be active at a time
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
@@ -28,6 +68,35 @@ const Settings = () => {
           <h1 className="text-2xl font-bold">Settings</h1>
         </div>
 
+        {/* User Account Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle>User Account</CardTitle>
+            <CardDescription>
+              Your account information and settings
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <Label className="text-sm font-medium">Account Type</Label>
+                <div className="flex items-center space-x-2">
+                  <UserRound className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm">{loading ? "Loading..." : userRole || "Unknown"}</span>
+                </div>
+              </div>
+              <Badge className="bg-blue-500 hover:bg-blue-600">
+                {userRole === "admin" ? "Administrator" : userRole}
+              </Badge>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Email Address</Label>
+              <div className="text-sm">{user?.email || "Not available"}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* CRM Configuration Card */}
         <Card>
           <CardHeader>
             <CardTitle>CRM Configuration</CardTitle>
