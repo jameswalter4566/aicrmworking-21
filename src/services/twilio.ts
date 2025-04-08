@@ -111,11 +111,11 @@ const createTwilioService = (): TwilioService => {
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
           forceAggressiveIceNomination: true,
-          // Add sound customization to help with debugging
+          // Use our local sound files instead of GitHub URLs
           sounds: {
-            incoming: 'https://cdn.jsdelivr.net/gh/twilio/twilio-voice.js@1.1.0/sounds/incoming.mp3',
-            outgoing: 'https://cdn.jsdelivr.net/gh/twilio/twilio-voice.js@1.1.0/sounds/outgoing.mp3',
-            disconnect: 'https://cdn.jsdelivr.net/gh/twilio/twilio-voice.js@1.1.0/sounds/disconnect.mp3',
+            incoming: '/sounds/incoming.mp3',
+            outgoing: '/sounds/outgoing.mp3',
+            disconnect: '/sounds/disconnect.mp3',
           }
         });
 
