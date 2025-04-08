@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -234,8 +233,8 @@ const LandingPage = () => {
       <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
         {/* Navigation at the top */}
         <div className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4 px-6">
-          <div className="container mx-auto flex justify-between items-center">
-            <div className="flex items-center">
+          <div className="container mx-auto flex justify-center items-center">
+            <div className="flex items-center absolute left-6">
               <div className="h-10 w-10 flex items-center justify-center bg-crm-blue text-white rounded">
                 <span className="font-bold text-sm">CRM</span>
               </div>
@@ -243,8 +242,8 @@ const LandingPage = () => {
             </div>
             
             <NavigationMenu className="hidden md:flex">
-              <NavigationMenuList>
-                <NavigationMenuItem className="mr-4">
+              <NavigationMenuList className="space-x-8">
+                <NavigationMenuItem>
                   <NavigationMenuLink 
                     className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
                     href="#how-it-works"
@@ -252,7 +251,7 @@ const LandingPage = () => {
                     How It Works
                   </NavigationMenuLink>
                 </NavigationMenuItem>
-                <NavigationMenuItem className="mr-4">
+                <NavigationMenuItem>
                   <NavigationMenuLink 
                     className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
                     href="#features"
@@ -260,7 +259,7 @@ const LandingPage = () => {
                     Features
                   </NavigationMenuLink>
                 </NavigationMenuItem>
-                <NavigationMenuItem className="mr-4">
+                <NavigationMenuItem>
                   <NavigationMenuLink 
                     className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
                     href="#plans"
@@ -268,7 +267,7 @@ const LandingPage = () => {
                     Plans
                   </NavigationMenuLink>
                 </NavigationMenuItem>
-                <NavigationMenuItem className="mr-4">
+                <NavigationMenuItem>
                   <NavigationMenuLink 
                     className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
                     href="#mortgage"
@@ -276,7 +275,7 @@ const LandingPage = () => {
                     Mortgage
                   </NavigationMenuLink>
                 </NavigationMenuItem>
-                <NavigationMenuItem className="mr-4">
+                <NavigationMenuItem>
                   <NavigationMenuLink 
                     className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
                     href="#real-estate"
@@ -284,7 +283,7 @@ const LandingPage = () => {
                     Real Estate
                   </NavigationMenuLink>
                 </NavigationMenuItem>
-                <NavigationMenuItem className="mr-4">
+                <NavigationMenuItem>
                   <NavigationMenuLink 
                     className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
                     href="#debt-settlement"
