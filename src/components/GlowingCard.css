@@ -2,36 +2,41 @@
 .glowing-card {
   position: relative;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
-  box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
-  animation: fadeIn 0.8s ease-out forwards;
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.2);
   opacity: 0;
   will-change: transform, opacity;
+  animation: fadeIn 0.8s ease-out forwards;
 }
 
 .glowing-card:hover {
   transform: translateY(-6px);
-  box-shadow: 0 0 80px rgba(255, 255, 255, 0.2);
+  box-shadow: 0 0 80px rgba(255, 255, 255, 0.3);
+}
+
+.glowing-card:hover .shine-overlay {
+  animation: shineMove 2s forwards;
 }
 
 /* Shine beam effect */
 .shine-overlay {
   content: '';
   position: absolute;
-  top: -50%;
+  top: -150%;
   left: -50%;
   width: 200%;
-  height: 200%;
+  height: 300%;
   background: linear-gradient(
     120deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.2) 50%,
     rgba(255, 255, 255, 0) 100%
   );
-  animation: shineMove 5s infinite linear;
   pointer-events: none;
   mix-blend-mode: screen;
   transform: rotate(25deg);
   will-change: transform;
+  /* Remove the infinite animation, only play on hover */
+  animation: none;
 }
 
 @keyframes shineMove {
@@ -67,9 +72,33 @@
 }
 
 .glow-text {
-  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.6);
+  font-weight: bold;
 }
 
 .glow-icon {
-  filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.6));
+  filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.7));
+  background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%);
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  position: relative;
+  z-index: 1;
+}
+
+.icon-circle {
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }

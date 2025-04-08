@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,13 +13,11 @@ const LandingPage = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isActive, setIsActive] = useState(false);
   
-  // Only set features visible when component mounts
   useEffect(() => {
     const timer = setTimeout(() => {
       setFeaturesVisible(true);
     }, 300);
     
-    // Set the component as active to reduce unnecessary animation calculations
     setIsActive(true);
     
     return () => {
@@ -29,7 +26,6 @@ const LandingPage = () => {
     };
   }, []);
   
-  // Optimize loading animation to use requestAnimationFrame instead of setInterval
   useEffect(() => {
     if (!isActive) return;
     
@@ -39,7 +35,6 @@ const LandingPage = () => {
     const updateProgress = (timestamp: number) => {
       if (!isActive) return;
       
-      // Only update every 30ms for smoother performance
       if (timestamp - lastTimestamp >= 30) {
         setLoadingProgress(prev => {
           const newProgress = prev + 1;
@@ -66,7 +61,6 @@ const LandingPage = () => {
   
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
 
-  // Memoize the floating cards config to prevent recreation on each render
   const floatingFeatureCards = React.useMemo(() => [
     {
       id: 1,
@@ -196,7 +190,6 @@ const LandingPage = () => {
     },
   ], []);
 
-  // Memoize the loading position calculation to reduce calculations
   const getLoadingPosition = React.useCallback((progress: number) => {
     const width = 300;
     const height = 56;
@@ -247,13 +240,11 @@ const LandingPage = () => {
 
     return { x, y };
   }, []);
-  
-  // Only calculate loading position when needed
+
   const loadingPos = isActive ? getLoadingPosition(loadingProgress) : { x: 0, y: 0 };
-  
-  // Reduce number of trail segments to improve performance
-  const trailSegments = 20; // Reduced from 50
-  
+
+  const trailSegments = 20;
+
   return (
     <div className="min-h-screen flex flex-col">
       <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
