@@ -161,23 +161,15 @@ serve(async (req) => {
     }
     
     // Check if this is a direct call from browser with no action specified
-    const isClientInitiatedCall = !action && 
-                                 requestData.From && 
-                                 requestData.From.startsWith('client:') && 
-                                 requestData.phoneNumber;
-    
-    // Special detection for Twilio initiating a call from a client
-    const isClientDirectCall = !action && 
-                              requestData.From &&
-                              requestData.From.startsWith('client:') && 
-                              (requestData.Called === '' || !requestData.Called);
+    // IMPORTANT: This detection is key for handling the incoming calls from browser client
+    const isClientInitiatedCall = 
+      requestData.From && 
+      requestData.From.startsWith('client:') && 
+      requestData.phoneNumber;
     
     if (isClientInitiatedCall) {
-      action = 'incomingCall';
+      action = 'clientCall';
       console.log("Detected client-initiated call from:", requestData.From, "to:", requestData.phoneNumber);
-    } else if (isClientDirectCall) {
-      action = 'clientDirectCall';
-      console.log("Detected client direct call from:", requestData.From);
     }
     
     console.log("Final action being used:", action);
@@ -200,118 +192,23 @@ serve(async (req) => {
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
     
-    // NEW: Special handling for client direct calls (when Twilio client calls directly without phone number)
-    if (action === 'clientDirectCall' || (requestData.From && requestData.From.startsWith('client:') && !requestData.phoneNumber)) {
-      console.log("Handling direct client call from:", requestData.From);
-      
-      // Check if there's a phone number parameter either in the URL or the body
-      let targetPhoneNumber = requestData.phoneNumber || requestData.To || url.searchParams.get('phoneNumber');
-      
-      // Lookup any leadId that might have been sent
-      const leadId = requestData.leadId || url.searchParams.get('leadId') || 'unknown';
-      console.log(`Client call includes leadId: ${leadId}`);
-      
-      // Create a TwiML response for the client call
+    // Ensure we have a caller ID to use
+    if (!TWILIO_PHONE_NUMBER) {
+      console.error("Missing TWILIO_PHONE_NUMBER for caller ID");
       const twiml = new twilio.twiml.VoiceResponse();
-      
-      if (!targetPhoneNumber) {
-        console.log("Client call received without target phone number");
-        twiml.say("No phone number was provided for this call. Please specify a phone number to call.");
-        twiml.pause({ length: 1 });
-        twiml.hangup();
-        
-        return new Response(twiml.toString(), { 
-          headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
-        });
-      }
-      
-      // Format phone number if needed
-      let formattedPhoneNumber = targetPhoneNumber;
-      if (!targetPhoneNumber.startsWith('+') && !targetPhoneNumber.includes('client:')) {
-        formattedPhoneNumber = '+' + targetPhoneNumber.replace(/\D/g, '');
-      }
-      
-      console.log(`Client attempting to call ${formattedPhoneNumber}`);
-      
-      // Create a unique conference ID for this call
-      const conferenceName = `${CONFERENCE_ROOM_PREFIX}${Date.now()}_${leadId}`;
-      console.log(`Created conference room for client call: ${conferenceName}`);
-      
-      // Add greeting
-      twiml.say("Please wait while we connect your call.");
-      twiml.pause({ length: 1 });
-      
-      // Create a Dial with conference
-      const dial = twiml.dial({
-        callerId: TWILIO_PHONE_NUMBER,
-        timeout: DEFAULT_TIMEOUT,
-        answerOnBridge: true
-      });
-      
-      // Configure the conference
-      const conference = dial.conference({
-        statusCallback: `${url.origin}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
-        statusCallbackEvent: ['start', 'end', 'join', 'leave', 'mute', 'hold'],
-        startConferenceOnEnter: true,
-        endConferenceOnExit: false,
-        waitUrl: DEFAULT_HOLD_MUSIC,
-        beep: true,
-        record: 'false',
-        maxParticipants: 10
-      }, conferenceName);
-      
-      // Now make a second call to join the target phone to the same conference
-      try {
-        if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
-          const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-          
-          // TwiML for the outbound leg
-          const outboundTwiml = new twilio.twiml.VoiceResponse();
-          outboundTwiml.say("You're being connected to a call.");
-          
-          // Join the same conference
-          const outboundDial = outboundTwiml.dial();
-          outboundDial.conference({
-            statusCallback: `${url.origin}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
-            statusCallbackEvent: ['start', 'end', 'join', 'leave'],
-            startConferenceOnEnter: true,
-            endConferenceOnExit: true,
-            waitUrl: DEFAULT_HOLD_MUSIC,
-            beep: true
-          }, conferenceName);
-          
-          // Create the outbound call
-          const call = await client.calls.create({
-            to: formattedPhoneNumber,
-            from: TWILIO_PHONE_NUMBER,
-            twiml: outboundTwiml.toString(),
-            statusCallback: `${url.origin}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
-            statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-            statusCallbackMethod: 'POST',
-          });
-          
-          console.log(`Initiated outbound call to ${formattedPhoneNumber} with SID: ${call.sid}`);
-        }
-      } catch (err) {
-        console.error("Error initiating outbound call:", err);
-        // Even if outbound call fails, we still return the TwiML for the browser client
-      }
-      
-      // Debug the generated TwiML
-      const twimlString = debugTwiML(twiml);
-      
-      return new Response(twimlString, { 
+      twiml.say("There was a configuration error. The system is missing a phone number to use as caller ID.");
+      return new Response(twiml.toString(), { 
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
       });
     }
 
-    // Universal handler for client-originated calls
-    if (!action || action === 'incomingCall' || isClientInitiatedCall) {
-      console.log("Handling incoming call or client-initiated call");
+    // CRITICAL: Handle incoming client calls with phoneNumber parameter
+    if (action === 'clientCall' || isClientInitiatedCall) {
+      console.log("Handling client-initiated call with phoneNumber");
       
-      // Extract parameters
-      const phoneNumber = requestData.phoneNumber || requestData.To || requestData.Digits;
-      const leadId = requestData.leadId || requestData.params?.leadId;
+      // Extract phone number and lead ID
+      const phoneNumber = requestData.phoneNumber;
+      const leadId = requestData.leadId || 'unknown';
       
       if (!phoneNumber) {
         console.error("No phone number provided for outbound call");
@@ -331,46 +228,27 @@ serve(async (req) => {
       }
       
       try {
-        // Create TwiML for the outbound call
-        const twiml = new twilio.twiml.VoiceResponse();
-        
-        // Verify we have a caller ID to use
-        if (!TWILIO_PHONE_NUMBER) {
-          console.error("Missing TWILIO_PHONE_NUMBER for caller ID");
-          twiml.say("There was a configuration error. The system is missing a phone number to use as caller ID.");
-          return new Response(twiml.toString(), { 
-            headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
-          });
-        }
-        
-        // Add greeting
-        twiml.say("Please wait while we connect your call.");
-        twiml.pause({ length: 1 });
-        
-        // Create a unique call ID with timestamp and random string
-        const callId = `call-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
-        
-        // Use the full URL for the status callback
+        // Get the host for constructing full URLs
         const host = req.headers.get('host') || '';
         const protocol = req.headers.get('x-forwarded-proto') || 'https';
-        const statusCallbackUrl = `${protocol}://${host}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId || ''}`;
-        const dialStatusCallbackUrl = `${protocol}://${host}/functions/v1/twilio-voice?action=dialStatus&leadId=${leadId || ''}&callId=${callId}`;
+        const baseUrl = `${protocol}://${host}`;
         
         // Create a unique conference name for this call
-        const conferenceName = `${CONFERENCE_ROOM_PREFIX}${Date.now()}_${leadId || 'unknown'}`;
-        console.log(`Created conference room for dial: ${conferenceName}`);
+        const conferenceName = `${CONFERENCE_ROOM_PREFIX}${Date.now()}_${leadId}`;
+        console.log(`Created conference room: ${conferenceName}`);
         
-        // Set up conference for the browser client
+        // Create TwiML for the browser client that ANSWERS THE CALL and puts it in a conference
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("Please wait while we connect your call.");
+        
         const dial = twiml.dial({
           answerOnBridge: true,
-          timeout: DEFAULT_TIMEOUT,
-          action: dialStatusCallbackUrl,
-          method: 'POST'
+          callerId: TWILIO_PHONE_NUMBER
         });
         
-        // Add the conference
+        // Add the browser client to the conference
         dial.conference({
-          statusCallback: `${protocol}://${host}/functions/v1/twilio-voice?action=conferenceStatus`,
+          statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
           statusCallbackEvent: ['start', 'end', 'join', 'leave'],
           startConferenceOnEnter: true,
           endConferenceOnExit: false,
@@ -379,7 +257,7 @@ serve(async (req) => {
           record: 'false'
         }, conferenceName);
         
-        // Now create an outbound call to join the phone to the same conference
+        // Now create a second call to join the target phone to the same conference
         if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
           const client = twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
           
@@ -390,7 +268,7 @@ serve(async (req) => {
           // Join the same conference
           const outboundDial = outboundTwiml.dial();
           outboundDial.conference({
-            statusCallback: `${protocol}://${host}/functions/v1/twilio-voice?action=conferenceStatus`,
+            statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
             statusCallbackEvent: ['start', 'end', 'join', 'leave'],
             startConferenceOnEnter: true,
             endConferenceOnExit: true,
@@ -404,7 +282,7 @@ serve(async (req) => {
               to: formattedPhoneNumber,
               from: TWILIO_PHONE_NUMBER,
               twiml: outboundTwiml.toString(),
-              statusCallback: statusCallbackUrl,
+              statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
               statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
               statusCallbackMethod: 'POST',
             });
@@ -413,11 +291,13 @@ serve(async (req) => {
           } catch (err) {
             console.error("Error initiating outbound call:", err);
             // We'll still return the TwiML for the browser client even if the outbound call fails
+            // This ensures the browser client call is answered and not immediately hung up
           }
         }
         
-        console.log("Returning TwiML response for conference-based call");
+        // Debug the generated TwiML
         const twimlString = debugTwiML(twiml);
+        console.log("Returning TwiML response for the browser client:", twimlString);
         
         return new Response(twimlString, { 
           headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
@@ -446,12 +326,8 @@ serve(async (req) => {
     }
     
     // Check for required credentials for token generation
-    console.log("Checking for required Twilio credentials...");
     if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-      console.error("Missing required Twilio credentials:", {
-        accountSidMissing: !TWILIO_ACCOUNT_SID,
-        authTokenMissing: !TWILIO_AUTH_TOKEN
-      });
+      console.error("Missing required Twilio credentials");
       
       // Return a TwiML response even for this error
       const twiml = new twilio.twiml.VoiceResponse();
@@ -496,7 +372,7 @@ serve(async (req) => {
         const PUBLIC_URL = `${protocol}://${host}`;
         
         // Create a unique conference ID for this call
-        const conferenceName = `${CONFERENCE_ROOM_PREFIX}${Date.now()}`;
+        const conferenceName = `${CONFERENCE_ROOM_PREFIX}${Date.now()}_${leadId || 'unknown'}`;
         console.log(`Created conference room: ${conferenceName}`);
         
         // Check if we need to make a call with browser client involved
@@ -809,6 +685,48 @@ serve(async (req) => {
       }
     }
     else {
+      // If no specific action is defined but we have a call coming in, treat it as client call
+      if (requestData.From && requestData.From.startsWith('client:')) {
+        console.log("Detected basic incoming client call without action");
+        
+        // Create a TwiML response for this call
+        const twiml = new twilio.twiml.VoiceResponse();
+        
+        // If there's a phone number specified, we should use it
+        const phoneNumber = requestData.phoneNumber;
+        
+        if (!phoneNumber) {
+          // No phone number provided, just say something and hang up
+          console.log("No target phone number provided");
+          twiml.say("No phone number was provided for this call. Please specify a phone number to call.");
+          twiml.pause({ length: 1 });
+          twiml.hangup();
+        } else {
+          // There is a phone number, treat like a client call
+          console.log(`Handling incoming client call with phone number: ${phoneNumber}`);
+          twiml.say("Please wait while we connect your call.");
+          
+          // Format phone number if needed
+          let formattedPhoneNumber = phoneNumber;
+          if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
+            formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
+          }
+          
+          // Dial the number
+          twiml.dial({
+            callerId: TWILIO_PHONE_NUMBER,
+            timeout: DEFAULT_TIMEOUT
+          }, formattedPhoneNumber);
+        }
+        
+        // Debug the generated TwiML
+        const twimlString = debugTwiML(twiml);
+        
+        return new Response(twimlString, {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+        });
+      }
+      
       // Default response for unknown actions
       console.log(`Unknown action: ${action}, returning JSON error response`);
       
@@ -829,4 +747,3 @@ serve(async (req) => {
     );
   }
 });
-

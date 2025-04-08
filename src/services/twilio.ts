@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -203,18 +202,43 @@ const createTwilioService = (): TwilioService => {
         device.on("incoming", (call: any) => {
           console.log(`Incoming call from: ${call.from || 'unknown'}`);
           
-          // For direct browser calls, we'll pass through to our edge function with 
-          // the target phone number instead of rejecting
+          // For direct browser calls, we'll automatically accept the call
+          // This is critical to ensure the call is answered and connected
           const params = call.customParameters || new Map();
           const phoneNumber = params.get('phoneNumber');
           const leadId = params.get('leadId') || 'unknown';
           
           if (phoneNumber) {
             console.log(`Incoming call includes target phone: ${phoneNumber}, leadId: ${leadId}`);
-            // The call will be handled by the TwiML in the edge function
+            console.log("Automatically accepting incoming call to connect to target phone");
+            
+            // Always accept the call - this is essential to prevent "no answer" errors
             call.accept();
+            
+            // Add to active calls tracking
+            activeCalls.push(call);
+            
+            // Set up listeners for this call
+            call.on('error', (error: any) => {
+              console.error('Call error:', error);
+              // Remove from active calls on error
+              activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+            });
+            
+            call.on('disconnect', () => {
+              console.log('Call disconnected');
+              // Remove from active calls when disconnected
+              activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+            });
+            
+            call.on('cancel', () => {
+              console.log('Call was cancelled');
+              // Remove from active calls
+              activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+            });
+            
           } else {
-            // For calls without a target phone, reject
+            console.log("Incoming call without phone number target, rejecting");
             call.reject();
           }
         });
@@ -650,4 +674,3 @@ const createTwilioService = (): TwilioService => {
 };
 
 export const twilioService: TwilioService = createTwilioService();
-
