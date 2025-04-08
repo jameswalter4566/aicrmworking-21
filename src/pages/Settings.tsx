@@ -1,4 +1,3 @@
-
 import React from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -102,14 +101,14 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* Debt Settlement Sales Pro */}
+                {/* Debt Sales Pro */}
                 <div className="flex items-center justify-between rounded-lg border p-4 shadow-sm">
                   <div className="flex space-x-3">
                     <div className="bg-purple-500 p-2 rounded-md">
                       <DollarSign className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-medium">Debt Settlement Sales Pro</h4>
+                      <h4 className="font-medium">Debt Sales Pro</h4>
                       <p className="text-sm text-gray-500">
                         Enable debt settlement industry specific features
                       </p>
