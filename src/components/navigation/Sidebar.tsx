@@ -1,11 +1,9 @@
-
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
   BarChart2, Settings, Home, DollarSign, 
   PhoneOutgoing, Menu, Bot, MessageSquare,
-  FileText, Calculator, Briefcase, Brain,
-  Presentation, Receipt
+  FileText, Calculator, Briefcase, Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -62,8 +60,6 @@ const Sidebar = () => {
         { name: "Pipeline", icon: DollarSign, path: "/deals" },
         { name: "Start an Application", icon: FileText, path: "/application" },
         { name: "Quick Pricer", icon: Calculator, path: "/pricer" },
-        { name: "Amortization Calculator", icon: Receipt, path: "/amortization" },
-        { name: "Pitch Deck Pro", icon: Presentation, path: "/pitch-deck" },
         { name: "Processor Assist", icon: Briefcase, path: "/processor" },
         { name: "AI Loan Officer", icon: Brain, path: "/ai-loan-officer" },
       ];
