@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -18,6 +19,7 @@ import Deals from "./pages/Deals";
 import PowerDialer from "./pages/PowerDialer";
 import AIDialer from "./pages/AIDialer";
 import SMSCampaign from "./pages/SMSCampaign";
+import Settings from "./pages/Settings";
 import LandingPage from "./pages/LandingPage";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -230,6 +232,7 @@ const App = () => {
               <Route path="/power-dialer" element={<ProtectedRoute><PowerDialer /></ProtectedRoute>} />
               <Route path="/ai-dialer" element={<ProtectedRoute><AIDialer /></ProtectedRoute>} />
               <Route path="/sms-campaign" element={<ProtectedRoute><SMSCampaign /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               
               <Route path="/" element={<Navigate to="/landing" replace />} />
               

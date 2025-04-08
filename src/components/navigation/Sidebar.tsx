@@ -17,7 +17,7 @@ const itemColors = [
   "bg-orange-600", // Calendar
   "bg-teal-600", // Deals
   "bg-indigo-600", // Reporting
-  "bg-gray-600", // Admin
+  "bg-gray-600", // Settings
   "bg-violet-600", // AI Dialer
   "bg-emerald-600", // SMS Campaign
 ];
@@ -33,7 +33,7 @@ const navItems = [
   { name: "Calendar", icon: Calendar, path: "#" },
   { name: "Deals", icon: DollarSign, path: "/deals" },
   { name: "Reporting", icon: BarChart2, path: "#" },
-  { name: "Admin", icon: Settings, path: "#" },
+  { name: "Settings", icon: Settings, path: "/settings" },
 ];
 
 const Sidebar = () => {
