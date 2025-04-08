@@ -239,33 +239,57 @@ const LandingPage = () => {
               <div className="h-10 w-10 flex items-center justify-center bg-crm-blue text-white rounded">
                 <span className="font-bold text-sm">CRM</span>
               </div>
-              <span className="ml-2 text-lg font-semibold text-white glow-text">SalesPro</span>
+              <span className="ml-2 text-lg font-semibold text-white enhanced-glow-text">SalesPro</span>
             </div>
             
             <NavigationMenu className="hidden md:flex">
               <NavigationMenuList>
-                <NavigationMenuItem className="mr-6">
+                <NavigationMenuItem className="mr-4">
                   <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link glow-text"
+                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
+                    href="#how-it-works"
+                  >
+                    How It Works
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem className="mr-4">
+                  <NavigationMenuLink 
+                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
                     href="#features"
                   >
                     Features
                   </NavigationMenuLink>
                 </NavigationMenuItem>
-                <NavigationMenuItem className="mr-6">
+                <NavigationMenuItem className="mr-4">
                   <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link glow-text"
-                    href="#pricing"
+                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
+                    href="#plans"
                   >
-                    Pricing
+                    Plans
                   </NavigationMenuLink>
                 </NavigationMenuItem>
-                <NavigationMenuItem className="mr-6">
+                <NavigationMenuItem className="mr-4">
                   <NavigationMenuLink 
-                    className="text-white hover:text-blue-200 transition-colors nav-link glow-text"
-                    href="#about"
+                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
+                    href="#mortgage"
                   >
-                    About
+                    Mortgage
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem className="mr-4">
+                  <NavigationMenuLink 
+                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
+                    href="#real-estate"
+                  >
+                    Real Estate
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+                <NavigationMenuItem className="mr-4">
+                  <NavigationMenuLink 
+                    className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text"
+                    href="#debt-settlement"
+                  >
+                    Debt Settlement
                   </NavigationMenuLink>
                 </NavigationMenuItem>
                 <NavigationMenuItem>
@@ -292,7 +316,7 @@ const LandingPage = () => {
           {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
         </div>
         
-        <div className="w-full max-w-4xl text-center space-y-8 relative z-20 mt-16">
+        <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-20 flex flex-col items-center justify-center">
           <div className="flex justify-center mb-6">
             <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl">
               <span className="font-bold text-2xl">CRM</span>
@@ -300,7 +324,7 @@ const LandingPage = () => {
           </div>
           
           <div className="flex flex-col items-center space-y-4">
-            <h1 className="text-4xl md:text-6xl font-bold text-white">
+            <h1 className="text-4xl md:text-6xl font-bold text-white enhanced-glow-text">
               Best CRM for:
             </h1>
             <AnimatedText texts={rotatingTexts} colors={textColors} />
@@ -346,7 +370,7 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <div className="pt-12" id="features">
+          <div className="pt-16" id="features">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <GlowingCard
                 title="Integrated Dialer"

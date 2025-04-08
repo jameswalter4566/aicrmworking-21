@@ -129,6 +129,11 @@
   font-weight: bold;
 }
 
+.enhanced-glow-text {
+  text-shadow: 0 0 25px rgba(255, 255, 255, 0.8);
+  font-weight: bold;
+}
+
 .glow-icon {
   filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.7));
   background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0) 70%);
