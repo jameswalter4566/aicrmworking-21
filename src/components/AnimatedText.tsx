@@ -21,8 +21,10 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
   };
 
   useEffect(() => {
+    // Clear any existing intervals to prevent memory leaks
     const timer = setInterval(() => {
       setIsAnimating(true);
+      
       setTimeout(() => {
         setCurrentIndex((prevIndex) => (prevIndex + 1) % texts.length);
         setIsAnimating(false);
@@ -30,7 +32,7 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
     }, interval);
 
     return () => clearInterval(timer);
-  }, [texts, interval]);
+  }, [texts.length, interval]); // Add texts.length as dependency
 
   return (
     <div className="h-16 relative w-full">
