@@ -33,16 +33,16 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
   }, [texts, interval]);
 
   return (
-    <div className="inline-block min-w-[300px] h-10 relative">
-      <span 
-        className={`absolute top-0 left-0 w-full transition-all duration-500 ${
+    <div className="h-16 relative w-full">
+      <h2 
+        className={`text-3xl md:text-5xl font-bold transition-all duration-500 ${
           getTextColor(currentIndex)
         } ${
           isAnimating ? "opacity-0 translate-y-4" : "opacity-100 translate-y-0"
         }`}
       >
         {texts[currentIndex]}
-      </span>
+      </h2>
     </div>
   );
 };

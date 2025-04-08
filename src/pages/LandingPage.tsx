@@ -27,12 +27,14 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900">
-            <span className="inline-block mr-3">Best CRM for:</span>
+          <div className="flex flex-col items-center space-y-4">
+            <h1 className="text-4xl md:text-6xl font-bold text-gray-900">
+              Best CRM for:
+            </h1>
             <AnimatedText texts={rotatingTexts} colors={textColors} />
-          </h1>
+          </div>
           
-          <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto mt-8">
             The all-in-one CRM platform for managing leads, calls, and closing more deals.
           </p>
           
