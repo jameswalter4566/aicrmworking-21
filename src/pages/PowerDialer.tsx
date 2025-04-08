@@ -197,6 +197,50 @@ export default function PowerDialer() {
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
+      <Card className="bg-muted/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex justify-between items-center">
+            System Controls
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const success = await twilioState.endAllCalls();
+                  if (success) {
+                    toast({
+                      title: "System Reset",
+                      description: "All active calls have been terminated. The system has been reset.",
+                    });
+                  }
+                }}
+              >
+                Reset All Calls
+              </Button>
+              
+              <Button
+                variant="default" 
+                size="sm"
+                onClick={async () => {
+                  const initialized = await twilioService.initializeTwilioDevice();
+                  if (initialized) {
+                    toast({
+                      title: "System Reinitialized",
+                      description: "The phone system has been reinitialized with a new token.",
+                    });
+                  }
+                }}
+              >
+                Reinitialize System
+              </Button>
+            </div>
+          </CardTitle>
+          <CardDescription>
+            Reset your system and terminate all active calls if you encounter any issues
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
       {Object.keys(twilioState.activeCalls).length > 0 && (
         <Card className="bg-muted/50">
           <CardHeader className="pb-2">

@@ -551,6 +551,11 @@ export const useTwilio = () => {
       return { success: false };
     }
     
+    if (Object.keys(activeCalls).length > 0) {
+      console.log("Ending existing calls before making a new call");
+      await endAllCalls();
+    }
+    
     try {
       const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
       
@@ -647,7 +652,7 @@ export const useTwilio = () => {
     }
 
     return result;
-  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket, joinConference]);
+  }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket, joinConference, endAllCalls]);
 
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);

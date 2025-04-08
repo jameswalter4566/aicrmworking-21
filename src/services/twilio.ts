@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -26,6 +25,7 @@ interface TwilioService {
   toggleMute: (mute: boolean) => boolean;
   toggleSpeaker: (speakerOn: boolean) => boolean;
   cleanup: () => void;
+  hangupAllCalls: () => Promise<boolean>;
 }
 
 const createTwilioService = (): TwilioService => {
@@ -59,7 +59,18 @@ const createTwilioService = (): TwilioService => {
 
   const initializeTwilioDevice = async (): Promise<boolean> => {
     try {
-      // Using the full Supabase URL to avoid HTML error pages
+      if (device) {
+        console.log("Cleaning up existing Twilio device before initialization");
+        try {
+          if (typeof device.destroy === 'function') {
+            await device.destroy();
+          }
+          device = null;
+        } catch (cleanupErr) {
+          console.warn("Error during cleanup of existing device:", cleanupErr);
+        }
+      }
+      
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
         method: 'POST',
         headers: {
@@ -82,21 +93,14 @@ const createTwilioService = (): TwilioService => {
         throw new Error(data.error || "No token in response");
       }
 
-      // Make sure we have the Twilio Device constructor available
       if (window.Twilio && window.Twilio.Device) {
-        // Store Device instance
         device = new window.Twilio.Device(data.token, {
-          // Codec preferences - Opus generally performs better
           codecPreferences: ["opus", "pcmu"],
-          // Increase call signaling timeout for reconnection attempts
           maxCallSignalingTimeoutMs: 30000,
-          // Enable logging for debugging
           logLevel: 'debug',
-          // Enable ICE aggressive nomination for faster call setup
           forceAggressiveIceNomination: true
         });
 
-        // Set up event handlers
         device.on("error", (error: any) => {
           console.error("Twilio Device Error:", error);
           toast({
@@ -112,11 +116,9 @@ const createTwilioService = (): TwilioService => {
 
         device.on("incoming", (call: any) => {
           console.log(`Incoming call from: ${call.from || 'unknown'}`);
-          // Reject incoming calls by default - this app is for outbound calling
           call.reject();
         });
 
-        // Register the device to enable incoming calls
         try {
           await device.register();
           console.log("Twilio device registered successfully.");
@@ -152,7 +154,7 @@ const createTwilioService = (): TwilioService => {
 
   const setAudioOutputDevice = async (deviceId: string): Promise<boolean> => {
     try {
-      if (device && device.audio) { // Check for device.audio existence
+      if (device && device.audio) {
         await device.audio.speakerDevices.set(deviceId);
         preferredAudioDevice = deviceId;
         console.log(`Set audio output device to: ${deviceId}`);
@@ -169,7 +171,7 @@ const createTwilioService = (): TwilioService => {
 
   const testAudioOutput = async (deviceId?: string): Promise<boolean> => {
     try {
-      if (!device || !device.audio) { // Check for device and device.audio
+      if (!device || !device.audio) {
         console.warn("Twilio device not initialized or audio not available, cannot test audio.");
         return false;
       }
@@ -194,7 +196,8 @@ const createTwilioService = (): TwilioService => {
         return { success: false, error: "Twilio device not initialized." };
       }
 
-      // Format phone number if needed
+      await endCall();
+
       let formattedPhoneNumber = phoneNumber;
       if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
         formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
@@ -203,7 +206,6 @@ const createTwilioService = (): TwilioService => {
       console.log(`Attempting to call ${formattedPhoneNumber} via browser client`);
       
       try {
-        // Try browser-based call first
         const call = await device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
@@ -213,7 +215,6 @@ const createTwilioService = (): TwilioService => {
         
         console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
         
-        // Set up call event listeners
         call.on('error', (error: any) => {
           console.error('Call error:', error);
           toast({
@@ -223,7 +224,6 @@ const createTwilioService = (): TwilioService => {
           });
         });
         
-        // Listen for accepted event
         call.on('accept', () => {
           console.log('Call accepted, audio connection established');
           toast({
@@ -232,7 +232,6 @@ const createTwilioService = (): TwilioService => {
           });
         });
         
-        // Listen for disconnect event
         call.on('disconnect', () => {
           console.log('Call disconnected');
           toast({
@@ -247,11 +246,9 @@ const createTwilioService = (): TwilioService => {
           leadId: leadId
         };
       } catch (deviceError) {
-        // Log the browser client error
         console.warn("Browser-based call initiation failed. Error:", deviceError);
         console.log("Falling back to server-side call initiation...");
         
-        // Fall back to using our edge function for call setup
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
           method: 'POST',
           headers: {
@@ -261,7 +258,7 @@ const createTwilioService = (): TwilioService => {
             action: 'makeCall',
             phoneNumber: formattedPhoneNumber,
             leadId: leadId,
-            browserClientName: 'browser-client'
+            browserClientName: device.identity || 'browser-client'
           })
         });
         
@@ -319,9 +316,40 @@ const createTwilioService = (): TwilioService => {
     }
   };
 
+  const hangupAllCalls = async (): Promise<boolean> => {
+    try {
+      if (device && typeof device.disconnectAll === 'function') {
+        device.disconnectAll();
+      }
+      
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'hangupAll'
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server hangup all response error:", response.status, errorText);
+        return true;
+      }
+      
+      const result = await response.json();
+      console.log("Hangup all result:", result);
+      
+      return true;
+    } catch (error) {
+      console.error("Error hanging up all calls:", error);
+      return false;
+    }
+  };
+
   const checkCallStatus = async (leadId: string): Promise<string> => {
     try {
-      // Mock implementation for browser-based calls
       console.log(`Checking call status for lead ID: ${leadId} (browser-based)`);
       return 'in-progress';
     } catch (error) {
@@ -354,7 +382,7 @@ const createTwilioService = (): TwilioService => {
 
   const toggleSpeaker = (speakerOn: boolean): boolean => {
     try {
-      if (device && device.audio) { // Check for device.audio existence
+      if (device && device.audio) {
         device.audio.speakerDevices.set(speakerOn ? 'default' : 'none');
         console.log(`Speaker ${speakerOn ? 'enabled' : 'disabled'}`);
         return true;
@@ -397,7 +425,8 @@ const createTwilioService = (): TwilioService => {
     checkCallStatus,
     toggleMute,
     toggleSpeaker,
-    cleanup
+    cleanup,
+    hangupAllCalls
   };
 };
 
