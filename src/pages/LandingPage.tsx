@@ -13,6 +13,9 @@ const LandingPage = () => {
     "Debt Officers"
   ];
   
+  // Define custom colors for each text
+  const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
+  
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
@@ -24,9 +27,11 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 flex flex-col md:flex-row items-center justify-center gap-3">
-            <span>Best CRM for:</span>
-            <AnimatedText texts={rotatingTexts} />
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900">
+            <span className="mr-3">Best CRM for:</span>
+            <span className="relative inline-block">
+              <AnimatedText texts={rotatingTexts} colors={textColors} />
+            </span>
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto">
