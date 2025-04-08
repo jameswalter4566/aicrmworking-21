@@ -99,83 +99,51 @@ const LandingPage = () => {
     const width = 300;
     const height = 56;
     const borderRadius = 10;
-    
-    const straightEdgesLength = 2 * (width - 2 * borderRadius) + 2 * (height - 2 * borderRadius);
-    const cornerLength = 2 * Math.PI * borderRadius;
-    const perimeter = straightEdgesLength + cornerLength;
-    
+
+    const topEdge = width - 2 * borderRadius;
+    const rightEdge = height - 2 * borderRadius;
+    const bottomEdge = width - 2 * borderRadius;
+    const leftEdge = height - 2 * borderRadius;
+
+    const cornerArcLength = (Math.PI / 2) * borderRadius;
+    const perimeter =
+      topEdge + rightEdge + bottomEdge + leftEdge + 4 * cornerArcLength;
+
     const p = (progress / 400) * perimeter;
-    
+
     let x = 0, y = 0;
-    
-    const topEdgeLength = width - 2 * borderRadius;
-    if (p < topEdgeLength) {
+
+    if (p < topEdge) {
       x = borderRadius + p;
       y = 0;
-      return { x, y };
-    }
-    
-    const trCornerStart = topEdgeLength;
-    const trCornerLength = Math.PI * borderRadius / 2;
-    if (p < trCornerStart + trCornerLength) {
-      const angle = (p - trCornerStart) / trCornerLength * (Math.PI / 2);
+    } else if (p < topEdge + cornerArcLength) {
+      const angle = ((p - topEdge) / cornerArcLength) * (Math.PI / 2);
       x = width - borderRadius + Math.sin(angle) * borderRadius;
       y = borderRadius - Math.cos(angle) * borderRadius;
-      return { x, y };
-    }
-    
-    const rightEdgeStart = trCornerStart + trCornerLength;
-    const rightEdgeLength = height - 2 * borderRadius;
-    if (p < rightEdgeStart + rightEdgeLength) {
+    } else if (p < topEdge + cornerArcLength + rightEdge) {
       x = width;
-      y = borderRadius + (p - rightEdgeStart);
-      return { x, y };
-    }
-    
-    const brCornerStart = rightEdgeStart + rightEdgeLength;
-    const brCornerLength = Math.PI * borderRadius / 2;
-    if (p < brCornerStart + brCornerLength) {
-      const angle = (p - brCornerStart) / brCornerLength * (Math.PI / 2);
-      x = width - borderRadius + Math.cos(angle) * borderRadius;
+      y = borderRadius + (p - topEdge - cornerArcLength);
+    } else if (p < topEdge + 2 * cornerArcLength + rightEdge) {
+      const angle = ((p - topEdge - cornerArcLength - rightEdge) / cornerArcLength) * (Math.PI / 2);
+      x = width - borderRadius + Math.cos(angle) * -borderRadius;
       y = height - borderRadius + Math.sin(angle) * borderRadius;
-      return { x, y };
-    }
-    
-    const bottomEdgeStart = brCornerStart + brCornerLength;
-    const bottomEdgeLength = width - 2 * borderRadius;
-    if (p < bottomEdgeStart + bottomEdgeLength) {
-      x = width - (p - bottomEdgeStart) - borderRadius;
+    } else if (p < topEdge + 2 * cornerArcLength + rightEdge + bottomEdge) {
+      x = width - borderRadius - (p - topEdge - 2 * cornerArcLength - rightEdge);
       y = height;
-      return { x, y };
-    }
-    
-    const blCornerStart = bottomEdgeStart + bottomEdgeLength;
-    const blCornerLength = Math.PI * borderRadius / 2;
-    if (p < blCornerStart + blCornerLength) {
-      const angle = (p - blCornerStart) / blCornerLength * (Math.PI / 2);
+    } else if (p < topEdge + 3 * cornerArcLength + rightEdge + bottomEdge) {
+      const angle = ((p - topEdge - 2 * cornerArcLength - rightEdge - bottomEdge) / cornerArcLength) * (Math.PI / 2);
       x = borderRadius - Math.sin(angle) * borderRadius;
-      y = height - borderRadius + Math.cos(angle) * borderRadius;
-      return { x, y };
-    }
-    
-    const leftEdgeStart = blCornerStart + blCornerLength;
-    const leftEdgeLength = height - 2 * borderRadius;
-    if (p < leftEdgeStart + leftEdgeLength) {
+      y = height - borderRadius + Math.cos(angle) * -borderRadius;
+    } else if (p < topEdge + 3 * cornerArcLength + rightEdge + bottomEdge + leftEdge) {
       x = 0;
-      y = height - (p - leftEdgeStart) - borderRadius;
-      return { x, y };
-    }
-    
-    const tlCornerStart = leftEdgeStart + leftEdgeLength;
-    const tlCornerLength = Math.PI * borderRadius / 2;
-    if (p < tlCornerStart + tlCornerLength) {
-      const angle = (p - tlCornerStart) / tlCornerLength * (Math.PI / 2);
+      y = height - borderRadius - (p - topEdge - 3 * cornerArcLength - rightEdge - bottomEdge);
+    } else {
+      const angle = ((p - topEdge - 3 * cornerArcLength - rightEdge - bottomEdge - leftEdge) / cornerArcLength) * (Math.PI / 2);
       x = borderRadius - Math.cos(angle) * borderRadius;
       y = borderRadius - Math.sin(angle) * borderRadius;
-      return { x, y };
     }
-    
-    return { x: 0, y: 0 };
+
+    return { x, y };
   };
   
   const loadingPos = getLoadingPosition(loadingProgress);
