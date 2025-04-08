@@ -1,177 +1,171 @@
 
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 
 type AuthMode = "signin" | "signup" | "reset";
 
+const authSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+  password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+});
+
+const resetSchema = z.object({
+  email: z.string().email({ message: "Please enter a valid email address" }),
+});
+
 const Auth = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [mode, setMode] = useState<AuthMode>("signin");
-  const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  const form = useForm<z.infer<typeof authSchema>>({
+    resolver: zodResolver(mode === "reset" ? resetSchema : authSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
 
+  const onSubmit = async (values: z.infer<typeof authSchema>) => {
+    setIsLoading(true);
+    
     try {
       if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+          email: values.email,
+          password: values.password,
         });
-
+        
         if (error) throw error;
         
-        toast.success("Signed in successfully!");
         navigate("/");
       } else if (mode === "signup") {
-        if (password !== confirmPassword) {
-          toast.error("Passwords don't match");
-          setLoading(false);
-          return;
-        }
-
         const { error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: values.email,
+          password: values.password,
         });
-
+        
         if (error) throw error;
         
-        toast.success("Signed up successfully! Please check your email for verification.");
+        toast({
+          title: "Success!",
+          description: "Please check your email for a confirmation link.",
+        });
+        
         setMode("signin");
       } else if (mode === "reset") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
           redirectTo: window.location.origin + "/reset-password",
         });
-
+        
         if (error) throw error;
         
-        toast.success("Password reset link sent to your email.");
+        toast({
+          title: "Password reset email sent",
+          description: "Please check your email for a password reset link.",
+        });
+        
         setMode("signin");
       }
     } catch (error: any) {
-      toast.error(error.message || "An error occurred");
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "An error occurred. Please try again.",
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      <div className="flex-1 flex flex-col justify-center items-center px-4 py-12">
-        <div className="w-full max-w-md">
-          <div className="flex justify-center mb-8">
-            <div className="h-12 w-12 flex items-center justify-center bg-crm-blue text-white rounded-xl">
-              <span className="font-bold text-sm">CRM</span>
-            </div>
-          </div>
-          
-          <div className="bg-white p-8 rounded-lg shadow-md">
-            <h2 className="text-2xl font-semibold text-center mb-6">
-              {mode === "signin" ? "Sign In" : mode === "signup" ? "Create Account" : "Reset Password"}
-            </h2>
-            
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  required
-                />
-              </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-bold">
+            {mode === "signin" ? "Sign In" : mode === "signup" ? "Sign Up" : "Reset Password"}
+          </CardTitle>
+          <CardDescription>
+            {mode === "signin" 
+              ? "Enter your credentials to access your account" 
+              : mode === "signup" 
+                ? "Create a new account to get started" 
+                : "Enter your email to receive a reset link"}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input placeholder="email@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               {mode !== "reset" && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required={mode !== "reset"}
-                  />
-                </div>
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input type="password" placeholder="••••••••" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               )}
               
-              {mode === "signup" && (
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-              )}
-              
-              <Button
-                type="submit"
-                className="w-full bg-crm-blue hover:bg-crm-blue/90"
-                disabled={loading}
-              >
-                {loading ? "Processing..." : 
-                  mode === "signin" ? "Sign In" : 
-                  mode === "signup" ? "Sign Up" : 
-                  "Send Reset Link"}
+              <Button className="w-full" type="submit" disabled={isLoading}>
+                {isLoading ? "Processing..." : mode === "signin" ? "Sign In" : mode === "signup" ? "Sign Up" : "Send Reset Link"}
               </Button>
             </form>
-            
-            <div className="mt-6 text-center text-sm">
-              {mode === "signin" ? (
-                <>
-                  <p>
-                    Don't have an account?{" "}
-                    <button
-                      type="button"
-                      onClick={() => setMode("signup")}
-                      className="text-crm-blue hover:underline font-medium"
-                    >
-                      Sign Up
-                    </button>
-                  </p>
-                  <p className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setMode("reset")}
-                      className="text-crm-blue hover:underline font-medium"
-                    >
-                      Forgot Password?
-                    </button>
-                  </p>
-                </>
-              ) : (
-                <p>
-                  Already have an account?{" "}
-                  <button
-                    type="button"
-                    onClick={() => setMode("signin")}
-                    className="text-crm-blue hover:underline font-medium"
-                  >
-                    Sign In
-                  </button>
+          </Form>
+          
+          <div className="mt-6 text-center text-sm">
+            {mode === "signin" ? (
+              <>
+                <p className="text-muted-foreground mb-2">
+                  Don't have an account?{" "}
+                  <Button variant="link" className="p-0" onClick={() => setMode("signup")}>
+                    Sign up
+                  </Button>
                 </p>
-              )}
-            </div>
+                <Button variant="link" className="p-0" onClick={() => setMode("reset")}>
+                  Forgot password?
+                </Button>
+              </>
+            ) : (
+              <p className="text-muted-foreground">
+                Already have an account?{" "}
+                <Button variant="link" className="p-0" onClick={() => setMode("signin")}>
+                  Sign in
+                </Button>
+              </p>
+            )}
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

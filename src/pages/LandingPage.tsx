@@ -2,9 +2,16 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import AnimatedText from "@/components/AnimatedText";
 
 const LandingPage = () => {
   const navigate = useNavigate();
+  
+  const rotatingTexts = [
+    "Mortgage Loan Officers",
+    "Real Estate Agents",
+    "Debt Officers"
+  ];
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -17,8 +24,9 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <h1 className="text-4xl md:text-6xl font-bold text-gray-900">
-            Simplify Your Sales Process
+          <h1 className="text-4xl md:text-6xl font-bold text-gray-900 flex flex-col md:flex-row items-center justify-center gap-3">
+            <span>Best CRM for:</span>
+            <AnimatedText texts={rotatingTexts} />
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto">
