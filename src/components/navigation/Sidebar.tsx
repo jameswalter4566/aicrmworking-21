@@ -11,6 +11,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
 import { useIndustry } from "@/context/IndustryContext";
 
+// Define a type for navigation items
+interface NavItem {
+  name: string;
+  icon: React.ElementType;
+  path: string;
+  badge?: number;
+}
+
 const itemColors = [
   "bg-blue-600", // Dashboard
   "bg-purple-600", // Leads
@@ -35,7 +43,7 @@ const Sidebar = () => {
   const { activeIndustry } = useIndustry();
   
   // Base navigation items that appear for all industries
-  const baseNavItems = [
+  const baseNavItems: NavItem[] = [
     { name: "Dashboard", icon: Home, path: "/" },
     { name: "Leads", icon: Users, path: "/people" },
     { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
@@ -47,7 +55,7 @@ const Sidebar = () => {
   ];
 
   // Conditional navigation items based on industry
-  const getIndustrySpecificItems = () => {
+  const getIndustrySpecificItems = (): NavItem[] => {
     if (activeIndustry === "mortgage") {
       return [
         { name: "Pipeline", icon: DollarSign, path: "/deals" },
@@ -62,7 +70,7 @@ const Sidebar = () => {
   };
 
   // Final navigation items
-  const finalNavItems = [
+  const finalNavItems: NavItem[] = [
     ...baseNavItems,
     ...getIndustrySpecificItems(),
     { name: "Reporting", icon: BarChart2, path: "#" },
