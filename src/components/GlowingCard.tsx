@@ -28,7 +28,10 @@ const GlowingCard = ({
         className
       )}
     >
-      {/* Shine effect - only activates on hover now */}
+      {/* Light ray effect */}
+      <div className="light-ray"></div>
+      
+      {/* Shine effect - only activates on hover */}
       <div className="shine-overlay"></div>
 
       {/* Centered Glow Icon at the top */}

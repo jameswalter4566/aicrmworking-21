@@ -318,21 +318,21 @@ const LandingPage = () => {
                 title="Integrated Dialer"
                 description="Streamline your workflow with our powerful auto-dialing system that increases productivity."
                 icon={<Phone size={28} className="text-white" />}
-                gradient="bg-gradient-to-br from-purple-600 via-indigo-500 to-black"
+                gradient="bg-purple-glow"
                 delay="delay-1"
               />
               <GlowingCard
                 title="AI Assistance"
                 description="Leverage cutting-edge AI to automate tasks and gain valuable insights from customer interactions."
                 icon={<Bot size={28} className="text-white" />}
-                gradient="bg-gradient-to-br from-emerald-600 via-teal-500 to-black"
+                gradient="bg-green-glow"
                 delay="delay-2"
               />
               <GlowingCard
                 title="Sales Analytics"
                 description="Track performance metrics and visualize your sales pipeline with comprehensive analytics."
                 icon={<LineChart size={28} className="text-white" />}
-                gradient="bg-gradient-to-br from-blue-600 via-sky-500 to-black"
+                gradient="bg-blue-glow"
                 delay="delay-3"
               />
             </div>
