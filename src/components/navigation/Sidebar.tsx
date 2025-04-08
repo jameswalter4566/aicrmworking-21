@@ -3,7 +3,8 @@ import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
   BarChart2, Settings, Home, DollarSign, 
-  PhoneOutgoing, Menu, Bot, MessageSquare
+  PhoneOutgoing, Menu, Bot, MessageSquare,
+  FileText, Calculator
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -17,25 +18,13 @@ const itemColors = [
   "bg-yellow-600", // Inbox
   "bg-pink-600", // Tasks
   "bg-orange-600", // Calendar
-  "bg-teal-600", // Deals
+  "bg-teal-600", // Pipeline/Deals
   "bg-indigo-600", // Reporting
   "bg-gray-600", // Settings
   "bg-violet-600", // AI Dialer
   "bg-emerald-600", // SMS Campaign
-];
-
-const navItems = [
-  { name: "Dashboard", icon: Home, path: "/" },
-  { name: "Leads", icon: Users, path: "/people" },
-  { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
-  { name: "AI Dialer", icon: Bot, path: "/ai-dialer" },
-  { name: "SMS Campaign", icon: MessageSquare, path: "/sms-campaign" },
-  { name: "Inbox", icon: Inbox, badge: 5, path: "#" },
-  { name: "Tasks", icon: ListTodo, path: "#" },
-  { name: "Calendar", icon: Calendar, path: "#" },
-  { name: "Deals", icon: DollarSign, path: "/deals" },
-  { name: "Reporting", icon: BarChart2, path: "#" },
-  { name: "Settings", icon: Settings, path: "/settings" },
+  "bg-rose-600", // Start an Application
+  "bg-amber-600", // Quick Pricer
 ];
 
 const Sidebar = () => {
@@ -45,6 +34,41 @@ const Sidebar = () => {
   const location = useLocation();
   const { activeIndustry } = useIndustry();
   
+  // Base navigation items that appear for all industries
+  const baseNavItems = [
+    { name: "Dashboard", icon: Home, path: "/" },
+    { name: "Leads", icon: Users, path: "/people" },
+    { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
+    { name: "AI Dialer", icon: Bot, path: "/ai-dialer" },
+    { name: "SMS Campaign", icon: MessageSquare, path: "/sms-campaign" },
+    { name: "Inbox", icon: Inbox, badge: 5, path: "#" },
+    { name: "Tasks", icon: ListTodo, path: "#" },
+    { name: "Calendar", icon: Calendar, path: "#" },
+  ];
+
+  // Conditional navigation items based on industry
+  const getIndustrySpecificItems = () => {
+    if (activeIndustry === "mortgage") {
+      return [
+        { name: "Pipeline", icon: DollarSign, path: "/deals" },
+        { name: "Start an Application", icon: FileText, path: "/application" },
+        { name: "Quick Pricer", icon: Calculator, path: "/pricer" },
+      ];
+    } else {
+      return [
+        { name: "Deals", icon: DollarSign, path: "/deals" },
+      ];
+    }
+  };
+
+  // Final navigation items
+  const finalNavItems = [
+    ...baseNavItems,
+    ...getIndustrySpecificItems(),
+    { name: "Reporting", icon: BarChart2, path: "#" },
+    { name: "Settings", icon: Settings, path: "/settings" },
+  ];
+  
   const getIndustryDisplayName = () => {
     switch (activeIndustry) {
       case "mortgage":
@@ -52,7 +76,7 @@ const Sidebar = () => {
       case "realEstate":
         return "Real Estate";
       case "debtSettlement":
-        return "Debt Settlement";
+        return "Debt";
       default:
         return "";
     }
@@ -110,7 +134,7 @@ const Sidebar = () => {
         {mobileMenuOpen && (
           <div className="px-2 pb-3 pt-1">
             <div className="grid grid-cols-3 gap-2">
-              {navItems.map((item, index) => {
+              {finalNavItems.map((item, index) => {
                 const active = isActive(item.path);
                 return (
                   <Link
@@ -171,7 +195,7 @@ const Sidebar = () => {
           </div>
         </div>
         <div className="space-y-2">
-          {navItems.map((item, index) => {
+          {finalNavItems.map((item, index) => {
             const active = isActive(item.path);
             return (
               <Link
@@ -180,7 +204,7 @@ const Sidebar = () => {
                 className={cn(
                   "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                   active 
-                    ? itemColors[index]
+                    ? itemColors[index % itemColors.length]
                     : "text-white hover:text-white",
                   expanded ? "px-5" : "px-0 justify-center"
                 )}
@@ -188,7 +212,7 @@ const Sidebar = () => {
                 <div 
                   className={cn(
                     "absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-md", 
-                    !active && itemColors[index]
+                    !active && itemColors[index % itemColors.length]
                   )}
                 />
                 <item.icon
