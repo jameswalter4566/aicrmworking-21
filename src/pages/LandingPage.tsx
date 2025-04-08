@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
-import { Phone, Bot, LineChart } from "lucide-react";
+import { Phone, Bot, LineChart, MessageSquare, Calendar, FileCheck } from "lucide-react";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -91,6 +92,42 @@ const LandingPage = () => {
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
+      zIndex: 10,
+    },
+    {
+      id: 4,
+      component: (
+        <FeatureCard 
+          title="SMS Campaigns" 
+          value="Bulk Messaging" 
+          icon={
+            <MessageSquare size={20} className="text-orange-400" />
+          } 
+        />
+      ),
+      initialX: -330,
+      initialY: 50,
+      floatRadius: 22,
+      floatSpeed: 0.002,
+      delay: 300,
+      zIndex: 10,
+    },
+    {
+      id: 5,
+      component: (
+        <FeatureCard 
+          title="Appointment Scheduling" 
+          value="Smart Calendar" 
+          icon={
+            <Calendar size={20} className="text-blue-500" />
+          } 
+        />
+      ),
+      initialX: -280,
+      initialY: 250,
+      floatRadius: 18,
+      floatSpeed: 0.0018,
+      delay: 150,
       zIndex: 10,
     },
   ];
@@ -181,7 +218,7 @@ const LandingPage = () => {
           
           <div className="pt-6">
             <div className="relative mx-auto w-[300px]">
-              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
+              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm shadow-[0_0_15px_5px_rgba(51,195,240,0.3)]"></div>
               
               {[...Array(50)].map((_, i) => {
                 const trailSegmentOffset = i * 4;
@@ -194,12 +231,12 @@ const LandingPage = () => {
                     style={{
                       left: `${trailPos.x}px`,
                       top: `${trailPos.y}px`,
-                      width: `${Math.max(3.5 - i * 0.07, 0.8)}px`,
-                      height: `${Math.max(3.5 - i * 0.07, 0.8)}px`,
+                      width: `${Math.max(4.5 - i * 0.07, 1)}px`,
+                      height: `${Math.max(4.5 - i * 0.07, 1)}px`,
                       opacity: `${Math.max(1 - i * 0.02, 0)}`,
                       transform: `translate(-50%, -50%)`,
-                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.5) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: `0 0 ${15 - i * 0.3}px ${5 - i * 0.1}px rgba(51,195,240,${Math.max(0.8 - i * 0.015, 0)})`,
+                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.6) 50%, rgba(51,195,240,0) 100%)",
+                      boxShadow: `0 0 ${20 - i * 0.3}px ${8 - i * 0.1}px rgba(51,195,240,${Math.max(0.9 - i * 0.015, 0)})`,
                     }}
                   ></div>
                 );
@@ -207,7 +244,7 @@ const LandingPage = () => {
 
               <Button 
                 onClick={() => navigate("/auth")}
-                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10"
+                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-bold tracking-wide shadow-[inset_0_0_12px_rgba(255,255,255,0.6),0_0_15px_rgba(51,195,240,0.7)]"
               >
                 Start Calling
               </Button>
