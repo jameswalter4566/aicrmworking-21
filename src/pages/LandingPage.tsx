@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -82,7 +81,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: -750,
-      initialY: -380, // Adjusted to match right side spacing
+      initialY: -380,
       floatRadius: 20,
       floatSpeed: 0.002,
       delay: 0,
@@ -118,11 +117,12 @@ const LandingPage = () => {
             icon={
               <LineChart size={20} className="text-green-400" />
             } 
+            className="w-48"
           />
         </div>
       ),
       initialX: 750,
-      initialY: -20, // Adjusted from 380 to -20 to align with other containers
+      initialY: -20,
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
@@ -142,7 +142,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: -750,
-      initialY: -180, // Adjusted to have equal spacing with left containers
+      initialY: -180,
       floatRadius: 22,
       floatSpeed: 0.002,
       delay: 300,
@@ -182,7 +182,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: -750,
-      initialY: -20, // Adjusted to have equal spacing with left containers
+      initialY: -20,
       floatRadius: 22,
       floatSpeed: 0.0018,
       delay: 200,
