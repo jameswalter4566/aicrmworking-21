@@ -61,6 +61,41 @@
   opacity: 0.7;
 }
 
+/* Diagonal beam of light effect */
+.beam-of-light {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.15) 100%
+  );
+  transform: rotate(25deg);
+  animation: beamSweep 6s ease-in-out infinite;
+  mix-blend-mode: screen;
+  filter: blur(20px);
+  opacity: 0.6;
+  z-index: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+@keyframes beamSweep {
+  0% {
+    transform: translate(-30%, -30%) rotate(25deg);
+  }
+  50% {
+    transform: translate(0%, 0%) rotate(25deg);
+  }
+  100% {
+    transform: translate(-30%, -30%) rotate(25deg);
+  }
+}
+
 @keyframes shineMove {
   0% {
     transform: translateY(-100%) rotate(25deg);
@@ -125,24 +160,24 @@
   height: 100%;
 }
 
-/* Gradient background classes with dark bottom third */
+/* Gradient background classes with darker bottom section (increased to ~45% dark area) */
 .bg-purple-glow {
   background: linear-gradient(to bottom, 
     rgba(153, 51, 255, 0.9) 0%, 
-    rgba(122, 41, 204, 0.85) 66%, 
+    rgba(122, 41, 204, 0.85) 55%, 
     rgba(30, 0, 60, 0.95) 100%);
 }
 
 .bg-green-glow {
   background: linear-gradient(to bottom, 
     rgba(46, 213, 115, 0.9) 0%, 
-    rgba(30, 150, 100, 0.85) 66%, 
+    rgba(30, 150, 100, 0.85) 55%, 
     rgba(5, 35, 40, 0.95) 100%);
 }
 
 .bg-blue-glow {
   background: linear-gradient(to bottom, 
     rgba(56, 128, 255, 0.9) 0%, 
-    rgba(40, 90, 200, 0.85) 66%, 
+    rgba(40, 90, 200, 0.85) 55%, 
     rgba(5, 20, 60, 0.95) 100%);
 }
