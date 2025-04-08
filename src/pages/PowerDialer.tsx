@@ -65,7 +65,7 @@ const SAMPLE_LEADS = [
     id: "4",
     name: "Jennifer Davis",
     company: "Global Tech",
-    phone: "+16502345678",
+    phone: "+918320354644",
     status: "New",
     priority: "High",
   },
