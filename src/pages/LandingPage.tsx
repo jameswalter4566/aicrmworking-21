@@ -28,10 +28,8 @@ const LandingPage = () => {
           </div>
           
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900">
-            <span className="mr-3">Best CRM for:</span>
-            <span className="relative inline-block">
-              <AnimatedText texts={rotatingTexts} colors={textColors} />
-            </span>
+            <span className="inline-block mr-3">Best CRM for:</span>
+            <AnimatedText texts={rotatingTexts} colors={textColors} />
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-600 max-w-2xl mx-auto">
