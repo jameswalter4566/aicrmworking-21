@@ -189,27 +189,46 @@ const createTwilioService = (): TwilioService => {
         return { success: false, error: "Twilio device not initialized." };
       }
 
-      // First try using the Twilio JS SDK directly for browser client call
+      // Format phone number if needed
+      let formattedPhoneNumber = phoneNumber;
+      if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
+        formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
+      }
+      
+      console.log(`Attempting to call ${formattedPhoneNumber} via browser client`);
+      
       try {
-        console.log(`Attempting to call ${phoneNumber} via browser client`);
+        // Try browser-based call first - it should pass phoneNumber and leadId as params
         const call = await device.connect({
           params: {
-            phoneNumber: phoneNumber,
+            phoneNumber: formattedPhoneNumber,
             leadId: leadId
           }
         });
-
+        
         console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
+        
+        // Set up call event listeners for error handling
+        call.on('error', (error: any) => {
+          console.error('Call error:', error);
+          toast({
+            title: "Call Error",
+            description: `Error during call: ${error.message || error}`,
+            variant: "destructive",
+          });
+        });
+        
         return { 
           success: true, 
-          callSid: call.sid,
+          callSid: call.sid || 'browser-call',
           leadId: leadId
         };
       } catch (deviceError) {
+        // Log the browser client error
         console.warn("Browser-based call initiation failed. Error:", deviceError);
         console.log("Falling back to server-side call initiation...");
         
-        // If browser-based call fails, try making a call through the edge function
+        // Fall back to using our edge function for call setup
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
           method: 'POST',
           headers: {
@@ -217,7 +236,7 @@ const createTwilioService = (): TwilioService => {
           },
           body: JSON.stringify({
             action: 'makeCall',
-            phoneNumber: phoneNumber,
+            phoneNumber: formattedPhoneNumber,
             leadId: leadId,
             browserClientName: 'browser-client'
           })

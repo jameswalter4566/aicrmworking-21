@@ -593,10 +593,16 @@ export const useTwilio = () => {
 
     console.log(`Placing call to ${phoneNumber}`);
     
+    // Format the phone number properly if needed
+    let formattedPhoneNumber = phoneNumber;
+    if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
+      formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
+    }
+    
     setupWebSocket();
     
     // Always include the leadId when making calls
-    const result = await twilioService.makeCall(phoneNumber, String(leadId));
+    const result = await twilioService.makeCall(formattedPhoneNumber, String(leadId));
     
     if (result.success && (result.callSid || result.browserCallSid)) {
       const leadIdStr = String(leadId);
@@ -609,7 +615,7 @@ export const useTwilio = () => {
         ...prev,
         [leadIdStr]: { 
           callSid: callSidToUse,
-          phoneNumber,
+          phoneNumber: formattedPhoneNumber,
           status: 'connecting',
           leadId,
           isMuted: false,
@@ -623,7 +629,7 @@ export const useTwilio = () => {
       
       toast({
         title: "Dialing",
-        description: `Calling ${phoneNumber}... Audio will stream through your browser when connected.`,
+        description: `Calling ${formattedPhoneNumber}... Audio will stream through your browser when connected.`,
       });
       
       // If this is a conference call, join the conference

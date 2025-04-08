@@ -32,7 +32,7 @@ function debugTwiML(twiml: any) {
 
 // Name of the conference room
 const CONFERENCE_ROOM_PREFIX = "Conference_Room_";
-const DEFAULT_HOLD_MUSIC = "https://cdn.jsdelivr.net/gh/twilio/twiliojs.js/media/dialtones-us.mp3";
+const DEFAULT_HOLD_MUSIC = "https://assets.twilio.com/resources/hold-music.mp3";
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Voice function`);
@@ -165,15 +165,58 @@ serve(async (req) => {
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
 
-    // If no action is specified at all, return a simple TwiML response
+    // If no action is specified at all, handle as a direct client call
+    // This is crucial for browser client initiated calls
     if (!action) {
-      console.log("No action specified, returning default TwiML response");
-      const twiml = new twilio.twiml.VoiceResponse();
-      twiml.say("Welcome to the Twilio Voice API. No specific action was requested.");
+      console.log("No action specified, handling as a potential client-initiated call");
       
-      return new Response(twiml.toString(), { 
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
-      });
+      // Extract any parameters that might have been sent
+      const phoneNumber = requestData.phoneNumber || requestData.params?.phoneNumber || requestData.To || url.searchParams.get('phoneNumber');
+      const leadId = requestData.leadId || requestData.params?.leadId || url.searchParams.get('leadId');
+      
+      console.log(`Extracted phoneNumber: ${phoneNumber}, leadId: ${leadId}`);
+      
+      if (phoneNumber) {
+        console.log(`Will dial out to: ${phoneNumber}`);
+        
+        // Format phone number if needed
+        let formattedPhoneNumber = phoneNumber;
+        if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
+          formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
+          console.log(`Formatted phone number: ${formattedPhoneNumber}`);
+        }
+        
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("Please wait while we connect your call.");
+        
+        const dial = twiml.dial({
+          callerId: TWILIO_PHONE_NUMBER,
+          timeout: 20,
+          action: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=dialStatus&leadId=${leadId || ''}`,
+          method: 'POST'
+        });
+        
+        dial.number({
+          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+          statusCallback: `https://${req.headers.get('host')}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId || ''}`,
+          statusCallbackMethod: 'POST'
+        }, formattedPhoneNumber);
+        
+        console.log("Returning TwiML response for direct dialing");
+        const twimlString = debugTwiML(twiml);
+        
+        return new Response(twimlString, { 
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+        });
+      } else {
+        // If no phone number given
+        const twiml = new twilio.twiml.VoiceResponse();
+        twiml.say("No phone number was provided. Please try your call again.");
+        
+        return new Response(twiml.toString(), { 
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+        });
+      }
     }
 
     // If requesting configuration
@@ -211,10 +254,6 @@ serve(async (req) => {
     // Handle inbound voice request from the Browser client
     if (action === 'incomingCall') {
       console.log("Processing incoming call from browser client");
-      
-      // Create a unique conference ID for this call
-      const conferenceName = `${CONFERENCE_ROOM_PREFIX}${Date.now()}`;
-      console.log(`Created conference room: ${conferenceName}`);
       
       // Extract the desired phone number to call (likely passed as a parameter)
       const phoneNumber = requestData.phoneNumber || requestData.To || requestData.Digits;
@@ -424,68 +463,6 @@ serve(async (req) => {
         );
       }
     } 
-    else if (action === 'directCall') {
-      // Make a direct outbound call without browser involvement
-      const { phoneNumber, leadId } = requestData;
-      
-      if (!phoneNumber) {
-        return new Response(
-          JSON.stringify({ success: false, error: 'Phone number is required' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      try {
-        console.log(`Making direct call to ${phoneNumber}`);
-        console.log(`Lead ID: ${leadId || 'not provided'}`);
-        
-        // Format phone number
-        let formattedPhoneNumber = phoneNumber;
-        if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
-          formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
-        }
-        
-        // Create simple TwiML
-        const twiml = new twilio.twiml.VoiceResponse();
-        twiml.say("Hello! This is a test call from your Power Dialer.");
-        twiml.pause({ length: 1 });
-        twiml.say("If you can hear this message, your outbound calling is working correctly.");
-        
-        // Log the TwiML for debugging
-        console.log("Outbound call TwiML:", twiml.toString());
-        
-        // We need to use a PUBLIC URL for callbacks
-        const PUBLIC_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
-        
-        // Place the call directly, not via browser client
-        const call = await client.calls.create({
-          to: formattedPhoneNumber,
-          from: TWILIO_PHONE_NUMBER,
-          twiml: twiml.toString(),
-          statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
-          statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-          statusCallbackMethod: 'POST',
-        });
-        
-        console.log(`Direct outbound call initiated with SID: ${call.sid}`);
-        
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            callSid: call.sid,
-            message: "Direct outbound call placed",
-            leadId: leadId
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      } catch (error) {
-        console.error("Error making direct call:", error);
-        return new Response(
-          JSON.stringify({ success: false, error: error.message || "Failed to make direct call" }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
     else if (action === 'conferenceStatus') {
       // Log the conference status updates
       console.log("Conference status update received:");
