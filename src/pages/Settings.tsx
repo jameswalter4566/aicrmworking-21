@@ -6,10 +6,22 @@ import { Label } from "@/components/ui/label";
 import { Settings as SettingsIcon, Home, Building, DollarSign } from "lucide-react";
 import { ColoredSwitch } from "@/components/ui/colored-switch";
 
+type IndustryType = "mortgage" | "realEstate" | "debtSettlement" | null;
+
 const Settings = () => {
-  const [mortgageEnabled, setMortgageEnabled] = useState(false);
-  const [realEstateEnabled, setRealEstateEnabled] = useState(false);
-  const [debtSettlementEnabled, setDebtSettlementEnabled] = useState(false);
+  // Use a single state variable to track the currently active industry
+  const [activeIndustry, setActiveIndustry] = useState<IndustryType>(null);
+
+  // Handler that ensures only one industry can be active at a time
+  const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
+    if (isChecked) {
+      // If turning on, make this the only active industry
+      setActiveIndustry(industry);
+    } else if (activeIndustry === industry) {
+      // If turning off the currently active industry, set to null
+      setActiveIndustry(null);
+    }
+  };
 
   return (
     <MainLayout>
@@ -30,7 +42,7 @@ const Settings = () => {
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Industry Mode</h3>
               <p className="text-sm text-gray-500">
-                Choose which industry modules you want to enable in your CRM
+                Choose which industry module you want to enable in your CRM (only one can be active at a time)
               </p>
               
               <div className="space-y-5">
@@ -50,15 +62,15 @@ const Settings = () => {
                   <div className="flex items-center space-x-2">
                     <ColoredSwitch
                       id="mortgage-mode"
-                      checked={mortgageEnabled}
-                      onCheckedChange={setMortgageEnabled}
+                      checked={activeIndustry === "mortgage"}
+                      onCheckedChange={(checked) => handleIndustryChange("mortgage", checked)}
                       colorScheme="blue"
                     />
                     <Label htmlFor="mortgage-mode" className="sr-only">
                       Mortgage mode
                     </Label>
                     <span className="text-sm font-medium">
-                      {mortgageEnabled ? "On" : "Off"}
+                      {activeIndustry === "mortgage" ? "On" : "Off"}
                     </span>
                   </div>
                 </div>
@@ -79,15 +91,15 @@ const Settings = () => {
                   <div className="flex items-center space-x-2">
                     <ColoredSwitch
                       id="real-estate-mode"
-                      checked={realEstateEnabled}
-                      onCheckedChange={setRealEstateEnabled}
+                      checked={activeIndustry === "realEstate"}
+                      onCheckedChange={(checked) => handleIndustryChange("realEstate", checked)}
                       colorScheme="green"
                     />
                     <Label htmlFor="real-estate-mode" className="sr-only">
                       Real Estate mode
                     </Label>
                     <span className="text-sm font-medium">
-                      {realEstateEnabled ? "On" : "Off"}
+                      {activeIndustry === "realEstate" ? "On" : "Off"}
                     </span>
                   </div>
                 </div>
@@ -108,15 +120,15 @@ const Settings = () => {
                   <div className="flex items-center space-x-2">
                     <ColoredSwitch
                       id="debt-settlement-mode"
-                      checked={debtSettlementEnabled}
-                      onCheckedChange={setDebtSettlementEnabled}
+                      checked={activeIndustry === "debtSettlement"}
+                      onCheckedChange={(checked) => handleIndustryChange("debtSettlement", checked)}
                       colorScheme="purple"
                     />
                     <Label htmlFor="debt-settlement-mode" className="sr-only">
                       Debt Settlement mode
                     </Label>
                     <span className="text-sm font-medium">
-                      {debtSettlementEnabled ? "On" : "Off"}
+                      {activeIndustry === "debtSettlement" ? "On" : "Off"}
                     </span>
                   </div>
                 </div>
