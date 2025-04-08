@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
+import { Check } from "lucide-react";
 
 type AuthMode = "signin" | "signup" | "reset";
 
@@ -111,6 +112,13 @@ const Auth = () => {
     }
   };
 
+  const features = [
+    "Unlimited calling",
+    "10 line power dialer",
+    "Unlimited bulk SMS",
+    "Pull title leads"
+  ];
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 p-4">
       <div className="w-full max-w-lg text-center mb-6">
@@ -118,9 +126,21 @@ const Auth = () => {
           {mode === "signup" ? "Try free for 7 days!" : "Welcome Back!"}
         </h1>
         {mode === "signup" && (
-          <p className="text-lg text-blue-300">
-            No credit card required
-          </p>
+          <>
+            <p className="text-lg text-blue-300 mb-6">
+              No credit card required
+            </p>
+            <div className="flex flex-col items-center justify-center mb-6">
+              <ul className="grid grid-cols-2 gap-x-8 gap-y-3 text-left mx-auto">
+                {features.map((feature, index) => (
+                  <li key={index} className="flex items-center text-white">
+                    <Check className="h-5 w-5 mr-2 text-blue-400 flex-shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </>
         )}
       </div>
       
