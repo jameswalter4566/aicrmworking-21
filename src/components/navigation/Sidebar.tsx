@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -7,6 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Link, useLocation } from "react-router-dom";
+import { useIndustry } from "@/context/IndustryContext";
 
 const itemColors = [
   "bg-blue-600", // Dashboard
@@ -41,6 +43,7 @@ const Sidebar = () => {
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobile();
   const location = useLocation();
+  const { industryName, industryColor } = useIndustry();
   
   const isActive = (path: string) => {
     if (path === "/") {
@@ -54,15 +57,18 @@ const Sidebar = () => {
     setMobileMenuOpen(prev => !prev);
   };
 
+  // Format the CRM name based on selected industry
+  const crmName = industryName ? `${industryName} Sales Pro` : "SalesPro";
+
   if (isMobile) {
     return (
-      <div className="w-full bg-crm-blue">
+      <div className={cn("w-full", industryColor)}>
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center">
             <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
               <span className="font-bold text-sm">CRM</span>
             </div>
-            <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>
+            <span className="ml-2 text-lg font-semibold text-white">{crmName}</span>
           </div>
           <button 
             onClick={toggleMobileMenu}
@@ -115,8 +121,9 @@ const Sidebar = () => {
   return (
     <div 
       className={cn(
-        "hidden md:block bg-crm-blue h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl",
-        expanded ? "w-72" : "w-20"
+        "hidden md:block h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl",
+        expanded ? "w-72" : "w-20",
+        industryColor || "bg-crm-blue"
       )}
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
@@ -127,7 +134,7 @@ const Sidebar = () => {
             <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
               <span className="font-bold text-sm">CRM</span>
             </div>
-            {expanded && <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>}
+            {expanded && <span className="ml-2 text-lg font-semibold text-white">{crmName}</span>}
           </div>
         </div>
         <div className="space-y-2">
