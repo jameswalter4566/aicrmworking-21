@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -204,7 +205,7 @@ export const thoughtlyService = {
     try {
       console.log('Retrieving leads from Supabase');
       
-      // Get auth token correctly by using await with the Promise
+      // Fix: Properly await the Promise and then extract the session data
       const { data: sessionData } = await supabase.auth.getSession();
       const authToken = sessionData?.session?.access_token;
       
