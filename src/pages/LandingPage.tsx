@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -181,7 +182,8 @@ const LandingPage = () => {
           
           <div className="pt-6">
             <div className="relative mx-auto w-[300px]">
-              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm"></div>
+              {/* Enhanced inner glow effect */}
+              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/30 backdrop-blur-sm bg-crm-blue/5 shadow-[inset_0_0_15px_2px_rgba(51,195,240,0.3)]"></div>
               
               {[...Array(50)].map((_, i) => {
                 const trailSegmentOffset = i * 4;
@@ -194,12 +196,12 @@ const LandingPage = () => {
                     style={{
                       left: `${trailPos.x}px`,
                       top: `${trailPos.y}px`,
-                      width: `${Math.max(3.5 - i * 0.07, 0.8)}px`,
-                      height: `${Math.max(3.5 - i * 0.07, 0.8)}px`,
+                      width: `${Math.max(4.5 - i * 0.07, 1)}px`,
+                      height: `${Math.max(4.5 - i * 0.07, 1)}px`,
                       opacity: `${Math.max(1 - i * 0.02, 0)}`,
                       transform: `translate(-50%, -50%)`,
-                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.5) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: `0 0 ${15 - i * 0.3}px ${5 - i * 0.1}px rgba(51,195,240,${Math.max(0.8 - i * 0.015, 0)})`,
+                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 50%, rgba(51,195,240,0) 100%)",
+                      boxShadow: `0 0 ${20 - i * 0.3}px ${8 - i * 0.1}px rgba(51,195,240,${Math.max(0.9 - i * 0.015, 0)})`,
                     }}
                   ></div>
                 );
@@ -207,7 +209,7 @@ const LandingPage = () => {
 
               <Button 
                 onClick={() => navigate("/auth")}
-                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10"
+                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[0_0_15px_rgba(51,195,240,0.5)]"
               >
                 Start Calling
               </Button>
