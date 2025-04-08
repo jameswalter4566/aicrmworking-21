@@ -116,7 +116,11 @@ const Auth = () => {
     "Unlimited calling",
     "10 line power dialer",
     "Unlimited bulk SMS",
-    "Pull title leads"
+    "Pull title leads",
+    "All in one marketing",
+    "Conversational AI dialer",
+    "Bulk Voice mail campaigns",
+    "AI backend automations"
   ];
 
   return (
