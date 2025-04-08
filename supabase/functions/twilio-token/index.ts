@@ -1,7 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import twilio from "npm:twilio@4.23.0";
-import { AccessToken } from "npm:twilio@4.23.0/jwt/AccessToken.js";
 import { v4 as uuidv4 } from "https://deno.land/std@0.177.0/uuid/mod.ts";
 
 // CORS headers for cross-origin requests
@@ -10,9 +8,13 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
+  'Content-Type': 'application/json'
 };
 
 console.log("Twilio token function loaded");
+
+// Using ESM imports from Twilio
+import twilio from "npm:twilio@4.23.0";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -41,18 +43,23 @@ serve(async (req) => {
         }),
         {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: corsHeaders
         }
       );
     }
 
-    // Generate a random identity for this client
-    const identity = `browser-${uuidv4()}`;
+    // Generate a timestamp-based identity for better uniqueness
+    const timestamp = Date.now();
+    const identity = `browser-refresh-${timestamp}`;
     console.log(`Generated identity: ${identity}`);
 
-    // Create access token with Voice grant
+    // Create access token with the twilio helper library
+    const { jwt } = twilio;
+    const AccessToken = jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
-    const accessToken = new AccessToken(
+
+    // Create an access token with 24-hour TTL
+    const token = new AccessToken(
       ACCOUNT_SID,
       API_KEY,
       API_SECRET,
@@ -64,16 +71,16 @@ serve(async (req) => {
       outgoingApplicationSid: TWIML_APP_SID,
       incomingAllow: true,
     });
-    accessToken.addGrant(voiceGrant);
+    token.addGrant(voiceGrant);
 
     // Generate the token
-    const token = accessToken.toJwt();
-    console.log("Token generated successfully");
+    const tokenString = token.toJwt();
+    console.log(`Token generated successfully with 24-hour TTL (Identity: ${identity})`);
 
     // Return the token as JSON
     return new Response(
       JSON.stringify({
-        token,
+        token: tokenString,
         identity,
         twilioAppSid: TWIML_APP_SID,
         twilioPhoneNumber: PHONE_NUMBER,
@@ -84,7 +91,7 @@ serve(async (req) => {
         refreshRequest: false
       }),
       {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: corsHeaders
       }
     );
   } catch (error) {
@@ -97,7 +104,7 @@ serve(async (req) => {
       }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: corsHeaders
       }
     );
   }
