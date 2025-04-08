@@ -21,9 +21,29 @@ const Settings = () => {
     if (isChecked) {
       // If turning on, make this the only active industry
       setActiveIndustry(industry);
+      toast({
+        title: "Industry Mode Changed",
+        description: `${getIndustryName(industry)} mode has been activated.`,
+        duration: 3000,
+      });
     } else if (activeIndustry === industry) {
       // If turning off the currently active industry, set to null
       setActiveIndustry(null);
+      toast({
+        title: "Industry Mode Deactivated",
+        description: "Industry mode has been turned off.",
+        duration: 3000,
+      });
+    }
+  };
+
+  // Helper function to get the formatted industry name
+  const getIndustryName = (industry: IndustryType): string => {
+    switch (industry) {
+      case "mortgage": return "Mortgage Sales Pro";
+      case "realEstate": return "Real Estate Sales Pro";
+      case "debtSettlement": return "Debt Sales Pro";
+      default: return "Unknown";
     }
   };
 
