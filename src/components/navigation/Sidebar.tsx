@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -61,7 +60,7 @@ const Sidebar = () => {
         <div className="flex items-center justify-between px-4 py-2">
           <div className="flex items-center">
             <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold text-lg">CRM</span>
+              <span className="font-bold text-sm">CRM</span>
             </div>
             <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>
           </div>
@@ -126,7 +125,7 @@ const Sidebar = () => {
         <div className={cn("px-4 py-3 mb-6", expanded ? "" : "flex justify-center")}>
           <div className="flex items-center">
             <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold text-lg">CRM</span>
+              <span className="font-bold text-sm">CRM</span>
             </div>
             {expanded && <span className="ml-2 text-lg font-semibold text-white">SalesPro</span>}
           </div>
