@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -304,6 +305,64 @@ export const useTwilio = () => {
     
     console.log("Microphone audio capture stopped");
   }, []);
+
+  // Define endCall before it's used
+  const endCall = useCallback(async (leadId: string | number) => {
+    const leadIdStr = String(leadId);
+    
+    if (activeCalls[leadIdStr]) {
+      if (statusCheckIntervals.current[leadIdStr]) {
+        clearInterval(statusCheckIntervals.current[leadIdStr]);
+        delete statusCheckIntervals.current[leadIdStr];
+      }
+      
+      await twilioService.endCall(leadIdStr);
+      
+      if (Object.keys(activeCalls).length <= 1) {
+        stopCapturingMicrophone();
+        activeStreamSidRef.current = null;
+        activeConferenceNameRef.current = null;
+      }
+      
+      setActiveCalls(prev => {
+        const newCalls = {...prev};
+        delete newCalls[leadIdStr];
+        return newCalls;
+      });
+      
+      toast({
+        title: "Call Ended",
+        description: `Call has been disconnected.`,
+      });
+      
+      return true;
+    }
+    
+    return false;
+  }, [activeCalls, stopCapturingMicrophone]);
+
+  // Define endAllCalls here, before it's used
+  const endAllCalls = useCallback(async () => {
+    Object.values(statusCheckIntervals.current).forEach(intervalId => {
+      clearInterval(intervalId);
+    });
+    statusCheckIntervals.current = {};
+    
+    await twilioService.hangupAllCalls();
+    
+    stopCapturingMicrophone();
+    activeStreamSidRef.current = null;
+    activeConferenceNameRef.current = null;
+    
+    setActiveCalls({});
+    
+    toast({
+      title: "All Calls Ended",
+      description: `All active calls have been disconnected.`,
+    });
+    
+    return true;
+  }, [stopCapturingMicrophone]);
 
   useEffect(() => {
     const initializeTwilio = async () => {
@@ -653,60 +712,6 @@ export const useTwilio = () => {
 
     return result;
   }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket, joinConference, endAllCalls]);
-
-  const endCall = useCallback(async (leadId: string | number) => {
-    const leadIdStr = String(leadId);
-    
-    if (activeCalls[leadIdStr]) {
-      if (statusCheckIntervals.current[leadIdStr]) {
-        clearInterval(statusCheckIntervals.current[leadIdStr]);
-        delete statusCheckIntervals.current[leadIdStr];
-      }
-      
-      await twilioService.endCall(leadIdStr);
-      
-      if (Object.keys(activeCalls).length <= 1) {
-        stopCapturingMicrophone();
-        activeStreamSidRef.current = null;
-        activeConferenceNameRef.current = null;
-      }
-      
-      setActiveCalls(prev => {
-        const newCalls = {...prev};
-        delete newCalls[leadIdStr];
-        return newCalls;
-      });
-      
-      toast({
-        title: "Call Ended",
-        description: `Call has been disconnected.`,
-      });
-      
-      return true;
-    }
-    
-    return false;
-  }, [activeCalls, stopCapturingMicrophone]);
-
-  const endAllCalls = useCallback(async () => {
-    Object.values(statusCheckIntervals.current).forEach(intervalId => {
-      clearInterval(intervalId);
-    });
-    statusCheckIntervals.current = {};
-    
-    await twilioService.endCall();
-    
-    stopCapturingMicrophone();
-    activeStreamSidRef.current = null;
-    activeConferenceNameRef.current = null;
-    
-    setActiveCalls({});
-    
-    toast({
-      title: "All Calls Ended",
-      description: `All active calls have been disconnected.`,
-    });
-  }, [stopCapturingMicrophone]);
 
   const toggleMute = useCallback((leadId: string | number, mute?: boolean) => {
     const leadIdStr = String(leadId);

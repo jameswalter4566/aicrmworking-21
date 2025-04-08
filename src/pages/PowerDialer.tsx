@@ -186,11 +186,9 @@ export default function PowerDialer() {
   };
 
   const handleEndCall = async (leadId: string) => {
-    const success = await twilioState.endCall(leadId);
-    if (success) {
-      updateLeadStatus(leadId, "Contacted");
-      setCallInProgress(false);
-    }
+    await twilioState.endCall(leadId);
+    updateLeadStatus(leadId, "Contacted");
+    setCallInProgress(false);
   };
 
   const [isDialing, setIsDialing] = useState(false);
