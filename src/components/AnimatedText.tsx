@@ -35,7 +35,7 @@ const AnimatedText: React.FC<AnimatedTextProps> = ({
   return (
     <div className="inline-block min-w-[300px] h-10 relative">
       <span 
-        className={`transition-all duration-500 ${
+        className={`absolute top-0 left-0 w-full transition-all duration-500 ${
           getTextColor(currentIndex)
         } ${
           isAnimating ? "opacity-0 translate-y-4" : "opacity-100 translate-y-0"
