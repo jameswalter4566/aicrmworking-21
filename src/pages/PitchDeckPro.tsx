@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { PresentationChart, Download, Save, Plus, Trash2 } from "lucide-react";
+import { Presentation, Download, Save, Plus, Trash2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const PitchDeckPro = () => {
@@ -62,7 +62,7 @@ const PitchDeckPro = () => {
     <MainLayout>
       <div className="space-y-6">
         <div className="flex items-center space-x-2">
-          <PresentationChart className="h-6 w-6 text-blue-500" />
+          <Presentation className="h-6 w-6 text-blue-500" />
           <h1 className="text-2xl font-bold">Pitch Deck Pro</h1>
         </div>
         
@@ -190,7 +190,7 @@ const PitchDeckPro = () => {
           </CardHeader>
           <CardContent className="min-h-[300px] flex justify-center items-center">
             <div className="text-center p-8 bg-gray-50 rounded-lg w-full">
-              <PresentationChart className="h-16 w-16 mx-auto text-blue-500 mb-4" />
+              <Presentation className="h-16 w-16 mx-auto text-blue-500 mb-4" />
               <h3 className="text-xl font-bold mb-2">{deckTitle}</h3>
               <p className="text-gray-600 mb-4">Loan Type: {loanType.toUpperCase()}</p>
               <div className="flex flex-col items-center space-y-2">

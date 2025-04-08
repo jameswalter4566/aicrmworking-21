@@ -5,7 +5,7 @@ import {
   BarChart2, Settings, Home, DollarSign, 
   PhoneOutgoing, Menu, Bot, MessageSquare,
   FileText, Calculator, Briefcase, Brain,
-  PresentationChart, Receipt
+  Presentation, Receipt
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -63,7 +63,7 @@ const Sidebar = () => {
         { name: "Start an Application", icon: FileText, path: "/application" },
         { name: "Quick Pricer", icon: Calculator, path: "/pricer" },
         { name: "Amortization Calculator", icon: Receipt, path: "/amortization" },
-        { name: "Pitch Deck Pro", icon: PresentationChart, path: "/pitch-deck" },
+        { name: "Pitch Deck Pro", icon: Presentation, path: "/pitch-deck" },
         { name: "Processor Assist", icon: Briefcase, path: "/processor" },
         { name: "AI Loan Officer", icon: Brain, path: "/ai-loan-officer" },
       ];
