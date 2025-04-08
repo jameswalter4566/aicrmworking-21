@@ -278,12 +278,38 @@ export default function PowerDialer() {
     <Card className="mb-4 relative overflow-hidden">
       <CardHeader className="pb-2 flex flex-row justify-between items-center">
         <div>
-          <CardTitle className="text-lg">Dialing Preview</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">Power Dialer</CardTitle>
           <CardDescription>
-            {dialingSessionActive 
-              ? "Session in progress - manage your current calls" 
-              : "Start a new dialing session"}
+            Make outbound calls to your leads in queue
           </CardDescription>
+          
+          <div className="flex items-center space-x-2 mt-2">
+            <Badge variant={twilioState.initialized ? "default" : "outline"}>
+              {twilioState.initialized ? "System Ready" : "Initializing..."}
+            </Badge>
+            <Badge variant={twilioState.microphoneActive ? "default" : "destructive"}>
+              {twilioState.microphoneActive ? "Microphone Active" : "Microphone Inactive"}
+            </Badge>
+            <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
+              {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
+            </Badge>
+          </div>
+          
+          <Tabs
+            defaultValue="dialer"
+            value={currentTab}
+            onValueChange={setCurrentTab}
+            className="mt-4"
+          >
+            <TabsList>
+              <TabsTrigger value="dialer" onClick={() => setCurrentTab("dialer")}>
+                Dialer
+              </TabsTrigger>
+              <TabsTrigger value="settings" onClick={() => setCurrentTab("settings")}>
+                Settings
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
         
         {dialingSessionActive && (
@@ -300,49 +326,228 @@ export default function PowerDialer() {
       </CardHeader>
       
       <CardContent className="min-h-[300px] flex">
-        <div className="flex-1 flex items-center justify-center">
-          {!dialingSessionActive ? (
-            <Button 
-              onClick={startDialingSession} 
-              className="bg-crm-blue hover:bg-crm-blue/90 px-8 py-6 h-auto text-lg"
-            >
-              <PhoneCall className="mr-2 h-5 w-5" />
-              Begin Dialing Session
-            </Button>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              {Object.keys(twilioState.activeCalls).length === 0 ? (
-                <div className="text-center text-muted-foreground">
-                  <PhoneCall className="mx-auto h-12 w-12 text-muted-foreground/50 mb-2" />
-                  <p>No active calls</p>
-                  <p className="text-sm">Select a lead from the queue below to start calling</p>
-                </div>
-              ) : (
-                <Card className="w-full bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
-                    {Object.entries(twilioState.activeCalls).map(([leadId, call]) => {
-                      const lead = leads.find(l => l.id === leadId);
-                      return (
-                        <div key={leadId} className="flex justify-between items-center">
-                          <div>
-                            <h3 className="font-medium text-lg">{lead?.name}</h3>
-                            <p className="text-muted-foreground">{call.phoneNumber}</p>
-                            <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
-                              {call.status === 'connecting' ? 'Ringing' : 
-                              call.status === 'in-progress' ? 'Connected' :
-                              call.status === 'completed' ? 'Ended' : 
-                              call.status}
-                            </Badge>
+        {currentTab === "dialer" ? (
+          <div className="flex-1 flex items-center justify-center">
+            {!dialingSessionActive ? (
+              <Button 
+                onClick={startDialingSession} 
+                className="bg-crm-blue hover:bg-crm-blue/90 px-8 py-6 h-auto text-lg"
+              >
+                <PhoneCall className="mr-2 h-5 w-5" />
+                Begin Dialing Session
+              </Button>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                {Object.keys(twilioState.activeCalls).length === 0 ? (
+                  <div className="text-center text-muted-foreground">
+                    <PhoneCall className="mx-auto h-12 w-12 text-muted-foreground/50 mb-2" />
+                    <p>No active calls</p>
+                    <p className="text-sm">Select a lead from the queue below to start calling</p>
+                  </div>
+                ) : (
+                  <Card className="w-full bg-blue-50 border-blue-200">
+                    <CardContent className="p-4">
+                      {Object.entries(twilioState.activeCalls).map(([leadId, call]) => {
+                        const lead = leads.find(l => l.id === leadId);
+                        return (
+                          <div key={leadId} className="flex justify-between items-center">
+                            <div>
+                              <h3 className="font-medium text-lg">{lead?.name}</h3>
+                              <p className="text-muted-foreground">{call.phoneNumber}</p>
+                              <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
+                                {call.status === 'connecting' ? 'Ringing' : 
+                                call.status === 'in-progress' ? 'Connected' :
+                                call.status === 'completed' ? 'Ended' : 
+                                call.status}
+                              </Badge>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
-              )}
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="w-full space-y-4">
+            <div className="space-y-4">
+              <Alert variant={twilioState.microphoneActive ? "default" : "destructive"}>
+                <InfoCircledIcon className="h-4 w-4" />
+                <AlertTitle>Microphone Status</AlertTitle>
+                <AlertDescription>
+                  {twilioState.microphoneActive 
+                    ? "Microphone is active and ready for calls."
+                    : "Microphone access is not available. Check browser permissions."}
+                </AlertDescription>
+              </Alert>
+              
+              <AudioDeviceSelector 
+                onDeviceChange={async (deviceId) => {
+                  const success = await twilioState.setAudioOutputDevice(deviceId);
+                  return success;
+                }}
+                onRefreshDevices={async () => {
+                  return twilioState.refreshAudioDevices();
+                }}
+                onTestAudio={async (deviceId) => {
+                  return twilioState.testAudio(deviceId);
+                }}
+                devices={twilioState.audioOutputDevices}
+                currentDeviceId={twilioState.currentAudioDevice}
+              />
+              
+              <div className="flex justify-between">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsAudioDebugOpen(true)}
+                >
+                  Advanced Diagnostics
+                </Button>
+                
+                <Button 
+                  onClick={async () => {
+                    const deviceId = twilioState.currentAudioDevice;
+                    if (deviceId) {
+                      const result = await twilioState.testAudio(deviceId);
+                      if (result) {
+                        toast({
+                          title: "Audio Test",
+                          description: "Audio playback successful. If you didn't hear anything, check your volume settings.",
+                        });
+                      } else {
+                        toast({
+                          title: "Audio Test Failed",
+                          description: "Could not play audio test. Check your speakers and volume.",
+                          variant: "destructive",
+                        });
+                      }
+                    }
+                  }}
+                >
+                  Test Audio
+                </Button>
+              </div>
             </div>
-          )}
-        </div>
+
+            <GlobalAudioSettings />
+
+            {!twilioState.initialized && (
+              <Card className="bg-muted/50">
+                <CardHeader>
+                  <CardTitle className="text-lg">Initialize Phone System</CardTitle>
+                  <CardDescription>
+                    Set up the phone system for making and receiving calls
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <AudioInitializer />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            <Card className="bg-muted/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex justify-between items-center">
+                  System Controls
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const success = await twilioState.endAllCalls();
+                        if (success) {
+                          toast({
+                            title: "System Reset",
+                            description: "All active calls have been terminated. The system has been reset.",
+                          });
+                        }
+                      }}
+                    >
+                      Reset All Calls
+                    </Button>
+                    
+                    <Button
+                      variant="default" 
+                      size="sm"
+                      onClick={async () => {
+                        const initialized = await twilioService.initializeTwilioDevice();
+                        if (initialized) {
+                          toast({
+                            title: "System Reinitialized",
+                            description: "The phone system has been reinitialized with a new token.",
+                          });
+                        }
+                      }}
+                    >
+                      Reinitialize System
+                    </Button>
+                  </div>
+                </CardTitle>
+                <CardDescription>
+                  Reset your system and terminate all active calls if you encounter any issues
+                </CardDescription>
+              </CardHeader>
+            </Card>
+            
+            <TabsContent value="scripts" className="mt-0 p-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Call Scripts</CardTitle>
+                  <CardDescription>
+                    Customizable scripts for different call scenarios
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="opening">Opening Script</Label>
+                      <ScrollArea className="h-24 border rounded-md p-2 mt-1">
+                        <div className="p-2">
+                          Hello, my name is [Your Name] calling from [Company Name]. 
+                          I'm reaching out today because we've been working with companies 
+                          like yours to [brief value proposition]. Do you have a few minutes 
+                          to chat about how we might be able to help your business?
+                        </div>
+                      </ScrollArea>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="objection">Objection Handling</Label>
+                      <ScrollArea className="h-24 border rounded-md p-2 mt-1">
+                        <div className="p-2">
+                          I understand your concern about [objection]. Many of our current 
+                          clients initially felt the same way. What they found, however, 
+                          was that [counter to objection with specific benefit/result]. 
+                          Would it make sense to at least explore if we could achieve 
+                          similar results for your business?
+                        </div>
+                      </ScrollArea>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="closing">Closing Script</Label>
+                      <ScrollArea className="h-24 border rounded-md p-2 mt-1">
+                        <div className="p-2">
+                          Based on what we've discussed, I think the next step would be to 
+                          [specific action - demo, meeting with specialist, etc.]. We have 
+                          availability on [propose specific times]. What works best for your schedule?
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline">Add New Script</Button>
+                  <Button>Save Changes</Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </div>
+        )}
         
         {dialingSessionActive && (
           <div className="w-60 border-l pl-4 flex flex-col gap-2">
@@ -452,50 +657,6 @@ export default function PowerDialer() {
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
-      <Card className="bg-muted/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex justify-between items-center">
-            System Controls
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const success = await twilioState.endAllCalls();
-                  if (success) {
-                    toast({
-                      title: "System Reset",
-                      description: "All active calls have been terminated. The system has been reset.",
-                    });
-                  }
-                }}
-              >
-                Reset All Calls
-              </Button>
-              
-              <Button
-                variant="default" 
-                size="sm"
-                onClick={async () => {
-                  const initialized = await twilioService.initializeTwilioDevice();
-                  if (initialized) {
-                    toast({
-                      title: "System Reinitialized",
-                      description: "The phone system has been reinitialized with a new token.",
-                    });
-                  }
-                }}
-              >
-                Reinitialize System
-              </Button>
-            </div>
-          </CardTitle>
-          <CardDescription>
-            Reset your system and terminate all active calls if you encounter any issues
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
       <DialerPreview />
 
       {!dialingSessionActive && Object.keys(twilioState.activeCalls).length > 0 && (
@@ -659,74 +820,62 @@ export default function PowerDialer() {
 
   const SettingsTab = () => (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Audio Settings</CardTitle>
-          <CardDescription>
-            Configure your audio devices for calls
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Alert variant={twilioState.microphoneActive ? "default" : "destructive"}>
-              <InfoCircledIcon className="h-4 w-4" />
-              <AlertTitle>Microphone Status</AlertTitle>
-              <AlertDescription>
-                {twilioState.microphoneActive 
-                  ? "Microphone is active and ready for calls."
-                  : "Microphone access is not available. Check browser permissions."}
-              </AlertDescription>
-            </Alert>
-            
-            <AudioDeviceSelector 
-              onDeviceChange={async (deviceId) => {
-                const success = await twilioState.setAudioOutputDevice(deviceId);
-                return success;
-              }}
-              onRefreshDevices={async () => {
-                return twilioState.refreshAudioDevices();
-              }}
-              onTestAudio={async (deviceId) => {
-                return twilioState.testAudio(deviceId);
-              }}
-              devices={twilioState.audioOutputDevices}
-              currentDeviceId={twilioState.currentAudioDevice}
-            />
-            
-            <div className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsAudioDebugOpen(true)}
-              >
-                Advanced Diagnostics
-              </Button>
-              
-              <Button 
-                onClick={async () => {
-                  const deviceId = twilioState.currentAudioDevice;
-                  if (deviceId) {
-                    const result = await twilioState.testAudio(deviceId);
-                    if (result) {
-                      toast({
-                        title: "Audio Test",
-                        description: "Audio playback successful. If you didn't hear anything, check your volume settings.",
-                      });
-                    } else {
-                      toast({
-                        title: "Audio Test Failed",
-                        description: "Could not play audio test. Check your speakers and volume.",
-                        variant: "destructive",
-                      });
-                    }
-                  }
-                }}
-              >
-                Test Audio
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <Alert variant={twilioState.microphoneActive ? "default" : "destructive"}>
+        <InfoCircledIcon className="h-4 w-4" />
+        <AlertTitle>Microphone Status</AlertTitle>
+        <AlertDescription>
+          {twilioState.microphoneActive 
+            ? "Microphone is active and ready for calls."
+            : "Microphone access is not available. Check browser permissions."}
+        </AlertDescription>
+      </Alert>
+      
+      <AudioDeviceSelector 
+        onDeviceChange={async (deviceId) => {
+          const success = await twilioState.setAudioOutputDevice(deviceId);
+          return success;
+        }}
+        onRefreshDevices={async () => {
+          return twilioState.refreshAudioDevices();
+        }}
+        onTestAudio={async (deviceId) => {
+          return twilioState.testAudio(deviceId);
+        }}
+        devices={twilioState.audioOutputDevices}
+        currentDeviceId={twilioState.currentAudioDevice}
+      />
+      
+      <div className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={() => setIsAudioDebugOpen(true)}
+        >
+          Advanced Diagnostics
+        </Button>
+        
+        <Button 
+          onClick={async () => {
+            const deviceId = twilioState.currentAudioDevice;
+            if (deviceId) {
+              const result = await twilioState.testAudio(deviceId);
+              if (result) {
+                toast({
+                  title: "Audio Test",
+                  description: "Audio playback successful. If you didn't hear anything, check your volume settings.",
+                });
+              } else {
+                toast({
+                  title: "Audio Test Failed",
+                  description: "Could not play audio test. Check your speakers and volume.",
+                  variant: "destructive",
+                });
+              }
+            }
+          }}
+        >
+          Test Audio
+        </Button>
+      </div>
 
       <GlobalAudioSettings />
 
@@ -745,131 +894,17 @@ export default function PowerDialer() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-
-  const ScriptsTab = () => (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Call Scripts</CardTitle>
-          <CardDescription>
-            Customizable scripts for different call scenarios
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="opening">Opening Script</Label>
-              <ScrollArea className="h-24 border rounded-md p-2 mt-1">
-                <div className="p-2">
-                  Hello, my name is [Your Name] calling from [Company Name]. 
-                  I'm reaching out today because we've been working with companies 
-                  like yours to [brief value proposition]. Do you have a few minutes 
-                  to chat about how we might be able to help your business?
-                </div>
-              </ScrollArea>
-            </div>
-
-            <div>
-              <Label htmlFor="objection">Objection Handling</Label>
-              <ScrollArea className="h-24 border rounded-md p-2 mt-1">
-                <div className="p-2">
-                  I understand your concern about [objection]. Many of our current 
-                  clients initially felt the same way. What they found, however, 
-                  was that [counter to objection with specific benefit/result]. 
-                  Would it make sense to at least explore if we could achieve 
-                  similar results for your business?
-                </div>
-              </ScrollArea>
-            </div>
-
-            <div>
-              <Label htmlFor="closing">Closing Script</Label>
-              <ScrollArea className="h-24 border rounded-md p-2 mt-1">
-                <div className="p-2">
-                  Based on what we've discussed, I think the next step would be to 
-                  [specific action - demo, meeting with specialist, etc.]. We have 
-                  availability on [propose specific times]. What works best for your schedule?
-                </div>
-              </ScrollArea>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button variant="outline">Add New Script</Button>
-          <Button>Save Changes</Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
-
-  return (
-    <MainLayout>
-      <TwilioScript
-        onLoad={() => setIsScriptLoaded(true)}
-        onError={(err) => console.error("TwilioScript error:", err)}
-      />
       
-      <AudioDebugModal />
-      
-      <div className="container py-4 px-4 md:px-6">
-        <div className="flex flex-col space-y-2 mb-4">
-          <h1 className="text-2xl font-bold tracking-tight">Power Dialer</h1>
-          <p className="text-muted-foreground">
-            Make outbound calls to your leads in queue
-          </p>
-
-          {tokenError && (
-            <Alert variant="destructive">
-              <AlertTitle>Token Error</AlertTitle>
-              <AlertDescription>{tokenError}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex items-center space-x-2">
-            <Badge variant={twilioState.initialized ? "default" : "outline"}>
-              {twilioState.initialized ? "System Ready" : "Initializing..."}
-            </Badge>
-            <Badge variant={twilioState.microphoneActive ? "default" : "destructive"}>
-              {twilioState.microphoneActive ? "Microphone Active" : "Microphone Inactive"}
-            </Badge>
-            <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
-              {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
-            </Badge>
-          </div>
-        </div>
-
-        <Tabs
-          defaultValue="dialer"
-          value={currentTab}
-          onValueChange={setCurrentTab}
-          className="space-y-4"
-        >
-          <TabsList>
-            <TabsTrigger value="dialer" onClick={() => setCurrentTab("dialer")}>
-              Dialer
-            </TabsTrigger>
-            <TabsTrigger value="settings" onClick={() => setCurrentTab("settings")}>
-              Settings
-            </TabsTrigger>
-            <TabsTrigger value="scripts" onClick={() => setCurrentTab("scripts")}>
-              Scripts
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="dialer" className="space-y-4">
-            <DialerTab />
-          </TabsContent>
-          <TabsContent value="settings" className="space-y-4">
-            <SettingsTab />
-          </TabsContent>
-          <TabsContent value="scripts" className="space-y-4">
-            <ScriptsTab />
-          </TabsContent>
-        </Tabs>
-        
-        <TwilioAudioPlayer sound="/sounds/test-tone.mp3" />
-      </div>
-    </MainLayout>
-  );
-}
+      <Card className="bg-muted/50">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex justify-between items-center">
+            System Controls
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const success = await twilioState.endAllCalls();
+                  if (success) {
+                    toast({
+                      title: "
