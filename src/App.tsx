@@ -24,6 +24,8 @@ import LandingPage from "./pages/LandingPage";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import AmortizationCalculator from "./pages/AmortizationCalculator";
+import PitchDeckPro from "./pages/PitchDeckPro";
 
 const queryClient = new QueryClient();
 
@@ -234,6 +236,8 @@ const App = () => {
                 <Route path="/ai-dialer" element={<ProtectedRoute><AIDialer /></ProtectedRoute>} />
                 <Route path="/sms-campaign" element={<ProtectedRoute><SMSCampaign /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/amortization" element={<ProtectedRoute><AmortizationCalculator /></ProtectedRoute>} />
+                <Route path="/pitch-deck" element={<ProtectedRoute><PitchDeckPro /></ProtectedRoute>} />
                 
                 <Route path="/" element={<Navigate to="/landing" replace />} />
                 

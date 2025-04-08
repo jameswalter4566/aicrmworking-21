@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -7,23 +7,31 @@ import { Settings as SettingsIcon, Home, Building, DollarSign, UserRound } from 
 import { ColoredSwitch } from "@/components/ui/colored-switch";
 import { useIndustry, IndustryType } from "@/context/IndustryContext";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 
 const Settings = () => {
   const { activeIndustry, setActiveIndustry } = useIndustry();
   const { user, userRole } = useAuth();
-  const [loading, setLoading] = useState(false);
 
   // Handler that ensures only one industry can be active at a time
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
     if (isChecked) {
       // If turning on, make this the only active industry
       setActiveIndustry(industry);
+      toast({
+        title: "Industry Mode Updated",
+        description: `${industry} mode has been activated and will persist across sessions.`,
+        duration: 3000,
+      });
     } else if (activeIndustry === industry) {
       // If turning off the currently active industry, set to null
       setActiveIndustry(null);
+      toast({
+        title: "Industry Mode Disabled",
+        description: "Industry-specific features have been disabled.",
+        duration: 3000,
+      });
     }
   };
 
@@ -49,7 +57,7 @@ const Settings = () => {
                 <Label className="text-sm font-medium">Account Type</Label>
                 <div className="flex items-center space-x-2">
                   <UserRound className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm">{loading ? "Loading..." : userRole || "Unknown"}</span>
+                  <span className="text-sm">{userRole || "Unknown"}</span>
                 </div>
               </div>
               <Badge className="bg-blue-500 hover:bg-blue-600">
@@ -75,7 +83,8 @@ const Settings = () => {
             <div className="space-y-4">
               <h3 className="text-lg font-medium">Industry Mode</h3>
               <p className="text-sm text-gray-500">
-                Choose which industry module you want to enable in your CRM (only one can be active at a time)
+                Choose which industry module you want to enable in your CRM (only one can be active at a time).<br />
+                <span className="font-medium text-blue-600">Your selection will be remembered across browser sessions.</span>
               </p>
               
               <div className="space-y-5">
@@ -88,7 +97,7 @@ const Settings = () => {
                     <div>
                       <h4 className="font-medium">Mortgage Sales Pro</h4>
                       <p className="text-sm text-gray-500">
-                        Enable mortgage industry specific features
+                        Enable mortgage industry specific features including Amortization Calculator and Pitch Deck Pro
                       </p>
                     </div>
                   </div>
