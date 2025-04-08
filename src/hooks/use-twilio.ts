@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -181,7 +180,6 @@ export const useTwilio = () => {
     }
   }, [currentAudioDevice]);
 
-  // Function to join a specific conference
   const joinConference = useCallback((conferenceName: string) => {
     if (!webSocketRef.current || webSocketRef.current.readyState !== WebSocket.OPEN) {
       console.error("WebSocket not connected, cannot join conference");
