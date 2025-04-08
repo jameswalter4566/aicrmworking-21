@@ -73,8 +73,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -480,
-      initialY: 180,
+      initialX: -580,
+      initialY: 240,
       floatRadius: 20,
       floatSpeed: 0.002,
       delay: 0,
@@ -91,8 +91,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 480,
-      initialY: 80,
+      initialX: 580,
+      initialY: -120,
       floatRadius: 25,
       floatSpeed: 0.0015,
       delay: 200,
@@ -109,8 +109,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 480,
-      initialY: 280,
+      initialX: 580,
+      initialY: 380,
       floatRadius: 30,
       floatSpeed: 0.0025,
       delay: 400,
@@ -127,8 +127,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -430,
-      initialY: -80,
+      initialX: -530,
+      initialY: -180,
       floatRadius: 22,
       floatSpeed: 0.002,
       delay: 300,
@@ -145,8 +145,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -400,
-      initialY: 320,
+      initialX: -500,
+      initialY: 420,
       floatRadius: 18,
       floatSpeed: 0.0018,
       delay: 150,
@@ -163,8 +163,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: 420,
-      initialY: -120,
+      initialX: 520,
+      initialY: -280,
       floatRadius: 25,
       floatSpeed: 0.002,
       delay: 250,
@@ -181,8 +181,8 @@ const LandingPage = () => {
           } 
         />
       ),
-      initialX: -450,
-      initialY: -180,
+      initialX: -550,
+      initialY: -320,
       floatRadius: 22,
       floatSpeed: 0.0018,
       delay: 200,
