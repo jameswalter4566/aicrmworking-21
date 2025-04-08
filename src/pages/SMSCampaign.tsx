@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -121,8 +122,8 @@ const SMSCampaign = () => {
     <SidebarProvider defaultOpen={false}>
       <div className="flex h-screen overflow-hidden w-full">
         <SMSSidebar />
-        <div className="flex-1 overflow-auto bg-gradient-to-br from-gray-900 via-gray-800 to-black">
-          <div className="container mx-auto px-4 py-6 text-white">
+        <div className="flex-1 overflow-auto">
+          <div className="container mx-auto px-4 py-6">
             <div className="mb-4 flex items-center">
               <Button 
                 variant="outline" 
@@ -146,7 +147,7 @@ const SMSCampaign = () => {
               </Card>
             </div>
 
-            <Card className="mb-6 bg-gray-900/80 backdrop-blur-lg border-gray-700/50">
+            <Card className="mb-6">
               <div className="p-6">
                 <h2 className="text-xl font-semibold mb-6">New Campaign 👋</h2>
                 
