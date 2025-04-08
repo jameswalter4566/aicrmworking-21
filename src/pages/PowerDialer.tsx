@@ -276,27 +276,64 @@ export default function PowerDialer() {
 
   const DialerPreview = () => (
     <Card className="mb-4 relative overflow-hidden">
-      <CardHeader className="pb-2 flex flex-row justify-between items-center">
-        <div>
-          <CardTitle className="text-lg">Dialing Preview</CardTitle>
-          <CardDescription>
-            {dialingSessionActive 
-              ? "Session in progress - manage your current calls" 
-              : "Start a new dialing session"}
-          </CardDescription>
+      <CardHeader className="pb-2">
+        <div className="flex flex-col space-y-2">
+          <h1 className="text-2xl font-bold tracking-tight">Power Dialer</h1>
+          <p className="text-muted-foreground">
+            Make outbound calls to your leads in queue
+          </p>
+
+          <div className="flex items-center space-x-2 mb-2">
+            <Badge variant={twilioState.initialized ? "default" : "outline"}>
+              {twilioState.initialized ? "System Ready" : "Initializing..."}
+            </Badge>
+            <Badge variant={twilioState.microphoneActive ? "default" : "destructive"}>
+              {twilioState.microphoneActive ? "Microphone Active" : "Microphone Inactive"}
+            </Badge>
+            <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
+              {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
+            </Badge>
+          </div>
+          
+          <Tabs
+            defaultValue="dialer"
+            value={currentTab}
+            onValueChange={setCurrentTab}
+            className="mb-2"
+          >
+            <TabsList>
+              <TabsTrigger value="dialer" onClick={() => setCurrentTab("dialer")}>
+                Dialer
+              </TabsTrigger>
+              <TabsTrigger value="settings" onClick={() => setCurrentTab("settings")}>
+                Settings
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
         
-        {dialingSessionActive && (
-          <div className="flex flex-col items-end">
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <Clock className="h-4 w-4" />
-              <span className="font-mono">{sessionDuration}</span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              Session started at {sessionStartTime?.toLocaleTimeString()}
-            </div>
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="text-lg">{dialingSessionActive ? "Dialing Session" : "Start Session"}</CardTitle>
+            <CardDescription>
+              {dialingSessionActive 
+                ? "Session in progress - manage your current calls" 
+                : "Start a new dialing session"}
+            </CardDescription>
           </div>
-        )}
+          
+          {dialingSessionActive && (
+            <div className="flex flex-col items-end">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="h-4 w-4" />
+                <span className="font-mono">{sessionDuration}</span>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Session started at {sessionStartTime?.toLocaleTimeString()}
+              </div>
+            </div>
+          )}
+        </div>
       </CardHeader>
       
       <CardContent className="min-h-[300px] flex">
@@ -452,52 +489,6 @@ export default function PowerDialer() {
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
-      <Card className="bg-muted/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex justify-between items-center">
-            System Controls
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const success = await twilioState.endAllCalls();
-                  if (success) {
-                    toast({
-                      title: "System Reset",
-                      description: "All active calls have been terminated. The system has been reset.",
-                    });
-                  }
-                }}
-              >
-                Reset All Calls
-              </Button>
-              
-              <Button
-                variant="default" 
-                size="sm"
-                onClick={async () => {
-                  const initialized = await twilioService.initializeTwilioDevice();
-                  if (initialized) {
-                    toast({
-                      title: "System Reinitialized",
-                      description: "The phone system has been reinitialized with a new token.",
-                    });
-                  }
-                }}
-              >
-                Reinitialize System
-              </Button>
-            </div>
-          </CardTitle>
-          <CardDescription>
-            Reset your system and terminate all active calls if you encounter any issues
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <DialerPreview />
-
       {!dialingSessionActive && Object.keys(twilioState.activeCalls).length > 0 && (
         <Card className="bg-muted/50">
           <CardHeader className="pb-2">
@@ -745,12 +736,8 @@ export default function PowerDialer() {
           </CardContent>
         </Card>
       )}
-    </div>
-  );
-
-  const ScriptsTab = () => (
-    <div className="space-y-4">
-      <Card>
+      
+      <Card className="mt-6">
         <CardHeader>
           <CardTitle className="text-lg">Call Scripts</CardTitle>
           <CardDescription>
@@ -801,6 +788,50 @@ export default function PowerDialer() {
           <Button>Save Changes</Button>
         </CardFooter>
       </Card>
+      
+      <Card className="bg-muted/50 mt-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex justify-between items-center">
+            System Controls
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  const success = await twilioState.endAllCalls();
+                  if (success) {
+                    toast({
+                      title: "System Reset",
+                      description: "All active calls have been terminated. The system has been reset.",
+                    });
+                  }
+                }}
+              >
+                Reset All Calls
+              </Button>
+              
+              <Button
+                variant="default" 
+                size="sm"
+                onClick={async () => {
+                  const initialized = await twilioService.initializeTwilioDevice();
+                  if (initialized) {
+                    toast({
+                      title: "System Reinitialized",
+                      description: "The phone system has been reinitialized with a new token.",
+                    });
+                  }
+                }}
+              >
+                Reinitialize System
+              </Button>
+            </div>
+          </CardTitle>
+          <CardDescription>
+            Reset your system and terminate all active calls if you encounter any issues
+          </CardDescription>
+        </CardHeader>
+      </Card>
     </div>
   );
 
@@ -814,59 +845,14 @@ export default function PowerDialer() {
       <AudioDebugModal />
       
       <div className="container py-4 px-4 md:px-6">
-        <div className="flex flex-col space-y-2 mb-4">
-          <h1 className="text-2xl font-bold tracking-tight">Power Dialer</h1>
-          <p className="text-muted-foreground">
-            Make outbound calls to your leads in queue
-          </p>
-
-          {tokenError && (
-            <Alert variant="destructive">
-              <AlertTitle>Token Error</AlertTitle>
-              <AlertDescription>{tokenError}</AlertDescription>
-            </Alert>
-          )}
-
-          <div className="flex items-center space-x-2">
-            <Badge variant={twilioState.initialized ? "default" : "outline"}>
-              {twilioState.initialized ? "System Ready" : "Initializing..."}
-            </Badge>
-            <Badge variant={twilioState.microphoneActive ? "default" : "destructive"}>
-              {twilioState.microphoneActive ? "Microphone Active" : "Microphone Inactive"}
-            </Badge>
-            <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
-              {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
-            </Badge>
-          </div>
-        </div>
-
-        <Tabs
-          defaultValue="dialer"
-          value={currentTab}
-          onValueChange={setCurrentTab}
-          className="space-y-4"
-        >
-          <TabsList>
-            <TabsTrigger value="dialer" onClick={() => setCurrentTab("dialer")}>
-              Dialer
-            </TabsTrigger>
-            <TabsTrigger value="settings" onClick={() => setCurrentTab("settings")}>
-              Settings
-            </TabsTrigger>
-            <TabsTrigger value="scripts" onClick={() => setCurrentTab("scripts")}>
-              Scripts
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="dialer" className="space-y-4">
-            <DialerTab />
-          </TabsContent>
-          <TabsContent value="settings" className="space-y-4">
-            <SettingsTab />
-          </TabsContent>
-          <TabsContent value="scripts" className="space-y-4">
-            <ScriptsTab />
-          </TabsContent>
-        </Tabs>
+        <DialerPreview />
+        
+        <TabsContent value="dialer" className="space-y-4">
+          <DialerTab />
+        </TabsContent>
+        <TabsContent value="settings" className="space-y-4">
+          <SettingsTab />
+        </TabsContent>
         
         <TwilioAudioPlayer sound="/sounds/test-tone.mp3" />
       </div>
