@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -78,7 +77,6 @@ const Sidebar = () => {
     { name: "Settings", icon: Settings, path: "/settings" },
   ];
   
-  // Debug current path
   useEffect(() => {
     console.log("Current location:", location.pathname);
   }, [location.pathname]);
@@ -114,7 +112,6 @@ const Sidebar = () => {
   };
 
   const isActive = (path: string) => {
-    // Debug specific path checks
     if (path === "/power-dialer") {
       const isPowerDialer = location.pathname === "/power-dialer";
       console.log(`Checking power-dialer: ${isPowerDialer}, current path: ${location.pathname}`);
@@ -125,7 +122,6 @@ const Sidebar = () => {
       return location.pathname === path;
     }
     
-    // For other paths
     return (path !== "#" && location.pathname === path) || 
            (path !== "#" && path !== "/" && location.pathname.startsWith(path));
   };
@@ -228,7 +224,7 @@ const Sidebar = () => {
                   "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
                   active 
                     ? itemColors[index % itemColors.length]
-                    : "text-white hover:text-white",
+                    : "text-white hover:text-white hover:bg-white/10",
                   expanded ? "px-5" : "px-0 justify-center"
                 )}
               >
