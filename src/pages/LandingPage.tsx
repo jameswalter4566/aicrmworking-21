@@ -82,7 +82,7 @@ const LandingPage = () => {
         </div>
       ),
       initialX: -750,
-      initialY: 280,
+      initialY: -280, // Adjusted from 280 to -280 to move higher
       floatRadius: 20,
       floatSpeed: 0.002,
       delay: 0,
