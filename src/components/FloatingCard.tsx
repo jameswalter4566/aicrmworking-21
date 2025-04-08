@@ -1,81 +1,75 @@
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 
 interface FloatingCardProps {
-  className?: string;
   children: React.ReactNode;
-  initialX?: number; 
-  initialY?: number;
-  floatRadius?: number; // How far the card can float from its center position
-  floatSpeed?: number; // Speed of the floating animation (lower is slower)
-  delay?: number; // Delay before animation starts
-  rotateAmount?: number; // Maximum rotation in degrees
+  initialX: number;
+  initialY: number;
+  floatRadius?: number;
+  floatSpeed?: number;
+  delay?: number;
+  rotateAmount?: number;
+  className?: string;
   zIndex?: number;
+  isActive?: boolean;
 }
 
 const FloatingCard: React.FC<FloatingCardProps> = ({
-  className = "",
   children,
-  initialX = 0,
-  initialY = 0,
-  floatRadius = 15,
-  floatSpeed = 0.003,
+  initialX,
+  initialY,
+  floatRadius = 20,
+  floatSpeed = 0.002,
   delay = 0,
-  rotateAmount = 3,
-  zIndex = 0,
+  rotateAmount = 0,
+  className = "",
+  zIndex = 10,
+  isActive = true,
 }) => {
-  const ref = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ x: initialX, y: initialY });
-  const [rotation, setRotation] = useState({ x: 0, y: 0 });
-  const animationRef = useRef<number>();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState({ x: initialX, y: initialY });
+  const animationRef = useRef<number>(0);
+  const startTimeRef = useRef<number>(Date.now() + delay);
 
   useEffect(() => {
-    // Start with a delay if specified
-    const timeout = setTimeout(() => {
-      let startTime = Date.now();
+    if (!isActive) return;
+    
+    const animate = () => {
+      if (!isActive) return;
       
-      const animateFloat = () => {
-        const elapsedTime = (Date.now() - startTime) * floatSpeed;
-        
-        // Use sine and cosine for smooth oscillations
-        const newX = initialX + Math.sin(elapsedTime * 0.5) * floatRadius;
-        const newY = initialY + Math.cos(elapsedTime * 0.7) * floatRadius;
-        
-        // Subtle rotation effect
-        const rotX = Math.sin(elapsedTime * 0.3) * rotateAmount;
-        const rotY = Math.cos(elapsedTime * 0.4) * rotateAmount;
-        
-        setPosition({ x: newX, y: newY });
-        setRotation({ x: rotX, y: rotY });
-        
-        animationRef.current = requestAnimationFrame(animateFloat);
-      };
+      const now = Date.now();
+      const elapsed = now - startTimeRef.current;
+      const angle = elapsed * floatSpeed;
       
-      animationRef.current = requestAnimationFrame(animateFloat);
+      const x = initialX + Math.cos(angle) * floatRadius;
+      const y = initialY + Math.sin(angle) * floatRadius;
       
-    }, delay);
+      setCoords({ x, y });
+      
+      animationRef.current = requestAnimationFrame(animate);
+    };
+    
+    animationRef.current = requestAnimationFrame(animate);
     
     return () => {
-      if (animationRef.current) {
-        cancelAnimationFrame(animationRef.current);
-      }
-      clearTimeout(timeout);
+      cancelAnimationFrame(animationRef.current);
     };
-  }, [initialX, initialY, floatRadius, floatSpeed, delay, rotateAmount]);
+  }, [initialX, initialY, floatRadius, floatSpeed, isActive]);
+
+  const style: React.CSSProperties = {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    transform: `translate(calc(${coords.x}px - 50%), calc(${coords.y}px - 50%))`,
+    zIndex: zIndex,
+    willChange: 'transform',
+  };
 
   return (
-    <div
-      ref={ref}
-      className={`absolute transition-transform ${className}`}
-      style={{
-        transform: `translate(${position.x}px, ${position.y}px) 
-                   rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
-        zIndex,
-      }}
-    >
+    <div ref={cardRef} style={style} className={`transition-opacity duration-500 ${className}`}>
       {children}
     </div>
   );
 };
 
-export default FloatingCard;
+export default React.memo(FloatingCard);

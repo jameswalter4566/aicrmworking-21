@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import FloatingCard from "./FloatingCard";
 
 interface FloatingItemConfig {
@@ -24,6 +23,14 @@ const FloatingAnimation: React.FC<FloatingAnimationProps> = ({
   className = "", 
   items 
 }) => {
+  const isMounted = useRef(true);
+  
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+  
   return (
     <div className={`relative ${className}`}>
       {items.map((item) => (
@@ -37,6 +44,7 @@ const FloatingAnimation: React.FC<FloatingAnimationProps> = ({
           rotateAmount={item.rotateAmount}
           className={item.className}
           zIndex={item.zIndex}
+          isActive={isMounted.current}
         >
           {item.component}
         </FloatingCard>
@@ -45,4 +53,4 @@ const FloatingAnimation: React.FC<FloatingAnimationProps> = ({
   );
 };
 
-export default FloatingAnimation;
+export default React.memo(FloatingAnimation);

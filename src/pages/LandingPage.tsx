@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,25 +12,51 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [featuresVisible, setFeaturesVisible] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
+  const [isActive, setIsActive] = useState(false);
   
+  // Only set features visible when component mounts
   useEffect(() => {
     const timer = setTimeout(() => {
       setFeaturesVisible(true);
     }, 300);
     
-    return () => clearTimeout(timer);
+    // Set the component as active to reduce unnecessary animation calculations
+    setIsActive(true);
+    
+    return () => {
+      clearTimeout(timer);
+      setIsActive(false);
+    };
   }, []);
   
+  // Optimize loading animation to use requestAnimationFrame instead of setInterval
   useEffect(() => {
-    const interval = setInterval(() => {
-      setLoadingProgress(prev => {
-        const newProgress = prev + 1;
-        return newProgress > 400 ? 0 : newProgress;
-      });
-    }, 30);
+    if (!isActive) return;
     
-    return () => clearInterval(interval);
-  }, []);
+    let animationId: number;
+    let lastTimestamp = 0;
+    
+    const updateProgress = (timestamp: number) => {
+      if (!isActive) return;
+      
+      // Only update every 30ms for smoother performance
+      if (timestamp - lastTimestamp >= 30) {
+        setLoadingProgress(prev => {
+          const newProgress = prev + 1;
+          return newProgress > 400 ? 0 : newProgress;
+        });
+        lastTimestamp = timestamp;
+      }
+      
+      animationId = requestAnimationFrame(updateProgress);
+    };
+    
+    animationId = requestAnimationFrame(updateProgress);
+    
+    return () => {
+      cancelAnimationFrame(animationId);
+    };
+  }, [isActive]);
   
   const rotatingTexts = [
     "Mortgage Loan Officers",
@@ -39,7 +66,8 @@ const LandingPage = () => {
   
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
 
-  const floatingFeatureCards = [
+  // Memoize the floating cards config to prevent recreation on each render
+  const floatingFeatureCards = React.useMemo(() => [
     {
       id: 1,
       component: (
@@ -166,9 +194,10 @@ const LandingPage = () => {
       delay: 200,
       zIndex: 10,
     },
-  ];
+  ], []);
 
-  const getLoadingPosition = (progress) => {
+  // Memoize the loading position calculation to reduce calculations
+  const getLoadingPosition = React.useCallback((progress: number) => {
     const width = 300;
     const height = 56;
     const borderRadius = 10;
@@ -217,9 +246,13 @@ const LandingPage = () => {
     }
 
     return { x, y };
-  };
+  }, []);
   
-  const loadingPos = getLoadingPosition(loadingProgress);
+  // Only calculate loading position when needed
+  const loadingPos = isActive ? getLoadingPosition(loadingProgress) : { x: 0, y: 0 };
+  
+  // Reduce number of trail segments to improve performance
+  const trailSegments = 20; // Reduced from 50
   
   return (
     <div className="min-h-screen flex flex-col">
@@ -231,7 +264,7 @@ const LandingPage = () => {
         </div>
         
         <div className="absolute inset-0 z-10 pointer-events-none">
-          <FloatingAnimation items={floatingFeatureCards} className="h-full" />
+          {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
         </div>
         
         <div className="w-full max-w-4xl text-center space-y-8 relative z-20">
@@ -256,8 +289,8 @@ const LandingPage = () => {
             <div className="relative mx-auto w-[300px]">
               <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_8px_rgba(51,195,240,0.4)]"></div>
               
-              {[...Array(50)].map((_, i) => {
-                const trailSegmentOffset = i * 4;
+              {isActive && [...Array(trailSegments)].map((_, i) => {
+                const trailSegmentOffset = i * (400 / trailSegments);
                 const trailPos = getLoadingPosition((loadingProgress - trailSegmentOffset + 400) % 400);
                 
                 return (
@@ -267,12 +300,13 @@ const LandingPage = () => {
                     style={{
                       left: `${trailPos.x}px`,
                       top: `${trailPos.y}px`,
-                      width: `${Math.max(5 - i * 0.07, 1.2)}px`,
-                      height: `${Math.max(5 - i * 0.07, 1.2)}px`,
-                      opacity: `${Math.max(1 - i * 0.015, 0)}`,
+                      width: `${Math.max(5 - i * 0.15, 1.2)}px`,
+                      height: `${Math.max(5 - i * 0.15, 1.2)}px`,
+                      opacity: `${Math.max(1 - i * 0.04, 0)}`,
                       transform: `translate(-50%, -50%)`,
                       background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: `0 0 ${25 - i * 0.3}px ${12 - i * 0.1}px rgba(51,195,240,${Math.max(0.95 - i * 0.015, 0)})`,
+                      boxShadow: i < 10 ? `0 0 ${25 - i * 0.8}px ${12 - i * 0.3}px rgba(51,195,240,${Math.max(0.95 - i * 0.04, 0)})` : 'none',
+                      willChange: i < 5 ? 'left, top' : 'auto',
                     }}
                   ></div>
                 );

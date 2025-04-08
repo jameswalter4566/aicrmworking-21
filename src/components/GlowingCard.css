@@ -5,6 +5,7 @@
   box-shadow: 0 0 40px rgba(255, 255, 255, 0.1);
   animation: fadeIn 0.8s ease-out forwards;
   opacity: 0;
+  will-change: transform, opacity;
 }
 
 .glowing-card:hover {
@@ -30,6 +31,7 @@
   pointer-events: none;
   mix-blend-mode: screen;
   transform: rotate(25deg);
+  will-change: transform;
 }
 
 @keyframes shineMove {
