@@ -30,7 +30,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { InfoCircledIcon, Cross2Icon } from "@radix-ui/react-icons";
-import { Phone } from "lucide-react";
+import { Phone, PhoneCall, Clock, RotateCw, Pause, PhoneOff, StopCircle } from "lucide-react";
 import TwilioScript from "@/components/TwilioScript";
 import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
@@ -97,6 +97,10 @@ export default function PowerDialer() {
   const [twilioReady, setTwilioReady] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
+  const [dialingSessionActive, setDialingSessionActive] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [sessionDuration, setSessionDuration] = useState<string>("00:00:00");
+  const [selectedDisposition, setSelectedDisposition] = useState<string | null>(null);
 
   const twilioState = useTwilio();
 
@@ -108,6 +112,63 @@ export default function PowerDialer() {
       return () => {};
     }
   }, [isScriptLoaded]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    
+    if (dialingSessionActive && sessionStartTime) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const diff = now.getTime() - sessionStartTime.getTime();
+        
+        const hours = Math.floor(diff / 3600000).toString().padStart(2, '0');
+        const minutes = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+        const seconds = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+        
+        setSessionDuration(`${hours}:${minutes}:${seconds}`);
+      }, 1000);
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [dialingSessionActive, sessionStartTime]);
+
+  const startDialingSession = () => {
+    setDialingSessionActive(true);
+    setSessionStartTime(new Date());
+    toast({
+      title: "Dialing Session Started",
+      description: "You can now begin calling leads.",
+    });
+  };
+
+  const stopDialingSession = () => {
+    setDialingSessionActive(false);
+    setSessionStartTime(null);
+    setSessionDuration("00:00:00");
+    toast({
+      title: "Dialing Session Ended",
+      description: "Your dialing session has been stopped.",
+    });
+    
+    twilioState.endAllCalls();
+    setCallInProgress(false);
+  };
+
+  const handleDisposition = (disposition: string) => {
+    setSelectedDisposition(disposition);
+    
+    if (Object.keys(twilioState.activeCalls).length > 0) {
+      const leadId = Object.keys(twilioState.activeCalls)[0];
+      updateLeadStatus(leadId, disposition);
+      
+      toast({
+        title: "Lead Dispositioned",
+        description: `Lead has been marked as "${disposition}".`,
+      });
+    }
+  };
 
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
@@ -194,6 +255,201 @@ export default function PowerDialer() {
 
   const [isDialing, setIsDialing] = useState(false);
 
+  const getDispositionStyle = (type: string) => {
+    switch(type) {
+      case "Contacted":
+        return "bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200";
+      case "Not Contacted":
+        return "bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200";
+      case "Appointment Set":
+        return "bg-purple-100 hover:bg-purple-200 text-purple-700 border-purple-200";
+      case "Submitted":
+        return "bg-green-100 hover:bg-green-200 text-green-700 border-green-200";
+      case "Dead":
+        return "bg-orange-100 hover:bg-orange-200 text-orange-700 border-orange-200";
+      case "DNC":
+        return "bg-red-100 hover:bg-red-200 text-red-700 border-red-200";
+      default:
+        return "bg-gray-100 hover:bg-gray-200 text-gray-700 border-gray-200";
+    }
+  };
+
+  const DialerPreview = () => (
+    <Card className="mb-4 relative overflow-hidden">
+      <CardHeader className="pb-2 flex flex-row justify-between items-center">
+        <div>
+          <CardTitle className="text-lg">Dialing Preview</CardTitle>
+          <CardDescription>
+            {dialingSessionActive 
+              ? "Session in progress - manage your current calls" 
+              : "Start a new dialing session"}
+          </CardDescription>
+        </div>
+        
+        {dialingSessionActive && (
+          <div className="flex flex-col items-end">
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4" />
+              <span className="font-mono">{sessionDuration}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              Session started at {sessionStartTime?.toLocaleTimeString()}
+            </div>
+          </div>
+        )}
+      </CardHeader>
+      
+      <CardContent className="min-h-[300px] flex">
+        <div className="flex-1 flex items-center justify-center">
+          {!dialingSessionActive ? (
+            <Button 
+              onClick={startDialingSession} 
+              className="bg-crm-blue hover:bg-crm-blue/90 px-8 py-6 h-auto text-lg"
+            >
+              <PhoneCall className="mr-2 h-5 w-5" />
+              Begin Dialing Session
+            </Button>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              {Object.keys(twilioState.activeCalls).length === 0 ? (
+                <div className="text-center text-muted-foreground">
+                  <PhoneCall className="mx-auto h-12 w-12 text-muted-foreground/50 mb-2" />
+                  <p>No active calls</p>
+                  <p className="text-sm">Select a lead from the queue below to start calling</p>
+                </div>
+              ) : (
+                <Card className="w-full bg-blue-50 border-blue-200">
+                  <CardContent className="p-4">
+                    {Object.entries(twilioState.activeCalls).map(([leadId, call]) => {
+                      const lead = leads.find(l => l.id === leadId);
+                      return (
+                        <div key={leadId} className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-medium text-lg">{lead?.name}</h3>
+                            <p className="text-muted-foreground">{call.phoneNumber}</p>
+                            <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
+                              {call.status === 'connecting' ? 'Ringing' : 
+                              call.status === 'in-progress' ? 'Connected' :
+                              call.status === 'completed' ? 'Ended' : 
+                              call.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+        
+        {dialingSessionActive && (
+          <div className="w-60 border-l pl-4 flex flex-col gap-2">
+            <p className="font-medium text-sm mb-2">Disposition</p>
+            
+            <Button 
+              variant="disposition" 
+              className={`justify-start ${getDispositionStyle("Contacted")} ${selectedDisposition === "Contacted" ? "ring-2 ring-blue-400" : ""}`}
+              onClick={() => handleDisposition("Contacted")}
+            >
+              Contacted
+            </Button>
+            
+            <Button 
+              variant="disposition" 
+              className={`justify-start ${getDispositionStyle("Not Contacted")} ${selectedDisposition === "Not Contacted" ? "ring-2 ring-gray-400" : ""}`}
+              onClick={() => handleDisposition("Not Contacted")}
+            >
+              Not Contacted
+            </Button>
+            
+            <Button 
+              variant="disposition" 
+              className={`justify-start ${getDispositionStyle("Appointment Set")} ${selectedDisposition === "Appointment Set" ? "ring-2 ring-purple-400" : ""}`}
+              onClick={() => handleDisposition("Appointment Set")}
+            >
+              Appointment Set
+            </Button>
+            
+            <Button 
+              variant="disposition" 
+              className={`justify-start ${getDispositionStyle("Submitted")} ${selectedDisposition === "Submitted" ? "ring-2 ring-green-400" : ""}`}
+              onClick={() => handleDisposition("Submitted")}
+            >
+              Submitted
+            </Button>
+            
+            <Button 
+              variant="disposition" 
+              className={`justify-start ${getDispositionStyle("Dead")} ${selectedDisposition === "Dead" ? "ring-2 ring-orange-400" : ""}`}
+              onClick={() => handleDisposition("Dead")}
+            >
+              Dead
+            </Button>
+            
+            <Button 
+              variant="disposition" 
+              className={`justify-start ${getDispositionStyle("DNC")} ${selectedDisposition === "DNC" ? "ring-2 ring-red-400" : ""}`}
+              onClick={() => handleDisposition("DNC")}
+            >
+              DNC
+            </Button>
+            
+            <Separator className="my-2" />
+            
+            <Button 
+              className="bg-gray-200 hover:bg-gray-300 text-gray-700"
+              onClick={() => {
+                toast({
+                  title: "Redial",
+                  description: "Redialing the last number...",
+                });
+              }}
+            >
+              <RotateCw className="h-4 w-4 mr-2" />
+              Redial
+            </Button>
+            
+            <Button 
+              className="bg-yellow-200 hover:bg-yellow-300 text-yellow-700"
+              onClick={() => {
+                toast({
+                  title: "Call Paused",
+                  description: "Current call has been paused.",
+                });
+              }}
+            >
+              <Pause className="h-4 w-4 mr-2" />
+              Pause
+            </Button>
+            
+            <Button 
+              className="bg-orange-200 hover:bg-orange-300 text-orange-700"
+              onClick={() => {
+                if (Object.keys(twilioState.activeCalls).length > 0) {
+                  const leadId = Object.keys(twilioState.activeCalls)[0];
+                  handleEndCall(leadId);
+                }
+              }}
+            >
+              <PhoneOff className="h-4 w-4 mr-2" />
+              Hang Up
+            </Button>
+            
+            <Button 
+              className="bg-red-500 hover:bg-red-600 text-white mt-4"
+              onClick={stopDialingSession}
+            >
+              <StopCircle className="h-4 w-4 mr-2" />
+              Stop Session
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
       <Card className="bg-muted/50">
@@ -240,7 +496,9 @@ export default function PowerDialer() {
         </CardHeader>
       </Card>
 
-      {Object.keys(twilioState.activeCalls).length > 0 && (
+      <DialerPreview />
+
+      {!dialingSessionActive && Object.keys(twilioState.activeCalls).length > 0 && (
         <Card className="bg-muted/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex justify-between items-center">

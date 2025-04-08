@@ -19,7 +19,7 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        disposition: "px-3 py-1 rounded-full text-xs font-semibold",
+        disposition: "px-3 py-2 rounded-full text-sm font-semibold border transition-all duration-200 justify-start w-full",
         dialer: "bg-crm-blue text-white hover:bg-crm-blue/90 transition-all duration-200",
         refresh: "text-gray-500 hover:text-primary hover:bg-gray-100 p-1 rounded-full",
       },
