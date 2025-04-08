@@ -67,7 +67,7 @@ const createTwilioService = (): TwilioService => {
       if (device) {
         console.log("Cleaning up existing Twilio device before initialization");
         try {
-          await hangupAllCalls();
+          // await hangupAllCalls();
           
           if (typeof device.destroy === 'function') {
             await device.destroy();
@@ -108,7 +108,7 @@ const createTwilioService = (): TwilioService => {
       if (window.Twilio && window.Twilio.Device) {
         // First make sure we terminate any previous device
         try {
-          await hangupAllCalls();
+          // await hangupAllCalls();
         } catch (err) {
           console.warn("Error cleaning up existing calls:", err);
         }
@@ -153,12 +153,12 @@ const createTwilioService = (): TwilioService => {
             if (!isCleaningUp) {
               isCleaningUp = true;
               setTimeout(() => {
-                hangupAllCalls().then(() => {
-                  isCleaningUp = false;
-                }).catch(err => {
-                  isCleaningUp = false;
-                  console.warn("Error in auto-cleanup after HANGUP:", err);
-                });
+                //  hangupAllCalls().then(() => {
+                //   isCleaningUp = false;
+                // }).catch(err => {
+                //   isCleaningUp = false;
+                //   console.warn("Error in auto-cleanup after HANGUP:", err);
+                // });
               }, 1000);
             }
           }
@@ -320,7 +320,7 @@ const createTwilioService = (): TwilioService => {
       }
 
       // First clean up any existing calls
-      await hangupAllCalls();
+      // await hangupAllCalls();
       
       // Make sure we're starting fresh
       activeCalls = [];
@@ -369,7 +369,7 @@ const createTwilioService = (): TwilioService => {
           if (error.code === '31005') {
             console.log("Attempting recovery from connection error");
             setTimeout(() => {
-              hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
+               hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
             }, 1000);
           }
         });
@@ -508,7 +508,7 @@ const createTwilioService = (): TwilioService => {
       }
       
       isCleaningUp = true;
-      console.log("Hanging up all calls...");
+      console.log("Hanging up all calls..1.");
       
       // First try the client-side approach
       if (device && typeof device.disconnectAll === 'function') {
@@ -635,7 +635,7 @@ const createTwilioService = (): TwilioService => {
 
   const cleanup = () => {
     if (device) {
-      hangupAllCalls().catch(err => console.warn("Error in final hangup:", err));
+       hangupAllCalls().catch(err => console.warn("Error in final hangup:", err)); 
       
       if (typeof device.destroy === 'function') {
         device.destroy();

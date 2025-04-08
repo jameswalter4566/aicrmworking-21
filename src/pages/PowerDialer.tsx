@@ -159,6 +159,7 @@ export default function PowerDialer() {
       const callResult = await twilioState.makeCall(lead.phone, lead.id);
       
       if (!callResult.success) {
+        console.error("Call failed:", JSON.stringify(callResult));
         toast({
           title: "Call Failed",
           description: callResult.error || "Unable to place call.",

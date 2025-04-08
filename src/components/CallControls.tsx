@@ -146,7 +146,7 @@ export function CallControls({
 
   useEffect(() => {
     return () => {
-      if (isInCall) {
+      if (isInCall && false) {
         console.log("CallControls unmounting - cleaning up active call");
         onHangup(leadId);
         setCallInitiated(false);

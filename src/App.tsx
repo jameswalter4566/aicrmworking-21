@@ -119,7 +119,7 @@ const AudioDiagnosticLogger = () => {
     testMicAccess();
     
     const interval = setInterval(async () => {
-      if (window.location.pathname.includes('/power-dialer') || 
+      if (window.location.pathname.includes('/poqwer-dialer') || 
           window.location.pathname.includes('/ai-dialer')) {
         console.group('🎤 Audio Streaming Diagnostics');
         
