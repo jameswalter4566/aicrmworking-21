@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff, Mic, MicOff, Volume, Volume2, RefreshCw } from "lucide-react";
@@ -45,6 +46,7 @@ export function CallControls({
   const [showDeviceSelector, setShowDeviceSelector] = useState(false);
   const [isResettingCall, setIsResettingCall] = useState(false);
   const [callInitiated, setCallInitiated] = useState(false);
+  const [callAttempts, setCallAttempts] = useState(0);
   
   const isInCall = !!activeCall;
   const isMuted = activeCall?.isMuted || false;
@@ -57,18 +59,23 @@ export function CallControls({
     
     try {
       setCallInitiated(true);
-      console.log(`Initiating call to ${phoneNumber} with leadId ${leadId}`);
+      setCallAttempts(prev => prev + 1);
+      console.log(`Initiating call to ${phoneNumber} with leadId ${leadId} (Attempt #${callAttempts + 1})`);
       onCall(phoneNumber, leadId);
+      
       toast({
         title: "Placing Call",
         description: `Calling ${phoneNumber}...`,
       });
+      
+      // Reset call initiated flag after 5 seconds to prevent multiple calls
       setTimeout(() => {
         setCallInitiated(false);
       }, 5000);
     } catch (error) {
       console.error("Error initiating call:", error);
       setCallInitiated(false);
+      
       toast({
         title: "Call Failed",
         description: "Unable to initiate call. Please try again.",
@@ -81,8 +88,14 @@ export function CallControls({
     try {
       await onHangup(leadId);
       setCallInitiated(false);
+      
+      toast({
+        title: "Call Ended",
+        description: "You've ended the call.",
+      });
     } catch (error) {
       console.error("Error hanging up call:", error);
+      
       toast({
         title: "Hangup Error",
         description: "Failed to properly terminate call. Please try resetting.",
@@ -97,6 +110,7 @@ export function CallControls({
       await onHangup(leadId);
       await new Promise(resolve => setTimeout(resolve, 1000));
       setCallInitiated(false);
+      
       toast({
         title: "Call Reset",
         description: "Call state has been reset. You can try calling again.",
@@ -146,6 +160,18 @@ export function CallControls({
         title: "No Answer",
         description: "The call was not answered. The recipient may be unavailable.",
         variant: "default",
+      });
+    } else if (activeCall && activeCall.status === 'busy') {
+      toast({
+        title: "Line Busy",
+        description: "The number you're calling is busy. Please try again later.",
+        variant: "default",
+      });
+    } else if (activeCall && activeCall.status === 'failed') {
+      toast({
+        title: "Call Failed",
+        description: "The call couldn't be completed. Please check the number and try again.",
+        variant: "destructive",
       });
     }
   }, [activeCall]);
@@ -266,6 +292,15 @@ export function CallControls({
                 <span>Conference: {activeCall.conferenceName.substring(0, 10)}...</span>
               </div>
             )}
+          </div>
+        )}
+        
+        {/* Show message when no answer was received */}
+        {!isInCall && callAttempts > 0 && (
+          <div className="text-xs text-center text-muted-foreground mt-1">
+            {callAttempts > 1 ? (
+              <span className="text-amber-500">Multiple call attempts made - recipient may be unavailable</span>
+            ) : null}
           </div>
         )}
       </div>

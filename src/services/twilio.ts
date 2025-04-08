@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -124,6 +123,18 @@ const createTwilioService = (): TwilioService => {
             incoming: '/sounds/incoming.mp3',
             outgoing: '/sounds/outgoing.mp3',
             disconnect: '/sounds/disconnect.mp3',
+            dtmf0: '/sounds/dtmf-0.mp3',
+            dtmf1: '/sounds/dtmf-1.mp3',
+            dtmf2: '/sounds/dtmf-2.mp3',
+            dtmf3: '/sounds/dtmf-3.mp3',
+            dtmf4: '/sounds/dtmf-4.mp3',
+            dtmf5: '/sounds/dtmf-5.mp3',
+            dtmf6: '/sounds/dtmf-6.mp3',
+            dtmf7: '/sounds/dtmf-7.mp3',
+            dtmf8: '/sounds/dtmf-8.mp3',
+            dtmf9: '/sounds/dtmf-9.mp3',
+            dtmfs: '/sounds/dtmf-star.mp3',
+            dtmfh: '/sounds/dtmf-pound.mp3'
           }
         });
 
@@ -332,6 +343,18 @@ const createTwilioService = (): TwilioService => {
           activeCalls = activeCalls.filter(c => c.sid !== call.sid);
         });
         
+        // Listen specifically for no-answer event
+        call.on('cancel', () => {
+          console.log('Call was cancelled or not answered');
+          toast({
+            title: "Call Not Answered",
+            description: "The recipient didn't answer the call.",
+          });
+          
+          // Remove from active calls
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+        });
+        
         return { 
           success: true, 
           callSid: call.sid || 'browser-call',
@@ -439,12 +462,18 @@ const createTwilioService = (): TwilioService => {
       
       // First try the client-side approach
       if (device && typeof device.disconnectAll === 'function') {
-        device.disconnectAll();
-        activeCalls = []; // Reset active calls tracking
+        try {
+          console.log("Executing device.disconnectAll() to clean up calls");
+          device.disconnectAll();
+          activeCalls = []; // Reset active calls tracking
+        } catch (clientError) {
+          console.warn("Error in client-side hangup:", clientError);
+        }
       }
       
       // Always also try the server-side approach for thorough cleanup
       try {
+        console.log("Executing server-side hangupAll for thorough cleanup");
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
           method: 'POST',
           headers: {
@@ -470,6 +499,7 @@ const createTwilioService = (): TwilioService => {
       setTimeout(() => {
         if (device && typeof device.disconnectAll === 'function') {
           try {
+            console.log("Executing delayed cleanup to ensure calls are terminated");
             device.disconnectAll();
           } catch (e) {
             console.warn("Error in delayed cleanup:", e);

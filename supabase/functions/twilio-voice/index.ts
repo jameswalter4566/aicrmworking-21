@@ -33,7 +33,7 @@ function debugTwiML(twiml: any) {
 // Name of the conference room
 const CONFERENCE_ROOM_PREFIX = "Conference_Room_";
 const DEFAULT_HOLD_MUSIC = "https://assets.twilio.com/resources/hold-music.mp3";
-const DEFAULT_TIMEOUT = 30; // seconds before ending call if no answer
+const DEFAULT_TIMEOUT = 20; // Reduced from 30 to 20 seconds to get faster no-answer responses
 
 serve(async (req) => {
   console.log(`Received ${req.method} request to Twilio Voice function`);
@@ -166,9 +166,18 @@ serve(async (req) => {
                                  requestData.From.startsWith('client:') && 
                                  requestData.phoneNumber;
     
+    // New special detection for Twilio initiating a call from a client
+    const isClientDirectCall = !action && 
+                              requestData.From &&
+                              requestData.From.startsWith('client:') && 
+                              requestData.Called === '';
+    
     if (isClientInitiatedCall) {
       action = 'incomingCall';
       console.log("Detected client-initiated call from:", requestData.From, "to:", requestData.phoneNumber);
+    } else if (isClientDirectCall) {
+      action = 'clientDirectCall';
+      console.log("Detected client direct call from:", requestData.From);
     }
     
     console.log("Final action being used:", action);
@@ -190,6 +199,46 @@ serve(async (req) => {
       twimlAppSidAvailable: !!TWILIO_TWIML_APP_SID,
       phoneNumberAvailable: !!TWILIO_PHONE_NUMBER
     });
+    
+    // NEW: Special handling for client direct calls (when Twilio client calls directly without phone number)
+    if (action === 'clientDirectCall') {
+      console.log("Handling direct client call from:", requestData.From);
+      
+      // Create a TwiML response to properly respond to client calls
+      const twiml = new twilio.twiml.VoiceResponse();
+      
+      // Create a unique conference ID for this call
+      const conferenceName = `${CONFERENCE_ROOM_PREFIX}${Date.now()}`;
+      console.log(`Created conference room for direct client call: ${conferenceName}`);
+      
+      // Add greeting
+      twiml.say("Your call has been received. Please wait for the system to connect you.");
+      twiml.pause({ length: 1 });
+      
+      // Create a Dial with conference
+      const dial = twiml.dial();
+      
+      // Configure the conference
+      dial.conference(
+        conferenceName,
+        {
+          statusCallback: `${url.origin}/functions/v1/twilio-voice?action=conferenceStatus`,
+          statusCallbackEvent: ['start', 'end', 'join', 'leave'],
+          startConferenceOnEnter: true,
+          endConferenceOnExit: false,
+          waitUrl: DEFAULT_HOLD_MUSIC,
+          beep: true,
+          record: 'false'
+        }
+      );
+      
+      // Debug the generated TwiML
+      const twimlString = debugTwiML(twiml);
+      
+      return new Response(twimlString, { 
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+      });
+    }
 
     // Universal handler for client-originated calls
     if (!action || action === 'incomingCall' || isClientInitiatedCall) {
@@ -245,7 +294,7 @@ serve(async (req) => {
         // Then dial out to the destination number
         const dial = twiml.dial({
           callerId: TWILIO_PHONE_NUMBER,
-          timeout: DEFAULT_TIMEOUT, // Shorter timeout to prevent long waits
+          timeout: DEFAULT_TIMEOUT, // Reduced timeout to prevent long waits
           action: dialStatusCallbackUrl,
           method: 'POST',
           answerOnBridge: true
@@ -374,7 +423,7 @@ serve(async (req) => {
             to: `client:${browserClientName}`,
             from: TWILIO_PHONE_NUMBER,
             twiml: browserTwimlString,
-            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
+            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
@@ -387,7 +436,7 @@ serve(async (req) => {
           
           // Add the phone to the same conference
           const phoneDialer = phoneTwiml.dial({
-            timeout: DEFAULT_TIMEOUT, // Shorter timeout to prevent long waits
+            timeout: DEFAULT_TIMEOUT, // Reduced timeout to prevent long waits
           });
           phoneDialer.conference(
             conferenceName,
@@ -409,7 +458,7 @@ serve(async (req) => {
             to: formattedPhoneNumber,
             from: TWILIO_PHONE_NUMBER,
             twiml: phoneTwimlString,
-            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
+            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
@@ -444,7 +493,7 @@ serve(async (req) => {
             to: formattedPhoneNumber,
             from: TWILIO_PHONE_NUMBER,
             twiml: twimlString,
-            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback`,
+            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
@@ -497,8 +546,9 @@ serve(async (req) => {
       
       const callStatus = callbackData.CallStatus;
       const callSid = callbackData.CallSid;
+      const leadId = callbackData.leadId || url.searchParams.get('leadId');
       
-      console.log(`Call ${callSid} status: ${callStatus}`);
+      console.log(`Call ${callSid} status: ${callStatus} for leadId: ${leadId || 'unknown'}`);
       console.log("Status callback parameters:", callbackData);
       
       // Return a valid TwiML response (properly formatted XML)
