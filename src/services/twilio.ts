@@ -36,6 +36,7 @@ const createTwilioService = (): TwilioService => {
   let audioContext: AudioContext | null = null;
   let preferredAudioDevice: string | null = null;
   let activeCalls: any[] = []; // Track active calls for better management
+  let isCleaningUp: boolean = false;
 
   const initializeAudioContext = async (): Promise<boolean> => {
     try {
@@ -63,9 +64,12 @@ const createTwilioService = (): TwilioService => {
 
   const initializeTwilioDevice = async (): Promise<boolean> => {
     try {
+      // First, clean up any existing device
       if (device) {
         console.log("Cleaning up existing Twilio device before initialization");
         try {
+          await hangupAllCalls();
+          
           if (typeof device.destroy === 'function') {
             await device.destroy();
           }
@@ -76,6 +80,10 @@ const createTwilioService = (): TwilioService => {
         }
       }
       
+      // Reset the cleaning up flag
+      isCleaningUp = false;
+      
+      console.log("Fetching Twilio token...");
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
         method: 'POST',
         headers: {
@@ -128,6 +136,20 @@ const createTwilioService = (): TwilioService => {
           
           if (errorCode === '31005' && errorMessage.includes('HANGUP')) {
             errorMessage = "Call terminated unexpectedly. The line may be busy or a previous call is still active.";
+            
+            // Automatically clean up when we get a HANGUP error
+            console.log("Received HANGUP error, performing cleanup");
+            if (!isCleaningUp) {
+              isCleaningUp = true;
+              setTimeout(() => {
+                hangupAllCalls().then(() => {
+                  isCleaningUp = false;
+                }).catch(err => {
+                  isCleaningUp = false;
+                  console.warn("Error in auto-cleanup after HANGUP:", err);
+                });
+              }, 1000);
+            }
           }
           
           toast({
@@ -157,7 +179,7 @@ const createTwilioService = (): TwilioService => {
 
         device.on("incoming", (call: any) => {
           console.log(`Incoming call from: ${call.from || 'unknown'}`);
-          call.reject();
+          call.reject(); // Automatically reject incoming calls for this app
         });
 
         try {
@@ -220,9 +242,8 @@ const createTwilioService = (): TwilioService => {
       const testDevice = deviceId || preferredAudioDevice || 'default';
       console.log(`Testing audio output device: ${testDevice}`);
 
-      await device.audio.speakerDevices.test(
-        'https://twimlets.com/echo.mp3'
-      );
+      // Use a local test tone instead of an external URL
+      await device.audio.speakerDevices.test('/sounds/test-tone.mp3');
       return true;
     } catch (error) {
       console.error("Error testing audio output:", error);
@@ -282,6 +303,14 @@ const createTwilioService = (): TwilioService => {
           
           // Remove from active calls on error
           activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+          
+          // Attempt recovery if we get a connection error
+          if (error.code === '31005') {
+            console.log("Attempting recovery from connection error");
+            setTimeout(() => {
+              hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
+            }, 1000);
+          }
         });
         
         call.on('accept', () => {
@@ -399,6 +428,15 @@ const createTwilioService = (): TwilioService => {
 
   const hangupAllCalls = async (): Promise<boolean> => {
     try {
+      // Prevent concurrent cleanup operations
+      if (isCleaningUp) {
+        console.log("Cleanup already in progress, skipping");
+        return true;
+      }
+      
+      isCleaningUp = true;
+      console.log("Hanging up all calls...");
+      
       // First try the client-side approach
       if (device && typeof device.disconnectAll === 'function') {
         device.disconnectAll();
@@ -406,28 +444,44 @@ const createTwilioService = (): TwilioService => {
       }
       
       // Always also try the server-side approach for thorough cleanup
-      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'hangupAll'
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server hangup all response error:", response.status, errorText);
-        return true; // Still return true as we attempted client-side cleanup
+      try {
+        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            action: 'hangupAll'
+          })
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Server hangup all response error:", response.status, errorText);
+        } else {
+          const result = await response.json();
+          console.log("Hangup all result:", result);
+        }
+      } catch (serverError) {
+        console.warn("Error in server-side hangup:", serverError);
       }
       
-      const result = await response.json();
-      console.log("Hangup all result:", result);
+      // Try a second cleanup after a short delay for reliability
+      setTimeout(() => {
+        if (device && typeof device.disconnectAll === 'function') {
+          try {
+            device.disconnectAll();
+          } catch (e) {
+            console.warn("Error in delayed cleanup:", e);
+          }
+        }
+        isCleaningUp = false;
+      }, 1000);
       
       return true;
     } catch (error) {
       console.error("Error hanging up all calls:", error);
+      isCleaningUp = false;
       return false;
     }
   };
@@ -516,6 +570,7 @@ const createTwilioService = (): TwilioService => {
         console.log("Audio context closed.");
       });
     }
+    isCleaningUp = false;
   };
 
   return {
