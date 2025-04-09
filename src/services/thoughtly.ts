@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -145,6 +144,38 @@ export const thoughtlyService = {
       return data.data || [];
     } catch (error) {
       console.error('Error in getContacts:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get a single contact by ID
+   * @param id The contact ID
+   * @returns The contact data
+   */
+  async getContactById(id: number | string) {
+    try {
+      console.log('Getting contact by ID:', id);
+      
+      // Use the dedicated thoughtly-get-contact edge function
+      const { data, error } = await supabase.functions.invoke('thoughtly-get-contact', {
+        body: { id }
+      });
+
+      if (error) {
+        console.error('Error getting contact by ID from Thoughtly:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('Error getting contact by ID from Thoughtly:', data.error);
+        throw new Error(data.error || 'Failed to get contact from Thoughtly');
+      }
+
+      console.log('Retrieved contact from Thoughtly:', data);
+      return data.data || null;
+    } catch (error) {
+      console.error('Error in getContactById:', error);
       throw error;
     }
   },
@@ -332,6 +363,88 @@ export const thoughtlyService = {
       };
     } catch (error) {
       console.error('Error in retrieveLeads:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Add a note to a contact
+   * @param contactId The contact ID
+   * @param note The note to add
+   * @returns Success status
+   */
+  async addNote(contactId: number | string, note: string) {
+    try {
+      console.log(`Adding note to contact ${contactId}:`, note);
+      
+      const { data, error } = await supabase.functions.invoke('thoughtly-add-note', {
+        body: {
+          contactId,
+          note
+        }
+      });
+
+      if (error) {
+        console.error('Error adding note to contact:', error);
+        throw error;
+      }
+
+      console.log('Note added successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in addNote:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get notes for a contact
+   * @param contactId The contact ID
+   * @returns Array of notes
+   */
+  async getNotes(contactId: number | string) {
+    try {
+      console.log('Getting notes for contact:', contactId);
+      
+      const { data, error } = await supabase.functions.invoke('thoughtly-get-notes', {
+        body: { contactId }
+      });
+
+      if (error) {
+        console.error('Error getting notes for contact:', error);
+        throw error;
+      }
+
+      console.log('Retrieved notes:', data);
+      return data.notes || [];
+    } catch (error) {
+      console.error('Error in getNotes:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Get activities for a contact
+   * @param contactId The contact ID
+   * @returns Array of activities
+   */
+  async getActivities(contactId: number | string) {
+    try {
+      console.log('Getting activities for contact:', contactId);
+      
+      const { data, error } = await supabase.functions.invoke('thoughtly-get-activities', {
+        body: { contactId }
+      });
+
+      if (error) {
+        console.error('Error getting activities for contact:', error);
+        throw error;
+      }
+
+      console.log('Retrieved activities:', data);
+      return data.activities || [];
+    } catch (error) {
+      console.error('Error in getActivities:', error);
       throw error;
     }
   }
