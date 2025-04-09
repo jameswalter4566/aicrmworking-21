@@ -51,7 +51,7 @@ import { Progress } from "@/components/ui/progress";
 import { thoughtlyService } from "@/services/thoughtly";
 import { supabase } from "@/integrations/supabase/client";
 
-const leadsData = [
+const sampleLeadsData = [
   {
     id: 1,
     firstName: "Dan",
@@ -129,14 +129,16 @@ type LeadFormValues = {
 };
 
 const People = () => {
-  const [leads, setLeads] = useState(leadsData);
-  const [customFields, setCustomFields] = useState([]);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [customFields, setCustomFields] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeDisposition, setActiveDisposition] = useState("All Leads");
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [apiResponse, setApiResponse] = useState<any>(null);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -155,22 +157,91 @@ const People = () => {
 
   useEffect(() => {
     const fetchLeads = async () => {
+      setIsLoading(true);
       try {
-        const fetchedLeads = await thoughtlyService.retrieveLeads();
-        if (fetchedLeads && fetchedLeads.length > 0) {
-          setLeads(fetchedLeads);
+        const response = await thoughtlyService.retrieveLeads();
+        console.log("API Response:", response);
+        
+        if (response && response.data) {
+          setLeads(response.data || []);
+          setApiResponse(response);
+        } else if (response && Array.isArray(response)) {
+          setLeads(response);
+          setApiResponse({ data: response, metadata: { totalLeadCount: response.length } });
+        } else {
+          console.warn("Unexpected response format:", response);
+          setLeads(sampleLeadsData);
+          setApiResponse({ 
+            success: false, 
+            data: sampleLeadsData,
+            metadata: { 
+              note: "Using sample data due to unexpected API response format",
+              totalLeadCount: sampleLeadsData.length
+            }
+          });
         }
       } catch (error) {
         console.error("Error fetching leads:", error);
+        toast.error("Failed to load leads. Using sample data instead.");
+        setLeads(sampleLeadsData);
+        setApiResponse({ 
+          success: false, 
+          error: String(error),
+          data: sampleLeadsData,
+          metadata: { 
+            note: "Using sample data due to API error",
+            totalLeadCount: sampleLeadsData.length
+          }
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchLeads();
   }, []);
 
+  useEffect(() => {
+    if (apiResponse) {
+      console.log("API Response State:", apiResponse);
+      console.log("Leads State:", leads);
+    }
+  }, [apiResponse, leads]);
+
+  const refreshLeads = async () => {
+    toast.info("Refreshing leads...");
+    try {
+      const response = await thoughtlyService.retrieveLeads();
+      if (response && response.data) {
+        setLeads(response.data);
+        setApiResponse(response);
+        toast.success(`Retrieved ${response.data.length} leads`);
+      } else if (response && Array.isArray(response)) {
+        setLeads(response);
+        toast.success(`Retrieved ${response.length} leads`);
+      } else {
+        toast.error("Unexpected API response format");
+      }
+    } catch (error) {
+      console.error("Error refreshing leads:", error);
+      toast.error("Failed to refresh leads");
+    }
+  };
+
   const filteredLeads = leads.filter(lead => {
-    if (activeDisposition === "All Leads") return true;
-    return lead.disposition === activeDisposition;
+    const dispositionMatch = activeDisposition === "All Leads" || lead.disposition === activeDisposition;
+    
+    if (searchTerm && searchTerm.trim() !== "") {
+      const term = searchTerm.toLowerCase();
+      const searchMatch = 
+        (lead.firstName?.toLowerCase().includes(term) || false) ||
+        (lead.lastName?.toLowerCase().includes(term) || false) ||
+        (lead.email?.toLowerCase().includes(term) || false) ||
+        (lead.phone1?.includes(term) || false);
+      return dispositionMatch && searchMatch;
+    }
+    
+    return dispositionMatch;
   });
 
   const updateLeadDisposition = (leadId: number | number[], newDisposition: string) => {
@@ -338,8 +409,29 @@ const People = () => {
             <Upload className="h-4 w-4 mr-2" />
             Import Lead List
           </Button>
+          <Button
+            variant="outline"
+            onClick={refreshLeads}
+            className="rounded-lg"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
       </div>
+
+      {apiResponse && (
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200 text-sm">
+          <details>
+            <summary className="font-medium text-blue-700 cursor-pointer">
+              API Response Info (Debug)
+            </summary>
+            <div className="mt-2 text-xs overflow-auto max-h-40 bg-white p-2 rounded">
+              <pre>{JSON.stringify(apiResponse, null, 2)}</pre>
+            </div>
+          </details>
+        </div>
+      )}
 
       <div className="disposition-filters">
         {dispositionTypes.map((disposition) => (
@@ -407,9 +499,16 @@ const People = () => {
       )}
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex items-center bg-crm-lightBlue">
-          <h2 className="font-medium text-gray-700">All Leads</h2>
-          <div className="ml-auto">
+        <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-crm-lightBlue">
+          <h2 className="font-medium text-gray-700">
+            {isLoading ? 'Loading...' : `All Leads (${filteredLeads.length})`}
+            {apiResponse?.metadata && (
+              <span className="text-xs text-gray-500 ml-2">
+                Total in DB: {apiResponse.metadata.totalLeadCount || 0}
+              </span>
+            )}
+          </h2>
+          <div>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -422,124 +521,131 @@ const People = () => {
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-crm-blue/10">
-              <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox 
-                    checked={isAllSelected}
-                    onCheckedChange={handleSelectAllLeads}
-                    aria-label="Select all"
-                  />
-                </TableHead>
-                <TableHead>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="flex items-center cursor-pointer focus:outline-none group">
-                      <span>Disposition</span>
-                      <ChevronDown className="ml-2 h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-48 bg-white">
-                      <DropdownMenuItem onClick={sortLeadsByDisposition}>
-                        Sort by Disposition
-                      </DropdownMenuItem>
-                      {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
-                        <DropdownMenuItem 
-                          key={disposition}
-                          onClick={() => setActiveDisposition(disposition)}
-                          className={dispositionColors[disposition as keyof typeof dispositionColors]}
-                        >
-                          {disposition}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableHead>
-                <TableHead>Avatar</TableHead>
-                <TableHead>First Name</TableHead>
-                <TableHead>Last Name</TableHead>
-                <TableHead>Mailing Address</TableHead>
-                <TableHead>Property Address</TableHead>
-                <TableHead>Primary Phone</TableHead>
-                <TableHead>Secondary Phone</TableHead>
-                <TableHead>Email</TableHead>
-                {customFields.map((field, index) => (
-                  <TableHead key={index}>{field}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredLeads.length > 0 ? (
-                filteredLeads.map((lead) => (
-                  <TableRow 
-                    key={lead.id} 
-                    className="hover:bg-crm-lightBlue transition-all duration-200 cursor-pointer my-4 shadow-sm hover:shadow-md hover:scale-[1.01]"
-                  >
-                    <TableCell>
-                      <Checkbox 
-                        checked={selectedLeads.includes(lead.id)}
-                        onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
-                        aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" className="p-0 h-auto">
-                            <Badge className={`disposition-badge ${getDispositionClass(lead.disposition)}`}>
-                              {lead.disposition}
-                            </Badge>
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-48 p-2">
-                          <div className="flex flex-col space-y-1">
-                            {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
-                              <Button 
-                                key={disposition}
-                                variant="ghost" 
-                                className={`justify-start text-sm ${dispositionColors[disposition as keyof typeof dispositionColors]}`}
-                                onClick={() => updateLeadDisposition(lead.id, disposition)}
-                              >
-                                {disposition}
-                              </Button>
-                            ))}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </TableCell>
-                    <TableCell>
-                      <Avatar className="h-10 w-10">
-                        {lead.avatar ? (
-                          <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
-                        ) : (
-                          <AvatarFallback className="bg-crm-lightBlue text-crm-blue">
-                            {lead.firstName.charAt(0)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                    </TableCell>
-                    <TableCell>{lead.firstName}</TableCell>
-                    <TableCell>{lead.lastName}</TableCell>
-                    <TableCell>{lead.mailingAddress}</TableCell>
-                    <TableCell>{lead.propertyAddress}</TableCell>
-                    <TableCell>{lead.phone1}</TableCell>
-                    <TableCell>{lead.phone2}</TableCell>
-                    <TableCell>{lead.email}</TableCell>
-                    {customFields.map((field, index) => (
-                      <TableCell key={index}>-</TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : (
+        {isLoading ? (
+          <div className="p-8 text-center">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mb-4"></div>
+            <p className="text-gray-500">Loading leads...</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-crm-blue/10">
                 <TableRow>
-                  <TableCell colSpan={11 + customFields.length} className="text-center py-8 text-gray-500">
-                    No leads found. Add your first lead to get started.
-                  </TableCell>
+                  <TableHead className="w-10">
+                    <Checkbox 
+                      checked={isAllSelected}
+                      onCheckedChange={handleSelectAllLeads}
+                      aria-label="Select all"
+                    />
+                  </TableHead>
+                  <TableHead>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className="flex items-center cursor-pointer focus:outline-none group">
+                        <span>Disposition</span>
+                        <ChevronDown className="ml-2 h-4 w-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-48 bg-white">
+                        <DropdownMenuItem onClick={sortLeadsByDisposition}>
+                          Sort by Disposition
+                        </DropdownMenuItem>
+                        {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
+                          <DropdownMenuItem 
+                            key={disposition}
+                            onClick={() => setActiveDisposition(disposition)}
+                            className={dispositionColors[disposition as keyof typeof dispositionColors]}
+                          >
+                            {disposition}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableHead>
+                  <TableHead>Avatar</TableHead>
+                  <TableHead>First Name</TableHead>
+                  <TableHead>Last Name</TableHead>
+                  <TableHead>Mailing Address</TableHead>
+                  <TableHead>Property Address</TableHead>
+                  <TableHead>Primary Phone</TableHead>
+                  <TableHead>Secondary Phone</TableHead>
+                  <TableHead>Email</TableHead>
+                  {customFields.map((field, index) => (
+                    <TableHead key={index}>{field}</TableHead>
+                  ))}
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.length > 0 ? (
+                  filteredLeads.map((lead) => (
+                    <TableRow 
+                      key={lead.id} 
+                      className="hover:bg-crm-lightBlue transition-all duration-200 cursor-pointer my-4 shadow-sm hover:shadow-md hover:scale-[1.01]"
+                    >
+                      <TableCell>
+                        <Checkbox 
+                          checked={selectedLeads.includes(lead.id)}
+                          onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
+                          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" className="p-0 h-auto">
+                              <Badge className={`disposition-badge ${getDispositionClass(lead.disposition)}`}>
+                                {lead.disposition}
+                              </Badge>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-48 p-2">
+                            <div className="flex flex-col space-y-1">
+                              {dispositionTypes.filter(d => d !== "All Leads").map((disposition) => (
+                                <Button 
+                                  key={disposition}
+                                  variant="ghost" 
+                                  className={`justify-start text-sm ${dispositionColors[disposition as keyof typeof dispositionColors]}`}
+                                  onClick={() => updateLeadDisposition(lead.id, disposition)}
+                                >
+                                  {disposition}
+                                </Button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </TableCell>
+                      <TableCell>
+                        <Avatar className="h-10 w-10">
+                          {lead.avatar ? (
+                            <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
+                          ) : (
+                            <AvatarFallback className="bg-crm-lightBlue text-crm-blue">
+                              {lead.firstName?.charAt(0) || '?'}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                      </TableCell>
+                      <TableCell>{lead.firstName || '-'}</TableCell>
+                      <TableCell>{lead.lastName || '-'}</TableCell>
+                      <TableCell>{lead.mailingAddress || '-'}</TableCell>
+                      <TableCell>{lead.propertyAddress || '-'}</TableCell>
+                      <TableCell>{lead.phone1 || '-'}</TableCell>
+                      <TableCell>{lead.phone2 || '-'}</TableCell>
+                      <TableCell>{lead.email || '-'}</TableCell>
+                      {customFields.map((field, index) => (
+                        <TableCell key={index}>-</TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={11 + customFields.length} className="text-center py-8 text-gray-500">
+                      No leads found. {leads.length > 0 ? 'Try changing your filters.' : 'Add your first lead to get started.'}
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
       </div>
 
       <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
