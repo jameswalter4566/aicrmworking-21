@@ -1,724 +1,698 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Device, Call } from '@twilio/voice-sdk';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from "@/hooks/use-toast";
-import PredictiveDialerContactsList from './PredictiveDialerContactsList';
-import PredictiveDialerQueueMonitor from './PredictiveDialerQueueMonitor';
-import TwilioDeviceSetup from './TwilioDeviceSetup';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import React, { useState, useEffect } from 'react';
 import {
-  Play, Pause, PhoneOutgoing, Phone, PhoneOff, Users, 
-  BarChart, Clock, MessageSquare
-} from 'lucide-react';
-import { predictiveDialer } from '@/utils/supabase-custom-client';
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { useToast } from "@/hooks/use-toast"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { MoreVertical, Edit, Copy, Trash } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Separator } from "@/components/ui/separator"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
+import { Textarea } from "@/components/ui/textarea"
+import { Calendar } from "@/components/ui/calendar"
+import { CalendarIcon } from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { cn } from "@/lib/utils"
+import { format } from "date-fns"
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
+import { useForm } from "react-hook-form"
+import * as z from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { Switch } from "@/components/ui/switch"
+import { Slider } from "@/components/ui/slider"
+import { Progress } from "@/components/ui/progress"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Skeleton } from "@/components/ui/skeleton"
+import { predictiveDialer, customSupabase } from "@/utils/supabase-custom-client";
 import { supabase } from "@/integrations/supabase/client";
-import { PredictiveDialerAgent, PredictiveDialerContact, PredictiveDialerCall, PredictiveDialerStats } from '@/types/predictive-dialer';
-import { ThoughtlyContact } from '@/services/thoughtly';
+import { v4 as uuidv4 } from 'uuid';
+import TwilioDeviceSetup from './TwilioDeviceSetup';
 
-export const PredictiveDialerDashboard: React.FC = () => {
-  const [isDialerRunning, setIsDialerRunning] = useState(false);
+// Define data structures (adjust as necessary)
+interface PredictiveDialerAgent {
+  id: string;
+  name: string;
+  status: 'Online' | 'Offline' | 'Busy';
+  phone_number: string;
+}
+
+interface PredictiveDialerContact {
+  id: string;
+  name: string;
+  phone_number: string;
+  status: 'New' | 'Contacted' | 'Do Not Call';
+  agent_id?: string | null;
+}
+
+interface PredictiveDialerCall {
+  id: string;
+  contact_id: string;
+  agent_id: string;
+  start_time: string;
+  end_time?: string;
+  status: 'Queued' | 'Ringing' | 'InProgress' | 'Completed' | 'Failed';
+}
+
+interface PredictiveDialerQueueItem {
+  id: string;
+  contact_id: string;
+  agent_id?: string | null;
+  time_added: string;
+}
+
+const PredictiveDialerDashboard: React.FC = () => {
+  const [agents, setAgents] = useState<PredictiveDialerAgent[]>([]);
+  const [contacts, setContacts] = useState<PredictiveDialerContact[]>([]);
+  const [calls, setCalls] = useState<PredictiveDialerCall[]>([]);
+  const [callQueue, setCallQueue] = useState<PredictiveDialerQueueItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
   const [currentAgent, setCurrentAgent] = useState<PredictiveDialerAgent | null>(null);
-  const [dialeRatio, setDialerRatio] = useState(3); // Calls per available agent
-  const [stats, setStats] = useState<PredictiveDialerStats>({
-    totalCalls: 0,
-    activeCalls: 0,
-    callsInQueue: 0,
-    availableAgents: 0,
-    completedCalls: 0,
-    humanAnswers: 0,
-    machineAnswers: 0,
-    averageWaitTime: 0
-  });
-  const [currentCall, setCurrentCall] = useState<Call | null>(null);
-  const [twilioDevice, setTwilioDevice] = useState<Device | null>(null);
-  const [retrievedContacts, setRetrievedContacts] = useState<ThoughtlyContact[]>([]);
-  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
-  
-  const { user } = useAuth();
+  const [isAgentOnline, setIsAgentOnline] = useState<boolean>(false);
+  const [isTwilioDeviceReady, setIsTwilioDeviceReady] = useState<boolean>(false);
+  const [newContactDrawerOpen, setNewContactDrawerOpen] = useState<boolean>(false);
   const { toast } = useToast();
 
-  // Handle Twilio device ready
-  const handleDeviceReady = useCallback((device: Device) => {
-    setTwilioDevice(device);
-    
-    // Set up incoming call handler
-    device.on('incoming', (call) => {
-      setCurrentCall(call);
-      
-      toast({
-        title: "Incoming Call",
-        description: `Incoming call from ${call.parameters.From}`,
-      });
-      
-      // Auto-accept the call
-      call.accept();
-      
-      call.on('disconnect', () => {
-        setCurrentCall(null);
-      });
-    });
-  }, [toast]);
-
-  // Ensure the current user is registered as an agent
-  const ensureAgentExists = useCallback(async () => {
-    if (!user) return null;
-    
-    try {
-      // Check if agent already exists for this user
-      const { data: existingAgents, error: searchError } = await predictiveDialer.getAgents()
-        .select('*')
-        .eq('user_id', user.id);
-        
-      if (searchError) throw searchError;
-      
-      let agent: PredictiveDialerAgent | null = null;
-      
-      if (existingAgents && existingAgents.length > 0) {
-        // Update existing agent
-        agent = existingAgents[0];
-        const { error: updateError } = await predictiveDialer.getAgents()
-          .update({ 
-            status: 'available',
-            last_status_change: new Date().toISOString() 
-          })
-          .eq('id', agent.id);
-          
-        if (updateError) throw updateError;
-        
-        agent.status = 'available';
-      } else {
-        // Create new agent
-        const { data: newAgent, error: insertError } = await predictiveDialer.getAgents()
-          .insert({
-            user_id: user.id,
-            name: user.email || 'Agent',
-            status: 'available',
-            last_status_change: new Date().toISOString()
-          })
-          .select()
-          .single();
-          
-        if (insertError || !newAgent) throw insertError;
-        
-        agent = newAgent;
-      }
-      
-      setCurrentAgent(agent);
-      return agent;
-    } catch (error) {
-      console.error("Error ensuring agent exists:", error);
-      toast({
-        title: "Agent Setup Error",
-        description: "Failed to set up your agent profile. Some features may not work correctly.",
-        variant: "destructive",
-      });
-      return null;
-    }
-  }, [user, toast]);
-
+  // Fetch initial data
   useEffect(() => {
-    ensureAgentExists();
-    fetchStats();
-    fetchContacts();
-    
-    const interval = setInterval(() => {
-      fetchStats();
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [ensureAgentExists]);
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const agentsData = await predictiveDialer.fetchAgents();
+        const contactsData = await predictiveDialer.fetchContacts();
+        const callsData = await predictiveDialer.fetchCalls();
+        const callQueueData = await predictiveDialer.fetchCallQueue();
 
-  const fetchStats = async () => {
-    try {
-      const { data: activeCalls, error: activeCallsError } = await predictiveDialer.getCalls()
-        .select('*')
-        .eq('status', 'in_progress');
-        
-      if (activeCallsError) throw activeCallsError;
-      
-      const { data: availableAgents, error: agentsError } = await predictiveDialer.getAgents()
-        .select('*')
-        .eq('status', 'available');
-        
-      if (agentsError) throw agentsError;
-      
-      const { data: queueItems, error: queueError } = await predictiveDialer.getCallQueue()
-        .select('*');
-        
-      if (queueError) throw queueError;
-      
-      const { data: completedCalls, error: completedCallsError } = await predictiveDialer.getCalls()
-        .select('*')
-        .eq('status', 'completed');
-        
-      if (completedCallsError) throw completedCallsError;
-      
-      const { data: humanAnswers, error: humanAnswersError } = await predictiveDialer.getCalls()
-        .select('*')
-        .eq('machine_detection_result', 'human');
-        
-      if (humanAnswersError) throw humanAnswersError;
-      
-      const { data: machineAnswers, error: machineAnswersError } = await predictiveDialer.getCalls()
-        .select('*')
-        .eq('machine_detection_result', 'machine');
-        
-      if (machineAnswersError) throw machineAnswersError;
-      
-      let avgWaitTime = 0;
-      if (queueItems && queueItems.length > 0) {
-        const now = new Date();
-        const totalWaitTime = queueItems.reduce((sum, item) => {
-          if (!item.created_timestamp) return sum;
-          const created = new Date(item.created_timestamp);
-          return sum + (now.getTime() - created.getTime());
-        }, 0);
-        avgWaitTime = totalWaitTime / queueItems.length / 1000 / 60;
+        setAgents(agentsData);
+        setContacts(contactsData);
+        setCalls(callsData);
+        setCallQueue(callQueueData);
+        setError(null);
+      } catch (e: any) {
+        setError(e.message);
+        toast({
+          title: "Error",
+          description: e.message,
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
       }
-      
-      setStats({
-        totalCalls: (activeCalls?.length || 0) + (completedCalls?.length || 0),
-        activeCalls: activeCalls?.length || 0,
-        callsInQueue: queueItems?.length || 0,
-        availableAgents: availableAgents?.length || 0,
-        completedCalls: completedCalls?.length || 0,
-        humanAnswers: humanAnswers?.length || 0,
-        machineAnswers: machineAnswers?.length || 0,
-        averageWaitTime: parseFloat(avgWaitTime.toFixed(1))
-      });
-    } catch (error) {
-      console.error("Error fetching stats:", error);
-    }
+    };
+
+    fetchData();
+  }, []);
+
+  // Realtime updates for agents
+  useEffect(() => {
+    const agentsSubscription = customSupabase
+      .channel('agents')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'predictive_dialer_agents' },
+        (payload) => {
+          console.log('Agent change received', payload);
+          predictiveDialer.fetchAgents().then(setAgents);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      customSupabase.removeChannel(agentsSubscription);
+    };
+  }, []);
+
+  // Realtime updates for contacts
+  useEffect(() => {
+    const contactsSubscription = customSupabase
+      .channel('contacts')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'predictive_dialer_contacts' },
+        (payload) => {
+          console.log('Contact change received', payload);
+          predictiveDialer.fetchContacts().then(setContacts);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      customSupabase.removeChannel(contactsSubscription);
+    };
+  }, []);
+
+  // Realtime updates for calls
+  useEffect(() => {
+    const callsSubscription = customSupabase
+      .channel('calls')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'predictive_dialer_calls' },
+        (payload) => {
+          console.log('Call change received', payload);
+          predictiveDialer.fetchCalls().then(setCalls);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      customSupabase.removeChannel(callsSubscription);
+    };
+  }, []);
+
+  // Realtime updates for call queue
+  useEffect(() => {
+    const callQueueSubscription = customSupabase
+      .channel('call_queue')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'predictive_dialer_call_queue' },
+        (payload) => {
+          console.log('Call queue change received', payload);
+          predictiveDialer.fetchCallQueue().then(setCallQueue);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      customSupabase.removeChannel(callQueueSubscription);
+    };
+  }, []);
+
+  const handleAgentSelect = (agent: PredictiveDialerAgent) => {
+    setCurrentAgent(agent);
+    setIsAgentOnline(agent.status === 'Online');
   };
 
-  const fetchContacts = async () => {
-    setIsLoadingContacts(true);
+  const handleAgentStatusChange = async (agentId: string, newStatus: 'Online' | 'Offline' | 'Busy') => {
     try {
-      // Get authentication token
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData?.session?.access_token;
-      
-      let headers = {};
-      if (authToken) {
-        headers = {
-          Authorization: `Bearer ${authToken}`
-        };
-      }
-      
-      // Call the retrieve-contacts function
-      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { source: 'all' },
-        headers
-      });
-      
+      const { error } = await predictiveDialer
+        .getAgents()
+        .update({ status: newStatus })
+        .eq('id', agentId);
+
       if (error) {
-        console.error("Error retrieving contacts:", error);
-        throw error;
+        console.error('Error updating agent status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update agent status.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: `Agent status updated to ${newStatus}.`,
+        });
       }
-      
-      if (data?.data) {
-        setRetrievedContacts(data.data);
-        
-        // Import contacts to predictive dialer if needed
-        for (const contact of data.data) {
-          if (contact.phone1) {
-            // Check if contact already exists in the dialer by phone number
-            const { data: existingContacts, error: searchError } = await predictiveDialer.getContacts()
-              .select('*')
-              .eq('phone_number', contact.phone1);
-              
-            if (searchError) {
-              console.error("Error searching for existing contact:", searchError);
-              continue;
-            }
-            
-            if (!existingContacts || existingContacts.length === 0) {
-              // Add to predictive dialer contacts
-              await predictiveDialer.getContacts().insert({
-                name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown',
-                phone_number: contact.phone1,
-                status: 'not_contacted',
-                notes: contact.disposition || ''
-              });
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching contacts:", error);
+    } catch (error: any) {
+      console.error('Error updating agent status:', error);
       toast({
         title: "Error",
-        description: "Failed to load contacts. Please try again.",
+        description: error.message || "Failed to update agent status.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoadingContacts(false);
     }
   };
 
-  const toggleDialer = async () => {
-    setIsDialerRunning(!isDialerRunning);
+  const handleContactSelect = async (contact: PredictiveDialerContact) => {
+    if (!contact || !contact.id) return;
+
+    setSelectedContactId(contact.id);
     
-    if (!isDialerRunning) {
-      // Make sure we have an agent
-      const agent = currentAgent || await ensureAgentExists();
+    try {
+      await supabase.functions.invoke('initiate-manual-call', {
+        body: {
+          contactId: contact.id,
+          agentId: currentAgent?.id,
+        }
+      });
       
-      if (!agent) {
-        toast({
-          title: "Agent Required",
-          description: "Unable to set up your agent profile. Please try again.",
-          variant: "destructive",
-        });
-        setIsDialerRunning(false);
-        return;
-      }
-      
-      try {
-        // Update agent status to available if needed
-        if (agent.status !== 'available') {
-          const { error } = await predictiveDialer.getAgents()
-            .update({ status: 'available' })
-            .eq('id', agent.id);
-          
-          if (error) throw error;
-          
-          setCurrentAgent({...agent, status: 'available'});
-        }
-        
-        // Start the dialer
-        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-start', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            agentId: agent.id,
-            maxConcurrentCalls: dialeRatio
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to start dialer');
-        }
-        
-        toast({
-          title: "Dialer Started",
-          description: `Predictive dialer is now running with a ratio of ${dialeRatio}:1.`,
-        });
-      } catch (error) {
-        console.error("Error starting dialer:", error);
-        toast({
-          title: "Error",
-          description: "Failed to start the predictive dialer.",
-          variant: "destructive",
-        });
-        setIsDialerRunning(false);
-      }
-    } else {
-      try {
-        // Stop the dialer
-        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/stop-predictive-dialer', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            agentId: currentAgent?.id
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to stop dialer');
-        }
-        
-        toast({
-          title: "Dialer Stopped",
-          description: "Predictive dialer has been stopped.",
-        });
-      } catch (error) {
-        console.error("Error stopping dialer:", error);
-        toast({
-          title: "Error",
-          description: "Failed to stop the predictive dialer.",
-          variant: "destructive",
-        });
-        setIsDialerRunning(true);
-      }
+      toast({
+        title: "Call Initiated",
+        description: `Calling ${contact.name} at ${contact.phone_number}`,
+      });
+    } catch (error) {
+      console.error('Error initiating manual call:', error);
+      toast({
+        title: "Call Failed",
+        description: "Could not initiate call. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
-  // Fix for the Promise handling in handleContactSelect
-  const handleContactSelect = async (contact: PredictiveDialerContact | ThoughtlyContact) => {
-    if (!twilioDevice) {
+  const handleContactStatusChange = async (contactId: string, newStatus: 'New' | 'Contacted' | 'Do Not Call') => {
+    try {
+      const { error } = await predictiveDialer
+        .getContacts()
+        .update({ status: newStatus })
+        .eq('id', contactId);
+
+      if (error) {
+        console.error('Error updating contact status:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update contact status.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: `Contact status updated to ${newStatus}.`,
+        });
+      }
+    } catch (error: any) {
+      console.error('Error updating contact status:', error);
       toast({
-        title: "Phone Not Ready",
-        description: "The phone system is not ready yet. Please wait a moment and try again.",
+        title: "Error",
+        description: error.message || "Failed to update contact status.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddToQueue = async (contactId: string) => {
+    if (!currentAgent) {
+      toast({
+        title: "Error",
+        description: "Please select an agent first.",
         variant: "destructive",
       });
       return;
     }
 
     try {
-      const agent = currentAgent || await ensureAgentExists();
-      if (!agent) {
-        toast({
-          title: "Agent Required",
-          description: "Unable to set up your agent profile. Please try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (currentCall) {
-        toast({
-          title: "Call In Progress",
-          description: "Please end your current call before making a new one.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      // Update agent status to busy
-      const { error: agentError } = await predictiveDialer.getAgents()
-        .update({ status: 'busy' })
-        .eq('id', agent.id);
-      
-      if (agentError) throw agentError;
-      
-      // Get phone number from either type of contact
-      const phoneNumber = 'phone_number' in contact 
-        ? contact.phone_number 
-        : (contact.phone1 || '');
-        
-      const contactName = 'name' in contact 
-        ? contact.name 
-        : `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown';
-      
-      if (!phoneNumber) {
-        throw new Error("No phone number available for this contact");
-      }
-
-      // For retrieved contacts that aren't in the dialer yet, add them
-      let contactId = 'id' in contact ? contact.id : '';
-      
-      if (!('phone_number' in contact)) {
-        // This is a ThoughtlyContact, check if it exists in predictive_dialer_contacts
-        const { data: existingContacts, error: searchError } = await predictiveDialer.getContacts()
-          .select('*')
-          .eq('phone_number', phoneNumber);
-          
-        if (searchError) throw searchError;
-        
-        if (!existingContacts || existingContacts.length === 0) {
-          // Add to predictive dialer contacts
-          const { data: newContact, error: insertError } = await predictiveDialer.getContacts()
-            .insert({
-              name: contactName,
-              phone_number: phoneNumber,
-              status: 'not_contacted',
-              notes: 'disposition' in contact ? (contact.disposition || '') : ''
-            })
-            .select()
-            .single();
-            
-          if (insertError || !newContact) throw insertError;
-          
-          contactId = newContact.id;
-        } else {
-          contactId = existingContacts[0].id;
-        }
-      }
-      
-      // Create call record
-      const newCall = {
+      const newQueueItem = {
+        id: uuidv4(),
         contact_id: contactId,
-        agent_id: agent.id,
-        status: 'in_progress',
-        start_timestamp: new Date().toISOString()
+        agent_id: currentAgent.id,
+        time_added: new Date().toISOString(),
       };
-      
-      const { data: callData, error: callError } = await predictiveDialer.getCalls().insert([newCall]).select();
-      
-      if (callError || !callData || callData.length === 0) throw new Error("Failed to create call record");
-      
-      // Update agent with current call
-      const { error: updateError } = await predictiveDialer.getAgents()
-        .update({ current_call_id: callData[0].id })
-        .eq('id', agent.id);
-      
-      if (updateError) throw updateError;
-      
-      setCurrentAgent({
-        ...agent,
-        status: 'busy',
-        current_call_id: callData[0].id
-      });
-      
-      // Make the call using Twilio Device
-      const call = await twilioDevice.connect({
-        params: {
-          To: phoneNumber
-        }
-      });
-      
-      setCurrentCall(call);
-      
-      // Handle call events
-      call.on('disconnect', () => {
-        setCurrentCall(null);
-        
-        // Update call record and agent status
-        predictiveDialer.getCalls()
-          .update({
-            status: 'completed',
-            end_timestamp: new Date().toISOString()
-          })
-          .eq('id', callData[0].id)
-          .then(() => {
-            // Reset agent status
-            return predictiveDialer.getAgents()
-              .update({
-                status: 'available',
-                current_call_id: null
-              })
-              .eq('id', agent.id);
-          })
-          .then(() => {
-            setCurrentAgent({
-              ...agent,
-              status: 'available',
-              current_call_id: null
-            });
-          })
-          .catch(error => {
-            console.error("Error updating call status:", error);
-          });
-      });
-      
-      toast({
-        title: "Call Initiated",
-        description: `Calling ${contactName}...`,
-      });
-    } catch (error) {
-      console.error("Error initiating call:", error);
-      
-      // Reset agent status on error
-      if (currentAgent) {
-        try {
-          // Reset agent status
-          await predictiveDialer.getAgents()
-            .update({ status: 'available', current_call_id: null })
-            .eq('id', currentAgent.id);
-            
-          setCurrentAgent({
-            ...currentAgent,
-            status: 'available',
-            current_call_id: null
-          });
-        } catch (resetError) {
-          console.error("Failed to reset agent status:", resetError);
-        }
+
+      const { error } = await predictiveDialer
+        .getCallQueue()
+        .insert(newQueueItem);
+
+      if (error) {
+        console.error('Error adding to call queue:', error);
+        toast({
+          title: "Error",
+          description: "Failed to add to call queue.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Contact added to call queue.",
+        });
       }
-      
+    } catch (error: any) {
+      console.error('Error adding to call queue:', error);
       toast({
-        title: "Call Failed",
-        description: "Failed to initiate the call. Please try again.",
+        title: "Error",
+        description: error.message || "Failed to add to call queue.",
         variant: "destructive",
       });
     }
   };
 
-  const handleEndCall = () => {
-    if (currentCall) {
-      currentCall.disconnect();
+  const handleRemoveFromQueue = async (queueItemId: string) => {
+    try {
+      const { error } = await predictiveDialer
+        .getCallQueue()
+        .delete()
+        .eq('id', queueItemId);
+
+      if (error) {
+        console.error('Error removing from call queue:', error);
+        toast({
+          title: "Error",
+          description: "Failed to remove from call queue.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Contact removed from call queue.",
+        });
+      }
+    } catch (error: any) {
+      console.error('Error removing from call queue:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove from call queue.",
+        variant: "destructive",
+      });
     }
   };
 
+  const handleCreateContact = async (values: z.infer<typeof contactSchema>) => {
+    try {
+      const newContact = {
+        id: uuidv4(),
+        name: values.name,
+        phone_number: values.phone_number,
+        status: 'New',
+        agent_id: currentAgent?.id,
+      };
+
+      const { error } = await predictiveDialer
+        .getContacts()
+        .insert(newContact);
+
+      if (error) {
+        console.error('Error creating contact:', error);
+        toast({
+          title: "Error",
+          description: "Failed to create contact.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Contact created successfully.",
+        });
+        setNewContactDrawerOpen(false);
+      }
+    } catch (error: any) {
+      console.error('Error creating contact:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create contact.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const contactSchema = z.object({
+    name: z.string().min(2, {
+      message: "Name must be at least 2 characters.",
+    }),
+    phone_number: z.string().min(10, {
+      message: "Phone number must be at least 10 characters.",
+    }),
+  })
+
+  const contactForm = useForm<z.infer<typeof contactSchema>>({
+    resolver: zodResolver(contactSchema),
+    defaultValues: {
+      name: "",
+      phone_number: "",
+    },
+  })
+
+  const handleTwilioDeviceReady = (device: any) => {
+    setIsTwilioDeviceReady(true);
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Predictive Dialer</h1>
-          <p className="text-gray-500">Automated outbound calling with machine detection</p>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <TwilioDeviceSetup onDeviceReady={handleDeviceReady} />
-          
-          <Button
-            onClick={toggleDialer}
-            className={isDialerRunning ? "bg-red-600 hover:bg-red-700" : "bg-green-600 hover:bg-green-700"}
-          >
-            {isDialerRunning ? (
-              <>
-                <Pause className="mr-2 h-4 w-4" />
-                Stop Dialer
-              </>
-            ) : (
-              <>
-                <Play className="mr-2 h-4 w-4" />
-                Start Dialer
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-      
-      {/* Active call display */}
-      {currentCall && (
-        <Card className="bg-blue-50 border-blue-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Phone className="h-5 w-5 text-blue-600 animate-pulse" />
-                <div>
-                  <p className="font-medium">Active Call</p>
-                  <p className="text-sm text-gray-600">
-                    {currentCall.parameters.To || "Unknown number"}
-                  </p>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Agents Section */}
+      <Card className="col-span-1">
+        <CardHeader>
+          <CardTitle>Agents</CardTitle>
+          <CardDescription>Select an agent to manage their status and assign calls.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p>Loading agents...</p>
+          ) : error ? (
+            <p className="text-red-500">Error: {error}</p>
+          ) : (
+            <div className="space-y-2">
+              {agents.map((agent) => (
+                <div key={agent.id} className="flex items-center justify-between p-2 rounded-md hover:bg-gray-100">
+                  <button onClick={() => handleAgentSelect(agent)} className="flex-1 text-left">
+                    {agent.name}
+                  </button>
+                  <Badge variant="secondary">{agent.status}</Badge>
                 </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+        <Separator />
+        <CardContent>
+          {currentAgent ? (
+            <div className="space-y-2">
+              <h3 className="text-lg font-semibold">Selected Agent: {currentAgent.name}</h3>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="agent-status">Status:</Label>
+                <Select value={currentAgent.status} onValueChange={(value) => handleAgentStatusChange(currentAgent.id, value as 'Online' | 'Offline' | 'Busy')}>
+                  <SelectTrigger id="agent-status">
+                    <SelectValue placeholder={currentAgent.status} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Online">Online</SelectItem>
+                    <SelectItem value="Offline">Offline</SelectItem>
+                    <SelectItem value="Busy">Busy</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Button 
-                variant="destructive"
-                size="sm"
-                onClick={handleEndCall}
-              >
-                <PhoneOff className="mr-2 h-4 w-4" />
-                End Call
+              <Button onClick={() => setNewContactDrawerOpen(true)}>
+                Create Contact
               </Button>
             </div>
-          </CardContent>
-        </Card>
-      )}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Active Calls</p>
-              <p className="text-2xl font-bold">{stats.activeCalls}</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-              <Phone className="h-5 w-5 text-blue-600" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Available Agents</p>
-              <p className="text-2xl font-bold">{stats.availableAgents}</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-              <Users className="h-5 w-5 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Calls in Queue</p>
-              <p className="text-2xl font-bold">{stats.callsInQueue}</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-yellow-100 flex items-center justify-center">
-              <Clock className="h-5 w-5 text-yellow-600" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4 flex justify-between items-center">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Completed Calls</p>
-              <p className="text-2xl font-bold">{stats.completedCalls}</p>
-            </div>
-            <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-              <PhoneOff className="h-5 w-5 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div>
-          <PredictiveDialerQueueMonitor 
-            currentAgentId={currentAgent?.id}
-          />
-        </div>
-        
-        <div>
-          <PredictiveDialerContactsList 
-            onContactSelect={handleContactSelect} 
-          />
-        </div>
-      </div>
-      
-      {/* Retrieved contacts section */}
-      <div className="mt-6">
-        <Card className="shadow-lg">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-semibold flex justify-between items-center">
-              <div>Retrieved Contacts</div>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs"
-                  onClick={fetchContacts}
-                  disabled={isLoadingContacts}
-                >
-                  {isLoadingContacts ? "Loading..." : "Refresh Contacts"}
-                </Button>
-              </div>
-            </CardTitle>
-          </CardHeader>
+          ) : (
+            <p>Select an agent to see details.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Contacts Section */}
+      <Card className="col-span-1">
+        <CardHeader>
+          <CardTitle>Contacts</CardTitle>
+          <CardDescription>Manage contacts and their statuses.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p>Loading contacts...</p>
+          ) : error ? (
+            <p className="text-red-500">Error: {error}</p>
+          ) : (
+            <ScrollArea className="h-[300px] w-full rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Name</TableHead>
+                    <TableHead>Phone Number</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contacts.map((contact) => (
+                    <TableRow key={contact.id}>
+                      <TableCell className="font-medium">{contact.name}</TableCell>
+                      <TableCell>{contact.phone_number}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{contact.status}</Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleContactSelect(contact)}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Initiate Call
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleAddToQueue(contact.id)}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              Add to Queue
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem>
+                              <Trash className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Call Queue Section */}
+      <Card className="col-span-1">
+        <CardHeader>
+          <CardTitle>Call Queue</CardTitle>
+          <CardDescription>Manage the call queue for the selected agent.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <p>Loading call queue...</p>
+          ) : error ? (
+            <p className="text-red-500">Error: {error}</p>
+          ) : (
+            <ScrollArea className="h-[300px] w-full rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[100px]">Contact</TableHead>
+                    <TableHead>Time Added</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {callQueue.map((queueItem) => {
+                    const contact = contacts.find((c) => c.id === queueItem.contact_id);
+                    return (
+                      <TableRow key={queueItem.id}>
+                        <TableCell className="font-medium">{contact?.name || 'Unknown'}</TableCell>
+                        <TableCell>{queueItem.time_added}</TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="outline" size="sm" onClick={() => handleRemoveFromQueue(queueItem.id)}>
+                            Remove
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* New Contact Drawer */}
+      <Drawer open={newContactDrawerOpen} onOpenChange={setNewContactDrawerOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>Create New Contact</DrawerTitle>
+            <DrawerDescription>
+              Create a new contact for the selected agent.
+            </DrawerDescription>
+          </DrawerHeader>
           <CardContent>
-            {retrievedContacts.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>No contacts retrieved yet.</p>
-                <p className="text-sm">Click Refresh Contacts to fetch contacts from your system.</p>
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[350px] overflow-y-auto pr-1">
-                {retrievedContacts.map((contact, index) => (
-                  <div 
-                    key={`${contact.id || index}`} 
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded hover:bg-gray-100 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate font-medium">
-                        {contact.firstName} {contact.lastName}
-                      </div>
-                      <div className="text-sm text-gray-500 truncate">
-                        {contact.phone1 || contact.phone2 || "No phone number"}
-                      </div>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-8 w-8 text-green-600 hover:text-green-800 hover:bg-green-100"
-                        onClick={() => contact.phone1 && handleContactSelect(contact)}
-                        disabled={!contact.phone1 || !!currentCall}
-                      >
-                        <Phone className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            <Form {...contactForm}>
+              <form onSubmit={contactForm.handleSubmit(handleCreateContact)} className="space-y-4">
+                <FormField
+                  control={contactForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={contactForm.control}
+                  name="phone_number"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Phone Number</FormLabel>
+                      <FormControl>
+                        <Input placeholder="555-555-5555" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit">Create Contact</Button>
+              </form>
+            </Form>
           </CardContent>
-        </Card>
-      </div>
+          <DrawerFooter>
+            <DrawerClose>Cancel</DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 };
