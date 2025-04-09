@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode } from "react";
 
 export type IndustryType = "mortgage" | "realEstate" | "debtSettlement" | null;
 
@@ -23,21 +23,7 @@ interface IndustryProviderProps {
 }
 
 export const IndustryProvider: React.FC<IndustryProviderProps> = ({ children }) => {
-  // Initialize state from localStorage or default to null
-  const [activeIndustry, setActiveIndustryState] = useState<IndustryType>(() => {
-    const savedIndustry = localStorage.getItem("activeIndustry");
-    return (savedIndustry as IndustryType) || null;
-  });
-
-  // Update localStorage when activeIndustry changes
-  const setActiveIndustry = (industry: IndustryType) => {
-    setActiveIndustryState(industry);
-    if (industry) {
-      localStorage.setItem("activeIndustry", industry);
-    } else {
-      localStorage.removeItem("activeIndustry");
-    }
-  };
+  const [activeIndustry, setActiveIndustry] = useState<IndustryType>(null);
 
   return (
     <IndustryContext.Provider value={{ activeIndustry, setActiveIndustry }}>
