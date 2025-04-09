@@ -1,7 +1,3 @@
-
-// For line 499 in PredictiveDialerDashboard.tsx, we need to fix the Promise handling
-// I'll modify just the portion containing the Promise handling error
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Device, Call } from '@twilio/voice-sdk';
 import { useAuth } from '@/context/AuthContext';
@@ -368,26 +364,26 @@ export const PredictiveDialerDashboard: React.FC = () => {
       return;
     }
 
-    const agent = currentAgent || await ensureAgentExists();
-    if (!agent) {
-      toast({
-        title: "Agent Required",
-        description: "Unable to set up your agent profile. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    if (currentCall) {
-      toast({
-        title: "Call In Progress",
-        description: "Please end your current call before making a new one.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     try {
+      const agent = currentAgent || await ensureAgentExists();
+      if (!agent) {
+        toast({
+          title: "Agent Required",
+          description: "Unable to set up your agent profile. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (currentCall) {
+        toast({
+          title: "Call In Progress",
+          description: "Please end your current call before making a new one.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Update agent status to busy
       const { error: agentError } = await predictiveDialer.getAgents()
         .update({ status: 'busy' })
@@ -512,19 +508,22 @@ export const PredictiveDialerDashboard: React.FC = () => {
     } catch (error) {
       console.error("Error initiating call:", error);
       
-      try {
-        // Reset agent status
-        await predictiveDialer.getAgents()
-          .update({ status: 'available', current_call_id: null })
-          .eq('id', agent.id);
-          
-        setCurrentAgent({
-          ...agent,
-          status: 'available',
-          current_call_id: null
-        });
-      } catch (resetError) {
-        console.error("Failed to reset agent status:", resetError);
+      // Reset agent status on error
+      if (currentAgent) {
+        try {
+          // Reset agent status
+          await predictiveDialer.getAgents()
+            .update({ status: 'available', current_call_id: null })
+            .eq('id', currentAgent.id);
+            
+          setCurrentAgent({
+            ...currentAgent,
+            status: 'available',
+            current_call_id: null
+          });
+        } catch (resetError) {
+          console.error("Failed to reset agent status:", resetError);
+        }
       }
       
       toast({

@@ -1,4 +1,3 @@
-
 // Follow the REST architecture for edge functions
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -25,39 +24,98 @@ Deno.serve(async (req) => {
     // Extract JWT token from Authorization header to identify the user
     const authHeader = req.headers.get('Authorization');
     let userId = null;
+    let isAuthenticated = false;
     
     if (authHeader) {
-      // Extract token from Bearer token format
-      const token = authHeader.replace('Bearer ', '');
-      
-      // Verify the token and get user information
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      
-      if (authError) {
-        console.error('Auth error:', authError.message);
-      } else if (user) {
-        userId = user.id;
-        console.log(`Request authenticated from user: ${userId}`);
+      try {
+        // Extract token from Bearer token format
+        const token = authHeader.replace('Bearer ', '');
+        
+        // Verify the token and get user information
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (authError) {
+          console.error('Auth error:', authError.message);
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: 'Invalid or expired authentication token'
+            }),
+            {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 401,
+            }
+          );
+        }
+        
+        if (user) {
+          userId = user.id;
+          isAuthenticated = true;
+          console.log(`Request authenticated from user: ${userId}`);
+        }
+      } catch (tokenError) {
+        console.error('Token parsing error:', tokenError);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Invalid authentication token format'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 401,
+          }
+        );
       }
     } else {
-      console.log('No Authorization header present, proceeding as anonymous upload');
+      // If you want to allow anonymous uploads, comment this out
+      // Otherwise, require authentication for all requests
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing authorization header' 
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
     }
     
     // Log detailed request information for debugging
     console.log('Request path:', req.url);
     console.log('Request method:', req.method);
+    console.log('Auth status:', isAuthenticated ? 'Authenticated' : 'Not authenticated');
     
-    // Log all headers for debugging
-    console.log('All request headers:', 
-      Object.fromEntries([...req.headers.entries()].map(([k, v]) => 
-        [k, k.toLowerCase() === 'authorization' ? 'Bearer [REDACTED]' : v]
-      ))
-    );
+    // Parse the request body
+    let body;
+    try {
+      body = await req.json();
+    } catch (parseError) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid JSON in request body'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
+    }
     
-    const { leads, leadType } = await req.json();
+    const { leads, leadType } = body;
     
     if (!leads || !Array.isArray(leads) || leads.length === 0) {
-      throw new Error('No valid leads data provided');
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'No valid leads data provided'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400,
+        }
+      );
     }
     
     console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'} for user: ${userId || 'anonymous'}`);
