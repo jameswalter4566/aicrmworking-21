@@ -25,6 +25,21 @@ export const PredictiveDialerContactsList: React.FC<ContactsListProps> = ({ onCo
 
   useEffect(() => {
     fetchContacts();
+
+    // Set up subscription to contacts table changes
+    const channel = predictiveDialer.customSupabase
+      .channel('predictive-dialer-contacts-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'predictive_dialer_contacts' },
+        () => {
+          fetchContacts();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      predictiveDialer.customSupabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchContacts = async () => {
@@ -189,7 +204,7 @@ export const PredictiveDialerContactsList: React.FC<ContactsListProps> = ({ onCo
     <Card className="shadow-lg">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg font-semibold flex justify-between items-center">
-          <div>Contacts</div>
+          <div>Dialer Contacts</div>
           <div className="flex space-x-2">
             <label className="cursor-pointer">
               <input 

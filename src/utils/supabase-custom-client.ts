@@ -1,5 +1,5 @@
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 
 // We're creating this custom client to type our predictive dialer tables
@@ -12,6 +12,9 @@ export const customSupabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KE
 
 // Extension of Supabase client with predictive dialer table access
 export const predictiveDialer = {
+  // Make the custom Supabase client available for channels
+  customSupabase,
+  
   // These methods are for direct table access
   getAgents: () => customSupabase.from('predictive_dialer_agents'),
   getCalls: () => customSupabase.from('predictive_dialer_calls'),
