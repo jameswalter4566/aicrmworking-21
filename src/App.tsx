@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -30,7 +31,6 @@ import PitchDeckPro from "./pages/PitchDeckPro";
 import PredictiveDialer from "./pages/PredictiveDialer";
 import AIRealtor from "./pages/AIRealtor";
 import ListingPresentation from "./pages/ListingPresentation";
-import LeadProfile from "./pages/LeadProfile";
 
 const queryClient = new QueryClient();
 
@@ -236,7 +236,6 @@ function App() {
                 
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
-                <Route path="/lead/:id" element={<ProtectedRoute><LeadProfile /></ProtectedRoute>} />
                 <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
                 <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
                 <Route path="/power-dialer" element={<PowerDialer />} />

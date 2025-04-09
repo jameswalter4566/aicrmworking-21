@@ -3,7 +3,6 @@ import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Search, Filter, Plus, Upload, ChevronDown, Check, RefreshCw } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import {
   Table,
   TableBody,
@@ -140,7 +139,6 @@ type LeadFormValues = {
 };
 
 const People = () => {
-  const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [customFields, setCustomFields] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -425,10 +423,6 @@ const People = () => {
     return pages;
   };
 
-  const handleRowClick = (leadId: number) => {
-    navigate(`/lead/${leadId}`);
-  };
-
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -609,7 +603,6 @@ const People = () => {
                   <TableRow 
                     key={lead.id} 
                     className="hover:bg-crm-lightBlue transition-all duration-200 cursor-pointer my-4 shadow-sm hover:shadow-md hover:scale-[1.01]"
-                    onClick={() => handleRowClick(lead.id)}
                   >
                     <TableCell>
                       <Checkbox 
