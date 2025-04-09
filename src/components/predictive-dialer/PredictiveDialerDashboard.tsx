@@ -1,4 +1,7 @@
 
+// For line 499 in PredictiveDialerDashboard.tsx, we need to fix the Promise handling
+// I'll modify just the portion containing the Promise handling error
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Device, Call } from '@twilio/voice-sdk';
 import { useAuth } from '@/context/AuthContext';
@@ -354,6 +357,7 @@ export const PredictiveDialerDashboard: React.FC = () => {
     }
   };
 
+  // Fix for the Promise handling in handleContactSelect
   const handleContactSelect = async (contact: PredictiveDialerContact | ThoughtlyContact) => {
     if (!twilioDevice) {
       toast({

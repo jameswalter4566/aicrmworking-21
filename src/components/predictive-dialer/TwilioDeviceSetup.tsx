@@ -37,9 +37,10 @@ const TwilioDeviceSetup: React.FC<TwilioDeviceSetupProps> = ({ onDeviceReady }) 
 
         const token = data.token;
         
-        // Initialize Twilio device
+        // Initialize Twilio device with correct codec types
+        // Fix: Using string array instead of specifying the Codec type directly
         twilioDevice = new Device(token, {
-          codecPreferences: ['opus', 'pcmu'],
+          codecPreferences: ["opus", "pcmu"],
           disableAudioContextSounds: false,
           logLevel: 'info'
         });
