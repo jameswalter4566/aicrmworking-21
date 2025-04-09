@@ -60,6 +60,358 @@ export type Database = {
         }
         Relationships: []
       }
+      power_dialer_agents: {
+        Row: {
+          created_at: string | null
+          current_call_id: string | null
+          id: string
+          last_status_change: string | null
+          name: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_call_id?: string | null
+          id?: string
+          last_status_change?: string | null
+          name: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_call_id?: string | null
+          id?: string
+          last_status_change?: string | null
+          name?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "power_dialer_agents_current_call_id_fkey"
+            columns: ["current_call_id"]
+            isOneToOne: false
+            referencedRelation: "power_dialer_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      power_dialer_call_queue: {
+        Row: {
+          assigned_to_agent_id: string | null
+          call_id: string
+          created_at: string | null
+          created_timestamp: string | null
+          id: string
+          priority: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to_agent_id?: string | null
+          call_id: string
+          created_at?: string | null
+          created_timestamp?: string | null
+          id?: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to_agent_id?: string | null
+          call_id?: string
+          created_at?: string | null
+          created_timestamp?: string | null
+          id?: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "power_dialer_call_queue_assigned_to_agent_id_fkey"
+            columns: ["assigned_to_agent_id"]
+            isOneToOne: false
+            referencedRelation: "power_dialer_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "power_dialer_call_queue_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "power_dialer_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      power_dialer_calls: {
+        Row: {
+          agent_id: string | null
+          contact_id: string | null
+          created_at: string | null
+          duration: number | null
+          end_timestamp: string | null
+          id: string
+          machine_detection_result: string | null
+          start_timestamp: string | null
+          status: string
+          twilio_call_sid: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          duration?: number | null
+          end_timestamp?: string | null
+          id?: string
+          machine_detection_result?: string | null
+          start_timestamp?: string | null
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          duration?: number | null
+          end_timestamp?: string | null
+          id?: string
+          machine_detection_result?: string | null
+          start_timestamp?: string | null
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "power_dialer_calls_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "power_dialer_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "power_dialer_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "power_dialer_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      power_dialer_contacts: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_call_timestamp: string | null
+          name: string
+          notes: string | null
+          phone_number: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_call_timestamp?: string | null
+          name: string
+          notes?: string | null
+          phone_number: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_call_timestamp?: string | null
+          name?: string
+          notes?: string | null
+          phone_number?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      predictive_dialer_agents: {
+        Row: {
+          created_at: string | null
+          current_call_id: string | null
+          id: string
+          last_status_change: string | null
+          name: string
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_call_id?: string | null
+          id?: string
+          last_status_change?: string | null
+          name: string
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_call_id?: string | null
+          id?: string
+          last_status_change?: string | null
+          name?: string
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_predictive_dialer_agents_current_call"
+            columns: ["current_call_id"]
+            isOneToOne: false
+            referencedRelation: "predictive_dialer_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      predictive_dialer_call_queue: {
+        Row: {
+          assigned_to_agent_id: string | null
+          call_id: string
+          created_at: string | null
+          created_timestamp: string | null
+          id: string
+          priority: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_to_agent_id?: string | null
+          call_id: string
+          created_at?: string | null
+          created_timestamp?: string | null
+          id?: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_to_agent_id?: string | null
+          call_id?: string
+          created_at?: string | null
+          created_timestamp?: string | null
+          id?: string
+          priority?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "predictive_dialer_call_queue_assigned_to_agent_id_fkey"
+            columns: ["assigned_to_agent_id"]
+            isOneToOne: false
+            referencedRelation: "predictive_dialer_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictive_dialer_call_queue_call_id_fkey"
+            columns: ["call_id"]
+            isOneToOne: false
+            referencedRelation: "predictive_dialer_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      predictive_dialer_calls: {
+        Row: {
+          agent_id: string | null
+          contact_id: string | null
+          created_at: string | null
+          duration: number | null
+          end_timestamp: string | null
+          id: string
+          machine_detection_result: string | null
+          start_timestamp: string | null
+          status: string
+          twilio_call_sid: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          duration?: number | null
+          end_timestamp?: string | null
+          id?: string
+          machine_detection_result?: string | null
+          start_timestamp?: string | null
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          contact_id?: string | null
+          created_at?: string | null
+          duration?: number | null
+          end_timestamp?: string | null
+          id?: string
+          machine_detection_result?: string | null
+          start_timestamp?: string | null
+          status?: string
+          twilio_call_sid?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "predictive_dialer_calls_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "predictive_dialer_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "predictive_dialer_calls_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "predictive_dialer_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      predictive_dialer_contacts: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_call_timestamp: string | null
+          name: string
+          notes: string | null
+          phone_number: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_call_timestamp?: string | null
+          name: string
+          notes?: string | null
+          phone_number: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_call_timestamp?: string | null
+          name?: string
+          notes?: string | null
+          phone_number?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company: string | null

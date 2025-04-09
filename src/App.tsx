@@ -26,6 +26,7 @@ import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import AmortizationCalculator from "./pages/AmortizationCalculator";
 import PitchDeckPro from "./pages/PitchDeckPro";
+import PredictiveDialer from "./pages/PredictiveDialer";
 
 const queryClient = new QueryClient();
 
@@ -186,7 +187,7 @@ const AudioDiagnosticLogger = () => {
   return null;
 };
 
-const App = () => {
+function App() {
   const [twilioLoaded, setTwilioLoaded] = useState(false);
 
   return (
@@ -232,9 +233,10 @@ const App = () => {
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
                 <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
-                <Route path="/power-dialer" element={<ProtectedRoute><PowerDialer /></ProtectedRoute>} />
-                <Route path="/ai-dialer" element={<ProtectedRoute><AIDialer /></ProtectedRoute>} />
-                <Route path="/sms-campaign" element={<ProtectedRoute><SMSCampaign /></ProtectedRoute>} />
+                <Route path="/power-dialer" element={<PowerDialer />} />
+                <Route path="/predictive-dialer" element={<PredictiveDialer />} />
+                <Route path="/ai-dialer" element={<AIDialer />} />
+                <Route path="/sms-campaign" element={<SMSCampaign />} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 
                 <Route path="/amortization" element={<ProtectedRoute><AmortizationCalculator /></ProtectedRoute>} />
@@ -250,6 +252,6 @@ const App = () => {
       </TooltipProvider>
     </QueryClientProvider>
   );
-};
+}
 
 export default App;

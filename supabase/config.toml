@@ -40,3 +40,27 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 [functions.add-to-addressbook]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.start-predictive-dialer]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.stop-predictive-dialer]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.predictive-dialer-webhook]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.predictive-dialer-machine-detection]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.connect-call-to-agent]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.initiate-manual-call]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
