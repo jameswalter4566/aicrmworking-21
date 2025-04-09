@@ -1,3 +1,4 @@
+
 // Follow the REST architecture for edge functions
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -21,6 +22,10 @@ Deno.serve(async (req) => {
   }
   
   try {
+    console.log('Retrieve-leads function called - Path:', req.url);
+    console.log('Method:', req.method);
+    console.log('Headers:', JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2));
+    
     // Extract JWT token from Authorization header to identify the user
     const authHeader = req.headers.get('Authorization');
     let userId = null;
@@ -31,12 +36,14 @@ Deno.serve(async (req) => {
       try {
         // Extract token from Bearer token format
         const token = authHeader.replace('Bearer ', '');
+        console.log('Token found in Authorization header');
         
         // Verify the token and get user information
         const { data: { user }, error: authError } = await supabase.auth.getUser(token);
         
         if (authError) {
           console.error('Auth error:', authError.message);
+          console.log('Will proceed with anonymous access');
           // Continue with anonymous access
         } else if (user) {
           userId = user.id;
@@ -45,25 +52,71 @@ Deno.serve(async (req) => {
         }
       } catch (tokenError) {
         console.error('Token parsing error:', tokenError);
+        console.log('Will proceed with anonymous access');
         // Continue with anonymous access
       }
     } else {
       console.log('No Authorization header present, proceeding with anonymous access');
     }
     
-    // Extract query parameters from request
-    const { source } = await req.json().catch(() => ({ source: 'all' })) || { source: 'all' };
-    console.log(`Retrieving leads from source: ${source || 'all'}`);
+    // Extract request body parameters
+    let requestBody = { source: 'all' };
+    try {
+      if (req.headers.get('content-type')?.includes('application/json')) {
+        const body = await req.json().catch(() => ({}));
+        requestBody = { ...requestBody, ...body };
+      }
+    } catch (parseError) {
+      console.error('Error parsing request body:', parseError);
+      // Continue with default values
+    }
+    
+    console.log(`Retrieving leads with parameters:`, requestBody);
+    
+    // Get total lead count first (for debugging)
+    const { count: totalLeadCount, error: countError } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true });
+      
+    if (countError) {
+      console.error('Error counting total leads:', countError.message);
+    } else {
+      console.log(`Total leads in database: ${totalLeadCount}`);
+    }
+    
+    // Get user-specific count if authenticated
+    let userLeadCount = 0;
+    if (userId) {
+      const { count, error: userCountError } = await supabase
+        .from('leads')
+        .select('*', { count: 'exact', head: true })
+        .eq('created_by', userId);
+        
+      if (userCountError) {
+        console.error('Error counting user leads:', userCountError.message);
+      } else {
+        userLeadCount = count || 0;
+        console.log(`Leads created by user ${userId}: ${userLeadCount}`);
+      }
+    }
     
     // Fetch leads from Supabase database
-    const leads = await fetchLeadsFromSupabase(userId);
+    const leads = await fetchLeadsFromSupabase(userId, requestBody.source);
     
-    console.log(`Successfully retrieved ${leads.length} leads`);
+    console.log(`Successfully retrieved ${leads.length} leads out of ${userId ? userLeadCount : totalLeadCount} total`);
     
     return new Response(
       JSON.stringify({ 
         success: true, 
-        data: leads 
+        data: leads,
+        metadata: {
+          userId: userId || 'anonymous',
+          isAuthenticated,
+          totalLeadCount: totalLeadCount || 0,
+          userLeadCount: userLeadCount || 0,
+          source: requestBody.source,
+          retrievedCount: leads.length
+        }
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -72,6 +125,7 @@ Deno.serve(async (req) => {
     );
   } catch (error) {
     console.error(`Error in retrieve-leads function: ${error.message}`);
+    console.error(`Stack trace: ${error.stack}`);
     
     // Determine appropriate status code based on error type
     let statusCode = 500;
@@ -80,7 +134,8 @@ Deno.serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error.message,
+        stack: error.stack 
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -91,28 +146,49 @@ Deno.serve(async (req) => {
 });
 
 // Function to fetch leads from Supabase
-async function fetchLeadsFromSupabase(userId) {
+async function fetchLeadsFromSupabase(userId, source = 'all') {
   try {
+    console.log(`Starting fetchLeadsFromSupabase - userId: ${userId || 'anonymous'}, source: ${source}`);
+    
     // Initialize query to the leads table
-    let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
+    let query = supabase.from('leads').select('*');
+    
+    // Add ordering
+    query = query.order('created_at', { ascending: false });
+    
+    // Apply source filtering if needed
+    if (source !== 'all') {
+      console.log(`Filtering by source: ${source}`);
+      // Implement source filtering logic if needed
+    }
     
     // If user is authenticated, filter by their user ID
     // Otherwise, return all leads, even those with null created_by
     if (userId) {
-      query = query.eq('created_by', userId);
       console.log(`Filtering leads for user: ${userId}`);
+      query = query.eq('created_by', userId);
     } else {
       console.log('Retrieving all leads (no user filtering)');
     }
     
+    console.log('Executing Supabase query...');
     const { data, error } = await query;
     
     if (error) {
+      console.error(`Query error: ${error.code} - ${error.message}`, error);
       throw new Error(`Failed to fetch leads from Supabase database: ${error.message}`);
     }
     
+    // Log raw data for debugging
+    console.log(`Raw query returned ${data?.length || 0} results`);
+    if (data && data.length > 0) {
+      console.log('First lead sample:', JSON.stringify(data[0], null, 2));
+    } else {
+      console.log('No leads found in query result');
+    }
+    
     // Transform the data to match the expected format
-    const transformedLeads = data.map(lead => ({
+    const transformedLeads = (data || []).map(lead => ({
       id: lead.id,
       firstName: lead.first_name,
       lastName: lead.last_name,
@@ -129,11 +205,12 @@ async function fetchLeadsFromSupabase(userId) {
       createdBy: lead.created_by
     }));
     
-    console.log(`Retrieved ${transformedLeads.length} leads from Supabase database`);
+    console.log(`Transformed ${transformedLeads.length} leads`);
     
     return transformedLeads;
   } catch (error) {
     console.error(`Error fetching leads from Supabase database: ${error.message}`);
+    console.error(`Stack trace: ${error.stack}`);
     throw error;
   }
 }
