@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 
@@ -106,6 +107,35 @@ const PaginationEllipsis = ({
 )
 PaginationEllipsis.displayName = "PaginationEllipsis"
 
+// New component for page size selector
+const PaginationSizeSelector = ({ 
+  options = [10, 20, 50, 100], 
+  value, 
+  onChange 
+}: {
+  options: number[],
+  value: number,
+  onChange: (size: number) => void
+}) => {
+  return (
+    <div className="flex items-center gap-2 text-sm">
+      <span>Rows per page:</span>
+      <select 
+        value={value} 
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="bg-transparent border rounded px-2 py-1 text-sm"
+      >
+        {options.map(size => (
+          <option key={size} value={size}>
+            {size}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+PaginationSizeSelector.displayName = "PaginationSizeSelector"
+
 export {
   Pagination,
   PaginationContent,
@@ -114,4 +144,5 @@ export {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
+  PaginationSizeSelector,
 }

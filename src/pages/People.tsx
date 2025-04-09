@@ -46,6 +46,16 @@ import {
   ToggleGroupItem 
 } from "@/components/ui/toggle-group";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationSizeSelector,
+} from "@/components/ui/pagination";
 import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
 import { thoughtlyService } from "@/services/thoughtly";
@@ -139,6 +149,10 @@ const People = () => {
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalLeads, setTotalLeads] = useState(0);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -156,38 +170,56 @@ const People = () => {
   });
 
   useEffect(() => {
-    const fetchLeads = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        console.log("Fetching leads from thoughtlyService.retrieveLeads()...");
-        const result = await thoughtlyService.retrieveLeads();
-        console.log("Fetch leads result:", result);
-        
-        if (result && Array.isArray(result) && result.length > 0) {
-          console.log(`Setting ${result.length} leads from API`);
-          setLeads(result);
-        } else {
-          console.log("No leads found in API response, using fallback data");
-          setLeads(fallbackLeadsData);
-        }
-      } catch (error) {
-        console.error("Error fetching leads:", error);
-        setLoadError("Failed to load leads. Please try again.");
-        setLeads(fallbackLeadsData);
-        toast.error("Failed to load leads. Using sample data instead.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchLeads();
-  }, []);
+  }, [currentPage, pageSize]);
+
+  const fetchLeads = async () => {
+    setIsLoading(true);
+    setLoadError(null);
+    try {
+      console.log(`Fetching leads page ${currentPage} with size ${pageSize}...`);
+      const result = await thoughtlyService.retrieveLeads({
+        page: currentPage,
+        limit: pageSize
+      });
+      console.log("Fetch leads result:", result);
+      
+      if (result && Array.isArray(result.data) && result.data.length > 0) {
+        console.log(`Setting ${result.data.length} leads from API`);
+        setLeads(result.data);
+        setTotalLeads(result.totalCount || result.data.length);
+      } else {
+        console.log("No leads found in API response, using fallback data");
+        setLeads(fallbackLeadsData);
+        setTotalLeads(fallbackLeadsData.length);
+      }
+    } catch (error) {
+      console.error("Error fetching leads:", error);
+      setLoadError("Failed to load leads. Please try again.");
+      setLeads(fallbackLeadsData);
+      setTotalLeads(fallbackLeadsData.length);
+      toast.error("Failed to load leads. Using sample data instead.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const filteredLeads = leads.filter(lead => {
     if (activeDisposition === "All Leads") return true;
     return lead.disposition === activeDisposition;
   });
+
+  const totalPages = Math.ceil(totalLeads / pageSize);
+  
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+  
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setCurrentPage(1);
+  };
 
   const updateLeadDisposition = (leadId: number | number[], newDisposition: string) => {
     if (Array.isArray(leadId)) {
@@ -336,12 +368,17 @@ const People = () => {
   };
 
   const refreshLeads = async () => {
+    setCurrentPage(1);
     try {
       setIsLoading(true);
-      const fetchedLeads = await thoughtlyService.retrieveLeads();
-      if (fetchedLeads && Array.isArray(fetchedLeads) && fetchedLeads.length > 0) {
-        setLeads(fetchedLeads);
-        toast.success(`Refreshed ${fetchedLeads.length} leads`);
+      const fetchedLeads = await thoughtlyService.retrieveLeads({
+        page: 1,
+        limit: pageSize
+      });
+      if (fetchedLeads && Array.isArray(fetchedLeads.data) && fetchedLeads.data.length > 0) {
+        setLeads(fetchedLeads.data);
+        setTotalLeads(fetchedLeads.totalCount || fetchedLeads.data.length);
+        toast.success(`Refreshed leads`);
       } else {
         toast.info("No leads found");
       }
@@ -351,6 +388,39 @@ const People = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const generatePagination = () => {
+    const pages: (number | 'ellipsis')[] = [];
+    
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+      
+      if (currentPage > 3) {
+        pages.push('ellipsis');
+      }
+      
+      const startPage = Math.max(2, currentPage - 1);
+      const endPage = Math.min(totalPages - 1, currentPage + 1);
+      
+      for (let i = startPage; i <= endPage; i++) {
+        pages.push(i);
+      }
+      
+      if (currentPage < totalPages - 2) {
+        pages.push('ellipsis');
+      }
+      
+      if (totalPages > 1) {
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
   };
 
   return (
@@ -603,12 +673,61 @@ const People = () => {
         </div>
       </div>
 
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+        <div className="text-sm text-gray-500">
+          Showing {filteredLeads.length} of {totalLeads} leads
+        </div>
+        
+        <div className="flex items-center justify-between w-full sm:w-auto">
+          <PaginationSizeSelector 
+            options={[10, 20, 50, 100]} 
+            value={pageSize} 
+            onChange={handlePageSizeChange} 
+          />
+          
+          <Pagination className="ml-4">
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => handlePageChange(currentPage - 1)} 
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+
+              {generatePagination().map((page, i) => (
+                <PaginationItem key={i}>
+                  {page === 'ellipsis' ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      isActive={page === currentPage}
+                      onClick={() => handlePageChange(page)}
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => handlePageChange(currentPage + 1)} 
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      </div>
+
       {process.env.NODE_ENV !== 'production' && (
         <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
           <h3 className="font-semibold mb-2">Lead Data Debug</h3>
           <div>
-            <p>Total leads: {leads.length}</p>
+            <p>Total leads: {totalLeads}</p>
             <p>Filtered leads: {filteredLeads.length}</p>
+            <p>Current page: {currentPage} of {totalPages}</p>
+            <p>Page size: {pageSize}</p>
             <p>Current disposition filter: {activeDisposition}</p>
             <p>Selected leads: {selectedLeads.length}</p>
             <p>Data source: {leads === fallbackLeadsData ? 'Fallback Data' : 'API Data'}</p>

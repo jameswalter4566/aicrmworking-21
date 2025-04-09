@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -226,11 +227,16 @@ export const thoughtlyService = {
   
   /**
    * Retrieve leads from Supabase via the retrieve-leads edge function
-   * @returns Array of leads from all sources
+   * @param options Optional pagination parameters
+   * @returns Array of leads with pagination data
    */
-  async retrieveLeads() {
+  async retrieveLeads(options?: {
+    page?: number;
+    limit?: number;
+    source?: string;
+  }) {
     try {
-      console.log('Retrieving leads from Supabase');
+      console.log('Retrieving leads from Supabase with options:', options);
       
       // Get authentication session
       const { data: sessionData } = await supabase.auth.getSession();
@@ -247,13 +253,20 @@ export const thoughtlyService = {
         console.log('No auth token found, request will be anonymous');
       }
       
-      console.log('Calling retrieve-leads edge function...');
+      // Add pagination parameters to request body
+      const requestBody = {
+        source: options?.source || 'all',
+        page: options?.page || 1,
+        limit: options?.limit || 10
+      };
+      
+      console.log('Calling retrieve-leads edge function...', requestBody);
       let response;
       
       try {
         // First try - use auth token if available
         response = await supabase.functions.invoke('retrieve-leads', {
-          body: { source: 'all' },
+          body: requestBody,
           headers
         });
       } catch (initialError) {
@@ -261,7 +274,7 @@ export const thoughtlyService = {
         
         // Fallback - try without headers to see if it's an auth issue
         response = await supabase.functions.invoke('retrieve-leads', {
-          body: { source: 'all' }
+          body: requestBody
         });
       }
       
@@ -279,19 +292,14 @@ export const thoughtlyService = {
         throw new Error(data.error || 'Failed to retrieve leads');
       }
       
-      // If no leads found but we have fallback data, use it
-      if ((!data.data || data.data.length === 0) && data.metadata?.totalLeadCount > 0) {
-        console.warn(`No leads returned but database has ${data.metadata.totalLeadCount} total leads. Authentication issue?`);
-      }
-      
-      // Check if data array exists and is populated
-      if (data.data && Array.isArray(data.data)) {
-        console.log(`Retrieved ${data.data.length} leads from edge function`);
-        return data.data;
-      } else {
-        console.warn('No leads found in response data array');
-        return [];
-      }
+      // Return the data along with pagination information
+      return {
+        data: data.data || [],
+        totalCount: data.metadata?.totalLeadCount || 0,
+        currentPage: options?.page || 1,
+        totalPages: data.metadata?.totalPages || 1,
+        pageSize: options?.limit || 10
+      };
     } catch (error) {
       console.error('Error in retrieveLeads:', error);
       throw error;
