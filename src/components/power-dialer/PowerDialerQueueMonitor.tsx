@@ -6,33 +6,16 @@ import { Badge } from '@/components/ui/badge';
 import { Phone, Clock, BarChart } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PowerDialerCall, PowerDialerCallQueue, PowerDialerContact } from '@/types/powerDialer';
 
-interface QueueCall {
-  id: string;
-  priority: number;
-  created_timestamp: string;
-  calls: {
-    id: string;
-    contact_id: string;
-    twilio_call_sid: string;
-    status: string;
-    contacts?: {
-      name: string;
-      phone_number: string;
-    }
-  }
+interface QueueCall extends PowerDialerCallQueue {
+  calls?: PowerDialerCall & {
+    contacts?: PowerDialerContact;
+  };
 }
 
-interface Call {
-  id: string;
-  contact_id: string;
-  status: string;
-  machine_detection_result: string;
-  start_timestamp: string;
-  contacts?: {
-    name: string;
-    phone_number: string;
-  }
+interface Call extends PowerDialerCall {
+  contacts?: PowerDialerContact;
 }
 
 interface PowerDialerQueueMonitorProps {
@@ -100,23 +83,23 @@ const PowerDialerQueueMonitor: React.FC<PowerDialerQueueMonitorProps> = ({ agent
       // Get queued calls
       const { data: queueData, error: queueError } = await supabase
         .from('power_dialer_call_queue')
-        .select('*, calls:power_dialer_calls(id, contact_id, twilio_call_sid, status, contacts:power_dialer_contacts(name, phone_number))')
+        .select('*, calls:call_id(id, contact_id, twilio_call_sid, status, contacts:contact_id(name, phone_number))')
         .order('priority', { ascending: false })
         .order('created_timestamp', { ascending: true });
 
       if (queueError) throw queueError;
-      setQueueCalls(queueData || []);
+      setQueueCalls(queueData as QueueCall[] || []);
 
       // Get active calls
       const { data: activeData, error: activeError } = await supabase
         .from('power_dialer_calls')
-        .select('*, contacts:power_dialer_contacts(name, phone_number)')
+        .select('*, contacts:contact_id(name, phone_number)')
         .eq('status', 'in_progress')
         .order('start_timestamp', { ascending: false })
         .limit(10);
 
       if (activeError) throw activeError;
-      setActiveCalls(activeData || []);
+      setActiveCalls(activeData as Call[] || []);
     } catch (error) {
       console.error('Error fetching queue data:', error);
     } finally {
@@ -260,7 +243,7 @@ const PowerDialerQueueMonitor: React.FC<PowerDialerQueueMonitorProps> = ({ agent
                         {call.machine_detection_result || 'Detecting...'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{formatTime(call.start_timestamp)}</TableCell>
+                    <TableCell>{formatTime(call.start_timestamp || '')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -293,11 +276,11 @@ const PowerDialerQueueMonitor: React.FC<PowerDialerQueueMonitorProps> = ({ agent
                     <TableCell>{item.calls?.contacts?.name || 'Unknown'}</TableCell>
                     <TableCell>{item.calls?.contacts?.phone_number || 'N/A'}</TableCell>
                     <TableCell>
-                      <Badge variant={item.priority > 1 ? 'default' : 'outline'}>
-                        {item.priority > 1 ? 'High' : 'Normal'}
+                      <Badge variant={(item.priority || 1) > 1 ? 'default' : 'outline'}>
+                        {(item.priority || 1) > 1 ? 'High' : 'Normal'}
                       </Badge>
                     </TableCell>
-                    <TableCell>{getWaitTime(item.created_timestamp)}</TableCell>
+                    <TableCell>{getWaitTime(item.created_timestamp || '')}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

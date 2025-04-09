@@ -6,22 +6,17 @@ import PowerDialerContactsList from './PowerDialerContactsList';
 import PowerDialerControls from './PowerDialerControls';
 import PowerDialerQueueMonitor from './PowerDialerQueueMonitor';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-interface PowerDialerAgent {
-  id: string;
-  name: string;
-  status: string;
-  current_call_id: string | null;
-}
+import { PowerDialerAgent } from '@/types/powerDialer';
+import { useAuth } from '@/context/AuthContext';
 
 const PowerDialerDashboard = () => {
   const [agent, setAgent] = useState<PowerDialerAgent | null>(null);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const { user } = useAuth();
 
   useEffect(() => {
     // Check if user is registered as an agent
     const checkAgent = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
@@ -31,7 +26,7 @@ const PowerDialerDashboard = () => {
         .single();
 
       if (!error && data) {
-        setAgent(data);
+        setAgent(data as PowerDialerAgent);
         
         // Subscribe to agent updates
         const subscription = supabase
@@ -57,7 +52,7 @@ const PowerDialerDashboard = () => {
     };
 
     checkAgent();
-  }, []);
+  }, [user]);
 
   return (
     <div className="container mx-auto p-4">

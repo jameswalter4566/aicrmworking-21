@@ -7,14 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, RefreshCw, Trash } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { ScrollArea } from '@/components/ui/scroll-area';
-
-interface PowerDialerContact {
-  id: string;
-  name: string;
-  phone_number: string;
-  status: string;
-  last_call_timestamp: string | null;
-}
+import { PowerDialerContact } from '@/types/powerDialer';
 
 const PowerDialerContactsList = () => {
   const [contacts, setContacts] = useState<PowerDialerContact[]>([]);
@@ -55,7 +48,7 @@ const PowerDialerContactsList = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setContacts(data || []);
+      setContacts(data as PowerDialerContact[] || []);
     } catch (error) {
       console.error('Error fetching contacts:', error);
       toast({
@@ -86,6 +79,7 @@ const PowerDialerContactsList = () => {
         .insert([{
           name: newContact.name,
           phone_number: newContact.phone_number,
+          status: 'not_contacted'
         }]);
 
       if (error) throw error;

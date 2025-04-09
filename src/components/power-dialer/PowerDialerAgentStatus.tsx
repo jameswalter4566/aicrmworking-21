@@ -6,13 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PhoneCall, PhoneOff, User } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-
-interface PowerDialerAgent {
-  id: string;
-  name: string;
-  status: string;
-  current_call_id: string | null;
-}
+import { PowerDialerAgent } from '@/types/powerDialer';
 
 const PowerDialerAgentStatus = () => {
   const { user } = useAuth();
@@ -65,7 +59,7 @@ const PowerDialerAgentStatus = () => {
       }
 
       setAgent(response.data.agent);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error registering agent:', error);
       toast({
         title: 'Agent Registration Error',
@@ -95,7 +89,7 @@ const PowerDialerAgentStatus = () => {
         title: 'Status Updated',
         description: `Agent status changed to ${status}`,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating agent status:', error);
       toast({
         title: 'Status Update Error',
