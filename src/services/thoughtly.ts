@@ -205,34 +205,47 @@ export const thoughtlyService = {
     try {
       console.log('Retrieving leads from Supabase');
       
-      // Fix: Properly await the Promise and then extract the session data
+      // Get authentication session
       const { data: sessionData } = await supabase.auth.getSession();
       const authToken = sessionData?.session?.access_token;
       
+      // Set up headers for authentication if token exists
       let headers = {};
       if (authToken) {
+        console.log('Auth token found, adding to request headers');
         headers = {
           Authorization: `Bearer ${authToken}`
         };
+      } else {
+        console.log('No auth token found, request will be anonymous');
       }
       
+      console.log('Calling retrieve-leads edge function...');
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { source: 'all' },
         headers
       });
 
       if (error) {
-        console.error('Error retrieving leads:', error);
+        console.error('Error retrieving leads from edge function:', error);
         throw error;
       }
 
+      console.log('Response from retrieve-leads:', data);
+      
       if (!data.success) {
-        console.error('Error retrieving leads:', data.error);
+        console.error('Error in response from retrieve-leads:', data.error);
         throw new Error(data.error || 'Failed to retrieve leads');
       }
       
-      // Return the leads as they come from our retrieve function
-      return data.data || [];
+      // Check if data array exists and is populated
+      if (data.data && Array.isArray(data.data)) {
+        console.log(`Retrieved ${data.data.length} leads from edge function`);
+        return data.data;
+      } else {
+        console.warn('No leads found in response data array');
+        return [];
+      }
     } catch (error) {
       console.error('Error in retrieveLeads:', error);
       throw error;

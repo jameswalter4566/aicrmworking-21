@@ -51,7 +51,7 @@ import { Progress } from "@/components/ui/progress";
 import { thoughtlyService } from "@/services/thoughtly";
 import { supabase } from "@/integrations/supabase/client";
 
-const leadsData = [
+const fallbackLeadsData = [
   {
     id: 1,
     firstName: "Dan",
@@ -129,7 +129,7 @@ type LeadFormValues = {
 };
 
 const People = () => {
-  const [leads, setLeads] = useState(leadsData);
+  const [leads, setLeads] = useState([]);
   const [customFields, setCustomFields] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
@@ -137,6 +137,8 @@ const People = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [activeDisposition, setActiveDisposition] = useState("All Leads");
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -155,13 +157,27 @@ const People = () => {
 
   useEffect(() => {
     const fetchLeads = async () => {
+      setIsLoading(true);
+      setLoadError(null);
       try {
-        const fetchedLeads = await thoughtlyService.retrieveLeads();
-        if (fetchedLeads && fetchedLeads.length > 0) {
-          setLeads(fetchedLeads);
+        console.log("Fetching leads from thoughtlyService.retrieveLeads()...");
+        const result = await thoughtlyService.retrieveLeads();
+        console.log("Fetch leads result:", result);
+        
+        if (result && Array.isArray(result) && result.length > 0) {
+          console.log(`Setting ${result.length} leads from API`);
+          setLeads(result);
+        } else {
+          console.log("No leads found in API response, using fallback data");
+          setLeads(fallbackLeadsData);
         }
       } catch (error) {
         console.error("Error fetching leads:", error);
+        setLoadError("Failed to load leads. Please try again.");
+        setLeads(fallbackLeadsData);
+        toast.error("Failed to load leads. Using sample data instead.");
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -319,11 +335,36 @@ const People = () => {
     toast.success("Leads sorted by disposition");
   };
 
+  const refreshLeads = async () => {
+    try {
+      setIsLoading(true);
+      const fetchedLeads = await thoughtlyService.retrieveLeads();
+      if (fetchedLeads && Array.isArray(fetchedLeads) && fetchedLeads.length > 0) {
+        setLeads(fetchedLeads);
+        toast.success(`Refreshed ${fetchedLeads.length} leads`);
+      } else {
+        toast.info("No leads found");
+      }
+    } catch (error) {
+      console.error("Error refreshing leads:", error);
+      toast.error("Failed to refresh leads");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Leads</h1>
         <div className="flex gap-3">
+          <Button 
+            className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+            onClick={refreshLeads}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
           <Button 
             className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
             onClick={() => setIsAddLeadOpen(true)}
@@ -372,6 +413,24 @@ const People = () => {
         </Button>
       </div>
 
+      {isLoading && (
+        <div className="flex justify-center my-8">
+          <div className="text-center">
+            <div className="w-full max-w-xs mx-auto mb-4">
+              <Progress value={75} className="w-full" />
+            </div>
+            <p className="text-gray-500">Loading leads...</p>
+          </div>
+        </div>
+      )}
+
+      {loadError && !isLoading && (
+        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg mb-6">
+          <h3 className="font-semibold">Error Loading Leads</h3>
+          <p>{loadError}</p>
+        </div>
+      )}
+
       {selectedLeads.length > 0 && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-start gap-4">
           <span className="text-sm font-medium text-gray-700">
@@ -406,7 +465,7 @@ const People = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
         <div className="p-4 border-b border-gray-200 flex items-center bg-crm-lightBlue">
           <h2 className="font-medium text-gray-700">All Leads</h2>
           <div className="ml-auto">
@@ -513,18 +572,18 @@ const People = () => {
                           <AvatarImage src={lead.avatar} alt={`${lead.firstName} ${lead.lastName}`} />
                         ) : (
                           <AvatarFallback className="bg-crm-lightBlue text-crm-blue">
-                            {lead.firstName.charAt(0)}
+                            {lead.firstName?.charAt(0) || '?'}
                           </AvatarFallback>
                         )}
                       </Avatar>
                     </TableCell>
-                    <TableCell>{lead.firstName}</TableCell>
-                    <TableCell>{lead.lastName}</TableCell>
-                    <TableCell>{lead.mailingAddress}</TableCell>
-                    <TableCell>{lead.propertyAddress}</TableCell>
-                    <TableCell>{lead.phone1}</TableCell>
-                    <TableCell>{lead.phone2}</TableCell>
-                    <TableCell>{lead.email}</TableCell>
+                    <TableCell>{lead.firstName || 'N/A'}</TableCell>
+                    <TableCell>{lead.lastName || 'N/A'}</TableCell>
+                    <TableCell>{lead.mailingAddress || 'N/A'}</TableCell>
+                    <TableCell>{lead.propertyAddress || 'N/A'}</TableCell>
+                    <TableCell>{lead.phone1 || 'N/A'}</TableCell>
+                    <TableCell>{lead.phone2 || 'N/A'}</TableCell>
+                    <TableCell>{lead.email || 'N/A'}</TableCell>
                     {customFields.map((field, index) => (
                       <TableCell key={index}>-</TableCell>
                     ))}
@@ -533,7 +592,9 @@ const People = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={11 + customFields.length} className="text-center py-8 text-gray-500">
-                    No leads found. Add your first lead to get started.
+                    {isLoading ? 
+                      "Loading leads..." : 
+                      "No leads found. Add your first lead to get started."}
                   </TableCell>
                 </TableRow>
               )}
@@ -541,6 +602,19 @@ const People = () => {
           </Table>
         </div>
       </div>
+
+      {process.env.NODE_ENV !== 'production' && (
+        <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+          <h3 className="font-semibold mb-2">Lead Data Debug</h3>
+          <div>
+            <p>Total leads: {leads.length}</p>
+            <p>Filtered leads: {filteredLeads.length}</p>
+            <p>Current disposition filter: {activeDisposition}</p>
+            <p>Selected leads: {selectedLeads.length}</p>
+            <p>Data source: {leads === fallbackLeadsData ? 'Fallback Data' : 'API Data'}</p>
+          </div>
+        </div>
+      )}
 
       <Dialog open={isAddLeadOpen} onOpenChange={setIsAddLeadOpen}>
         <DialogContent className="sm:max-w-[600px] rounded-xl">
