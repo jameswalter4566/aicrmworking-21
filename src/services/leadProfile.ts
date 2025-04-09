@@ -46,7 +46,7 @@ export const leadProfileService = {
       
       // Call the lead-profile edge function
       const { data, error } = await supabase.functions.invoke('lead-profile', {
-        params: { id: leadId }
+        body: { id: leadId }
       });
 
       if (error) {

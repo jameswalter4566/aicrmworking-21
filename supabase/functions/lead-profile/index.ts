@@ -22,26 +22,20 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Check if it's a GET request
-    if (req.method !== 'GET') {
-      throw new Error('Method not allowed. Please use GET.');
-    }
+    // Extract lead ID from request body
+    const { id } = await req.json();
 
-    // Extract lead ID from URL
-    const url = new URL(req.url);
-    const leadId = url.searchParams.get('id');
-
-    if (!leadId) {
+    if (!id) {
       throw new Error('Lead ID is required');
     }
 
-    console.log(`Fetching lead with ID: ${leadId}`);
+    console.log(`Fetching lead with ID: ${id}`);
 
     // Query the leads table for a specific lead
     const { data: lead, error } = await supabase
       .from('leads')
       .select('*')
-      .eq('id', leadId)
+      .eq('id', id)
       .single();
 
     if (error) {

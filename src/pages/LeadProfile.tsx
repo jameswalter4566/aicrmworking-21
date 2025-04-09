@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import MainLayout from "@/components/layouts/MainLayout";
-import { leadProfileService, LeadProfile, LeadNote, LeadActivity } from "@/services/leadProfile";
+import { leadProfileService, type LeadProfile as LeadProfileType, LeadNote, LeadActivity } from "@/services/leadProfile";
 import {
   Card,
   CardContent,
@@ -24,7 +23,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft, Phone, Mail, MapPin, Tag, Calendar, FileText, 
-  Clock, UserCircle, ChevronRight, Send, Edit, Save, X
+  Clock, UserCircle, ChevronRight, Send, Edit, Save, X,
+  MessageSquare, Activity
 } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -32,7 +32,7 @@ import { format, formatDistanceToNow } from "date-fns";
 
 const LeadProfile = () => {
   const { id } = useParams<{ id: string }>();
-  const [lead, setLead] = useState<LeadProfile | null>(null);
+  const [lead, setLead] = useState<LeadProfileType | null>(null);
   const [notes, setNotes] = useState<LeadNote[]>([]);
   const [activities, setActivities] = useState<LeadActivity[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +40,7 @@ const LeadProfile = () => {
   const [newNote, setNewNote] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [editMode, setEditMode] = useState(false);
-  const [editedLead, setEditedLead] = useState<LeadProfile>({});
+  const [editedLead, setEditedLead] = useState<LeadProfileType>({});
 
   useEffect(() => {
     const fetchLeadData = async () => {
@@ -54,7 +54,6 @@ const LeadProfile = () => {
         setLead(leadData);
         setEditedLead(leadData);
         
-        // Fetch notes and activities in parallel
         const [notesData, activitiesData] = await Promise.all([
           leadProfileService.getLeadNotes(id),
           leadProfileService.getLeadActivities(id)
@@ -90,25 +89,21 @@ const LeadProfile = () => {
 
   const toggleEditMode = () => {
     if (editMode) {
-      // If we're exiting edit mode, reset the edited lead to the current lead
       setEditedLead(lead || {});
     }
     setEditMode(!editMode);
   };
 
   const handleSaveChanges = () => {
-    // In a real app, this would save to the backend
-    // For now, just update the local state
     setLead(editedLead);
     setEditMode(false);
     toast.success("Lead information updated");
   };
 
-  const handleEditChange = (field: keyof LeadProfile, value: string) => {
+  const handleEditChange = (field: keyof LeadProfileType, value: string) => {
     setEditedLead(prev => ({ ...prev, [field]: value }));
   };
 
-  // Helper to get disposition color
   const getDispositionColor = (disposition?: string) => {
     switch(disposition) {
       case "Not Contacted":
