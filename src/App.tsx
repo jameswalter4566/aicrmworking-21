@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -16,6 +17,7 @@ import PublicRoute from "./components/PublicRoute";
 import Index from "./pages/Index";
 import People from "./pages/People";
 import Deals from "./pages/Deals";
+import Pipeline from "./pages/Pipeline";
 import PowerDialer from "./pages/PowerDialer";
 import AIDialer from "./pages/AIDialer";
 import SMSCampaign from "./pages/SMSCampaign";
@@ -27,6 +29,8 @@ import NotFound from "./pages/NotFound";
 import AmortizationCalculator from "./pages/AmortizationCalculator";
 import PitchDeckPro from "./pages/PitchDeckPro";
 import PredictiveDialer from "./pages/PredictiveDialer";
+import AIRealtor from "./pages/AIRealtor";
+import ListingPresentation from "./pages/ListingPresentation";
 
 const queryClient = new QueryClient();
 
@@ -233,9 +237,12 @@ function App() {
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
                 <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
+                <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
                 <Route path="/power-dialer" element={<PowerDialer />} />
                 <Route path="/predictive-dialer" element={<PredictiveDialer />} />
                 <Route path="/ai-dialer" element={<AIDialer />} />
+                <Route path="/ai-realtor" element={<ProtectedRoute><AIRealtor /></ProtectedRoute>} />
+                <Route path="/listing-presentation" element={<ProtectedRoute><ListingPresentation /></ProtectedRoute>} />
                 <Route path="/sms-campaign" element={<SMSCampaign />} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 

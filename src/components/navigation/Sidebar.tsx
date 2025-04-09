@@ -1,10 +1,11 @@
+
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
   BarChart2, Settings, Home, DollarSign, 
   PhoneOutgoing, Menu, Bot, MessageSquare,
   FileText, Calculator, Briefcase, Brain,
-  Presentation, Phone
+  Presentation, Phone, Building
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -67,6 +68,12 @@ const Sidebar = () => {
         { name: "Pitch Deck Pro", icon: Presentation, path: "/pitch-deck" },
         { name: "Processor Assist", icon: Briefcase, path: "/processor" },
         { name: "AI Loan Officer", icon: Brain, path: "/ai-loan-officer" },
+      ];
+    } else if (activeIndustry === "realEstate") {
+      return [
+        { name: "Pipeline", icon: Building, path: "/pipeline" },
+        { name: "AI Realtor", icon: Brain, path: "/ai-realtor" },
+        { name: "Listing Presentation Builder", icon: Presentation, path: "/listing-presentation" }
       ];
     } else {
       return [
