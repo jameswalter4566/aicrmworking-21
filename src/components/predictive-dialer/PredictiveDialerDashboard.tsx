@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Device, Call } from '@twilio/voice-sdk';
 import { useAuth } from '@/context/AuthContext';
@@ -17,6 +16,7 @@ import { predictiveDialer } from '@/utils/supabase-custom-client';
 import { supabase } from "@/integrations/supabase/client";
 import { PredictiveDialerAgent, PredictiveDialerContact, PredictiveDialerCall, PredictiveDialerStats } from '@/types/predictive-dialer';
 import { ThoughtlyContact } from '@/services/thoughtly';
+import { thoughtlyService } from '@/services/thoughtly';
 
 export const PredictiveDialerDashboard: React.FC = () => {
   const [isDialerRunning, setIsDialerRunning] = useState(false);
@@ -40,11 +40,9 @@ export const PredictiveDialerDashboard: React.FC = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Handle Twilio device ready
   const handleDeviceReady = useCallback((device: Device) => {
     setTwilioDevice(device);
     
-    // Set up incoming call handler
     device.on('incoming', (call) => {
       setCurrentCall(call);
       
@@ -53,7 +51,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
         description: `Incoming call from ${call.parameters.From}`,
       });
       
-      // Auto-accept the call
       call.accept();
       
       call.on('disconnect', () => {
@@ -62,12 +59,10 @@ export const PredictiveDialerDashboard: React.FC = () => {
     });
   }, [toast]);
 
-  // Ensure the current user is registered as an agent
   const ensureAgentExists = useCallback(async () => {
     if (!user) return null;
     
     try {
-      // Check if agent already exists for this user
       const { data: existingAgents, error: searchError } = await predictiveDialer.getAgents()
         .select('*')
         .eq('user_id', user.id);
@@ -77,7 +72,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
       let agent: PredictiveDialerAgent | null = null;
       
       if (existingAgents && existingAgents.length > 0) {
-        // Update existing agent
         agent = existingAgents[0];
         const { error: updateError } = await predictiveDialer.getAgents()
           .update({ 
@@ -90,7 +84,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
         
         agent.status = 'available';
       } else {
-        // Create new agent
         const { data: newAgent, error: insertError } = await predictiveDialer.getAgents()
           .insert({
             user_id: user.id,
@@ -118,18 +111,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
       return null;
     }
   }, [user, toast]);
-
-  useEffect(() => {
-    ensureAgentExists();
-    fetchStats();
-    fetchContacts();
-    
-    const interval = setInterval(() => {
-      fetchStats();
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [ensureAgentExists]);
 
   const fetchStats = async () => {
     try {
@@ -197,35 +178,13 @@ export const PredictiveDialerDashboard: React.FC = () => {
   const fetchContacts = async () => {
     setIsLoadingContacts(true);
     try {
-      // Get authentication token
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData?.session?.access_token;
+      const contacts = await thoughtlyService.retrieveLeads();
       
-      let headers = {};
-      if (authToken) {
-        headers = {
-          Authorization: `Bearer ${authToken}`
-        };
-      }
-      
-      // Call the retrieve-contacts function
-      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { source: 'all' },
-        headers
-      });
-      
-      if (error) {
-        console.error("Error retrieving contacts:", error);
-        throw error;
-      }
-      
-      if (data?.data) {
-        setRetrievedContacts(data.data);
+      if (contacts && Array.isArray(contacts)) {
+        setRetrievedContacts(contacts);
         
-        // Import contacts to predictive dialer if needed
-        for (const contact of data.data) {
+        for (const contact of contacts) {
           if (contact.phone1) {
-            // Check if contact already exists in the dialer by phone number
             const { data: existingContacts, error: searchError } = await predictiveDialer.getContacts()
               .select('*')
               .eq('phone_number', contact.phone1);
@@ -236,7 +195,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
             }
             
             if (!existingContacts || existingContacts.length === 0) {
-              // Add to predictive dialer contacts
               await predictiveDialer.getContacts().insert({
                 name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown',
                 phone_number: contact.phone1,
@@ -263,7 +221,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
     setIsDialerRunning(!isDialerRunning);
     
     if (!isDialerRunning) {
-      // Make sure we have an agent
       const agent = currentAgent || await ensureAgentExists();
       
       if (!agent) {
@@ -277,7 +234,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
       }
       
       try {
-        // Update agent status to available if needed
         if (agent.status !== 'available') {
           const { error } = await predictiveDialer.getAgents()
             .update({ status: 'available' })
@@ -288,7 +244,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
           setCurrentAgent({...agent, status: 'available'});
         }
         
-        // Start the dialer
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-start', {
           method: 'POST',
           headers: {
@@ -321,7 +276,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
       }
     } else {
       try {
-        // Stop the dialer
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/stop-predictive-dialer', {
           method: 'POST',
           headers: {
@@ -354,7 +308,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
     }
   };
 
-  // Fix for the Promise handling in handleContactSelect
   const handleContactSelect = async (contact: PredictiveDialerContact | ThoughtlyContact) => {
     if (!twilioDevice) {
       toast({
@@ -385,14 +338,12 @@ export const PredictiveDialerDashboard: React.FC = () => {
         return;
       }
       
-      // Update agent status to busy
       const { error: agentError } = await predictiveDialer.getAgents()
         .update({ status: 'busy' })
         .eq('id', agent.id);
       
       if (agentError) throw agentError;
       
-      // Get phone number from either type of contact
       const phoneNumber = 'phone_number' in contact 
         ? contact.phone_number 
         : (contact.phone1 || '');
@@ -405,11 +356,9 @@ export const PredictiveDialerDashboard: React.FC = () => {
         throw new Error("No phone number available for this contact");
       }
 
-      // For retrieved contacts that aren't in the dialer yet, add them
       let contactId = 'id' in contact ? contact.id : '';
       
       if (!('phone_number' in contact)) {
-        // This is a ThoughtlyContact, check if it exists in predictive_dialer_contacts
         const { data: existingContacts, error: searchError } = await predictiveDialer.getContacts()
           .select('*')
           .eq('phone_number', phoneNumber);
@@ -417,7 +366,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
         if (searchError) throw searchError;
         
         if (!existingContacts || existingContacts.length === 0) {
-          // Add to predictive dialer contacts
           const { data: newContact, error: insertError } = await predictiveDialer.getContacts()
             .insert({
               name: contactName,
@@ -436,7 +384,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
         }
       }
       
-      // Create call record
       const newCall = {
         contact_id: contactId,
         agent_id: agent.id,
@@ -448,7 +395,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
       
       if (callError || !callData || callData.length === 0) throw new Error("Failed to create call record");
       
-      // Update agent with current call
       const { error: updateError } = await predictiveDialer.getAgents()
         .update({ current_call_id: callData[0].id })
         .eq('id', agent.id);
@@ -461,7 +407,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
         current_call_id: callData[0].id
       });
       
-      // Make the call using Twilio Device
       const call = await twilioDevice.connect({
         params: {
           To: phoneNumber
@@ -470,12 +415,9 @@ export const PredictiveDialerDashboard: React.FC = () => {
       
       setCurrentCall(call);
       
-      // Handle call events
       call.on('disconnect', () => {
         setCurrentCall(null);
         
-        // Update call record and agent status
-        // Convert the PromiseLike to a standard Promise to use catch method
         Promise.resolve(
           predictiveDialer.getCalls()
             .update({
@@ -485,7 +427,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
             .eq('id', callData[0].id)
         )
           .then(() => {
-            // Reset agent status
             return predictiveDialer.getAgents()
               .update({
                 status: 'available',
@@ -512,10 +453,8 @@ export const PredictiveDialerDashboard: React.FC = () => {
     } catch (error) {
       console.error("Error initiating call:", error);
       
-      // Reset agent status on error
       if (currentAgent) {
         try {
-          // Reset agent status
           await predictiveDialer.getAgents()
             .update({ status: 'available', current_call_id: null })
             .eq('id', currentAgent.id);
@@ -543,6 +482,18 @@ export const PredictiveDialerDashboard: React.FC = () => {
       currentCall.disconnect();
     }
   };
+
+  useEffect(() => {
+    ensureAgentExists();
+    fetchStats();
+    fetchContacts();
+    
+    const interval = setInterval(() => {
+      fetchStats();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [ensureAgentExists]);
 
   return (
     <div className="space-y-6">
@@ -574,7 +525,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
         </div>
       </div>
       
-      {/* Active call display */}
       {currentCall && (
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4">
@@ -665,7 +615,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
         </div>
       </div>
       
-      {/* Retrieved contacts section */}
       <div className="mt-6">
         <Card className="shadow-lg">
           <CardHeader className="pb-3">
