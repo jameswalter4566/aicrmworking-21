@@ -1,8 +1,11 @@
+
 import * as React from "react"
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { ButtonProps, buttonVariants } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Label } from "@/components/ui/label"
 
 const Pagination = ({ className, ...props }: React.ComponentProps<"nav">) => (
   <nav
@@ -106,6 +109,40 @@ const PaginationEllipsis = ({
 )
 PaginationEllipsis.displayName = "PaginationEllipsis"
 
+interface PageSizeSelectorProps {
+  pageSize: number;
+  onPageSizeChange: (pageSize: number) => void;
+  options?: number[];
+  className?: string;
+}
+
+const PaginationPageSizeSelector = ({
+  pageSize,
+  onPageSizeChange,
+  options = [10, 20, 50, 100],
+  className,
+}: PageSizeSelectorProps) => (
+  <div className={cn("flex items-center space-x-2", className)}>
+    <Label htmlFor="page-size" className="text-sm whitespace-nowrap">Show:</Label>
+    <Select
+      value={String(pageSize)}
+      onValueChange={(value) => onPageSizeChange(Number(value))}
+    >
+      <SelectTrigger id="page-size" className="h-8 w-[70px]">
+        <SelectValue placeholder={pageSize} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((option) => (
+          <SelectItem key={option} value={String(option)}>
+            {option}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+)
+PaginationPageSizeSelector.displayName = "PaginationPageSizeSelector"
+
 export {
   Pagination,
   PaginationContent,
@@ -114,4 +151,5 @@ export {
   PaginationLink,
   PaginationNext,
   PaginationPrevious,
+  PaginationPageSizeSelector,
 }

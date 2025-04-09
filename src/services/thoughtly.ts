@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -16,6 +17,20 @@ export interface ThoughtlyContact {
   mailingAddress?: string;
   propertyAddress?: string;
   createdBy?: string;
+  notes?: string;
+}
+
+export interface PaginationParams {
+  page?: number;
+  limit?: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  totalCount: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
 
 export const thoughtlyService = {
@@ -225,12 +240,13 @@ export const thoughtlyService = {
   },
   
   /**
-   * Retrieve leads from Supabase via the retrieve-leads edge function
-   * @returns Array of leads from all sources
+   * Retrieve leads from Supabase via the retrieve-leads edge function with pagination
+   * @param paginationParams Pagination parameters (page and limit)
+   * @returns Paginated array of leads from all sources
    */
-  async retrieveLeads() {
+  async retrieveLeads(paginationParams: PaginationParams = { page: 1, limit: 10 }): Promise<PaginatedResult<ThoughtlyContact>> {
     try {
-      console.log('Retrieving leads from Supabase');
+      console.log('Retrieving leads from Supabase with pagination:', paginationParams);
       
       // Get authentication session
       const { data: sessionData } = await supabase.auth.getSession();
@@ -247,13 +263,17 @@ export const thoughtlyService = {
         console.log('No auth token found, request will be anonymous');
       }
       
-      console.log('Calling retrieve-leads edge function...');
+      console.log('Calling retrieve-leads edge function with pagination...');
       let response;
       
       try {
         // First try - use auth token if available
         response = await supabase.functions.invoke('retrieve-leads', {
-          body: { source: 'all' },
+          body: { 
+            source: 'all',
+            page: paginationParams.page || 1,
+            limit: paginationParams.limit || 10
+          },
           headers
         });
       } catch (initialError) {
@@ -261,7 +281,11 @@ export const thoughtlyService = {
         
         // Fallback - try without headers to see if it's an auth issue
         response = await supabase.functions.invoke('retrieve-leads', {
-          body: { source: 'all' }
+          body: { 
+            source: 'all',
+            page: paginationParams.page || 1,
+            limit: paginationParams.limit || 10
+          }
         });
       }
       
@@ -279,18 +303,25 @@ export const thoughtlyService = {
         throw new Error(data.error || 'Failed to retrieve leads');
       }
       
-      // If no leads found but we have fallback data, use it
-      if ((!data.data || data.data.length === 0) && data.metadata?.totalLeadCount > 0) {
-        console.warn(`No leads returned but database has ${data.metadata.totalLeadCount} total leads. Authentication issue?`);
-      }
-      
       // Check if data array exists and is populated
       if (data.data && Array.isArray(data.data)) {
         console.log(`Retrieved ${data.data.length} leads from edge function`);
-        return data.data;
+        return {
+          data: data.data,
+          totalCount: data.metadata?.totalLeadCount || 0,
+          page: data.metadata?.currentPage || 1,
+          limit: data.metadata?.limit || 10,
+          totalPages: data.metadata?.totalPages || 1
+        };
       } else {
         console.warn('No leads found in response data array');
-        return [];
+        return {
+          data: [],
+          totalCount: 0,
+          page: paginationParams.page || 1,
+          limit: paginationParams.limit || 10,
+          totalPages: 0
+        };
       }
     } catch (error) {
       console.error('Error in retrieveLeads:', error);
