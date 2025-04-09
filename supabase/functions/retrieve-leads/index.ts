@@ -1,4 +1,3 @@
-
 // Follow the REST architecture for edge functions
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -25,35 +24,41 @@ Deno.serve(async (req) => {
     // Extract JWT token from Authorization header to identify the user
     const authHeader = req.headers.get('Authorization');
     let userId = null;
+    let isAuthenticated = false;
     
+    // Try to authenticate with the token if it exists
     if (authHeader) {
-      // Extract token from Bearer token format
-      const token = authHeader.replace('Bearer ', '');
-      
-      // Verify the token and get user information
-      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-      
-      if (authError) {
-        console.error('Auth error:', authError.message);
-        throw new Error('Unauthorized: Invalid authentication token');
-      } else if (user) {
-        userId = user.id;
-        console.log(`Request authenticated from user: ${userId}`);
-      } else {
-        throw new Error('Unauthorized: User not found');
+      try {
+        // Extract token from Bearer token format
+        const token = authHeader.replace('Bearer ', '');
+        
+        // Verify the token and get user information
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        
+        if (authError) {
+          console.error('Auth error:', authError.message);
+          // Continue with anonymous access
+        } else if (user) {
+          userId = user.id;
+          isAuthenticated = true;
+          console.log(`Request authenticated from user: ${userId}`);
+        }
+      } catch (tokenError) {
+        console.error('Token parsing error:', tokenError);
+        // Continue with anonymous access
       }
     } else {
-      console.log('No Authorization header present');
-      throw new Error('Unauthorized: Authentication required');
+      console.log('No Authorization header present, proceeding with anonymous access');
     }
     
-    const { source } = await req.json() || { source: 'all' };
-    console.log(`Retrieving leads from source: ${source || 'all'} for user: ${userId}`);
+    // Extract query parameters from request
+    const { source } = await req.json().catch(() => ({ source: 'all' })) || { source: 'all' };
+    console.log(`Retrieving leads from source: ${source || 'all'}`);
     
-    // Fetch leads from Supabase database directly, filtered by user
+    // Fetch leads from Supabase database
     const leads = await fetchLeadsFromSupabase(userId);
     
-    console.log(`Successfully retrieved ${leads.length} leads for user: ${userId}`);
+    console.log(`Successfully retrieved ${leads.length} leads`);
     
     return new Response(
       JSON.stringify({ 
@@ -88,16 +93,19 @@ Deno.serve(async (req) => {
 // Function to fetch leads from Supabase
 async function fetchLeadsFromSupabase(userId) {
   try {
-    if (!userId) {
-      throw new Error('User ID is required to fetch leads');
+    // Initialize query to the leads table
+    let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
+    
+    // If user is authenticated, filter by their user ID
+    // Otherwise, return all leads, even those with null created_by
+    if (userId) {
+      query = query.eq('created_by', userId);
+      console.log(`Filtering leads for user: ${userId}`);
+    } else {
+      console.log('Retrieving all leads (no user filtering)');
     }
     
-    // Query the leads table in Supabase, filtering by created_by
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('created_by', userId)  // Only fetch leads created by this user
-      .order('created_at', { ascending: false });
+    const { data, error } = await query;
     
     if (error) {
       throw new Error(`Failed to fetch leads from Supabase database: ${error.message}`);
@@ -121,7 +129,7 @@ async function fetchLeadsFromSupabase(userId) {
       createdBy: lead.created_by
     }));
     
-    console.log(`Retrieved ${transformedLeads.length} leads from Supabase database for user: ${userId}`);
+    console.log(`Retrieved ${transformedLeads.length} leads from Supabase database`);
     
     return transformedLeads;
   } catch (error) {
