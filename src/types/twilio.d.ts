@@ -1,3 +1,4 @@
+
 // Updated type definitions for Twilio Voice SDK 2.x
 
 interface OutputDeviceCollection {
@@ -73,16 +74,6 @@ interface TwilioCall {
   off(event: string, handler: Function): this;
 }
 
-interface TwilioCallResult {
-  success: boolean;
-  error?: string;
-  callSid?: string;
-  browserCallSid?: string;
-  phoneCallSid?: string; 
-  conferenceName?: string;
-  transcriptionSid?: string;
-}
-
 interface TwilioDeviceOptions {
   codecPreferences?: string[];
   fakeLocalDtmf?: boolean;
@@ -131,8 +122,4 @@ interface Twilio {
 
 interface Window {
   Twilio?: Twilio;
-}
-
-declare namespace twilio {
-  // Keep any existing types here
 }
