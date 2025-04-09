@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -89,7 +88,7 @@ const SMSCampaign = () => {
     setIsSending(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('send-sms-csv-email', {
+      const { data, error } = await supabase.functions.invoke('send-sms', {
         body: JSON.stringify({
           contacts: contacts,
           message: message,
@@ -103,7 +102,7 @@ const SMSCampaign = () => {
 
       toast({
         title: "Campaign sent successfully",
-        description: "Your SMS campaign has been sent via email.",
+        description: `SMS campaign sent to ${data.contactsCount} contacts.`,
         variant: "default",
       });
     } catch (error) {
