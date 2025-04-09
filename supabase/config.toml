@@ -54,3 +54,4 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 [functions.retrieve-transcription]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
