@@ -32,25 +32,7 @@ enabled = false
 [experimental]
 multisite = false
 
-# CRITICAL: Explicitly disable JWT verification for ALL Twilio-related functions
-# Ensure all invoker roles are added for maximum compatibility
 [functions]
-[functions.store-leads]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.twilio-voice]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.twilio-token]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.twilio-stream]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
 [functions.send-sms]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
