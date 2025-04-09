@@ -276,7 +276,7 @@ export default function PowerDialer() {
   };
 
   const DialerPreview = () => (
-    <Card className="mb-4 relative overflow-hidden">
+    <Card className="mb-8 relative overflow-hidden min-h-[450px]">
       <CardHeader className="pb-2">
         <div className="flex flex-col space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Power Dialer</h1>
@@ -337,27 +337,33 @@ export default function PowerDialer() {
         </div>
       </CardHeader>
       
-      <CardContent className="min-h-[300px] flex">
+      <CardContent className="min-h-[350px] flex">
         <div className="flex-1 flex items-center justify-center">
           {!dialingSessionActive ? (
-            <Button 
-              onClick={startDialingSession} 
-              className="bg-crm-blue hover:bg-crm-blue/90 px-8 py-6 h-auto text-lg"
-            >
-              <PhoneCall className="mr-2 h-5 w-5" />
-              Begin Dialing Session
-            </Button>
+            <div className="text-center py-16">
+              <Button 
+                onClick={startDialingSession} 
+                className="bg-crm-blue hover:bg-crm-blue/90 px-8 py-6 h-auto text-lg mb-6"
+              >
+                <PhoneCall className="mr-2 h-5 w-5" />
+                Begin Dialing Session
+              </Button>
+              <p className="text-muted-foreground mt-4 max-w-md mx-auto">
+                Start a dialing session to begin making calls to your leads. 
+                Your active calls will appear here once the session is started.
+              </p>
+            </div>
           ) : (
-            <div className="w-full h-full flex items-center justify-center">
+            <div className="w-full h-full flex items-center justify-center p-6">
               {Object.keys(twilioState.activeCalls).length === 0 ? (
-                <div className="text-center text-muted-foreground">
-                  <PhoneCall className="mx-auto h-12 w-12 text-muted-foreground/50 mb-2" />
-                  <p>No active calls</p>
-                  <p className="text-sm">Select a lead from the queue below to start calling</p>
+                <div className="text-center text-muted-foreground py-8">
+                  <PhoneCall className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                  <p className="text-lg">No active calls</p>
+                  <p className="text-sm mt-2 max-w-md">Select a lead from the queue below to start calling</p>
                 </div>
               ) : (
                 <Card className="w-full bg-blue-50 border-blue-200">
-                  <CardContent className="p-4">
+                  <CardContent className="p-6">
                     {Object.entries(twilioState.activeCalls).map(([leadId, call]) => {
                       const lead = leads.find(l => l.id === leadId);
                       return (
@@ -849,10 +855,10 @@ export default function PowerDialer() {
         <DialerPreview />
         
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
-          <TabsContent value="dialer" className="space-y-4">
+          <TabsContent value="dialer" className="space-y-4 mt-8">
             <DialerTab />
           </TabsContent>
-          <TabsContent value="settings" className="space-y-4">
+          <TabsContent value="settings" className="space-y-4 mt-8">
             <SettingsTab />
           </TabsContent>
         </Tabs>
