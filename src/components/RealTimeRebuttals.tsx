@@ -1,308 +1,267 @@
-import React, { useState, useEffect, useRef } from "react";
+
+import React, { useState, useEffect } from "react";
 import { Bot, MessageCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
 
+// Define potential rebuttal types based on common sales objections
+const REBUTTAL_CATEGORIES = {
+  PRICE: "Price Objection",
+  TIME: "Time Concern", 
+  INTEGRATION: "Integration Concern",
+  DECISION_MAKER: "Decision Maker",
+  COMPETITION: "Competition",
+  VALUE: "Value Proposition",
+  SOCIAL_PROOF: "Social Proof",
+  STALLING: "Stalling Tactic"
+};
+
+// Rebuttal templates mapped to categories
 const REBUTTAL_TEMPLATES = {
-  "Price Objection": [
+  [REBUTTAL_CATEGORIES.PRICE]: [
     "I understand your concern about the price. Many clients initially feel that way, but they quickly realize the ROI is substantial within just 3 months of implementation.",
-    "When you consider the long-term value and cost savings, our solution actually costs less than most alternatives on the market.",
-    "I appreciate you being upfront about budget concerns. We do have flexible payment options that might work better for your situation."
+    "Looking at this as an investment rather than a cost, our clients typically see a 3x return within the first year.",
+    "We offer flexible payment options that might work better with your budget constraints this quarter."
   ],
-  "Integration Concern": [
+  [REBUTTAL_CATEGORIES.TIME]: [
+    "I appreciate that time is valuable. Our implementation process has been streamlined to minimize disruption to your workflow.",
+    "The initial setup takes less than a week, and we have a dedicated team to assist you throughout the process."
+  ],
+  [REBUTTAL_CATEGORIES.INTEGRATION]: [
     "Let me assure you that our platform integrates seamlessly with your existing systems. Our implementation team will handle the entire process.",
-    "Our solution was designed with integration in mind. We've successfully integrated with similar systems at companies just like yours.",
-    "That's a valid concern, but we have APIs and pre-built connectors for all major systems, making integration much simpler than you might expect."
+    "We have successfully integrated with similar systems for clients in your industry, and they reported minimal disruption.",
+    "Our API architecture makes integration straightforward with most modern systems."
   ],
-  "Customization": [
-    "Yes, our solution is fully customizable to your specific needs. We can set up a demo focused on your industry use case.",
-    "The platform is built on a modular architecture, allowing you to enable just the features you need for your unique workflows.",
-    "Our professional services team can develop custom modules for any specialized requirements your business might have."
-  ],
-  "Social Proof": [
-    "Many of our clients in your industry, like Company X and Company Y, have seen a 35% increase in efficiency after implementing our solution.",
-    "We currently serve over 500 companies in your sector, and our retention rate is above 95%, which speaks to the value they're getting.",
-    "One of your competitors recently deployed our solution and reported a 28% reduction in operational costs within the first quarter."
-  ],
-  "Stalling": [
+  [REBUTTAL_CATEGORIES.DECISION_MAKER]: [
     "I completely understand you need to consult with your team. Perhaps we could schedule a follow-up call next week with all decision-makers present?",
-    "While you discuss internally, I'd be happy to send over some case studies specific to your industry that might help address some questions.",
-    "That makes sense. To help with your internal discussions, what specific information would be most valuable for your team to review?"
+    "Would it be helpful if I prepared some specific information to help your discussion with the decision-makers?"
   ],
-  "Competitor Mention": [
-    "I'm familiar with that solution. Where our offering really differentiates is our dedicated support team and industry-specific features.",
-    "That's a good option too. Many of our current clients actually switched from them because of our more intuitive interface and lower total cost of ownership.",
-    "I'd be happy to provide a detailed comparison showing where we excel compared to that solution, especially for your specific use case."
+  [REBUTTAL_CATEGORIES.COMPETITION]: [
+    "I appreciate you're evaluating other options. What specifically are you looking for in a solution that would make it the ideal fit?",
+    "While our competitors offer similar features, our customer support and implementation process consistently receive higher satisfaction ratings."
   ],
-  "Implementation Concerns": [
-    "Our typical implementation takes just 2-3 weeks, and we assign a dedicated project manager to ensure minimal disruption to your operations.",
-    "We have a proven implementation methodology that's been refined through hundreds of deployments in organizations similar to yours.",
-    "Implementation is actually where many of our clients say we excel. Our team handles all the heavy lifting, requiring minimal time from your staff."
+  [REBUTTAL_CATEGORIES.VALUE]: [
+    "Beyond the core features, our clients particularly value the ongoing training and support we provide at no additional cost.",
+    "What's unique about our solution is how it specifically addresses the challenges you mentioned earlier about [specific point]."
+  ],
+  [REBUTTAL_CATEGORIES.SOCIAL_PROOF]: [
+    "Many of our clients in your industry, like Company X and Company Y, have seen a 35% increase in efficiency after implementing our solution.",
+    "I'd be happy to connect you with some of our clients who had similar concerns before joining us."
+  ],
+  [REBUTTAL_CATEGORIES.STALLING]: [
+    "I completely understand you need to consult with your team. Perhaps we could schedule a follow-up call next week with all decision-makers present?",
+    "While you're discussing internally, would it be helpful if I sent over some case studies specific to your industry?"
   ]
 };
 
-interface RealTimeRebuttalProps {
-  isActive: boolean;
-  callSid?: string;
-}
+// Keywords that might signal different objection types
+const OBJECTION_KEYWORDS = {
+  [REBUTTAL_CATEGORIES.PRICE]: ["expensive", "cost", "price", "budget", "afford", "investment", "spend", "money"],
+  [REBUTTAL_CATEGORIES.TIME]: ["time", "busy", "schedule", "when", "long", "takes", "implement", "soon", "quickly"],
+  [REBUTTAL_CATEGORIES.INTEGRATION]: ["integrate", "compatible", "existing", "system", "work with", "technical", "setup"],
+  [REBUTTAL_CATEGORIES.DECISION_MAKER]: ["boss", "manager", "team", "discuss", "decide", "approval", "committee", "board"],
+  [REBUTTAL_CATEGORIES.COMPETITION]: ["other", "competitor", "alternative", "considering", "options", "comparing"],
+  [REBUTTAL_CATEGORIES.VALUE]: ["worth", "value", "benefit", "results", "outcome", "advantage", "roi"],
+  [REBUTTAL_CATEGORIES.SOCIAL_PROOF]: ["others", "customers", "clients", "case", "example", "who else"],
+  [REBUTTAL_CATEGORIES.STALLING]: ["think about", "get back", "later", "not now", "next time", "consider", "not sure", "maybe"]
+};
 
-interface TranscriptionSegment {
+interface Transcript {
+  speaker: string;
   text: string;
-  speaker: "customer" | "agent";
-  timestamp: number;
 }
 
 interface Rebuttal {
   id: number;
   text: string;
   category: string;
-  timestamp: number;
+  timestamp: Date;
 }
 
-export const RealTimeRebuttals: React.FC<RealTimeRebuttalProps> = ({ isActive, callSid }) => {
+interface RealTimeRebuttalProps {
+  isActive: boolean;
+  activeCallSid?: string;
+}
+
+export const RealTimeRebuttals: React.FC<RealTimeRebuttalProps> = ({ isActive, activeCallSid }) => {
   const [rebuttals, setRebuttals] = useState<Rebuttal[]>([]);
-  const [transcribedSegments, setTranscribedSegments] = useState<TranscriptionSegment[]>([]);
-  const [transcribedText, setTranscribedText] = useState<string>("");
-  const [isSimulation, setIsSimulation] = useState<boolean>(true);
-  const [lastRebuttalTime, setLastRebuttalTime] = useState<number>(0);
+  const [transcriptions, setTranscriptions] = useState<Transcript[]>([]);
+  const [fullTranscript, setFullTranscript] = useState<string>("");
+  const [simulationMode, setSimulationMode] = useState<boolean>(true);
+  const [lastPolled, setLastPolled] = useState<number>(0);
   const [transcriptionSid, setTranscriptionSid] = useState<string | null>(null);
   
-  const pollingIntervalRef = useRef<number | null>(null);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
-  
-  const analyzeTranscriptForObjections = (text: string): string | null => {
-    const objectionPhrases = {
-      "Price Objection": ["too expensive", "costs too much", "price", "afford", "budget", "cheaper"],
-      "Integration Concern": ["integrate", "integration", "connect", "existing systems", "compatible"],
-      "Customization": ["customize", "customization", "specific needs", "tailor", "flexible"],
-      "Social Proof": ["other companies", "customer reviews", "testimonials", "case studies", "references"],
-      "Stalling": ["need time", "think about it", "discuss with", "get back to you", "not ready", "team"],
-      "Competitor Mention": ["other vendor", "competitor", "alternative solution", "already use", "different provider"],
-      "Implementation Concerns": ["implementation", "difficult to set up", "complicated", "time-consuming", "training"]
-    };
+  // Get transcriptions from Twilio via our edge function
+  const fetchTranscriptions = async () => {
+    if (!isActive || !activeCallSid) return;
     
-    const lowerText = text.toLowerCase();
-    
-    for (const [category, phrases] of Object.entries(objectionPhrases)) {
-      if (phrases.some(phrase => lowerText.includes(phrase.toLowerCase()))) {
-        return category;
-      }
-    }
-    
-    return null;
-  };
-  
-  const generateRebuttal = (category: string): Rebuttal => {
-    const templates = REBUTTAL_TEMPLATES[category as keyof typeof REBUTTAL_TEMPLATES] || REBUTTAL_TEMPLATES["Social Proof"];
-    const randomIndex = Math.floor(Math.random() * templates.length);
-    
-    return {
-      id: Date.now(),
-      text: templates[randomIndex],
-      category,
-      timestamp: Date.now()
-    };
-  };
-  
-  useEffect(() => {
-    const startTranscriptionService = async () => {
-      if (isActive && callSid) {
-        try {
-          console.log("Starting transcription for call:", callSid);
-          const { data, error } = await supabase.functions.invoke('retrieve-transcription', {
-            body: { action: 'start', callSid }
-          });
-          
-          if (error) {
-            throw new Error(error.message);
-          }
-          
-          if (data?.success && data?.data?.sid) {
-            setTranscriptionSid(data.data.sid);
-            console.log("Started transcription with SID:", data.data.sid);
-            toast({
-              title: "Transcription Started",
-              description: "Real-time transcription is now active for this call.",
-            });
-            
-            startPolling();
-          }
-        } catch (error) {
-          console.error("Error starting transcription:", error);
-          setIsSimulation(true);
-          startSimulation();
-        }
-      } else if (!isActive && transcriptionSid && callSid) {
-        try {
-          const { data, error } = await supabase.functions.invoke('retrieve-transcription', {
-            body: { action: 'stop', callSid, transcriptionSid }
-          });
-          
-          if (error) {
-            throw new Error(error.message);
-          }
-          
-          console.log("Stopped transcription:", data);
-          stopPolling();
-        } catch (error) {
-          console.error("Error stopping transcription:", error);
-        }
-        
-        setTranscriptionSid(null);
-        setRebuttals([]);
-        setTranscribedSegments([]);
-        setTranscribedText("");
-      }
-    };
-    
-    startTranscriptionService();
-    
-    return () => {
-      stopPolling();
-    };
-  }, [isActive, callSid]);
-  
-  const startPolling = () => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-    }
-    
-    pollingIntervalRef.current = window.setInterval(async () => {
-      if (isSimulation) {
-        await fetchSimulatedTranscription();
-      } else {
-        await fetchSimulatedTranscription();
-      }
-    }, 3000);
-  };
-  
-  const stopPolling = () => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current);
-      pollingIntervalRef.current = null;
-    }
-  };
-  
-  const fetchSimulatedTranscription = async () => {
     try {
+      const action = transcriptionSid ? 'status' : 'start';
+      
+      // Call our edge function to interact with Twilio's Transcription API
       const { data, error } = await supabase.functions.invoke('retrieve-transcription', {
-        body: { action: 'simulate' }
+        body: {
+          action: simulationMode ? 'simulate' : action,
+          callSid: activeCallSid,
+          transcriptionSid,
+          options: {
+            track: 'both_tracks',
+            partialResults: true,
+            languageCode: 'en-US'
+          }
+        }
       });
       
       if (error) {
-        throw new Error(error.message);
+        console.error("Error fetching transcriptions:", error);
+        // Fall back to simulation mode if there's an error
+        setSimulationMode(true);
+        return;
       }
       
-      if (data?.success && data?.data?.transcriptions) {
-        handleNewTranscriptionData(data.data.transcriptions);
-        setIsSimulation(true);
+      if (data.success && data.transcription) {
+        // Store the transcription SID for future status checks
+        if (data.transcription.sid && !transcriptionSid) {
+          setTranscriptionSid(data.transcription.sid);
+        }
+        
+        // Handle transcript data
+        if (data.transcript && Array.isArray(data.transcript)) {
+          setTranscriptions(data.transcript);
+          
+          // Update full transcript text
+          const transcriptText = data.transcript.map(
+            (t: Transcript) => `${t.speaker}: ${t.text}`
+          ).join("\n");
+          
+          setFullTranscript(transcriptText);
+          
+          // Generate rebuttals based on transcript content
+          analyzeTranscriptAndGenerateRebuttals(data.transcript);
+        }
       }
-    } catch (error) {
-      console.error("Error fetching simulated transcription:", error);
+      
+      setLastPolled(Date.now());
+    } catch (err) {
+      console.error("Error in transcription fetching:", err);
+      // Fall back to simulation mode
+      setSimulationMode(true);
     }
   };
   
-  const handleNewTranscriptionData = (newSegments: TranscriptionSegment[]) => {
-    setTranscribedSegments(prev => {
-      const existingTexts = prev.map(segment => segment.text);
-      const uniqueNewSegments = newSegments.filter(segment => !existingTexts.includes(segment.text));
-      
-      return [...prev, ...uniqueNewSegments];
-    });
+  // Stop transcription when component unmounts or becomes inactive
+  const stopTranscription = async () => {
+    if (!activeCallSid || !transcriptionSid) return;
     
-    let fullText = "";
-    for (const segment of [...transcribedSegments, ...newSegments]) {
-      const speakerLabel = segment.speaker === "customer" ? "Customer: " : "You: ";
-      fullText += `${speakerLabel}${segment.text}\n`;
+    try {
+      await supabase.functions.invoke('retrieve-transcription', {
+        body: {
+          action: 'stop',
+          callSid: activeCallSid,
+          transcriptionSid
+        }
+      });
+      setTranscriptionSid(null);
+    } catch (err) {
+      console.error("Error stopping transcription:", err);
     }
-    setTranscribedText(fullText);
+  };
+  
+  // Analyze transcript to detect objections and generate rebuttals
+  const analyzeTranscriptAndGenerateRebuttals = (transcript: Transcript[]) => {
+    // Only analyze customer statements
+    const customerStatements = transcript
+      .filter(t => t.speaker.toLowerCase().includes("customer"))
+      .map(t => t.text);
     
-    const customerSegments = newSegments.filter(segment => segment.speaker === "customer");
+    if (customerStatements.length === 0) return;
     
-    for (const segment of customerSegments) {
-      const objectionCategory = analyzeTranscriptForObjections(segment.text);
+    // Look at the most recent customer statement
+    const latestStatement = customerStatements[customerStatements.length - 1].toLowerCase();
+    
+    // Detect objections based on keywords
+    const detectedObjectionTypes = Object.entries(OBJECTION_KEYWORDS).filter(([category, keywords]) => {
+      return keywords.some(keyword => latestStatement.includes(keyword.toLowerCase()));
+    }).map(([category]) => category);
+    
+    // If we detected an objection, generate a rebuttal
+    if (detectedObjectionTypes.length > 0) {
+      const objectionType = detectedObjectionTypes[0]; // Take the first detected objection type
+      const potentialRebuttals = REBUTTAL_TEMPLATES[objectionType];
       
-      if (objectionCategory && Date.now() - lastRebuttalTime > 10000) {
-        const newRebuttal = generateRebuttal(objectionCategory);
-        setRebuttals(prev => [...prev, newRebuttal]);
-        setLastRebuttalTime(Date.now());
+      if (potentialRebuttals && potentialRebuttals.length > 0) {
+        // Select a random rebuttal from the matching category
+        const rebuttalText = potentialRebuttals[Math.floor(Math.random() * potentialRebuttals.length)];
+        
+        // Check if we already suggested this rebuttal
+        const rebuttalExists = rebuttals.some(r => r.text === rebuttalText);
+        
+        if (!rebuttalExists) {
+          const newRebuttal: Rebuttal = {
+            id: Date.now(),
+            text: rebuttalText,
+            category: objectionType,
+            timestamp: new Date()
+          };
+          
+          setRebuttals(prev => [...prev, newRebuttal]);
+        }
       }
     }
   };
   
-  const startSimulation = () => {
-    if (!isActive) return;
-    
-    const initialRebuttal = generateRebuttal("Price Objection");
-    setRebuttals([initialRebuttal]);
-    
-    setTranscribedText("Customer: I'm not sure if this is worth the investment right now...");
-    
-    const timers: NodeJS.Timeout[] = [];
-    
-    timers.push(setTimeout(() => {
-      const newText = "Customer: I'm not sure if this is worth the investment right now...\nYou: I understand your concern about the investment...";
-      setTranscribedText(newText);
-    }, 2000));
-    
-    timers.push(setTimeout(() => {
-      const newText = "Customer: I'm not sure if this is worth the investment right now...\nYou: I understand your concern about the investment...\nCustomer: We have budget constraints this quarter.";
-      setTranscribedText(newText);
-      
-      const newRebuttal = generateRebuttal("Integration Concern");
-      setRebuttals(prev => [...prev, newRebuttal]);
-    }, 4000));
-    
-    timers.push(setTimeout(() => {
-      const newText = "Customer: I'm not sure if this is worth the investment right now...\nYou: I understand your concern about the investment...\nCustomer: We have budget constraints this quarter.\nCustomer: And I'm worried about integration with our current systems.";
-      setTranscribedText(newText);
-      
-      const newRebuttal = generateRebuttal("Customization");
-      setRebuttals(prev => [...prev, newRebuttal]);
-    }, 8000));
-    
-    timers.push(setTimeout(() => {
-      const newText = "Customer: I'm not sure if this is worth the investment right now...\nYou: I understand your concern about the investment...\nCustomer: We have budget constraints this quarter.\nCustomer: And I'm worried about integration with our current systems.\nYou: We can discuss flexible payment options...";
-      setTranscribedText(newText);
-    }, 11000));
-    
-    timers.push(setTimeout(() => {
-      const newText = "Customer: I'm not sure if this is worth the investment right now...\nYou: I understand your concern about the investment...\nCustomer: We have budget constraints this quarter.\nCustomer: And I'm worried about integration with our current systems.\nYou: We can discuss flexible payment options...\nCustomer: I need to talk this over with my team first.";
-      setTranscribedText(newText);
-      
-      const newRebuttal = generateRebuttal("Stalling");
-      setRebuttals(prev => [...prev, newRebuttal]);
-    }, 15000));
-  };
-  
+  // Polling for transcript updates
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+    if (!isActive || !activeCallSid) {
+      setTranscriptions([]);
+      setRebuttals([]);
+      setFullTranscript("");
+      setTranscriptionSid(null);
+      return;
     }
-  }, [transcribedText, rebuttals]);
+    
+    // Initial fetch
+    fetchTranscriptions();
+    
+    // Set up polling
+    const intervalId = setInterval(() => {
+      fetchTranscriptions();
+    }, 3000); // Poll every 3 seconds
+    
+    return () => {
+      clearInterval(intervalId);
+      stopTranscription();
+    };
+  }, [isActive, activeCallSid]);
   
+  // Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      stopTranscription();
+    };
+  }, []);
+
   if (!isActive) return null;
-  
+
   return (
     <div className="mt-4 space-y-4">
       <Card>
         <CardHeader className="bg-muted/40 pb-2 pt-3 px-4 border-b flex flex-row items-center justify-between">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <MessageCircle className="h-4 w-4 text-blue-500" />
-            Live Conversation {isSimulation ? "(Simulation)" : ""}
+            Live Conversation
           </CardTitle>
           <Badge variant="outline" className="bg-blue-100 text-blue-700">
-            Transcribing
+            {simulationMode ? "Simulating" : "Transcribing"}
           </Badge>
         </CardHeader>
         <CardContent className="p-3">
-          <ScrollArea className="h-[100px] w-full rounded-md border p-2 bg-muted/30" ref={scrollAreaRef as any}>
+          <ScrollArea className="h-[100px] w-full rounded-md border p-2 bg-muted/30">
             <div className="whitespace-pre-line text-sm">
-              {transcribedText}
+              {fullTranscript || "Waiting for conversation to begin..."}
               <span className="inline-block w-2 h-4 bg-blue-500 ml-1 animate-pulse">|</span>
             </div>
           </ScrollArea>
@@ -319,7 +278,7 @@ export const RealTimeRebuttals: React.FC<RealTimeRebuttalProps> = ({ isActive, c
         <CardContent className="p-3">
           <ScrollArea className="h-[200px] pr-2">
             <AnimatePresence>
-              {rebuttals.map((rebuttal) => (
+              {rebuttals.map((rebuttal, index) => (
                 <motion.div
                   key={rebuttal.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -333,15 +292,20 @@ export const RealTimeRebuttals: React.FC<RealTimeRebuttalProps> = ({ isActive, c
                         {rebuttal.category}
                       </Badge>
                       <span className="text-xs text-gray-500">
-                        {Date.now() - rebuttal.timestamp < 60000 
-                          ? `${Math.round((Date.now() - rebuttal.timestamp) / 1000)}s ago` 
-                          : `${Math.round((Date.now() - rebuttal.timestamp) / 60000)}m ago`}
+                        {index === rebuttals.length - 1 ? 'Just now' : `${Math.floor((Date.now() - rebuttal.timestamp.getTime()) / 60000)}m ago`}
                       </span>
                     </div>
                     <p className="text-sm">{rebuttal.text}</p>
                   </div>
                 </motion.div>
               ))}
+              {rebuttals.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                  <Bot className="h-12 w-12 mb-2 opacity-50" />
+                  <p className="text-center text-sm">Listening for customer objections...</p>
+                  <p className="text-center text-xs mt-1">Rebuttals will appear here</p>
+                </div>
+              )}
             </AnimatePresence>
           </ScrollArea>
         </CardContent>

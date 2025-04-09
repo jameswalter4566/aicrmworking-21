@@ -419,7 +419,7 @@ export default function PowerDialer() {
           {dialingSessionActive && Object.keys(twilioState.activeCalls).length > 0 && (
             <RealTimeRebuttals 
               isActive={true} 
-              callSid={Object.values(twilioState.activeCalls)[0]?.callSid} 
+              activeCallSid={Object.values(twilioState.activeCalls)[0]?.callSid}
             />
           )}
         </div>
@@ -888,4 +888,21 @@ export default function PowerDialer() {
       <AudioDebugModal />
       
       <div className="container py-4 px-4 md:px-6">
-        <Dial
+        <DialerSettings />
+        
+        <DialerPreview />
+        
+        <Tabs value={currentTab} onValueChange={setCurrentTab}>
+          <TabsContent value="dialer" className="space-y-4 mt-8">
+            <DialerTab />
+          </TabsContent>
+          <TabsContent value="settings" className="space-y-4 mt-8">
+            <SettingsTab />
+          </TabsContent>
+        </Tabs>
+        
+        <TwilioAudioPlayer sound="/sounds/test-tone.mp3" />
+      </div>
+    </MainLayout>
+  );
+}
