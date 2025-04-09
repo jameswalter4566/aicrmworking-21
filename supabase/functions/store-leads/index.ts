@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   
   try {
     // Log detailed request information for debugging
-    console.log('Request path:', req.url);
+    console.log('Store-leads function called - Path:', req.url);
     console.log('Request method:', req.method);
     console.log('Auth header present:', !!req.headers.get('Authorization'));
     
@@ -96,6 +96,7 @@ Deno.serve(async (req) => {
     }
     
     console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'} for user: ${userId || 'anonymous'}`);
+    console.log('Sample lead data:', JSON.stringify(leads[0], null, 2));
     
     // Store leads directly in Supabase database
     const result = await storeLeadsInSupabase(leads, userId);
@@ -104,7 +105,9 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: `Successfully stored ${leads.length} leads`, 
-        data: result
+        data: result,
+        userId: userId || 'anonymous',
+        isAuthenticated
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -155,6 +158,8 @@ async function storeLeadsInSupabase(leads, userId) {
     }));
     
     console.log('Processed leads for database storage');
+    console.log('First processed lead:', JSON.stringify(processedLeads[0], null, 2));
+    console.log(`Using user ID: ${userId || 'anonymous'} for created_by field`);
     
     // Insert leads into the leads table in Supabase database
     const { data, error } = await supabase

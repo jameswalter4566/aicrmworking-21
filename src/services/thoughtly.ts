@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -29,7 +28,21 @@ export const thoughtlyService = {
     try {
       console.log('Creating contact in Thoughtly:', contact);
       
-      // Send the contact directly to the thoughtly-contacts edge function
+      // First, also store the contact in our local database to ensure persistence
+      const { data: storedData, error: storeError } = await supabase.functions.invoke('store-leads', {
+        body: {
+          leads: [contact],
+          leadType: "manual"
+        }
+      });
+      
+      if (storeError) {
+        console.error('Error storing contact in local database:', storeError);
+      } else {
+        console.log('Contact stored in local database:', storedData);
+      }
+      
+      // Then, send the contact to the thoughtly-contacts edge function
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
         body: {
           action: 'createContact',
@@ -58,6 +71,20 @@ export const thoughtlyService = {
   async createBulkContacts(contacts: ThoughtlyContact[]) {
     try {
       console.log(`Creating ${contacts.length} contacts in Thoughtly`);
+      
+      // First, also store the contacts in our local database to ensure persistence
+      const { data: storedData, error: storeError } = await supabase.functions.invoke('store-leads', {
+        body: {
+          leads: contacts,
+          leadType: "bulk"
+        }
+      });
+      
+      if (storeError) {
+        console.error('Error storing bulk contacts in local database:', storeError);
+      } else {
+        console.log('Bulk contacts stored in local database:', storedData);
+      }
       
       // Send the contacts directly to the thoughtly-contacts edge function
       const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
@@ -209,7 +236,7 @@ export const thoughtlyService = {
       const { data: sessionData } = await supabase.auth.getSession();
       const authToken = sessionData?.session?.access_token;
       
-      // Set up headers for authentication if token exists
+      // Setup headers for authentication if token exists
       let headers = {};
       if (authToken) {
         console.log('Auth token found, adding to request headers');
@@ -221,10 +248,24 @@ export const thoughtlyService = {
       }
       
       console.log('Calling retrieve-leads edge function...');
-      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { source: 'all' },
-        headers
-      });
+      let response;
+      
+      try {
+        // First try - use auth token if available
+        response = await supabase.functions.invoke('retrieve-leads', {
+          body: { source: 'all' },
+          headers
+        });
+      } catch (initialError) {
+        console.error('First attempt failed, trying fallback approach:', initialError);
+        
+        // Fallback - try without headers to see if it's an auth issue
+        response = await supabase.functions.invoke('retrieve-leads', {
+          body: { source: 'all' }
+        });
+      }
+      
+      const { data, error } = response;
 
       if (error) {
         console.error('Error retrieving leads from edge function:', error);
@@ -236,6 +277,11 @@ export const thoughtlyService = {
       if (!data.success) {
         console.error('Error in response from retrieve-leads:', data.error);
         throw new Error(data.error || 'Failed to retrieve leads');
+      }
+      
+      // If no leads found but we have fallback data, use it
+      if ((!data.data || data.data.length === 0) && data.metadata?.totalLeadCount > 0) {
+        console.warn(`No leads returned but database has ${data.metadata.totalLeadCount} total leads. Authentication issue?`);
       }
       
       // Check if data array exists and is populated
