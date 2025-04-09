@@ -226,6 +226,36 @@ export const thoughtlyService = {
   },
   
   /**
+   * Delete a contact from Thoughtly
+   * @param contactId The ID of the contact to delete
+   * @returns Summary of deletion operation
+   */
+  async deleteContact(contactId: number | string) {
+    try {
+      console.log('Deleting contact from Thoughtly:', contactId);
+      
+      // Send the delete request to the thoughtly-contacts edge function
+      const { data, error } = await supabase.functions.invoke('thoughtly-contacts', {
+        body: {
+          action: 'deleteContact',
+          contactId: contactId
+        }
+      });
+
+      if (error) {
+        console.error('Error deleting contact from Thoughtly:', error);
+        throw error;
+      }
+
+      console.log('Contact deleted successfully from Thoughtly:', data);
+      return data;
+    } catch (error) {
+      console.error('Error in deleteContact:', error);
+      throw error;
+    }
+  },
+  
+  /**
    * Retrieve leads from Supabase via the retrieve-leads edge function
    * @param options Optional pagination parameters
    * @returns Array of leads with pagination data

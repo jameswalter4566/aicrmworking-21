@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { UserPlus, Phone, Upload, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
 import { predictiveDialer } from '@/utils/supabase-custom-client';
 import { PredictiveDialerContact } from '@/types/predictive-dialer';
+import { thoughtlyService } from '@/services/thoughtly';
 
 interface ContactsListProps {
   onContactSelect?: (contact: PredictiveDialerContact) => void;
@@ -165,9 +165,23 @@ export const PredictiveDialerContactsList: React.FC<ContactsListProps> = ({ onCo
 
   const deleteContact = async (id: string) => {
     try {
+      // First delete from local database
       const { error } = await predictiveDialer.getContacts().delete().eq('id', id);
       
       if (error) throw error;
+      
+      // If the contact has a numeric ID, it might also exist in Thoughtly
+      const numericId = parseInt(id);
+      if (!isNaN(numericId)) {
+        try {
+          // Try to delete from Thoughtly as well
+          await thoughtlyService.deleteContact(numericId);
+          console.log('Contact also deleted from Thoughtly');
+        } catch (thoughtlyError) {
+          console.warn('Could not delete contact from Thoughtly, might not exist there:', thoughtlyError);
+          // We don't throw here since the local deletion was successful
+        }
+      }
       
       setContacts(contacts.filter(contact => contact.id !== id));
       
