@@ -88,3 +88,7 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 [functions.retrieve-leads]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.thoughtly-get-contact]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
