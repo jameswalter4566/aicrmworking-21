@@ -57,7 +57,11 @@ Deno.serve(async (req) => {
     }
     
     // Extract request body parameters
-    let requestBody = { source: 'all' };
+    let requestBody = { 
+      source: 'all',
+      page: 1,
+      pageSize: 20
+    };
     try {
       if (req.headers.get('content-type')?.includes('application/json')) {
         const body = await req.json().catch(() => ({}));
@@ -102,10 +106,10 @@ Deno.serve(async (req) => {
     let leads = [];
     if (isAuthenticated && userLeadCount === 0 && totalLeadCount > 0) {
       console.log("User has no leads but there are leads in the database. Fetching all leads for testing purposes.");
-      leads = await fetchAllLeads(userId, requestBody.source);
+      leads = await fetchAllLeads(userId, requestBody.source, requestBody.page, requestBody.pageSize);
     } else {
       // Otherwise, fetch leads normally (user-specific or all depending on authentication)
-      leads = await fetchLeadsFromSupabase(userId, requestBody.source);
+      leads = await fetchLeadsFromSupabase(userId, requestBody.source, requestBody.page, requestBody.pageSize);
     }
     
     console.log(`Successfully retrieved ${leads.length} leads out of ${userId ? userLeadCount : totalLeadCount} total`);
@@ -120,7 +124,10 @@ Deno.serve(async (req) => {
           totalLeadCount: totalLeadCount || 0,
           userLeadCount: userLeadCount || 0,
           source: requestBody.source,
-          retrievedCount: leads.length
+          retrievedCount: leads.length,
+          page: requestBody.page,
+          pageSize: requestBody.pageSize,
+          totalPages: Math.ceil((userId ? userLeadCount : totalLeadCount) / requestBody.pageSize) || 1
         }
       }),
       {
@@ -151,9 +158,9 @@ Deno.serve(async (req) => {
 });
 
 // Function to fetch leads from Supabase with user filtering
-async function fetchLeadsFromSupabase(userId, source = 'all') {
+async function fetchLeadsFromSupabase(userId, source = 'all', page = 1, pageSize = 20) {
   try {
-    console.log(`Starting fetchLeadsFromSupabase - userId: ${userId || 'anonymous'}, source: ${source}`);
+    console.log(`Starting fetchLeadsFromSupabase - userId: ${userId || 'anonymous'}, source: ${source}, page: ${page}, pageSize: ${pageSize}`);
     
     // Initialize query to the leads table
     let query = supabase.from('leads').select('*');
@@ -174,6 +181,14 @@ async function fetchLeadsFromSupabase(userId, source = 'all') {
     } else {
       console.log('Retrieving all leads (no user filtering)');
     }
+    
+    // Calculate pagination
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    console.log(`Pagination: from=${from}, to=${to}, page=${page}, pageSize=${pageSize}`);
+    
+    // Apply pagination
+    query = query.range(from, to);
     
     console.log('Executing Supabase query...');
     const { data, error } = await query;
@@ -221,7 +236,7 @@ async function fetchLeadsFromSupabase(userId, source = 'all') {
 
 // Function to fetch all leads regardless of user ID for testing purposes
 // Only used when a user has no leads but there are leads in the database
-async function fetchAllLeads(userId, source = 'all') {
+async function fetchAllLeads(userId, source = 'all', page = 1, pageSize = 20) {
   try {
     console.log(`Starting fetchAllLeads (testing mode) for user: ${userId || 'anonymous'}`);
     
@@ -239,6 +254,14 @@ async function fetchAllLeads(userId, source = 'all') {
     
     // Don't filter by user ID to return all leads
     console.log('Testing mode: Retrieving ALL leads regardless of created_by');
+    
+    // Calculate pagination
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    console.log(`Pagination: from=${from}, to=${to}, page=${page}, pageSize=${pageSize}`);
+    
+    // Apply pagination
+    query = query.range(from, to);
     
     console.log('Executing Supabase query...');
     const { data, error } = await query;
