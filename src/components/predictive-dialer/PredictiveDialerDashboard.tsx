@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Device, Call } from '@twilio/voice-sdk';
 import { useAuth } from '@/context/AuthContext';
@@ -474,12 +475,15 @@ export const PredictiveDialerDashboard: React.FC = () => {
         setCurrentCall(null);
         
         // Update call record and agent status
-        predictiveDialer.getCalls()
-          .update({
-            status: 'completed',
-            end_timestamp: new Date().toISOString()
-          })
-          .eq('id', callData[0].id)
+        // Convert the PromiseLike to a standard Promise to use catch method
+        Promise.resolve(
+          predictiveDialer.getCalls()
+            .update({
+              status: 'completed',
+              end_timestamp: new Date().toISOString()
+            })
+            .eq('id', callData[0].id)
+        )
           .then(() => {
             // Reset agent status
             return predictiveDialer.getAgents()
