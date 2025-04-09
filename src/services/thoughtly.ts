@@ -216,21 +216,23 @@ export const thoughtlyService = {
         };
       }
       
-      console.log('Calling retrieve-leads edge function...');
-      const response = await supabase.functions.invoke('retrieve-leads', {
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { source: 'all' },
         headers
       });
 
-      console.log('Full API response:', response);
-
-      if (response.error) {
-        console.error('Error retrieving leads:', response.error);
-        throw response.error;
+      if (error) {
+        console.error('Error retrieving leads:', error);
+        throw error;
       }
 
-      return response.data;
+      if (!data.success) {
+        console.error('Error retrieving leads:', data.error);
+        throw new Error(data.error || 'Failed to retrieve leads');
+      }
       
+      // Return the leads as they come from our retrieve function
+      return data.data || [];
     } catch (error) {
       console.error('Error in retrieveLeads:', error);
       throw error;
