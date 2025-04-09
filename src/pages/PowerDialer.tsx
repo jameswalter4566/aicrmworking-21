@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -36,7 +37,6 @@ import { Phone, PhoneCall, Clock, RotateCw, Pause, PhoneOff, StopCircle } from "
 import TwilioScript from "@/components/TwilioScript";
 import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
-import { RealTimeRebuttals } from "@/components/RealTimeRebuttals";
 import { toast } from "@/components/ui/use-toast";
 
 const SAMPLE_LEADS = [
@@ -278,6 +278,7 @@ export default function PowerDialer() {
     }
   };
 
+  // Add horizontal dialer settings above the preview container
   const DialerSettings = () => (
     <div className="mb-4">
       <div className="flex flex-wrap items-center gap-4 justify-between">
@@ -365,59 +366,53 @@ export default function PowerDialer() {
       </CardHeader>
       
       <CardContent className="min-h-[350px] flex">
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 flex items-center justify-center">
-            {!dialingSessionActive ? (
-              <div className="text-center py-16">
-                <Button 
-                  onClick={startDialingSession} 
-                  className="bg-crm-blue hover:bg-crm-blue/90 px-8 py-6 h-auto text-lg mb-6"
-                >
-                  <PhoneCall className="mr-2 h-5 w-5" />
-                  Begin Dialing Session
-                </Button>
-                <p className="text-muted-foreground mt-4 max-w-md mx-auto">
-                  Start a dialing session to begin making calls to your leads with {concurrentLines} concurrent line{parseInt(concurrentLines) > 1 ? 's' : ''}.
-                  Your active calls will appear here once the session is started.
-                </p>
-              </div>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center p-6">
-                {Object.keys(twilioState.activeCalls).length === 0 ? (
-                  <div className="text-center text-muted-foreground py-8">
-                    <PhoneCall className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
-                    <p className="text-lg">No active calls</p>
-                    <p className="text-sm mt-2 max-w-md">Select a lead from the queue below to start calling</p>
-                  </div>
-                ) : (
-                  <Card className="w-full bg-blue-50 border-blue-200">
-                    <CardContent className="p-6">
-                      {Object.entries(twilioState.activeCalls).map(([leadId, call]) => {
-                        const lead = leads.find(l => l.id === leadId);
-                        return (
-                          <div key={leadId} className="flex justify-between items-center">
-                            <div>
-                              <h3 className="font-medium text-lg">{lead?.name}</h3>
-                              <p className="text-muted-foreground">{call.phoneNumber}</p>
-                              <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
-                                {call.status === 'connecting' ? 'Ringing' : 
-                                call.status === 'in-progress' ? 'Connected' :
-                                call.status === 'completed' ? 'Ended' : 
-                                call.status}
-                              </Badge>
-                            </div>
+        <div className="flex-1 flex items-center justify-center">
+          {!dialingSessionActive ? (
+            <div className="text-center py-16">
+              <Button 
+                onClick={startDialingSession} 
+                className="bg-crm-blue hover:bg-crm-blue/90 px-8 py-6 h-auto text-lg mb-6"
+              >
+                <PhoneCall className="mr-2 h-5 w-5" />
+                Begin Dialing Session
+              </Button>
+              <p className="text-muted-foreground mt-4 max-w-md mx-auto">
+                Start a dialing session to begin making calls to your leads with {concurrentLines} concurrent line{parseInt(concurrentLines) > 1 ? 's' : ''}.
+                Your active calls will appear here once the session is started.
+              </p>
+            </div>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center p-6">
+              {Object.keys(twilioState.activeCalls).length === 0 ? (
+                <div className="text-center text-muted-foreground py-8">
+                  <PhoneCall className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
+                  <p className="text-lg">No active calls</p>
+                  <p className="text-sm mt-2 max-w-md">Select a lead from the queue below to start calling</p>
+                </div>
+              ) : (
+                <Card className="w-full bg-blue-50 border-blue-200">
+                  <CardContent className="p-6">
+                    {Object.entries(twilioState.activeCalls).map(([leadId, call]) => {
+                      const lead = leads.find(l => l.id === leadId);
+                      return (
+                        <div key={leadId} className="flex justify-between items-center">
+                          <div>
+                            <h3 className="font-medium text-lg">{lead?.name}</h3>
+                            <p className="text-muted-foreground">{call.phoneNumber}</p>
+                            <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
+                              {call.status === 'connecting' ? 'Ringing' : 
+                              call.status === 'in-progress' ? 'Connected' :
+                              call.status === 'completed' ? 'Ended' : 
+                              call.status}
+                            </Badge>
                           </div>
-                        );
-                      })}
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            )}
-          </div>
-          
-          {dialingSessionActive && Object.keys(twilioState.activeCalls).length > 0 && (
-            <RealTimeRebuttals isActive={true} />
+                        </div>
+                      );
+                    })}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           )}
         </div>
         
