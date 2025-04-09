@@ -40,35 +40,3 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 [functions.add-to-addressbook]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.twilio-token]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.twilio-voice]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.retrieve-leads]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-start]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-webhook]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-agent-connect]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-stop]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-end-call]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
