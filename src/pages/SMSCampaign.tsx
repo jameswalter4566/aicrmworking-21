@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +31,7 @@ const SMSCampaign = () => {
   const [isImporting, setIsImporting] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [isSending, setIsSending] = useState(false);
+  const [currentAddressBookId, setCurrentAddressBookId] = useState<string | null>(null);
   const { toast } = useToast();
 
   const form = useForm();
@@ -48,7 +48,20 @@ const SMSCampaign = () => {
     setIsImporting(true);
     try {
       const retrievedContacts = await thoughtlyService.getContacts();
+      
+      const { data, error } = await supabase.functions.invoke('add-to-addressbook', {
+        body: JSON.stringify({
+          contacts: retrievedContacts,
+          bookName: `Imported Campaign ${new Date().toLocaleString()}`
+        })
+      });
+
+      if (error) {
+        throw new Error(`Error adding imported contacts to address book: ${error.message}`);
+      }
+      
       setContacts(retrievedContacts);
+      setCurrentAddressBookId(data.addressbookId);
       
       toast({
         title: "Contacts imported successfully",
@@ -68,8 +81,7 @@ const SMSCampaign = () => {
     }
   };
 
-  const handleAddContacts = (newContacts) => {
-    // Format the manually added contacts to match the expected structure
+  const handleAddContacts = (newContacts, addressbookId) => {
     const formattedContacts = newContacts.map(contact => ({
       phone_number: contact.phone_number,
       attributes: {
@@ -80,9 +92,13 @@ const SMSCampaign = () => {
     
     setContacts([...contacts, ...formattedContacts]);
     
+    if (addressbookId) {
+      setCurrentAddressBookId(addressbookId);
+    }
+    
     toast({
       title: "Contacts added",
-      description: `${newContacts.length} contacts added manually.`,
+      description: `${newContacts.length} contacts added to campaign.`,
       variant: "default",
     });
   };
@@ -97,9 +113,9 @@ const SMSCampaign = () => {
       return;
     }
 
-    if (contacts.length === 0) {
+    if (contacts.length === 0 || !currentAddressBookId) {
       toast({
-        title: "No contacts",
+        title: "No contacts or address book",
         description: "Please add contacts before sending.",
         variant: "destructive",
       });
@@ -111,9 +127,9 @@ const SMSCampaign = () => {
     try {
       const { data, error } = await supabase.functions.invoke('send-sms', {
         body: JSON.stringify({
-          contacts: contacts,
+          addressbookId: currentAddressBookId,
           message: message,
-          campaignName: campaignName
+          campaignName: campaignName || `Campaign ${new Date().toLocaleString()}`
         })
       });
 
@@ -123,7 +139,7 @@ const SMSCampaign = () => {
 
       toast({
         title: "Campaign sent successfully",
-        description: `SMS campaign sent to ${data.contactsCount} contacts.`,
+        description: `SMS campaign sent to ${data.contactsCount || contacts.length} contacts.`,
         variant: "default",
       });
     } catch (error) {
@@ -241,7 +257,6 @@ const SMSCampaign = () => {
                         </RadioGroup>
                       </div>
 
-                      {/* Manual contact entry component */}
                       <ManualContactEntry onContactsAdded={handleAddContacts} />
 
                       <div className="mb-6">
@@ -319,7 +334,7 @@ const SMSCampaign = () => {
                       <Button variant="outline">Cancel</Button>
                       <Button 
                         onClick={handleSendMessage}
-                        disabled={isSending || contacts.length === 0}
+                        disabled={isSending || contacts.length === 0 || !currentAddressBookId}
                       >
                         {isSending ? "Sending..." : "Send Campaign"}
                         {isSending ? null : <Mail className="ml-2 h-4 w-4" />}

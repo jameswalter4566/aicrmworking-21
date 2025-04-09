@@ -36,3 +36,7 @@ multisite = false
 [functions.send-sms]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.add-to-addressbook]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]

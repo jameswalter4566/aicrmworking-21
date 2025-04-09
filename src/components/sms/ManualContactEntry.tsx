@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash, UserPlus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Contact {
   phone_number: string;
@@ -14,7 +15,7 @@ interface Contact {
 }
 
 interface ManualContactEntryProps {
-  onContactsAdded: (contacts: Contact[]) => void;
+  onContactsAdded: (contacts: Contact[], addressbookId?: string) => void;
 }
 
 const ManualContactEntry = ({ onContactsAdded }: ManualContactEntryProps) => {
@@ -40,7 +41,7 @@ const ManualContactEntry = ({ onContactsAdded }: ManualContactEntryProps) => {
     setContacts(newContacts);
   };
 
-  const handleAddContacts = () => {
+  const handleAddContacts = async () => {
     // Filter out any contacts without phone numbers
     const validContacts = contacts.filter(contact => contact.phone_number.trim() !== "");
     
@@ -61,29 +62,40 @@ const ManualContactEntry = ({ onContactsAdded }: ManualContactEntryProps) => {
         phone_number: contact.phone_number,
         firstName: contact.firstName,
         lastName: contact.lastName,
-        // Add required properties for the SMS function
         attributes: {
           firstName: contact.firstName,
           lastName: contact.lastName
         }
       }));
       
-      // Pass the formatted contacts to the parent component
-      onContactsAdded(formattedContacts);
+      // Call the edge function to add contacts to address book
+      const { data, error } = await supabase.functions.invoke('add-to-addressbook', {
+        body: JSON.stringify({
+          contacts: formattedContacts,
+          bookName: `Manual Campaign ${new Date().toLocaleString()}`
+        })
+      });
+
+      if (error) {
+        throw new Error(`Error adding contacts to address book: ${error.message}`);
+      }
+      
+      // Pass the formatted contacts and addressbook ID to the parent component
+      onContactsAdded(formattedContacts, data.addressbookId);
       
       // Reset the form with one empty contact
       setContacts([{ phone_number: "", firstName: "", lastName: "" }]);
       
       toast({
-        title: "Contacts added",
-        description: `${validContacts.length} contacts added to campaign.`,
+        title: "Contacts added to address book",
+        description: `${validContacts.length} contacts added successfully.`,
         variant: "default",
       });
     } catch (error) {
       console.error("Error adding contacts:", error);
       toast({
         title: "Error adding contacts",
-        description: "An error occurred while adding contacts.",
+        description: "An error occurred while adding contacts to the address book.",
         variant: "destructive",
       });
     } finally {

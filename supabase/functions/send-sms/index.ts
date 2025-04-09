@@ -13,11 +13,11 @@ serve(async (req) => {
   }
 
   try {
-    const { contacts, message } = await req.json();
+    const { addressbookId, message, campaignName } = await req.json();
 
-    if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
+    if (!addressbookId) {
       return new Response(
-        JSON.stringify({ error: 'Valid contacts are required' }),
+        JSON.stringify({ error: 'Address book ID is required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -49,87 +49,6 @@ serve(async (req) => {
     }
     
     const apiEndpoint = "https://api.valorsms.com/sms/";
-
-    // Create an addressbook with proper headers
-    const addressbookResponse = await fetch(`${apiEndpoint}addaddressbook`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      body: JSON.stringify({
-        private_key: smsPrivateKey,
-        public_key: smsPublicKey,
-        name: `Campaign ${new Date().toISOString()}`
-      })
-    });
-
-    const addressbookData = await addressbookResponse.json();
-    
-    if (addressbookData.result?.error) {
-      console.error("Addressbook creation error:", addressbookData);
-      return new Response(
-        JSON.stringify({ error: `Failed to create address book: ${addressbookData.result?.error || 'Unknown error'}` }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    const addressbookId = addressbookData.result.addressbook_id;
-
-    // Add contacts to addressbook with proper error handling
-    const addContactPromises = contacts.map(async (contact) => {
-      // Extract phone number from different possible formats
-      const phoneNumber = contact.phone_number || contact.phone1 || contact.phoneNumber;
-      
-      // Extract name data from different possible formats
-      const firstName = contact.firstName || 
-                      (contact.attributes && contact.attributes.firstName) || 
-                      '';
-      
-      const lastName = contact.lastName || 
-                     (contact.attributes && contact.attributes.lastName) || 
-                     '';
-      
-      if (!phoneNumber) return { success: false, error: 'No phone number' };
-
-      try {
-        const response = await fetch(`${apiEndpoint}addphone`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            private_key: smsPrivateKey,
-            public_key: smsPublicKey,
-            addressbook_id: addressbookId,
-            phone: phoneNumber,
-            variables: `${firstName};${lastName};`
-          })
-        });
-
-        return await response.json();
-      } catch (error) {
-        console.error(`Error adding phone ${phoneNumber}:`, error);
-        return { success: false, error: error.message };
-      }
-    });
-
-    const addContactResults = await Promise.all(addContactPromises);
-    const successfulContacts = addContactResults.filter(result => !result.result?.error).length;
-
-    if (successfulContacts === 0) {
-      return new Response(
-        JSON.stringify({ error: 'Failed to add any contacts to the address book' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
 
     // Check account balance with proper error handling
     const balanceResponse = await fetch(`${apiEndpoint}userbalance`, {
@@ -170,6 +89,7 @@ serve(async (req) => {
         sender: "ThoughtlyAI",
         body: message,
         addressbook_id: addressbookId,
+        name: campaignName || `SMS Campaign ${new Date().toISOString()}`,
         date: "",
         run_at: 0,
         transliterate: 0,
@@ -194,7 +114,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         campaignId: campaignData.result.id,
-        contactsCount: successfulContacts,
+        contactsCount: campaignData.result.phones_count || 0,
         balance: balanceData.result.balance_currency,
         currency: balanceData.result.currency
       }),
