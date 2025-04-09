@@ -81,9 +81,17 @@ serve(async (req) => {
 
     // Add contacts to addressbook with proper error handling
     const addContactPromises = contacts.map(async (contact) => {
+      // Extract phone number from different possible formats
       const phoneNumber = contact.phone_number || contact.phone1 || contact.phoneNumber;
-      const firstName = contact.firstName || contact.attributes?.firstName || '';
-      const lastName = contact.lastName || contact.attributes?.lastName || '';
+      
+      // Extract name data from different possible formats
+      const firstName = contact.firstName || 
+                      (contact.attributes && contact.attributes.firstName) || 
+                      '';
+      
+      const lastName = contact.lastName || 
+                     (contact.attributes && contact.attributes.lastName) || 
+                     '';
       
       if (!phoneNumber) return { success: false, error: 'No phone number' };
 

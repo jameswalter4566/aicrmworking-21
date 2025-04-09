@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -19,6 +20,7 @@ import { useForm } from "react-hook-form";
 import { thoughtlyService } from "@/services/thoughtly";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import ManualContactEntry from "@/components/sms/ManualContactEntry";
 
 const SMSCampaign = () => {
   const navigate = useNavigate();
@@ -66,6 +68,25 @@ const SMSCampaign = () => {
     }
   };
 
+  const handleAddContacts = (newContacts) => {
+    // Format the manually added contacts to match the expected structure
+    const formattedContacts = newContacts.map(contact => ({
+      phone_number: contact.phone_number,
+      attributes: {
+        firstName: contact.firstName,
+        lastName: contact.lastName
+      }
+    }));
+    
+    setContacts([...contacts, ...formattedContacts]);
+    
+    toast({
+      title: "Contacts added",
+      description: `${newContacts.length} contacts added manually.`,
+      variant: "default",
+    });
+  };
+
   const handleSendMessage = async () => {
     if (!message) {
       toast({
@@ -79,7 +100,7 @@ const SMSCampaign = () => {
     if (contacts.length === 0) {
       toast({
         title: "No contacts",
-        description: "Please import contacts before sending.",
+        description: "Please add contacts before sending.",
         variant: "destructive",
       });
       return;
@@ -219,6 +240,9 @@ const SMSCampaign = () => {
                           </div>
                         </RadioGroup>
                       </div>
+
+                      {/* Manual contact entry component */}
+                      <ManualContactEntry onContactsAdded={handleAddContacts} />
 
                       <div className="mb-6">
                         <Button 
