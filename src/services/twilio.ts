@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -7,7 +6,6 @@ export interface TwilioCallResult {
   browserCallSid?: string;
   phoneCallSid?: string;
   conferenceName?: string;
-  transcriptionSid?: string;  // Added this line to fix the error
   message?: string;
   error?: string;
   leadId?: string | number;

@@ -1,5 +1,52 @@
 
-project_id = "lovable"
+project_id = "imrmboyczebjlbnkgjns"
 
-[functions.retrieve-transcription]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+bucket_size = 100
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[analytics]
+enabled = false
+
+[experimental]
+multisite = false
+
+# CRITICAL: Explicitly disable JWT verification for ALL Twilio-related functions
+# Ensure all invoker roles are added for maximum compatibility
+[functions]
+[functions.store-leads]
 verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.twilio-voice]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.twilio-token]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.twilio-stream]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
