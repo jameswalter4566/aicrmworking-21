@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -16,21 +17,6 @@ export interface ThoughtlyContact {
   mailingAddress?: string;
   propertyAddress?: string;
   createdBy?: string;
-}
-
-export interface ContactNote {
-  id: string;
-  content: string;
-  createdAt: string;
-  createdBy?: string;
-}
-
-export interface ContactActivity {
-  id: string;
-  type: string;
-  description: string;
-  timestamp: string;
-  details?: Record<string, any>;
 }
 
 export const thoughtlyService = {
@@ -346,145 +332,6 @@ export const thoughtlyService = {
       };
     } catch (error) {
       console.error('Error in retrieveLeads:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get a single contact by ID
-   * @param id The contact ID to retrieve
-   * @returns The contact data
-   */
-  async getContactById(id: number | string) {
-    try {
-      console.log('Getting contact from Thoughtly by ID:', id);
-      
-      const { data, error } = await supabase.functions.invoke('thoughtly-get-contact', {
-        body: { id }
-      });
-
-      if (error) {
-        console.error('Error getting contact from Thoughtly:', error);
-        throw error;
-      }
-
-      if (!data.success) {
-        console.error('Error getting contact from Thoughtly:', data.error);
-        throw new Error(data.error || 'Failed to get contact from Thoughtly');
-      }
-
-      console.log('Retrieved contact from Thoughtly:', data);
-      return data || {};
-    } catch (error) {
-      console.error('Error in getContactById:', error);
-      throw error;
-    }
-  },
-
-  /**
-   * Get contact notes by contact ID
-   * @param contactId The ID of the contact to get notes for
-   * @returns Array of notes for the contact
-   */
-  async getContactNotes(contactId: number | string) {
-    try {
-      // In a real implementation, we would call an API endpoint
-      // For now, we'll return mock data
-      return [
-        {
-          id: '1',
-          content: 'Initial contact made via phone. Lead expressed interest in property listings in downtown area.',
-          createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-          createdBy: 'James Walker'
-        },
-        {
-          id: '2',
-          content: 'Follow-up email sent with listings matching their criteria.',
-          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          createdBy: 'James Walker'
-        },
-        {
-          id: '3',
-          content: 'Scheduled a viewing for next Tuesday at 2 PM.',
-          createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          createdBy: 'James Walker'
-        }
-      ] as ContactNote[];
-    } catch (error) {
-      console.error('Error getting contact notes:', error);
-      return [];
-    }
-  },
-
-  /**
-   * Get contact activity by contact ID
-   * @param contactId The ID of the contact to get activity for
-   * @returns Array of activity items for the contact
-   */
-  async getContactActivity(contactId: number | string) {
-    try {
-      // In a real implementation, we would call an API endpoint
-      // For now, we'll return mock data
-      return [
-        {
-          id: '1',
-          type: 'email',
-          description: 'Sent welcome email',
-          timestamp: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-          details: { subject: 'Welcome to our service!' }
-        },
-        {
-          id: '2',
-          type: 'phone',
-          description: 'Outbound call',
-          timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-          details: { duration: '4:32', outcome: 'Answered' }
-        },
-        {
-          id: '3',
-          type: 'form',
-          description: 'Filled out interest form',
-          timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-          id: '4',
-          type: 'phone',
-          description: 'Inbound call',
-          timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-          details: { duration: '6:15', outcome: 'Answered' }
-        },
-        {
-          id: '5',
-          type: 'email',
-          description: 'Follow-up email',
-          timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          details: { subject: 'Following up on our conversation' }
-        }
-      ] as ContactActivity[];
-    } catch (error) {
-      console.error('Error getting contact activity:', error);
-      return [];
-    }
-  },
-  
-  /**
-   * Add a note to a contact
-   * @param contactId The ID of the contact to add a note to
-   * @param content The content of the note
-   * @returns The created note
-   */
-  async addContactNote(contactId: number | string, content: string) {
-    try {
-      // In a real implementation, we would call an API endpoint
-      // For now, we'll return mock data
-      return {
-        id: Date.now().toString(),
-        content,
-        createdAt: new Date().toISOString(),
-        createdBy: 'Current User'
-      } as ContactNote;
-    } catch (error) {
-      console.error('Error adding contact note:', error);
       throw error;
     }
   }

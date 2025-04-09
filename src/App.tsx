@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -15,7 +16,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import Index from "./pages/Index";
 import People from "./pages/People";
-import LeadProfile from "./pages/LeadProfile";
 import Deals from "./pages/Deals";
 import Pipeline from "./pages/Pipeline";
 import PowerDialer from "./pages/PowerDialer";
@@ -236,7 +236,6 @@ function App() {
                 
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
-                <Route path="/lead/:id" element={<ProtectedRoute><LeadProfile /></ProtectedRoute>} />
                 <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
                 <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
                 <Route path="/power-dialer" element={<PowerDialer />} />

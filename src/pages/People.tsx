@@ -60,7 +60,6 @@ import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
 import { thoughtlyService } from "@/services/thoughtly";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
 
 const fallbackLeadsData = [
   {
@@ -140,7 +139,6 @@ type LeadFormValues = {
 };
 
 const People = () => {
-  const navigate = useNavigate();
   const [leads, setLeads] = useState([]);
   const [customFields, setCustomFields] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -425,10 +423,6 @@ const People = () => {
     return pages;
   };
 
-  const handleRowClick = (leadId: number) => {
-    navigate(`/lead/${leadId}`);
-  };
-
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -609,16 +603,15 @@ const People = () => {
                   <TableRow 
                     key={lead.id} 
                     className="hover:bg-crm-lightBlue transition-all duration-200 cursor-pointer my-4 shadow-sm hover:shadow-md hover:scale-[1.01]"
-                    onClick={() => handleRowClick(lead.id)}
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell>
                       <Checkbox 
                         checked={selectedLeads.includes(lead.id)}
                         onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
                         aria-label={`Select ${lead.firstName} ${lead.lastName}`}
                       />
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button variant="ghost" className="p-0 h-auto">
@@ -634,10 +627,7 @@ const People = () => {
                                 key={disposition}
                                 variant="ghost" 
                                 className={`justify-start text-sm ${dispositionColors[disposition as keyof typeof dispositionColors]}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateLeadDisposition(lead.id, disposition);
-                                }}
+                                onClick={() => updateLeadDisposition(lead.id, disposition)}
                               >
                                 {disposition}
                               </Button>
