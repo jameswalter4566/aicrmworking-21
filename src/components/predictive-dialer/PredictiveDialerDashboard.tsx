@@ -16,17 +16,7 @@ import {
 import { predictiveDialer } from '@/utils/supabase-custom-client';
 import { supabase } from "@/integrations/supabase/client";
 import { PredictiveDialerAgent, PredictiveDialerContact, PredictiveDialerCall, PredictiveDialerStats } from '@/types/predictive-dialer';
-import { ThoughtlyContact, PaginationParams } from '@/services/thoughtly';
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious, 
-  PaginationEllipsis,
-  PaginationPageSizeSelector
-} from "@/components/ui/pagination";
+import { ThoughtlyContact } from '@/services/thoughtly';
 
 export const PredictiveDialerDashboard: React.FC = () => {
   const [isDialerRunning, setIsDialerRunning] = useState(false);
@@ -46,10 +36,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
   const [twilioDevice, setTwilioDevice] = useState<Device | null>(null);
   const [retrievedContacts, setRetrievedContacts] = useState<ThoughtlyContact[]>([]);
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalContacts, setTotalContacts] = useState(0);
   
   const { user } = useAuth();
   const { toast } = useToast();
@@ -145,10 +131,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
     return () => clearInterval(interval);
   }, [ensureAgentExists]);
 
-  useEffect(() => {
-    fetchContacts();
-  }, [currentPage, pageSize]);
-
   const fetchStats = async () => {
     try {
       const { data: activeCalls, error: activeCallsError } = await predictiveDialer.getCalls()
@@ -215,22 +197,33 @@ export const PredictiveDialerDashboard: React.FC = () => {
   const fetchContacts = async () => {
     setIsLoadingContacts(true);
     try {
-      // Define pagination parameters
-      const paginationParams: PaginationParams = {
-        page: currentPage,
-        limit: pageSize
-      };
-
-      // Call the retrieve-leads function with pagination
-      const result = await thoughtlyService.retrieveLeads(paginationParams);
+      // Get authentication token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const authToken = sessionData?.session?.access_token;
       
-      if (result.data) {
-        setRetrievedContacts(result.data);
-        setTotalPages(result.totalPages);
-        setTotalContacts(result.totalCount);
+      let headers = {};
+      if (authToken) {
+        headers = {
+          Authorization: `Bearer ${authToken}`
+        };
+      }
+      
+      // Call the retrieve-contacts function
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
+        body: { source: 'all' },
+        headers
+      });
+      
+      if (error) {
+        console.error("Error retrieving contacts:", error);
+        throw error;
+      }
+      
+      if (data?.data) {
+        setRetrievedContacts(data.data);
         
         // Import contacts to predictive dialer if needed
-        for (const contact of result.data) {
+        for (const contact of data.data) {
           if (contact.phone1) {
             // Check if contact already exists in the dialer by phone number
             const { data: existingContacts, error: searchError } = await predictiveDialer.getContacts()
@@ -430,7 +423,7 @@ export const PredictiveDialerDashboard: React.FC = () => {
               name: contactName,
               phone_number: phoneNumber,
               status: 'not_contacted',
-              notes: contact.disposition || ''
+              notes: 'disposition' in contact ? (contact.disposition || '') : ''
             })
             .select()
             .single();
@@ -692,11 +685,7 @@ export const PredictiveDialerDashboard: React.FC = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {isLoadingContacts ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Loading contacts...</p>
-              </div>
-            ) : retrievedContacts.length === 0 ? (
+            {retrievedContacts.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <p>No contacts retrieved yet.</p>
                 <p className="text-sm">Click Refresh Contacts to fetch contacts from your system.</p>
@@ -731,85 +720,6 @@ export const PredictiveDialerDashboard: React.FC = () => {
                 ))}
               </div>
             )}
-            
-            <div className="flex items-center justify-between pt-4 border-t mt-4">
-              <PaginationPageSizeSelector 
-                pageSize={pageSize} 
-                onPageSizeChange={(size) => {
-                  setPageSize(size);
-                  setCurrentPage(1); // Reset to page 1 when changing page size
-                }}
-              />
-              
-              <Pagination>
-                <PaginationContent>
-                  {currentPage > 1 && (
-                    <PaginationItem>
-                      <PaginationPrevious onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} />
-                    </PaginationItem>
-                  )}
-                  
-                  {/* First page */}
-                  {currentPage > 2 && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Ellipsis if needed */}
-                  {currentPage > 3 && (
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Previous page if not first */}
-                  {currentPage > 1 && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => setCurrentPage(currentPage - 1)}>
-                        {currentPage - 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Current page */}
-                  <PaginationItem>
-                    <PaginationLink isActive onClick={() => {}}>{currentPage}</PaginationLink>
-                  </PaginationItem>
-                  
-                  {/* Next page if not last */}
-                  {currentPage < totalPages && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => setCurrentPage(currentPage + 1)}>
-                        {currentPage + 1}
-                      </PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Ellipsis if needed */}
-                  {currentPage < totalPages - 2 && (
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  )}
-                  
-                  {/* Last page if not current or next */}
-                  {currentPage < totalPages - 1 && (
-                    <PaginationItem>
-                      <PaginationLink onClick={() => setCurrentPage(totalPages)}>
-                        {totalPages}
-                      </PaginationLink>
-                    </PaginationItem>
-                  )}
-                  
-                  {currentPage < totalPages && (
-                    <PaginationItem>
-                      <PaginationNext onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} />
-                    </PaginationItem>
-                  )}
-                </PaginationContent>
-              </Pagination>
-            </div>
           </CardContent>
         </Card>
       </div>

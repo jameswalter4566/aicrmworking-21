@@ -38,17 +38,6 @@ import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { RealTimeRebuttals } from "@/components/RealTimeRebuttals";
 import { toast } from "@/components/ui/use-toast";
-import { thoughtlyService, ThoughtlyContact } from "@/services/thoughtly";
-import { 
-  Pagination, 
-  PaginationContent, 
-  PaginationItem, 
-  PaginationLink, 
-  PaginationNext, 
-  PaginationPrevious, 
-  PaginationEllipsis,
-  PaginationPageSizeSelector
-} from "@/components/ui/pagination";
 
 const SAMPLE_LEADS = [
   {
@@ -103,7 +92,7 @@ const SAMPLE_LEADS = [
 
 export default function PowerDialer() {
   const [currentTab, setCurrentTab] = useState("dialer");
-  const [leads, setLeads] = useState<any[]>([]);
+  const [leads, setLeads] = useState(SAMPLE_LEADS);
   const [sortBy, setSortBy] = useState("priority");
   const [filterStatus, setFilterStatus] = useState("all");
   const [isAudioDebugOpen, setIsAudioDebugOpen] = useState(false);
@@ -116,11 +105,6 @@ export default function PowerDialer() {
   const [sessionDuration, setSessionDuration] = useState<string>("00:00:00");
   const [selectedDisposition, setSelectedDisposition] = useState<string | null>(null);
   const [concurrentLines, setConcurrentLines] = useState<string>("1");
-  const [isLoading, setIsLoading] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalLeads, setTotalLeads] = useState(0);
 
   const twilioState = useTwilio();
 
@@ -132,10 +116,6 @@ export default function PowerDialer() {
       return () => {};
     }
   }, [isScriptLoaded]);
-
-  useEffect(() => {
-    fetchLeads();
-  }, [currentPage, pageSize]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -157,48 +137,6 @@ export default function PowerDialer() {
       if (interval) clearInterval(interval);
     };
   }, [dialingSessionActive, sessionStartTime]);
-
-  const fetchLeads = async () => {
-    setIsLoading(true);
-    try {
-      const result = await thoughtlyService.retrieveLeads({ page: currentPage, limit: pageSize });
-      
-      const mappedLeads = result.data.map((contact: ThoughtlyContact, index: number) => ({
-        id: String(contact.id) || String(index),
-        name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown',
-        company: contact.mailingAddress || 'Unknown Company',
-        phone: contact.phone1 || '',
-        status: contact.disposition || "New",
-        priority: getRandomPriority(),
-        email: contact.email || '',
-        notes: contact.notes || ''
-      }));
-      
-      setLeads(mappedLeads);
-      setTotalPages(result.totalPages);
-      setTotalLeads(result.totalCount);
-      
-      if (mappedLeads.length === 0 && SAMPLE_LEADS.length > 0) {
-        console.log("No real leads found, using sample data instead");
-        setLeads(SAMPLE_LEADS);
-      }
-    } catch (error) {
-      console.error("Error fetching leads:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load leads. Using sample data instead.",
-        variant: "destructive",
-      });
-      setLeads(SAMPLE_LEADS);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const getRandomPriority = () => {
-    const priorities = ["High", "Medium", "Low"];
-    return priorities[Math.floor(Math.random() * priorities.length)];
-  };
 
   const startDialingSession = () => {
     setDialingSessionActive(true);
@@ -694,142 +632,58 @@ export default function PowerDialer() {
         </CardHeader>
         <ScrollArea className="flex-1 h-[calc(100vh-450px)]">
           <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <p className="text-gray-500">Loading leads...</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {filteredAndSortedLeads.map((lead) => (
-                  <Card key={lead.id} className="p-3 hover:bg-accent/50">
-                    <div className="flex justify-between items-start">
-                      <div className="space-y-1">
-                        <div className="font-medium">{lead.name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {lead.company}
-                        </div>
-                        <div className="text-sm">{lead.phone}</div>
+            <div className="space-y-3">
+              {filteredAndSortedLeads.map((lead) => (
+                <Card key={lead.id} className="p-3 hover:bg-accent/50">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <div className="font-medium">{lead.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {lead.company}
                       </div>
-                      <div className="flex flex-col items-end">
-                        <Badge
-                          variant={
-                            lead.status === "New"
-                              ? "default"
-                              : lead.status === "Attempted"
-                              ? "secondary"
-                              : "outline"
-                          }
-                          className="mb-2"
-                        >
-                          {lead.status}
-                        </Badge>
-                        <Badge
-                          variant={
-                            lead.priority === "High"
-                              ? "destructive"
-                              : lead.priority === "Medium"
-                              ? "default"
-                              : "outline"
-                          }
-                          className="mb-2"
-                        >
-                          {lead.priority}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleCallLead(lead)}
-                          disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0}
-                          className="w-16 h-8"
-                        >
-                          <Phone className="mr-1 h-3 w-3" /> Call
-                        </Button>
-                      </div>
+                      <div className="text-sm">{lead.phone}</div>
                     </div>
-                  </Card>
-                ))}
-
-                {filteredAndSortedLeads.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    <p>No leads found with the current filters.</p>
+                    <div className="flex flex-col items-end">
+                      <Badge
+                        variant={
+                          lead.status === "New"
+                            ? "default"
+                            : lead.status === "Attempted"
+                            ? "secondary"
+                            : "outline"
+                        }
+                        className="mb-2"
+                      >
+                        {lead.status}
+                      </Badge>
+                      <Badge
+                        variant={
+                          lead.priority === "High"
+                            ? "destructive"
+                            : lead.priority === "Medium"
+                            ? "default"
+                            : "outline"
+                        }
+                        className="mb-2"
+                      >
+                        {lead.priority}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => handleCallLead(lead)}
+                        disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0}
+                        className="w-16 h-8"
+                      >
+                        <Phone className="mr-1 h-3 w-3" /> Call
+                      </Button>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
+                </Card>
+              ))}
+            </div>
           </CardContent>
         </ScrollArea>
-        
-        <div className="flex items-center justify-between px-4 py-2 border-t">
-          <PaginationPageSizeSelector 
-            pageSize={pageSize} 
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }} 
-          />
-          
-          <Pagination>
-            <PaginationContent>
-              {currentPage > 1 && (
-                <PaginationItem>
-                  <PaginationPrevious onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} />
-                </PaginationItem>
-              )}
-              
-              {currentPage > 2 && (
-                <PaginationItem>
-                  <PaginationLink onClick={() => setCurrentPage(1)}>1</PaginationLink>
-                </PaginationItem>
-              )}
-              
-              {currentPage > 3 && (
-                <PaginationItem>
-                  <PaginationEllipsis />
-                </PaginationItem>
-              )}
-              
-              {currentPage > 1 && (
-                <PaginationItem>
-                  <PaginationLink onClick={() => setCurrentPage(currentPage - 1)}>
-                    {currentPage - 1}
-                  </PaginationLink>
-                </PaginationItem>
-              )}
-              
-              <PaginationItem>
-                <PaginationLink isActive onClick={() => {}}>{currentPage}</PaginationLink>
-              </PaginationItem>
-              
-              {currentPage < totalPages && (
-                <PaginationItem>
-                  <PaginationLink onClick={() => setCurrentPage(currentPage + 1)}>
-                    {currentPage + 1}
-                  </PaginationLink>
-                </PaginationItem>
-              )}
-              
-              {currentPage < totalPages - 2 && (
-                <PaginationItem>
-                  <PaginationEllipsis />
-                </PaginationItem>
-              )}
-              
-              {currentPage < totalPages - 1 && (
-                <PaginationItem>
-                  <PaginationLink onClick={() => setCurrentPage(totalPages)}>
-                    {totalPages}
-                  </PaginationLink>
-                </PaginationItem>
-              )}
-              
-              {currentPage < totalPages && (
-                <PaginationItem>
-                  <PaginationNext onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} />
-                </PaginationItem>
-              )}
-            </PaginationContent>
-          </Pagination>
-        </div>
       </Card>
     </div>
   );
