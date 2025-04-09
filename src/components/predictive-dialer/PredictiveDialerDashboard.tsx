@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from "@/hooks/use-toast";
@@ -35,7 +34,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Fetch current agent status
   const fetchCurrentAgent = useCallback(async () => {
     if (!user) return;
     
@@ -50,51 +48,43 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
     }
   }, [user]);
 
-  // Fetch stats
   const fetchStats = async () => {
     try {
-      // Get active calls
       const { data: activeCalls, error: activeCallsError } = await predictiveDialer.getCalls()
         .select('*')
         .eq('status', 'in_progress');
         
       if (activeCallsError) throw activeCallsError;
       
-      // Get available agents
       const { data: availableAgents, error: agentsError } = await predictiveDialer.getAgents()
         .select('*')
         .eq('status', 'available');
         
       if (agentsError) throw agentsError;
       
-      // Get queue items
       const { data: queueItems, error: queueError } = await predictiveDialer.getCallQueue()
         .select('*');
         
       if (queueError) throw queueError;
       
-      // Get completed calls
       const { data: completedCalls, error: completedCallsError } = await predictiveDialer.getCalls()
         .select('*')
         .eq('status', 'completed');
         
       if (completedCallsError) throw completedCallsError;
       
-      // Get human answers
       const { data: humanAnswers, error: humanAnswersError } = await predictiveDialer.getCalls()
         .select('*')
         .eq('machine_detection_result', 'human');
         
       if (humanAnswersError) throw humanAnswersError;
       
-      // Get machine answers
       const { data: machineAnswers, error: machineAnswersError } = await predictiveDialer.getCalls()
         .select('*')
         .eq('machine_detection_result', 'machine');
         
       if (machineAnswersError) throw machineAnswersError;
       
-      // Calculate average wait time for calls in queue
       let avgWaitTime = 0;
       if (queueItems && queueItems.length > 0) {
         const now = new Date();
@@ -103,7 +93,7 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
           const created = new Date(item.created_timestamp);
           return sum + (now.getTime() - created.getTime());
         }, 0);
-        avgWaitTime = totalWaitTime / queueItems.length / 1000 / 60; // In minutes
+        avgWaitTime = totalWaitTime / queueItems.length / 1000 / 60;
       }
       
       setStats({
@@ -134,10 +124,8 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
   }, [fetchCurrentAgent]);
 
   const toggleDialer = async () => {
-    // Update status
     setIsDialerRunning(!isDialerRunning);
     
-    // If starting the dialer, verify agent status first
     if (!isDialerRunning) {
       if (!currentAgent) {
         toast({
@@ -151,14 +139,12 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
       
       if (currentAgent.status !== 'available') {
         try {
-          // Update agent status to available
           const { error } = await predictiveDialer.getAgents()
             .update({ status: 'available' })
             .eq('id', currentAgent.id);
           
           if (error) throw error;
           
-          // Update local state
           setCurrentAgent({...currentAgent, status: 'available'});
         } catch (error) {
           console.error("Error updating agent status:", error);
@@ -172,9 +158,8 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
         }
       }
       
-      // Call edge function to start dialing
       try {
-        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/start-predictive-dialer', {
+        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-start', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -205,7 +190,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
         setIsDialerRunning(false);
       }
     } else {
-      // Stop the dialer
       try {
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/stop-predictive-dialer', {
           method: 'POST',
@@ -234,7 +218,7 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
           description: "Failed to stop the predictive dialer.",
           variant: "destructive",
         });
-        setIsDialerRunning(true); // Revert the state change
+        setIsDialerRunning(true);
       }
     }
   };
@@ -258,7 +242,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
       return;
     }
     
-    // Update agent status to busy
     try {
       const { error: agentError } = await predictiveDialer.getAgents()
         .update({ status: 'busy' })
@@ -266,7 +249,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
       
       if (agentError) throw agentError;
       
-      // Create call record
       const newCall = {
         contact_id: contact.id,
         agent_id: currentAgent.id,
@@ -278,14 +260,12 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
       
       if (callError || !callData || callData.length === 0) throw new Error("Failed to create call record");
       
-      // Update agent with current call
       const { error: updateError } = await predictiveDialer.getAgents()
         .update({ current_call_id: callData[0].id })
         .eq('id', currentAgent.id);
       
       if (updateError) throw updateError;
       
-      // Call the edge function to initiate the actual call via Twilio
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/initiate-manual-call', {
         method: 'POST',
         headers: {
@@ -305,7 +285,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
         throw new Error(data.error || "Failed to initiate call");
       }
       
-      // Update local agent state
       setCurrentAgent({
         ...currentAgent,
         status: 'busy',
@@ -319,7 +298,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
     } catch (error) {
       console.error("Error initiating call:", error);
       
-      // Try to reset agent status
       try {
         await predictiveDialer.getAgents()
           .update({ status: 'available', current_call_id: null })
@@ -337,8 +315,42 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
   };
 
   const handleAgentStatusChange = async (agentId: string, status: string) => {
-    if (agentId === currentAgent?.id) {
-      setCurrentAgent({...currentAgent, status: status as PredictiveDialerAgent['status']});
+    try {
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-agent-connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-status',
+          agentId,
+          status
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update agent status');
+      }
+      
+      if (agentId === currentAgent?.id) {
+        setCurrentAgent({...currentAgent, status: status as PredictiveDialerAgent['status']});
+        
+        if (data.assignedCall) {
+          toast({
+            title: "Call Assigned",
+            description: `You have been assigned a call from ${data.assignedCall.contact?.name || 'Unknown'}`,
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error updating agent status:", error);
+      toast({
+        title: "Status Update Failed",
+        description: "Failed to update agent status.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -348,19 +360,22 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
     }
     
     try {
-      // Call an edge function to connect the call to the agent through Twilio
-      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/connect-call-to-agent', {
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-agent-connect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ callId, agentId })
+        body: JSON.stringify({
+          action: 'connect-call',
+          callId,
+          agentId
+        })
       });
       
       const data = await response.json();
       
       if (!response.ok) {
-        throw new Error(data.error || "Failed to connect call");
+        throw new Error(data.error || 'Failed to connect call');
       }
       
       setCurrentAgent({
@@ -385,7 +400,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
 
   return (
     <div className="space-y-6">
-      {/* Header with controls */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold">Predictive Dialer</h1>
@@ -412,7 +426,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
         </div>
       </div>
       
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 flex justify-between items-center">
@@ -464,14 +477,12 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Agent Controls */}
         <div>
           <PredictiveDialerAgentManager 
             onAgentStatusChange={handleAgentStatusChange} 
           />
         </div>
         
-        {/* Queue Monitor */}
         <div>
           <PredictiveDialerQueueMonitor 
             onAssignCallToAgent={handleAssignCallToAgent}
@@ -479,7 +490,6 @@ export const PredictiveDialerDashboard: React.FC<PredictiveDialerDashboardProps>
           />
         </div>
         
-        {/* Contacts List */}
         <div>
           <PredictiveDialerContactsList onContactSelect={handleContactSelect} />
         </div>

@@ -1,205 +1,250 @@
 
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, UserCheck, UserMinus, UserPlus } from 'lucide-react';
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/context/AuthContext';
+import { User, UserCheck, Clock } from 'lucide-react';
 import { predictiveDialer } from '@/utils/supabase-custom-client';
 import { PredictiveDialerAgent } from '@/types/predictive-dialer';
+import { useToast } from '@/hooks/use-toast';
 
-interface AgentManagerProps {
+export interface PredictiveDialerAgentManagerProps {
   onAgentStatusChange?: (agentId: string, status: string) => void;
 }
 
-export const PredictiveDialerAgentManager: React.FC<AgentManagerProps> = ({ onAgentStatusChange }) => {
+const PredictiveDialerAgentManager: React.FC<PredictiveDialerAgentManagerProps> = ({ onAgentStatusChange }) => {
   const [agents, setAgents] = useState<PredictiveDialerAgent[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+  const [currentAgent, setCurrentAgent] = useState<PredictiveDialerAgent | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  
   const { user } = useAuth();
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchAgents();
+    
+    // Subscribe to changes in the agents table
+    const agentsSubscription = predictiveDialer.getAgents()
+      .on('*', () => {
+        fetchAgents();
+      })
+      .subscribe();
+    
+    return () => {
+      predictiveDialer.getAgents().unsubscribe(agentsSubscription);
+    };
   }, []);
-
+  
   const fetchAgents = async () => {
     try {
       const agents = await predictiveDialer.fetchAgents();
       setAgents(agents);
-    } catch (error) {
-      console.error("Error fetching agents:", error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch agents. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const registerAsAgent = async () => {
-    if (!user) return;
-    
-    setIsLoading(true);
-    try {
-      // Check if user is already registered as an agent
-      const myAgent = agents.find(a => a.user_id === user.id);
       
-      if (myAgent) {
-        toast({
-          title: "Already registered",
-          description: "You are already registered as an agent.",
-        });
-      } else {
-        // Register as a new agent
-        const newAgent: Partial<PredictiveDialerAgent> = {
-          user_id: user.id,
-          name: user.email || 'Agent',
-          status: 'offline',
-        };
-        
-        const { data, error } = await predictiveDialer.getAgents().insert([newAgent]);
-        
-        if (error) throw error;
-        
-        toast({
-          title: "Success",
-          description: "You are now registered as an agent.",
-        });
-        
-        fetchAgents();
+      // Find current user's agent
+      if (user) {
+        const myAgent = agents.find(agent => agent.user_id === user.id);
+        setCurrentAgent(myAgent || null);
       }
     } catch (error) {
-      console.error("Error registering agent:", error);
+      console.error('Error fetching agents:', error);
+    }
+  };
+  
+  const registerAsAgent = async () => {
+    if (!user) {
       toast({
-        title: "Error",
+        title: "Authentication Required",
+        description: "You need to be logged in to register as an agent.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsRegistering(true);
+    
+    try {
+      // Use the dialer-agent-connect function to register
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-agent-connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'register',
+          userId: user.id,
+          name: user.email || 'Agent'
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to register as agent');
+      }
+      
+      setCurrentAgent(data.agent);
+      
+      toast({
+        title: "Registration Successful",
+        description: "You are now registered as an agent.",
+      });
+      
+      // Refresh the agents list
+      fetchAgents();
+    } catch (error) {
+      console.error('Error registering as agent:', error);
+      toast({
+        title: "Registration Failed",
         description: "Failed to register as an agent. Please try again.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsRegistering(false);
     }
   };
-
-  const updateAgentStatus = async (agentId: string, status: string) => {
-    setIsLoading(true);
+  
+  const updateAgentStatus = async (newStatus: 'available' | 'busy' | 'offline') => {
+    if (!currentAgent) return;
+    
     try {
-      const { error } = await predictiveDialer.getAgents()
-        .update({ status })
-        .eq('id', agentId);
-
-      if (error) throw error;
-
-      // Update local state
-      setAgents(agents.map(agent => 
-        agent.id === agentId ? { ...agent, status: status as PredictiveDialerAgent['status'] } : agent
-      ));
-
-      if (onAgentStatusChange) {
-        onAgentStatusChange(agentId, status);
+      // Call the edge function to update status
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-agent-connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'update-status',
+          agentId: currentAgent.id,
+          status: newStatus
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update status');
       }
-
+      
+      setCurrentAgent({...currentAgent, status: newStatus});
+      
+      if (onAgentStatusChange) {
+        onAgentStatusChange(currentAgent.id, newStatus);
+      }
+      
       toast({
         title: "Status Updated",
-        description: `Agent status changed to ${status}.`,
+        description: `Your status is now ${newStatus}.`,
       });
     } catch (error) {
-      console.error("Error updating agent status:", error);
+      console.error('Error updating agent status:', error);
       toast({
-        title: "Error",
-        description: "Failed to update agent status. Please try again.",
+        title: "Status Update Failed",
+        description: "Failed to update your status.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
     }
   };
-
-  const getStatusColor = (status: string) => {
-    switch(status) {
-      case 'available': return 'bg-green-500 hover:bg-green-600';
-      case 'busy': return 'bg-red-500 hover:bg-red-600';
-      case 'offline': return 'bg-gray-500 hover:bg-gray-600';
-      default: return 'bg-gray-500 hover:bg-gray-600';
+  
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'available':
+        return 'bg-green-500';
+      case 'busy':
+        return 'bg-red-500';
+      case 'offline':
+      default:
+        return 'bg-gray-500';
     }
   };
-
-  const getCurrentUserAgent = () => {
-    if (!user) return null;
-    return agents.find(agent => agent.user_id === user.id);
+  
+  const formatTimestamp = (timestamp: string | undefined) => {
+    if (!timestamp) return 'N/A';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString();
   };
-
-  const myAgent = getCurrentUserAgent();
 
   return (
-    <Card className="shadow-lg">
+    <Card className="h-full">
       <CardHeader className="pb-3">
-        <CardTitle className="text-lg font-semibold flex justify-between items-center">
-          <div>Agent Management</div>
-          {myAgent && (
-            <Badge className={getStatusColor(myAgent.status)}>
-              {myAgent.status.toUpperCase()}
-            </Badge>
-          )}
-        </CardTitle>
+        <CardTitle>Agent Management</CardTitle>
       </CardHeader>
       <CardContent>
-        {!myAgent ? (
-          <Button 
-            onClick={registerAsAgent} 
-            className="w-full bg-blue-600 hover:bg-blue-700"
-            disabled={isLoading}
-          >
-            <UserPlus className="mr-2 h-4 w-4" />
-            Register as Agent
-          </Button>
+        {!currentAgent ? (
+          <div className="flex flex-col gap-4 items-center justify-center h-40">
+            <p className="text-gray-500">You are not registered as an agent</p>
+            <Button onClick={registerAsAgent} disabled={isRegistering}>
+              {isRegistering ? 'Registering...' : 'Register as Agent'}
+            </Button>
+          </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-2">
-              <Button 
-                className={`bg-green-600 hover:bg-green-700 ${myAgent.status === 'available' ? 'ring-2 ring-green-300' : ''}`}
-                onClick={() => updateAgentStatus(myAgent.id, 'available')}
-                disabled={isLoading || myAgent.status === 'available'}
-              >
-                <UserCheck className="mr-2 h-4 w-4" />
-                Available
-              </Button>
-              <Button 
-                className={`bg-gray-500 hover:bg-gray-600 ${myAgent.status === 'offline' ? 'ring-2 ring-gray-300' : ''}`}
-                onClick={() => updateAgentStatus(myAgent.id, 'offline')}
-                disabled={isLoading || myAgent.status === 'offline'}
-              >
-                <UserMinus className="mr-2 h-4 w-4" />
-                Offline
-              </Button>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Your Status:</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge className={getStatusBadgeColor(currentAgent.status)}>
+                    {currentAgent.status.charAt(0).toUpperCase() + currentAgent.status.slice(1)}
+                  </Badge>
+                  {currentAgent.status === 'busy' && (
+                    <span className="text-xs text-gray-500">
+                      On call since {formatTimestamp(currentAgent.last_status_change)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  size="sm" 
+                  variant={currentAgent.status === 'available' ? "default" : "outline"}
+                  onClick={() => updateAgentStatus('available')}
+                  disabled={currentAgent.status === 'available'}
+                >
+                  Available
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={currentAgent.status === 'offline' ? "default" : "outline"}
+                  onClick={() => updateAgentStatus('offline')}
+                  disabled={currentAgent.status === 'offline'}
+                >
+                  Offline
+                </Button>
+              </div>
             </div>
             
-            {myAgent.status === 'busy' && (
-              <div className="p-3 bg-red-100 border border-red-300 rounded text-center">
-                <p className="text-red-800 text-sm">You are currently on a call</p>
-                <p className="text-xs text-red-600 mt-1">Status will automatically update when the call ends</p>
-              </div>
-            )}
-
-            <div className="mt-4">
-              <h3 className="text-sm font-medium mb-2">All Agents ({agents.length})</h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {agents.map((agent) => (
-                  <div 
-                    key={agent.id} 
-                    className="flex items-center justify-between p-2 bg-gray-50 rounded"
-                  >
-                    <div className="flex items-center">
-                      <div className={`w-2 h-2 rounded-full mr-2 ${
-                        agent.status === 'available' ? 'bg-green-500' :
-                        agent.status === 'busy' ? 'bg-red-500' : 'bg-gray-500'
-                      }`}></div>
-                      <div className="text-sm">{agent.name}</div>
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium mb-2">All Agents</p>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {agents.map(agent => (
+                  <div key={agent.id} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <UserCheck className={`h-4 w-4 ${
+                        agent.status === 'available' ? 'text-green-500' : 
+                        agent.status === 'busy' ? 'text-red-500' : 'text-gray-500'
+                      }`} />
+                      <span>{agent.name}</span>
                     </div>
-                    <Badge className={getStatusColor(agent.status)}>{agent.status}</Badge>
+                    <Badge className={getStatusBadgeColor(agent.status)}>
+                      {agent.status}
+                    </Badge>
                   </div>
                 ))}
+                
+                {agents.length === 0 && (
+                  <p className="text-center text-gray-500 p-4">No agents registered</p>
+                )}
               </div>
+            </div>
+            
+            <div className="flex items-center justify-between text-xs text-gray-500 pt-2">
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" />
+                Last updated: {new Date().toLocaleTimeString()}
+              </span>
+              <span>{agents.length} agent(s)</span>
             </div>
           </div>
         )}
