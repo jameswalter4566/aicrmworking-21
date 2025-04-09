@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,6 @@ import TwilioScript from "@/components/TwilioScript";
 import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "@/components/ui/use-toast";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const SAMPLE_LEADS = [
   {
@@ -102,7 +102,6 @@ export default function PowerDialer() {
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [sessionDuration, setSessionDuration] = useState<string>("00:00:00");
   const [selectedDisposition, setSelectedDisposition] = useState<string | null>(null);
-  const [concurrentLines, setConcurrentLines] = useState<string>("1");
 
   const twilioState = useTwilio();
 
@@ -141,7 +140,7 @@ export default function PowerDialer() {
     setSessionStartTime(new Date());
     toast({
       title: "Dialing Session Started",
-      description: `You can now begin calling leads with ${concurrentLines} concurrent lines.`,
+      description: "You can now begin calling leads.",
     });
   };
 
@@ -276,86 +275,6 @@ export default function PowerDialer() {
     }
   };
 
-  const DialerSettings = () => (
-    <Card className="mb-4">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Dialer Configuration</CardTitle>
-        <CardDescription>Adjust your dialing settings</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col gap-4">
-          <div>
-            <Label htmlFor="concurrent-lines" className="mb-2 block">Concurrent Lines</Label>
-            <div className="flex flex-col gap-2">
-              <p className="text-sm text-muted-foreground mb-1">
-                Select how many lines you want to dial simultaneously
-              </p>
-              <ToggleGroup 
-                type="single" 
-                value={concurrentLines}
-                onValueChange={(value) => {
-                  if (value) setConcurrentLines(value);
-                }}
-                className="justify-start"
-              >
-                <ToggleGroupItem value="1" aria-label="1 line" className="data-[state=on]:bg-blue-600 data-[state=on]:text-white">
-                  1 Line
-                </ToggleGroupItem>
-                <ToggleGroupItem value="3" aria-label="3 lines" className="data-[state=on]:bg-blue-600 data-[state=on]:text-white">
-                  3 Lines
-                </ToggleGroupItem>
-                <ToggleGroupItem value="6" aria-label="6 lines" className="data-[state=on]:bg-blue-600 data-[state=on]:text-white">
-                  6 Lines
-                </ToggleGroupItem>
-                <ToggleGroupItem value="10" aria-label="10 lines" className="data-[state=on]:bg-blue-600 data-[state=on]:text-white">
-                  10 Lines
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          </div>
-          
-          <div className="flex justify-between items-center">
-            <div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const success = await twilioState.endAllCalls();
-                  if (success) {
-                    toast({
-                      title: "System Reset",
-                      description: "All active calls have been terminated. The system has been reset.",
-                    });
-                  }
-                }}
-              >
-                Reset All Calls
-              </Button>
-            </div>
-            
-            <div>
-              <Button
-                variant="default" 
-                size="sm"
-                onClick={async () => {
-                  const initialized = await twilioService.initializeTwilioDevice();
-                  if (initialized) {
-                    toast({
-                      title: "System Reinitialized",
-                      description: "The phone system has been reinitialized with a new token.",
-                    });
-                  }
-                }}
-              >
-                Reinitialize System
-              </Button>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-
   const DialerPreview = () => (
     <Card className="mb-8 relative overflow-hidden min-h-[450px]">
       <CardHeader className="pb-2">
@@ -399,7 +318,7 @@ export default function PowerDialer() {
             <CardTitle className="text-lg">{dialingSessionActive ? "Dialing Session" : "Start Session"}</CardTitle>
             <CardDescription>
               {dialingSessionActive 
-                ? `Session in progress with ${concurrentLines} concurrent lines` 
+                ? "Session in progress - manage your current calls" 
                 : "Start a new dialing session"}
             </CardDescription>
           </div>
@@ -933,7 +852,6 @@ export default function PowerDialer() {
       <AudioDebugModal />
       
       <div className="container py-4 px-4 md:px-6">
-        <DialerSettings />
         <DialerPreview />
         
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
