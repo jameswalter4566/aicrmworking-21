@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { User, UserCheck, Clock } from 'lucide-react';
-import { predictiveDialer } from '@/utils/supabase-custom-client';
+import { customSupabase as supabase } from '@/utils/supabase-custom-client';
 import { PredictiveDialerAgent } from '@/types/predictive-dialer';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,26 +24,35 @@ const PredictiveDialerAgentManager: React.FC<PredictiveDialerAgentManagerProps> 
   useEffect(() => {
     fetchAgents();
     
-    // Subscribe to changes in the agents table
-    const agentsSubscription = predictiveDialer.getAgents()
-      .on('*', () => {
-        fetchAgents();
-      })
+    // Set up real-time subscription using Supabase channels
+    const channel = supabase
+      .channel('predictive-dialer-agents-changes')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'predictive_dialer_agents' },
+        () => {
+          fetchAgents();
+        }
+      )
       .subscribe();
     
     return () => {
-      predictiveDialer.getAgents().unsubscribe(agentsSubscription);
+      supabase.removeChannel(channel);
     };
   }, []);
   
   const fetchAgents = async () => {
     try {
-      const agents = await predictiveDialer.fetchAgents();
-      setAgents(agents);
+      const { data, error } = await supabase
+        .from('predictive_dialer_agents')
+        .select('*');
+        
+      if (error) throw error;
+      
+      setAgents(data as PredictiveDialerAgent[]);
       
       // Find current user's agent
       if (user) {
-        const myAgent = agents.find(agent => agent.user_id === user.id);
+        const myAgent = data.find(agent => agent.user_id === user.id);
         setCurrentAgent(myAgent || null);
       }
     } catch (error) {

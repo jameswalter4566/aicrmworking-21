@@ -1,7 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
-import { PredictiveDialerAgent, PredictiveDialerCall, PredictiveDialerContact, PredictiveDialerQueueItem } from '@/types/predictive-dialer';
 
 // We're creating this custom client to type our predictive dialer tables
 // since they're not yet added to the auto-generated types
@@ -13,6 +12,7 @@ export const customSupabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KE
 
 // Extension of Supabase client with predictive dialer table access
 export const predictiveDialer = {
+  // These methods are for direct table access
   getAgents: () => customSupabase.from('predictive_dialer_agents'),
   getCalls: () => customSupabase.from('predictive_dialer_calls'),
   getContacts: () => customSupabase.from('predictive_dialer_contacts'),
@@ -43,3 +43,11 @@ export const predictiveDialer = {
     return data as unknown as PredictiveDialerQueueItem[];
   },
 };
+
+// Import these types to ensure proper typing 
+import { 
+  PredictiveDialerAgent, 
+  PredictiveDialerCall, 
+  PredictiveDialerContact, 
+  PredictiveDialerQueueItem 
+} from '@/types/predictive-dialer';
