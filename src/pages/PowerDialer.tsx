@@ -417,10 +417,7 @@ export default function PowerDialer() {
           </div>
           
           {dialingSessionActive && Object.keys(twilioState.activeCalls).length > 0 && (
-            <RealTimeRebuttals 
-              isActive={true} 
-              activeCallSid={Object.values(twilioState.activeCalls)[0]?.callSid}
-            />
+            <RealTimeRebuttals isActive={true} />
           )}
         </div>
         
