@@ -40,19 +40,3 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 [functions.add-to-addressbook]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-start]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-webhook]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-machine-detection]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.power-dialer-agent-connect]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
