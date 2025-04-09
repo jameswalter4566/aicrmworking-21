@@ -60,7 +60,6 @@ import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { Progress } from "@/components/ui/progress";
 import { thoughtlyService } from "@/services/thoughtly";
 import { supabase } from "@/integrations/supabase/client";
-import LeadClickableRow from "@/components/dashboard/LeadClickableRow";
 
 const fallbackLeadsData = [
   {
@@ -601,23 +600,21 @@ const People = () => {
             <TableBody>
               {filteredLeads.length > 0 ? (
                 filteredLeads.map((lead) => (
-                  <LeadClickableRow key={lead.id} lead={lead}>
+                  <TableRow 
+                    key={lead.id} 
+                    className="hover:bg-crm-lightBlue transition-all duration-200 cursor-pointer my-4 shadow-sm hover:shadow-md hover:scale-[1.01]"
+                  >
                     <TableCell>
                       <Checkbox 
                         checked={selectedLeads.includes(lead.id)}
                         onCheckedChange={(checked) => handleSelectLead(lead.id, !!checked)}
                         aria-label={`Select ${lead.firstName} ${lead.lastName}`}
-                        onClick={(e) => e.stopPropagation()}
                       />
                     </TableCell>
                     <TableCell>
                       <Popover>
                         <PopoverTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            className="p-0 h-auto"
-                            onClick={(e) => e.stopPropagation()}
-                          >
+                          <Button variant="ghost" className="p-0 h-auto">
                             <Badge className={`disposition-badge ${getDispositionClass(lead.disposition)}`}>
                               {lead.disposition}
                             </Badge>
@@ -630,10 +627,7 @@ const People = () => {
                                 key={disposition}
                                 variant="ghost" 
                                 className={`justify-start text-sm ${dispositionColors[disposition as keyof typeof dispositionColors]}`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateLeadDisposition(lead.id, disposition);
-                                }}
+                                onClick={() => updateLeadDisposition(lead.id, disposition)}
                               >
                                 {disposition}
                               </Button>
@@ -663,7 +657,7 @@ const People = () => {
                     {customFields.map((field, index) => (
                       <TableCell key={index}>-</TableCell>
                     ))}
-                  </LeadClickableRow>
+                  </TableRow>
                 ))
               ) : (
                 <TableRow>
