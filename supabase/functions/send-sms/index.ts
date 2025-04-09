@@ -7,6 +7,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -36,8 +37,7 @@ serve(async (req) => {
 
     const smsPrivateKey = Deno.env.get("VALORSMS_PRIVATE_KEY");
     const smsPublicKey = Deno.env.get("VALORSMS_PUBLIC_KEY");
-    const apiEndpoint = "http://api.valorsms.com/sms/";
-
+    
     if (!smsPrivateKey || !smsPublicKey) {
       return new Response(
         JSON.stringify({ error: 'SMS API keys are not configured' }),
@@ -47,12 +47,15 @@ serve(async (req) => {
         }
       );
     }
+    
+    const apiEndpoint = "https://api.valorsms.com/sms/";
 
-    // Create an addressbook
+    // Create an addressbook with proper headers
     const addressbookResponse = await fetch(`${apiEndpoint}addaddressbook`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         private_key: smsPrivateKey,
@@ -63,9 +66,10 @@ serve(async (req) => {
 
     const addressbookData = await addressbookResponse.json();
     
-    if (addressbookData.result.error) {
+    if (addressbookData.result?.error) {
+      console.error("Addressbook creation error:", addressbookData);
       return new Response(
-        JSON.stringify({ error: 'Failed to create address book' }),
+        JSON.stringify({ error: `Failed to create address book: ${addressbookData.result?.error || 'Unknown error'}` }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -75,36 +79,56 @@ serve(async (req) => {
 
     const addressbookId = addressbookData.result.addressbook_id;
 
-    // Add contacts to addressbook
+    // Add contacts to addressbook with proper error handling
     const addContactPromises = contacts.map(async (contact) => {
-      const phoneNumber = contact.phone1 || contact.phone_number;
+      const phoneNumber = contact.phone_number || contact.phone1 || contact.phoneNumber;
+      const firstName = contact.firstName || contact.attributes?.firstName || '';
+      const lastName = contact.lastName || contact.attributes?.lastName || '';
       
       if (!phoneNumber) return { success: false, error: 'No phone number' };
 
-      const response = await fetch(`${apiEndpoint}addphone`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          private_key: smsPrivateKey,
-          public_key: smsPublicKey,
-          addressbook_id: addressbookId,
-          phone: phoneNumber,
-          variables: `${contact.firstName || ''};${contact.lastName || ''};`
-        })
-      });
+      try {
+        const response = await fetch(`${apiEndpoint}addphone`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            private_key: smsPrivateKey,
+            public_key: smsPublicKey,
+            addressbook_id: addressbookId,
+            phone: phoneNumber,
+            variables: `${firstName};${lastName};`
+          })
+        });
 
-      return response.json();
+        return await response.json();
+      } catch (error) {
+        console.error(`Error adding phone ${phoneNumber}:`, error);
+        return { success: false, error: error.message };
+      }
     });
 
     const addContactResults = await Promise.all(addContactPromises);
+    const successfulContacts = addContactResults.filter(result => !result.result?.error).length;
 
-    // Check account balance
+    if (successfulContacts === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to add any contacts to the address book' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Check account balance with proper error handling
     const balanceResponse = await fetch(`${apiEndpoint}userbalance`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         private_key: smsPrivateKey,
@@ -114,11 +138,23 @@ serve(async (req) => {
 
     const balanceData = await balanceResponse.json();
     
-    // Create and send SMS campaign
+    if (balanceData.result?.error) {
+      console.error("Balance check error:", balanceData);
+      return new Response(
+        JSON.stringify({ error: 'Failed to check account balance' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    // Create and send SMS campaign with proper error handling
     const campaignResponse = await fetch(`${apiEndpoint}createcampaign`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
       body: JSON.stringify({
         private_key: smsPrivateKey,
@@ -134,13 +170,25 @@ serve(async (req) => {
     });
 
     const campaignData = await campaignResponse.json();
+    
+    if (campaignData.result?.error) {
+      console.error("Campaign creation error:", campaignData);
+      return new Response(
+        JSON.stringify({ error: 'Failed to create SMS campaign' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
         campaignId: campaignData.result.id,
-        contactsCount: contacts.length,
-        balance: balanceData.result.balance_currency
+        contactsCount: successfulContacts,
+        balance: balanceData.result.balance_currency,
+        currency: balanceData.result.currency
       }),
       {
         status: 200,
@@ -148,6 +196,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
+    console.error("Error in SMS function:", error);
     return new Response(
       JSON.stringify({ error: error.message || 'Unknown error' }),
       {
