@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash } from "lucide-react";
+import { Plus, Trash, UserPlus } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
 
 interface Contact {
   phone_number: string;
@@ -20,6 +21,8 @@ const ManualContactEntry = ({ onContactsAdded }: ManualContactEntryProps) => {
   const [contacts, setContacts] = useState<Contact[]>([
     { phone_number: "", firstName: "", lastName: "" }
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
   const addContactField = () => {
     setContacts([...contacts, { phone_number: "", firstName: "", lastName: "" }]);
@@ -40,10 +43,51 @@ const ManualContactEntry = ({ onContactsAdded }: ManualContactEntryProps) => {
   const handleAddContacts = () => {
     // Filter out any contacts without phone numbers
     const validContacts = contacts.filter(contact => contact.phone_number.trim() !== "");
-    if (validContacts.length > 0) {
-      onContactsAdded(validContacts);
+    
+    if (validContacts.length === 0) {
+      toast({
+        title: "No valid contacts",
+        description: "Please add at least one contact with a phone number.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Format contacts for consistency with the expected structure
+      const formattedContacts = validContacts.map(contact => ({
+        phone_number: contact.phone_number,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        // Add required properties for the SMS function
+        attributes: {
+          firstName: contact.firstName,
+          lastName: contact.lastName
+        }
+      }));
+      
+      // Pass the formatted contacts to the parent component
+      onContactsAdded(formattedContacts);
+      
       // Reset the form with one empty contact
       setContacts([{ phone_number: "", firstName: "", lastName: "" }]);
+      
+      toast({
+        title: "Contacts added",
+        description: `${validContacts.length} contacts added to campaign.`,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error adding contacts:", error);
+      toast({
+        title: "Error adding contacts",
+        description: "An error occurred while adding contacts.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -110,8 +154,16 @@ const ManualContactEntry = ({ onContactsAdded }: ManualContactEntryProps) => {
             type="button"
             onClick={handleAddContacts}
             className="mt-2"
+            disabled={isSubmitting}
           >
-            Add to Campaign
+            {isSubmitting ? (
+              "Adding..."
+            ) : (
+              <>
+                <UserPlus className="mr-2 h-4 w-4" />
+                Add to Campaign
+              </>
+            )}
           </Button>
         </div>
       </div>
