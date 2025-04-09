@@ -20,7 +20,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -102,6 +104,7 @@ export default function PowerDialer() {
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [sessionDuration, setSessionDuration] = useState<string>("00:00:00");
   const [selectedDisposition, setSelectedDisposition] = useState<string | null>(null);
+  const [concurrentLines, setConcurrentLines] = useState<string>("1");
 
   const twilioState = useTwilio();
 
@@ -140,7 +143,7 @@ export default function PowerDialer() {
     setSessionStartTime(new Date());
     toast({
       title: "Dialing Session Started",
-      description: "You can now begin calling leads.",
+      description: `You can now begin calling leads using ${concurrentLines} concurrent line${parseInt(concurrentLines) > 1 ? 's' : ''}.`,
     });
   };
 
@@ -275,32 +278,51 @@ export default function PowerDialer() {
     }
   };
 
-  const DialerPreview = () => (
-    <Card className="mb-8 relative overflow-hidden min-h-[450px]">
-      <CardHeader className="pb-2">
-        <div className="flex flex-col space-y-2">
+  // Add horizontal dialer settings above the preview container
+  const DialerSettings = () => (
+    <div className="mb-4">
+      <div className="flex flex-wrap items-center gap-4 justify-between">
+        <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight">Power Dialer</h1>
-          <p className="text-muted-foreground">
-            Make outbound calls to your leads in queue
-          </p>
-
-          <div className="flex items-center space-x-2 mb-2">
+          
+          <div className="flex items-center space-x-2">
             <Badge variant={twilioState.initialized ? "default" : "outline"}>
               {twilioState.initialized ? "System Ready" : "Initializing..."}
             </Badge>
             <Badge variant={twilioState.microphoneActive ? "default" : "destructive"}>
               {twilioState.microphoneActive ? "Microphone Active" : "Microphone Inactive"}
             </Badge>
-            <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
-              {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
-            </Badge>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Label htmlFor="concurrentLines" className="text-sm font-medium">
+              Concurrent Lines:
+            </Label>
+            <Select 
+              value={concurrentLines} 
+              onValueChange={setConcurrentLines}
+            >
+              <SelectTrigger className="w-28 h-8">
+                <SelectValue placeholder="Lines" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel>Number of Lines</SelectLabel>
+                  <SelectItem value="1">1 Line</SelectItem>
+                  <SelectItem value="3">3 Lines</SelectItem>
+                  <SelectItem value="6">6 Lines</SelectItem>
+                  <SelectItem value="10">10 Lines</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
           
           <Tabs
             defaultValue="dialer"
             value={currentTab}
             onValueChange={setCurrentTab}
-            className="mb-2"
           >
             <TabsList>
               <TabsTrigger value="dialer" onClick={() => setCurrentTab("dialer")}>
@@ -312,13 +334,19 @@ export default function PowerDialer() {
             </TabsList>
           </Tabs>
         </div>
-        
+      </div>
+    </div>
+  );
+
+  const DialerPreview = () => (
+    <Card className="mb-8 relative overflow-hidden min-h-[450px]">
+      <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>
             <CardTitle className="text-lg">{dialingSessionActive ? "Dialing Session" : "Start Session"}</CardTitle>
             <CardDescription>
               {dialingSessionActive 
-                ? "Session in progress - manage your current calls" 
+                ? `Session in progress - using ${concurrentLines} concurrent line${parseInt(concurrentLines) > 1 ? 's' : ''}` 
                 : "Start a new dialing session"}
             </CardDescription>
           </div>
@@ -349,7 +377,7 @@ export default function PowerDialer() {
                 Begin Dialing Session
               </Button>
               <p className="text-muted-foreground mt-4 max-w-md mx-auto">
-                Start a dialing session to begin making calls to your leads. 
+                Start a dialing session to begin making calls to your leads with {concurrentLines} concurrent line{parseInt(concurrentLines) > 1 ? 's' : ''}.
                 Your active calls will appear here once the session is started.
               </p>
             </div>
@@ -852,6 +880,8 @@ export default function PowerDialer() {
       <AudioDebugModal />
       
       <div className="container py-4 px-4 md:px-6">
+        <DialerSettings />
+        
         <DialerPreview />
         
         <Tabs value={currentTab} onValueChange={setCurrentTab}>
