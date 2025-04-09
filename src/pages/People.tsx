@@ -31,16 +31,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-  PaginationSizeSelector,
-} from "@/components/ui/pagination";
 import { useForm } from "react-hook-form";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -138,8 +128,6 @@ type LeadFormValues = {
   disposition: string;
 };
 
-const pageSizeOptions = [10, 20, 50, 100];
-
 const People = () => {
   const [leads, setLeads] = useState([]);
   const [customFields, setCustomFields] = useState([]);
@@ -151,11 +139,6 @@ const People = () => {
   const [selectedLeads, setSelectedLeads] = useState<number[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalLeads, setTotalLeads] = useState(0);
 
   const form = useForm<LeadFormValues>({
     defaultValues: {
@@ -172,99 +155,39 @@ const People = () => {
     },
   });
 
-  const fetchLeads = async (page = currentPage, size = pageSize) => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      console.log(`Fetching leads from thoughtlyService.retrieveLeads() with page=${page}, pageSize=${size}...`);
-      const result = await thoughtlyService.retrieveLeads({
-        page: page,
-        pageSize: size
-      });
-      console.log("Fetch leads result:", result);
-      
-      if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
-        console.log(`Setting ${result.data.length} leads from API`);
-        setLeads(result.data);
-        setTotalPages(result.metadata.totalPages);
-        setTotalLeads(result.metadata.totalLeadCount);
-      } else {
-        console.log("No leads found in API response, using fallback data");
-        setLeads(fallbackLeadsData);
-        setTotalPages(1);
-        setTotalLeads(fallbackLeadsData.length);
-      }
-    } catch (error) {
-      console.error("Error fetching leads:", error);
-      setLoadError("Failed to load leads. Please try again.");
-      setLeads(fallbackLeadsData);
-      setTotalPages(1);
-      setTotalLeads(fallbackLeadsData.length);
-      toast.error("Failed to load leads. Using sample data instead.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const fetchLeads = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        console.log("Fetching leads from thoughtlyService.retrieveLeads()...");
+        const result = await thoughtlyService.retrieveLeads();
+        console.log("Fetch leads result:", result);
+        
+        if (result && Array.isArray(result) && result.length > 0) {
+          console.log(`Setting ${result.length} leads from API`);
+          setLeads(result);
+        } else {
+          console.log("No leads found in API response, using fallback data");
+          setLeads(fallbackLeadsData);
+        }
+      } catch (error) {
+        console.error("Error fetching leads:", error);
+        setLoadError("Failed to load leads. Please try again.");
+        setLeads(fallbackLeadsData);
+        toast.error("Failed to load leads. Using sample data instead.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchLeads();
-  }, [currentPage, pageSize]);
-
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
-  };
+  }, []);
 
   const filteredLeads = leads.filter(lead => {
     if (activeDisposition === "All Leads") return true;
     return lead.disposition === activeDisposition;
   });
-
-  const generatePagination = () => {
-    const pages = [];
-    const maxVisiblePages = 5;
-    
-    if (totalPages <= maxVisiblePages) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      pages.push(1);
-      
-      let start = Math.max(2, currentPage - 1);
-      let end = Math.min(totalPages - 1, currentPage + 1);
-      
-      if (end - start < maxVisiblePages - 3) {
-        if (currentPage < totalPages / 2) {
-          end = Math.min(totalPages - 1, start + maxVisiblePages - 3);
-        } else {
-          start = Math.max(2, end - (maxVisiblePages - 3));
-        }
-      }
-      
-      if (start > 2) {
-        pages.push('ellipsis-start');
-      }
-      
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-      
-      if (end < totalPages - 1) {
-        pages.push('ellipsis-end');
-      }
-      
-      if (totalPages > 1) {
-        pages.push(totalPages);
-      }
-    }
-    
-    return pages;
-  };
 
   const updateLeadDisposition = (leadId: number | number[], newDisposition: string) => {
     if (Array.isArray(leadId)) {
@@ -413,10 +336,22 @@ const People = () => {
   };
 
   const refreshLeads = async () => {
-    fetchLeads(currentPage, pageSize);
+    try {
+      setIsLoading(true);
+      const fetchedLeads = await thoughtlyService.retrieveLeads();
+      if (fetchedLeads && Array.isArray(fetchedLeads) && fetchedLeads.length > 0) {
+        setLeads(fetchedLeads);
+        toast.success(`Refreshed ${fetchedLeads.length} leads`);
+      } else {
+        toast.info("No leads found");
+      }
+    } catch (error) {
+      console.error("Error refreshing leads:", error);
+      toast.error("Failed to refresh leads");
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-  const paginationItems = generatePagination();
 
   return (
     <MainLayout>
@@ -531,17 +466,9 @@ const People = () => {
       )}
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-crm-lightBlue">
+        <div className="p-4 border-b border-gray-200 flex items-center bg-crm-lightBlue">
           <h2 className="font-medium text-gray-700">All Leads</h2>
-          <div className="flex items-center gap-4">
-            <div className="text-sm text-gray-500">
-              Showing {filteredLeads.length} of {totalLeads} leads
-            </div>
-            <PaginationSizeSelector 
-              options={pageSizeOptions} 
-              value={pageSize} 
-              onChange={handlePageSizeChange}
-            />
+          <div className="ml-auto">
             <Button 
               variant="ghost" 
               size="sm" 
@@ -674,63 +601,16 @@ const People = () => {
             </TableBody>
           </Table>
         </div>
-
-        <div className="p-4 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            Showing {filteredLeads.length} of {totalLeads} leads
-          </div>
-          
-          {totalPages > 1 && (
-            <Pagination>
-              <PaginationContent>
-                {currentPage > 1 && (
-                  <PaginationItem>
-                    <PaginationPrevious onClick={() => handlePageChange(currentPage - 1)} />
-                  </PaginationItem>
-                )}
-                
-                {paginationItems.map((page, i) => {
-                  if (page === 'ellipsis-start' || page === 'ellipsis-end') {
-                    return (
-                      <PaginationItem key={`ellipsis-${i}`}>
-                        <PaginationEllipsis />
-                      </PaginationItem>
-                    );
-                  }
-                  
-                  return (
-                    <PaginationItem key={`page-${page}`}>
-                      <PaginationLink 
-                        isActive={currentPage === page}
-                        onClick={() => handlePageChange(page as number)}
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                })}
-                
-                {currentPage < totalPages && (
-                  <PaginationItem>
-                    <PaginationNext onClick={() => handlePageChange(currentPage + 1)} />
-                  </PaginationItem>
-                )}
-              </PaginationContent>
-            </Pagination>
-          )}
-        </div>
       </div>
 
       {process.env.NODE_ENV !== 'production' && (
         <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg text-sm">
           <h3 className="font-semibold mb-2">Lead Data Debug</h3>
           <div>
-            <p>Total leads: {totalLeads}</p>
+            <p>Total leads: {leads.length}</p>
             <p>Filtered leads: {filteredLeads.length}</p>
             <p>Current disposition filter: {activeDisposition}</p>
             <p>Selected leads: {selectedLeads.length}</p>
-            <p>Page: {currentPage} of {totalPages}</p>
-            <p>Page size: {pageSize}</p>
             <p>Data source: {leads === fallbackLeadsData ? 'Fallback Data' : 'API Data'}</p>
           </div>
         </div>
