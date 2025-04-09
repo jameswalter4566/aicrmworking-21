@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,7 +17,8 @@ import {
   Layout, 
   Home,
   Download,
-  Share2
+  Share2,
+  MessageSquare
 } from "lucide-react";
 
 const ListingPresentation = () => {

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Search, Building, User, MessageSquare, Home } from "lucide-react";
 import { useIndustry } from "@/context/IndustryContext";
+import Brain from "@/components/icons/Brain";
 
 const AIRealtor = () => {
   const { activeIndustry } = useIndustry();
