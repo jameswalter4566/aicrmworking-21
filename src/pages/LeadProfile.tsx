@@ -158,11 +158,14 @@ const LeadProfile = () => {
     }
   };
 
-  const handleMortgageDataSave = async (section: string, data: Record<string, any>) => {
+  const handleMortgageDataSave = async (data: Record<string, any>) => {
     if (!id || !lead) return;
     
     try {
       setIsSaving(true);
+      
+      const section = data.section || "personalInfo";
+      delete data.section;
       
       const currentMortgageData = lead.mortgageData || {};
       const updatedMortgageData = {
@@ -191,7 +194,7 @@ const LeadProfile = () => {
       toast.success(`Mortgage ${section} information updated successfully`);
     } catch (err) {
       console.error("Error updating mortgage data:", err);
-      toast.error(`Failed to update ${section} information`);
+      toast.error(`Failed to update information`);
     } finally {
       setIsSaving(false);
     }
@@ -574,10 +577,9 @@ const LeadProfile = () => {
 
         {activeIndustry === 'mortgage' && (
           <Mortgage1003Form 
-            lead={lead} 
-            onSave={handleMortgageDataSave}
-            isEditable={!editMode} 
-            isSaving={isSaving}
+            section="personalInfo"
+            loanData={lead.mortgageData} 
+            onSave={(data) => handleMortgageDataSave(data)} 
           />
         )}
         

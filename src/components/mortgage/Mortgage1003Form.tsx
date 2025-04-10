@@ -1,3 +1,4 @@
+
 import React from "react";
 import PersonalInfoForm from "./Mortgage1003PersonalInfo";
 
@@ -8,13 +9,23 @@ interface Mortgage1003FormProps {
 }
 
 const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({ section, loanData, onSave }) => {
+  // Handler to include section information when saving
+  const handleSaveWithSection = (formData: any) => {
+    // Add the section to the data being saved
+    const dataWithSection = {
+      ...formData,
+      section: section
+    };
+    onSave(dataWithSection);
+  };
+
   // Render different form sections based on the section parameter
   switch (section) {
     case "personalInfo":
       return (
         <PersonalInfoForm 
           initialData={loanData?.personalInfo} 
-          onSave={(data) => onSave(data)} 
+          onSave={handleSaveWithSection} 
         />
       );
     case "employment":
