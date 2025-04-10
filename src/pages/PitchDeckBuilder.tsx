@@ -262,7 +262,7 @@ const PitchDeckBuilder = () => {
       setPitchDeck(prev => ({
         ...prev,
         [section]: {
-          ...prev[section as keyof typeof prev],
+          ...(prev[section as keyof typeof prev] as object || {}), // Fix: Cast to object and provide default empty object
           [subField]: value
         }
       }));
@@ -281,7 +281,7 @@ const PitchDeckBuilder = () => {
       mortgage_data: {
         ...prev.mortgage_data,
         [section]: {
-          ...prev.mortgage_data?.[section as keyof typeof prev.mortgage_data],
+          ...(prev.mortgage_data?.[section as keyof typeof prev.mortgage_data] || {}), // Fix: Provide default empty object
           [field]: parseFloat(value) || 0
         }
       }
