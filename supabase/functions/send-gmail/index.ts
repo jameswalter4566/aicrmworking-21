@@ -44,7 +44,6 @@ serve(async (req) => {
     console.log(`Preparing to send email to: ${to}`);
 
     // Retrieve a Google email connection from the database
-    // We're not requiring specific user - just getting the first available connection
     const { data: connection, error: connectionError } = await supabaseAdmin
       .from('user_email_connections')
       .select('*')
@@ -106,6 +105,89 @@ serve(async (req) => {
       emailContent = body;
     }
 
+    // Check if we need to refresh the token
+    let accessToken = connection.access_token;
+    const tokenExpiresAt = new Date(connection.expires_at || '').getTime();
+    const now = Date.now();
+    
+    // Always refresh the token to ensure we have the right scopes
+    console.log("Refreshing access token to ensure proper scopes...");
+      
+    if (!connection.refresh_token) {
+      console.error("No refresh token available");
+      return new Response(
+        JSON.stringify({ 
+          error: 'Email connection refresh token not available',
+          message: 'Please reconnect your Gmail account in the Settings page with the proper scopes'
+        }),
+        { 
+          status: 401, 
+          headers: corsHeaders 
+        }
+      );
+    }
+    
+    try {
+      // Refresh the token
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
+          refresh_token: connection.refresh_token,
+          grant_type: 'refresh_token'
+        })
+      });
+      
+      if (!refreshResponse.ok) {
+        const refreshError = await refreshResponse.text();
+        console.error('Token refresh error:', refreshResponse.status, refreshError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to refresh access token', 
+            details: refreshError,
+            message: 'Please reconnect your Gmail account in the Settings page'
+          }),
+          { 
+            status: 401, 
+            headers: corsHeaders 
+          }
+        );
+      }
+      
+      const refreshData = await refreshResponse.json();
+      accessToken = refreshData.access_token;
+      
+      console.log("Access token refreshed successfully");
+      
+      // Update the stored token
+      await supabaseAdmin
+        .from('user_email_connections')
+        .update({ 
+          access_token: accessToken,
+          expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+        })
+        .eq('id', connection.id);
+    } catch (refreshError) {
+      console.error('Error refreshing token:', refreshError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to refresh access token', 
+          details: refreshError.message,
+          message: 'Please reconnect your Gmail account in the Settings page'
+        }),
+        { 
+          status: 500, 
+          headers: corsHeaders 
+        }
+      );
+    }
+
+    console.log("Sending email via Gmail API...");
+    
     // Create the email raw content
     const emailRaw = [
       `From: ${connection.email}`,
@@ -115,79 +197,6 @@ serve(async (req) => {
       '',
       emailContent
     ].join('\r\n');
-
-    console.log("Email content prepared, sending via Gmail API...");
-
-    // Check if we need to refresh the token
-    let accessToken = connection.access_token;
-    const tokenExpiresAt = new Date(connection.expires_at || '').getTime();
-    const now = Date.now();
-    
-    if (tokenExpiresAt <= now) {
-      console.log("Access token expired, refreshing...");
-      
-      if (!connection.refresh_token) {
-        console.error("No refresh token available");
-        return new Response(
-          JSON.stringify({ error: 'Email connection refresh token not available' }),
-          { 
-            status: 401, 
-            headers: corsHeaders 
-          }
-        );
-      }
-      
-      try {
-        // Refresh the token
-        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: new URLSearchParams({
-            client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
-            client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-            refresh_token: connection.refresh_token,
-            grant_type: 'refresh_token'
-          })
-        });
-        
-        if (!refreshResponse.ok) {
-          const refreshError = await refreshResponse.text();
-          console.error('Token refresh error:', refreshResponse.status, refreshError);
-          return new Response(
-            JSON.stringify({ error: 'Failed to refresh access token', details: refreshError }),
-            { 
-              status: 401, 
-              headers: corsHeaders 
-            }
-          );
-        }
-        
-        const refreshData = await refreshResponse.json();
-        accessToken = refreshData.access_token;
-        
-        // Update the stored token
-        await supabaseAdmin
-          .from('user_email_connections')
-          .update({ 
-            access_token: accessToken,
-            expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
-          })
-          .eq('id', connection.id);
-          
-        console.log("Access token refreshed successfully");
-      } catch (refreshError) {
-        console.error('Error refreshing token:', refreshError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to refresh access token', details: refreshError.message }),
-          { 
-            status: 500, 
-            headers: corsHeaders 
-          }
-        );
-      }
-    }
 
     // Send email via Gmail API
     const emailResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
@@ -204,6 +213,21 @@ serve(async (req) => {
     if (!emailResponse.ok) {
       const errorText = await emailResponse.text();
       console.error('Gmail API error:', emailResponse.status, errorText);
+      
+      // Check if it's a permissions error
+      if (errorText.includes("insufficient")) {
+        return new Response(
+          JSON.stringify({ 
+            error: `Gmail API permission error: You need to reconnect your Gmail account with the proper scopes`,
+            details: errorText,
+            code: 'INSUFFICIENT_PERMISSIONS'
+          }),
+          { 
+            status: 403, 
+            headers: corsHeaders 
+          }
+        );
+      }
       
       return new Response(
         JSON.stringify({ 

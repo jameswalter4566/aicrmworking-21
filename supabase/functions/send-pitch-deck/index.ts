@@ -75,16 +75,13 @@ Deno.serve(async (req) => {
       }
     });
     
-    if (!pdfResponse.data || pdfResponse.error) {
-      console.error('PDF generation error:', pdfResponse.error || 'Invalid response format');
-      throw new Error(`Failed to generate PDF: ${
-        pdfResponse.error?.message || 
-        pdfResponse.error || 
-        'Invalid response format'
-      }`);
+    // Better error handling for PDF generation
+    if (pdfResponse.error) {
+      console.error('PDF generation error from function:', pdfResponse.error);
+      throw new Error(`Failed to generate PDF: ${pdfResponse.error}`);
     }
     
-    if (!pdfResponse.data.pdfData) {
+    if (!pdfResponse.data || !pdfResponse.data.pdfData) {
       console.error('Invalid PDF response format:', pdfResponse);
       throw new Error('Failed to generate PDF: Missing PDF data in response');
     }
@@ -122,9 +119,16 @@ Deno.serve(async (req) => {
       }
     });
     
+    // Better error handling for email sending
     if (emailResponse.error) {
       console.error('Email sending error:', emailResponse.error);
-      throw new Error(`Failed to send email: ${emailResponse.error.message || 'Unknown error'}`);
+      
+      // Check if it's a permissions issue
+      if (emailResponse.data && emailResponse.data.code === 'INSUFFICIENT_PERMISSIONS') {
+        throw new Error(`Gmail needs additional permissions. Please go to Settings and reconnect your Gmail account.`);
+      }
+      
+      throw new Error(`Failed to send email: ${emailResponse.error}`);
     }
     
     console.log("Email sent successfully to:", recipientEmail);

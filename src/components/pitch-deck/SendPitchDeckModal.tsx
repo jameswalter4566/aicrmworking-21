@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface SendPitchDeckModalProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Reset form when modal opens
   React.useEffect(() => {
@@ -34,6 +36,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
           pitchDeck.description || ""
         }\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n[Your Name]`
       );
+      setError(null);
     }
   }, [isOpen, pitchDeck]);
 
@@ -42,6 +45,8 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     if (!pitchDeck) return;
 
     setLoading(true);
+    setError(null);
+    
     try {
       // Check if email is connected before sending
       const { data: connections, error: connectionsError } = await supabase
@@ -94,7 +99,15 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
 
       if (!data || data.success === false) {
         console.error("Error in response data:", data);
-        throw new Error(data?.error || "Unknown error occurred");
+        const errorMessage = data?.error || "Unknown error occurred";
+        
+        // Check for Gmail permission errors
+        if (errorMessage.includes("permissions") || errorMessage.includes("Gmail needs additional permissions")) {
+          setError("Your Gmail account needs additional permissions to send emails with attachments. Please go to Settings and reconnect your Gmail account.");
+          return;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       toast.success(`Pitch deck sent to ${recipientEmail}`);
@@ -105,6 +118,13 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     } catch (error: any) {
       console.error("Error sending pitch deck:", error);
       toast.error(`Failed to send: ${error.message}`);
+      
+      // Set specific error message
+      if (error.message.includes("permissions") || error.message.includes("reconnect")) {
+        setError("Your Gmail connection needs additional permissions. Please go to the Settings page and reconnect your Gmail account.");
+      } else {
+        setError(error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -119,6 +139,15 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
             Send your pitch deck as a PDF attachment to your client's email.
           </DialogDescription>
         </DialogHeader>
+
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           <div className="space-y-2">
