@@ -1,7 +1,7 @@
 
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Share2 } from "lucide-react";
+import { ArrowRightToLine } from "lucide-react";
 import { mortgageDealService } from "@/services/mortgageDealService";
 import { toast } from "sonner";
 
@@ -33,7 +33,7 @@ const PushToPipelineButton: React.FC<PushToPipelineButtonProps> = ({ leadId, onS
     <Button 
       onClick={handlePushToPipeline} 
       disabled={isLoading} 
-      className="bg-green-600 hover:bg-green-700"
+      className="bg-green-600 hover:bg-green-700 mt-4 w-full"
     >
       {isLoading ? (
         <>
@@ -42,7 +42,7 @@ const PushToPipelineButton: React.FC<PushToPipelineButtonProps> = ({ leadId, onS
         </>
       ) : (
         <>
-          <Share2 className="mr-2 h-4 w-4" />
+          <ArrowRightToLine className="mr-2 h-4 w-4" />
           Push to Pipeline
         </>
       )}
