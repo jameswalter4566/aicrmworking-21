@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
           .from('pitch_decks')
           .insert({
             ...pitchDeckData,
-            created_by: user.id,
+            created_by: user.id,  // Explicitly set the created_by field to the user ID
           })
           .select('*')
           .single();
