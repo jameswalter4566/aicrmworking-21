@@ -5,7 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
 // Make sure this EXACTLY matches what you've configured in Google Cloud Console
-const REDIRECT_URI = Deno.env.get('REDIRECT_URI') || 'https://imrmboyczebjlbnkgjns.lovableproject.com/settings';
+const REDIRECT_URI = 'https://imrmboyczebjlbnkgjns.lovableproject.com/settings';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
@@ -18,7 +18,7 @@ const corsHeaders = {
 };
 
 // Validate required environment variables
-if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+if (!CLIENT_ID || !CLIENT_SECRET || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('Missing required environment variables:', {
     hasClientId: !!CLIENT_ID,
     hasClientSecret: !!CLIENT_SECRET,
@@ -33,6 +33,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 serve(async (req) => {
   console.log("Function invoked with URL:", req.url);
+  console.log("Using REDIRECT_URI:", REDIRECT_URI);
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -52,7 +53,7 @@ serve(async (req) => {
       console.log("Creating authorization URL");
       
       // Validate required environment variables
-      if (!CLIENT_ID || !REDIRECT_URI) {
+      if (!CLIENT_ID) {
         console.error('Missing required environment variables for authorization');
         return new Response(
           JSON.stringify({ 
