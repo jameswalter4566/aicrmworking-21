@@ -15,9 +15,16 @@ import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
 import { useAuth } from "@/context/AuthContext";
 import { useIndustry } from "@/context/IndustryContext";
-import { leadProfileService } from "@/services/leadProfile";
+import { leadProfileService, LeadProfile } from "@/services/leadProfile";
 import { useNavigate, useParams } from "react-router-dom";
-import { thoughtlyService } from "@/services/thoughtly";
+
+// Define the props for the Mortgage1003Form component
+interface Mortgage1003FormProps {
+  lead: LeadProfile;
+  onSave: (section: string, data: Record<string, any>) => Promise<void>;
+  isEditable: boolean;
+  isSaving: boolean;
+}
 
 // Define the structure for the Mortgage 1003 form
 export interface Mortgage1003Form {
@@ -92,11 +99,11 @@ export interface Mortgage1003Form {
     amortizationType?: string;
     interestRate?: string;
     mortgageInsurance?: string;
+    status?: string;
   };
 }
 
-const Mortgage1003Form: React.FC = () => {
-  const { leadId } = useParams();
+const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({ lead, onSave, isEditable, isSaving }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { activeIndustry } = useIndustry();
@@ -106,60 +113,47 @@ const Mortgage1003Form: React.FC = () => {
   const [pushingToPipeline, setPushingToPipeline] = useState(false);
 
   useEffect(() => {
-    const fetchLeadData = async () => {
-      if (leadId) {
-        setLoading(true);
-        try {
-          const lead = await leadProfileService.getLeadById(leadId);
-          if (lead && lead.mortgageData) {
-            setFormData(lead.mortgageData);
-          }
-        } catch (error) {
-          console.error("Error fetching lead data:", error);
-          toast.error("Failed to load lead data");
-        } finally {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchLeadData();
-  }, [leadId]);
+    // Initialize form data from lead's mortgage data
+    if (lead && lead.mortgageData) {
+      setFormData(lead.mortgageData);
+    }
+    setLoading(false);
+  }, [lead]);
 
   const handleChange = (section: string, field: string, value: any) => {
     setFormData(prevData => {
-      const updatedSection = { ...(prevData[section] || {}), [field]: value };
+      const updatedSection = { ...(prevData[section as keyof Mortgage1003Form] || {}), [field]: value };
       return { ...prevData, [section]: updatedSection };
     });
   };
 
   const handleCheckboxChange = (section: string, field: string, checked: boolean) => {
     setFormData(prevData => {
-      const updatedSection = { ...(prevData[section] || {}), [field]: checked };
+      const updatedSection = { ...(prevData[section as keyof Mortgage1003Form] || {}), [field]: checked };
       return { ...prevData, [section]: updatedSection };
     });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!leadId) {
+    if (!lead?.id) {
       toast.error("Lead ID is missing.");
       return;
     }
 
     setSaving(true);
     try {
-      // Call the updateMortgageData function
-      await leadProfileService.updateMortgageData(leadId, 'borrower', formData.borrower || {});
-      await leadProfileService.updateMortgageData(leadId, 'currentAddress', formData.currentAddress || {});
-      await leadProfileService.updateMortgageData(leadId, 'employment', formData.employment || {});
-      await leadProfileService.updateMortgageData(leadId, 'income', formData.income || {});
-      await leadProfileService.updateMortgageData(leadId, 'assets', formData.assets || {});
-      await leadProfileService.updateMortgageData(leadId, 'liabilities', formData.liabilities || {});
-      await leadProfileService.updateMortgageData(leadId, 'property', formData.property || {});
-      await leadProfileService.updateMortgageData(leadId, 'declarations', formData.declarations || {});
-      await leadProfileService.updateMortgageData(leadId, 'demographic', formData.demographic || {});
-      await leadProfileService.updateMortgageData(leadId, 'loan', formData.loan || {});
+      // Update each section of the mortgage data
+      await onSave('borrower', formData.borrower || {});
+      await onSave('currentAddress', formData.currentAddress || {});
+      await onSave('employment', formData.employment || {});
+      await onSave('income', formData.income || {});
+      await onSave('assets', formData.assets || {});
+      await onSave('liabilities', formData.liabilities || {});
+      await onSave('property', formData.property || {});
+      await onSave('declarations', formData.declarations || {});
+      await onSave('demographic', formData.demographic || {});
+      await onSave('loan', formData.loan || {});
 
       toast.success("Mortgage data updated successfully!");
     } catch (error) {
@@ -171,15 +165,15 @@ const Mortgage1003Form: React.FC = () => {
   };
 
   const handlePushToPipeline = async () => {
-    if (!leadId) {
+    if (!lead?.id) {
       toast.error("Lead ID is missing.");
       return;
     }
 
     setPushingToPipeline(true);
     try {
-      // Update the lead to mark it as a mortgage lead and set the addedToPipelineAt timestamp
-      await leadProfileService.updateLead(leadId, {
+      // Update the lead to mark it as a mortgage lead
+      await leadProfileService.updateLead(lead.id, {
         isMortgageLead: true,
         addedToPipelineAt: new Date().toISOString()
       });
@@ -421,7 +415,7 @@ const Mortgage1003Form: React.FC = () => {
               <Checkbox
                 id="isSelfEmployed"
                 checked={formData.employment?.isSelfEmployed || false}
-                onCheckedChange={(checked) => handleCheckboxChange("employment", "isSelfEmployed", checked || false)}
+                onCheckedChange={(checked) => handleCheckboxChange("employment", "isSelfEmployed", checked as boolean)}
               />
               <span>Is Self-Employed</span>
             </Label>
@@ -688,7 +682,7 @@ const Mortgage1003Form: React.FC = () => {
               <Checkbox
                 id="hasBankruptcies"
                 checked={formData.declarations?.hasBankruptcies || false}
-                onCheckedChange={(checked) => handleCheckboxChange("declarations", "hasBankruptcies", checked || false)}
+                onCheckedChange={(checked) => handleCheckboxChange("declarations", "hasBankruptcies", checked as boolean)}
               />
               <span>Have you had bankruptcies in the last 7 years?</span>
             </Label>
@@ -698,7 +692,7 @@ const Mortgage1003Form: React.FC = () => {
               <Checkbox
                 id="hasAlimonyObligation"
                 checked={formData.declarations?.hasAlimonyObligation || false}
-                onCheckedChange={(checked) => handleCheckboxChange("declarations", "hasAlimonyObligation", checked || false)}
+                onCheckedChange={(checked) => handleCheckboxChange("declarations", "hasAlimonyObligation", checked as boolean)}
               />
               <span>Do you have alimony obligations?</span>
             </Label>
@@ -708,7 +702,7 @@ const Mortgage1003Form: React.FC = () => {
               <Checkbox
                 id="isCoSigner"
                 checked={formData.declarations?.isCoSigner || false}
-                onCheckedChange={(checked) => handleCheckboxChange("declarations", "isCoSigner", checked || false)}
+                onCheckedChange={(checked) => handleCheckboxChange("declarations", "isCoSigner", checked as boolean)}
               />
               <span>Are you a co-signer on any debt?</span>
             </Label>
@@ -718,7 +712,7 @@ const Mortgage1003Form: React.FC = () => {
               <Checkbox
                 id="intendToOccupy"
                 checked={formData.declarations?.intendToOccupy || false}
-                onCheckedChange={(checked) => handleCheckboxChange("declarations", "intendToOccupy", checked || false)}
+                onCheckedChange={(checked) => handleCheckboxChange("declarations", "intendToOccupy", checked as boolean)}
               />
               <span>Do you intend to occupy the property as your primary residence?</span>
             </Label>
@@ -728,7 +722,7 @@ const Mortgage1003Form: React.FC = () => {
               <Checkbox
                 id="isCitizen"
                 checked={formData.declarations?.isCitizen || false}
-                onCheckedChange={(checked) => handleCheckboxChange("declarations", "isCitizen", checked || false)}
+                onCheckedChange={(checked) => handleCheckboxChange("declarations", "isCitizen", checked as boolean)}
               />
               <span>Are you a U.S. citizen?</span>
             </Label>
