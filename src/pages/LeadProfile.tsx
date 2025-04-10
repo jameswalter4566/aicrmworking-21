@@ -611,6 +611,7 @@ const LeadProfile = () => {
                         {activity.type === "Text" && <MessageSquare className="h-5 w-5 text-blue-600" />}
                         {activity.type === "Meeting" && <Calendar className="h-5 w-5 text-blue-600" />}
                         {activity.type === "Edit" && <Edit className="h-5 w-5 text-blue-600" />}
+                        {activity.type === "Disposition Change" && <Activity className="h-5 w-5 text-blue-600" />}
                         {activity.type === "Mortgage Information Update" && <FileText className="h-5 w-5 text-blue-600" />}
                       </div>
                       {index < activities.length - 1 && (

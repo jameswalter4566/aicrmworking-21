@@ -1,996 +1,923 @@
 
-import React from "react";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState } from 'react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { LeadProfile } from "@/services/leadProfile";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { useToast } from "@/hooks/use-toast";
-import { LeadProfile as LeadProfileType } from "@/services/leadProfile";
+import { Save, Briefcase, Home, CreditCard, User, FileText, 
+  Building, BarChart, Percent, ClipboardCheck } from "lucide-react";
+import { toast } from "sonner";
 
 interface Mortgage1003FormProps {
-  lead: LeadProfileType;
+  lead: LeadProfile;
   onSave: (section: string, data: Record<string, any>) => Promise<void>;
-  isEditable?: boolean;
-  isSaving?: boolean;
+  isEditable: boolean;
+  isSaving: boolean;
 }
 
-const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
-  lead,
-  onSave,
+const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({ 
+  lead, 
+  onSave, 
   isEditable = true,
-  isSaving = false
+  isSaving = false 
 }) => {
-  const { toast } = useToast();
-  const [activeSection, setActiveSection] = React.useState<string>("borrower");
-  const [formData, setFormData] = React.useState<Record<string, any>>({
-    // Borrower Information
-    fullLegalName: lead.mortgageData?.borrower?.fullLegalName || "",
-    dateOfBirth: lead.mortgageData?.borrower?.dateOfBirth || "",
-    socialSecurityNumber: lead.mortgageData?.borrower?.socialSecurityNumber || "",
-    maritalStatus: lead.mortgageData?.borrower?.maritalStatus || "",
-    dependents: lead.mortgageData?.borrower?.dependents || "",
-    citizenship: lead.mortgageData?.borrower?.citizenship || "",
-    
-    // Current Address
-    currentAddress: lead.mortgageData?.currentAddress?.streetAddress || lead.propertyAddress || "",
-    cityStateZip: lead.mortgageData?.currentAddress?.cityStateZip || "",
-    durationAtAddress: lead.mortgageData?.currentAddress?.durationAtAddress || "",
-    housingStatus: lead.mortgageData?.currentAddress?.housingStatus || "rent",
-    monthlyHousingExpense: lead.mortgageData?.currentAddress?.monthlyHousingExpense || "",
-    
-    // Employment
-    employerName: lead.mortgageData?.employment?.employerName || "",
-    employerAddress: lead.mortgageData?.employment?.employerAddress || "",
-    jobTitle: lead.mortgageData?.employment?.jobTitle || "",
-    startDate: lead.mortgageData?.employment?.startDate || "",
-    endDate: lead.mortgageData?.employment?.endDate || "",
-    monthlyIncome: lead.mortgageData?.employment?.monthlyIncome || "",
-    isSelfEmployed: lead.mortgageData?.employment?.isSelfEmployed || false,
-    
-    // Income and Assets
-    baseIncome: lead.mortgageData?.income?.baseIncome || "",
-    overtimeIncome: lead.mortgageData?.income?.overtimeIncome || "",
-    otherIncome: lead.mortgageData?.income?.otherIncome || "",
-    bankAccounts: lead.mortgageData?.assets?.bankAccounts || "",
-    investments: lead.mortgageData?.assets?.investments || "",
-    realEstateAssets: lead.mortgageData?.assets?.realEstateAssets || "",
-    otherAssets: lead.mortgageData?.assets?.otherAssets || "",
-    
-    // Liabilities
-    creditCards: lead.mortgageData?.liabilities?.creditCards || "",
-    autoLoans: lead.mortgageData?.liabilities?.autoLoans || "",
-    studentLoans: lead.mortgageData?.liabilities?.studentLoans || "",
-    otherMortgages: lead.mortgageData?.liabilities?.otherMortgages || "",
-    personalLoans: lead.mortgageData?.liabilities?.personalLoans || "",
-    monthlyPayments: lead.mortgageData?.liabilities?.monthlyPayments || "",
-    
-    // Property Information
-    subjectPropertyAddress: lead.mortgageData?.property?.subjectPropertyAddress || lead.propertyAddress || "",
-    propertyValue: lead.mortgageData?.property?.propertyValue || "",
-    loanAmount: lead.mortgageData?.property?.loanAmount || "",
-    loanPurpose: lead.mortgageData?.property?.loanPurpose || "purchase",
-    propertyType: lead.mortgageData?.property?.propertyType || "",
-    occupancy: lead.mortgageData?.property?.occupancy || "primary",
-    titleType: lead.mortgageData?.property?.titleType || "",
-    
-    // Declarations
-    hasBankruptcies: lead.mortgageData?.declarations?.hasBankruptcies || false,
-    hasAlimonyObligation: lead.mortgageData?.declarations?.hasAlimonyObligation || false,
-    isCoSigner: lead.mortgageData?.declarations?.isCoSigner || false,
-    intendToOccupy: lead.mortgageData?.declarations?.intendToOccupy || true,
-    isCitizen: lead.mortgageData?.declarations?.isCitizen || true,
-    
-    // Demographic Information
-    ethnicity: lead.mortgageData?.demographic?.ethnicity || "",
-    race: lead.mortgageData?.demographic?.race || "",
-    sex: lead.mortgageData?.demographic?.sex || "",
-    collectionMethod: lead.mortgageData?.demographic?.collectionMethod || "applicant-provided",
-    
-    // Loan Information
-    loanType: lead.mortgageData?.loan?.loanType || "conventional",
-    mortgageTerm: lead.mortgageData?.loan?.mortgageTerm || "30",
-    amortizationType: lead.mortgageData?.loan?.amortizationType || "fixed",
-    interestRate: lead.mortgageData?.loan?.interestRate || "",
-    mortgageInsurance: lead.mortgageData?.loan?.mortgageInsurance || ""
+  // Get mortgage data from lead or initialize empty object
+  const mortgageData = lead.mortgageData || {};
+  
+  // Initialize form state for each section
+  const [borrowerForm, setBorrowerForm] = useState({
+    fullLegalName: mortgageData.borrower?.fullLegalName || '',
+    dateOfBirth: mortgageData.borrower?.dateOfBirth || '',
+    socialSecurityNumber: mortgageData.borrower?.socialSecurityNumber || '',
+    maritalStatus: mortgageData.borrower?.maritalStatus || '',
+    dependents: mortgageData.borrower?.dependents || '',
+    citizenship: mortgageData.borrower?.citizenship || ''
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const [addressForm, setAddressForm] = useState({
+    streetAddress: mortgageData.currentAddress?.streetAddress || '',
+    cityStateZip: mortgageData.currentAddress?.cityStateZip || '',
+    durationAtAddress: mortgageData.currentAddress?.durationAtAddress || '',
+    housingStatus: mortgageData.currentAddress?.housingStatus || '',
+    monthlyHousingExpense: mortgageData.currentAddress?.monthlyHousingExpense || ''
+  });
 
-  const handleSwitchChange = (name: string, checked: boolean) => {
-    setFormData(prev => ({ ...prev, [name]: checked }));
-  };
+  const [employmentForm, setEmploymentForm] = useState({
+    employerName: mortgageData.employment?.employerName || '',
+    employerAddress: mortgageData.employment?.employerAddress || '',
+    jobTitle: mortgageData.employment?.jobTitle || '',
+    startDate: mortgageData.employment?.startDate || '',
+    endDate: mortgageData.employment?.endDate || '',
+    monthlyIncome: mortgageData.employment?.monthlyIncome || '',
+    isSelfEmployed: mortgageData.employment?.isSelfEmployed || false
+  });
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+  const [incomeForm, setIncomeForm] = useState({
+    baseIncome: mortgageData.income?.baseIncome || '',
+    overtimeIncome: mortgageData.income?.overtimeIncome || '',
+    otherIncome: mortgageData.income?.otherIncome || ''
+  });
 
-  const handleSaveSection = async () => {
-    if (!isEditable || isSaving) return;
+  const [assetsForm, setAssetsForm] = useState({
+    bankAccounts: mortgageData.assets?.bankAccounts || '',
+    investments: mortgageData.assets?.investments || '',
+    realEstateAssets: mortgageData.assets?.realEstateAssets || '',
+    otherAssets: mortgageData.assets?.otherAssets || ''
+  });
+
+  const [liabilitiesForm, setLiabilitiesForm] = useState({
+    creditCards: mortgageData.liabilities?.creditCards || '',
+    autoLoans: mortgageData.liabilities?.autoLoans || '',
+    studentLoans: mortgageData.liabilities?.studentLoans || '',
+    otherMortgages: mortgageData.liabilities?.otherMortgages || '',
+    personalLoans: mortgageData.liabilities?.personalLoans || '',
+    monthlyPayments: mortgageData.liabilities?.monthlyPayments || ''
+  });
+
+  const [propertyForm, setPropertyForm] = useState({
+    subjectPropertyAddress: mortgageData.property?.subjectPropertyAddress || '',
+    propertyValue: mortgageData.property?.propertyValue || '',
+    loanAmount: mortgageData.property?.loanAmount || '',
+    loanPurpose: mortgageData.property?.loanPurpose || '',
+    propertyType: mortgageData.property?.propertyType || '',
+    occupancy: mortgageData.property?.occupancy || '',
+    titleType: mortgageData.property?.titleType || ''
+  });
+
+  const [declarationsForm, setDeclarationsForm] = useState({
+    hasBankruptcies: mortgageData.declarations?.hasBankruptcies || false,
+    hasAlimonyObligation: mortgageData.declarations?.hasAlimonyObligation || false,
+    isCoSigner: mortgageData.declarations?.isCoSigner || false,
+    intendToOccupy: mortgageData.declarations?.intendToOccupy || true,
+    isCitizen: mortgageData.declarations?.isCitizen || true
+  });
+
+  const [demographicForm, setDemographicForm] = useState({
+    ethnicity: mortgageData.demographic?.ethnicity || '',
+    race: mortgageData.demographic?.race || '',
+    sex: mortgageData.demographic?.sex || '',
+    collectionMethod: mortgageData.demographic?.collectionMethod || 'Applicant Provided'
+  });
+
+  const [loanForm, setLoanForm] = useState({
+    loanType: mortgageData.loan?.loanType || '',
+    mortgageTerm: mortgageData.loan?.mortgageTerm || '',
+    amortizationType: mortgageData.loan?.amortizationType || '',
+    interestRate: mortgageData.loan?.interestRate || '',
+    mortgageInsurance: mortgageData.loan?.mortgageInsurance || ''
+  });
+
+  const handleSaveSection = async (section: string, data: Record<string, any>) => {
+    if (!isEditable) return;
     
     try {
-      const sectionMap: Record<string, string> = {
-        borrower: "borrower",
-        address: "currentAddress",
-        employment: "employment",
-        incomeAssets: "incomeAndAssets",
-        liabilities: "liabilities",
-        property: "property",
-        declarations: "declarations",
-        demographic: "demographic",
-        loan: "loan"
-      };
-
-      const section = sectionMap[activeSection];
-      const sectionData = getSectionData(activeSection);
-      
-      await onSave(section, sectionData);
-      toast({
-        title: "Information saved",
-        description: `${getSectionTitle(activeSection)} information has been updated.`,
-      });
+      await onSave(section, data);
     } catch (error) {
-      console.error(`Error saving ${activeSection} information:`, error);
-      toast({
-        variant: "destructive",
-        title: "Error saving information",
-        description: "There was a problem saving your changes. Please try again."
-      });
+      console.error(`Error saving ${section} data:`, error);
+      toast.error(`Failed to save ${section} information`);
     }
-  };
-
-  const getSectionData = (section: string) => {
-    switch (section) {
-      case 'borrower':
-        return {
-          fullLegalName: formData.fullLegalName,
-          dateOfBirth: formData.dateOfBirth,
-          socialSecurityNumber: formData.socialSecurityNumber,
-          maritalStatus: formData.maritalStatus,
-          dependents: formData.dependents,
-          citizenship: formData.citizenship
-        };
-      case 'address':
-        return {
-          streetAddress: formData.currentAddress,
-          cityStateZip: formData.cityStateZip,
-          durationAtAddress: formData.durationAtAddress,
-          housingStatus: formData.housingStatus,
-          monthlyHousingExpense: formData.monthlyHousingExpense
-        };
-      case 'employment':
-        return {
-          employerName: formData.employerName,
-          employerAddress: formData.employerAddress,
-          jobTitle: formData.jobTitle,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          monthlyIncome: formData.monthlyIncome,
-          isSelfEmployed: formData.isSelfEmployed
-        };
-      case 'incomeAssets':
-        return {
-          income: {
-            baseIncome: formData.baseIncome,
-            overtimeIncome: formData.overtimeIncome,
-            otherIncome: formData.otherIncome
-          },
-          assets: {
-            bankAccounts: formData.bankAccounts,
-            investments: formData.investments,
-            realEstateAssets: formData.realEstateAssets,
-            otherAssets: formData.otherAssets
-          }
-        };
-      case 'liabilities':
-        return {
-          creditCards: formData.creditCards,
-          autoLoans: formData.autoLoans,
-          studentLoans: formData.studentLoans,
-          otherMortgages: formData.otherMortgages,
-          personalLoans: formData.personalLoans,
-          monthlyPayments: formData.monthlyPayments
-        };
-      case 'property':
-        return {
-          subjectPropertyAddress: formData.subjectPropertyAddress,
-          propertyValue: formData.propertyValue,
-          loanAmount: formData.loanAmount,
-          loanPurpose: formData.loanPurpose,
-          propertyType: formData.propertyType,
-          occupancy: formData.occupancy,
-          titleType: formData.titleType
-        };
-      case 'declarations':
-        return {
-          hasBankruptcies: formData.hasBankruptcies,
-          hasAlimonyObligation: formData.hasAlimonyObligation,
-          isCoSigner: formData.isCoSigner,
-          intendToOccupy: formData.intendToOccupy,
-          isCitizen: formData.isCitizen
-        };
-      case 'demographic':
-        return {
-          ethnicity: formData.ethnicity,
-          race: formData.race,
-          sex: formData.sex,
-          collectionMethod: formData.collectionMethod
-        };
-      case 'loan':
-        return {
-          loanType: formData.loanType,
-          mortgageTerm: formData.mortgageTerm,
-          amortizationType: formData.amortizationType,
-          interestRate: formData.interestRate,
-          mortgageInsurance: formData.mortgageInsurance
-        };
-      default:
-        return {};
-    }
-  };
-
-  const getSectionTitle = (section: string): string => {
-    const titles: Record<string, string> = {
-      borrower: "Borrower",
-      address: "Current Address",
-      employment: "Employment",
-      incomeAssets: "Income & Assets",
-      liabilities: "Liabilities",
-      property: "Property",
-      declarations: "Declarations",
-      demographic: "Demographic",
-      loan: "Loan"
-    };
-    
-    return titles[section] || "Unknown Section";
   };
 
   return (
-    <Card className="mt-6 border-2 border-blue-500">
-      <Tabs 
-        value={activeSection} 
-        onValueChange={setActiveSection} 
-        className="w-full"
-      >
-        <TabsList className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 w-full">
-          <TabsTrigger value="borrower">Borrower</TabsTrigger>
-          <TabsTrigger value="address">Address</TabsTrigger>
-          <TabsTrigger value="employment">Employment</TabsTrigger>
-          <TabsTrigger value="incomeAssets">Income & Assets</TabsTrigger>
-          <TabsTrigger value="liabilities">Liabilities</TabsTrigger>
-          <TabsTrigger value="property">Property</TabsTrigger>
-          <TabsTrigger value="declarations">Declarations</TabsTrigger>
-          <TabsTrigger value="demographic">Demographic</TabsTrigger>
-          <TabsTrigger value="loan">Loan</TabsTrigger>
-        </TabsList>
+    <Card className="border-blue-500 border-2">
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <FileText className="h-5 w-5 mr-2 text-blue-500" />
+          Mortgage Application (Form 1003)
+        </CardTitle>
+        <CardDescription>
+          FNMA Standard Loan Application Information
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Tabs defaultValue="borrower" className="w-full">
+          <TabsList className="flex flex-wrap mb-4">
+            <TabsTrigger value="borrower" className="mr-1 mb-1">
+              <User className="h-4 w-4 mr-1" /> Borrower
+            </TabsTrigger>
+            <TabsTrigger value="address" className="mr-1 mb-1">
+              <Home className="h-4 w-4 mr-1" /> Address
+            </TabsTrigger>
+            <TabsTrigger value="employment" className="mr-1 mb-1">
+              <Briefcase className="h-4 w-4 mr-1" /> Employment
+            </TabsTrigger>
+            <TabsTrigger value="income" className="mr-1 mb-1">
+              <BarChart className="h-4 w-4 mr-1" /> Income
+            </TabsTrigger>
+            <TabsTrigger value="assets" className="mr-1 mb-1">
+              <Building className="h-4 w-4 mr-1" /> Assets
+            </TabsTrigger>
+            <TabsTrigger value="liabilities" className="mr-1 mb-1">
+              <CreditCard className="h-4 w-4 mr-1" /> Liabilities
+            </TabsTrigger>
+            <TabsTrigger value="property" className="mr-1 mb-1">
+              <Home className="h-4 w-4 mr-1" /> Property
+            </TabsTrigger>
+            <TabsTrigger value="declarations" className="mr-1 mb-1">
+              <ClipboardCheck className="h-4 w-4 mr-1" /> Declarations
+            </TabsTrigger>
+            <TabsTrigger value="demographic" className="mr-1 mb-1">
+              <User className="h-4 w-4 mr-1" /> Demographic
+            </TabsTrigger>
+            <TabsTrigger value="loan" className="mr-1 mb-1">
+              <Percent className="h-4 w-4 mr-1" /> Loan
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Borrower Information */}
-        <TabsContent value="borrower">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Borrower Information</h3>
-            
-            <div className="space-y-4">
-              <div>
+          {/* Borrower Information Section */}
+          <TabsContent value="borrower" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="fullLegalName">Full Legal Name</Label>
-                <Input
+                <Input 
                   id="fullLegalName"
-                  name="fullLegalName"
-                  value={formData.fullLegalName}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
                   placeholder="First Middle Last Suffix"
+                  value={borrowerForm.fullLegalName}
+                  onChange={(e) => setBorrowerForm({...borrowerForm, fullLegalName: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="dateOfBirth">Date of Birth</Label>
-                  <Input
-                    id="dateOfBirth"
-                    name="dateOfBirth"
-                    type="date"
-                    value={formData.dateOfBirth}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="socialSecurityNumber">Social Security Number</Label>
-                  <Input
-                    id="socialSecurityNumber"
-                    name="socialSecurityNumber"
-                    value={formData.socialSecurityNumber}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                    placeholder="XXX-XX-XXXX"
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                <Input 
+                  id="dateOfBirth"
+                  type="date"
+                  value={borrowerForm.dateOfBirth}
+                  onChange={(e) => setBorrowerForm({...borrowerForm, dateOfBirth: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="maritalStatus">Marital Status</Label>
-                  <Select
-                    value={formData.maritalStatus}
-                    onValueChange={(value) => handleSelectChange("maritalStatus", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="maritalStatus">
-                      <SelectValue placeholder="Select marital status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="single">Single</SelectItem>
-                      <SelectItem value="married">Married</SelectItem>
-                      <SelectItem value="separated">Separated</SelectItem>
-                      <SelectItem value="divorced">Divorced</SelectItem>
-                      <SelectItem value="widowed">Widowed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="dependents">Number of Dependents (and ages)</Label>
-                  <Input
-                    id="dependents"
-                    name="dependents"
-                    value={formData.dependents}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                    placeholder="Example: 3 (5, 7, 10)"
-                  />
-                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="socialSecurityNumber">Social Security Number</Label>
+                <Input 
+                  id="socialSecurityNumber"
+                  placeholder="XXX-XX-XXXX"
+                  value={borrowerForm.socialSecurityNumber}
+                  onChange={(e) => setBorrowerForm({...borrowerForm, socialSecurityNumber: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
-              
-              <div>
-                <Label htmlFor="citizenship">Citizenship/Residency Status</Label>
-                <Select
-                  value={formData.citizenship}
-                  onValueChange={(value) => handleSelectChange("citizenship", value)}
-                  disabled={!isEditable}
+              <div className="space-y-2">
+                <Label htmlFor="maritalStatus">Marital Status</Label>
+                <Select 
+                  value={borrowerForm.maritalStatus}
+                  onValueChange={(value) => setBorrowerForm({...borrowerForm, maritalStatus: value})}
+                  disabled={!isEditable || isSaving}
                 >
-                  <SelectTrigger id="citizenship">
-                    <SelectValue placeholder="Select citizenship status" />
+                  <SelectTrigger id="maritalStatus">
+                    <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="usCitizen">US Citizen</SelectItem>
-                    <SelectItem value="permanentResident">Permanent Resident</SelectItem>
-                    <SelectItem value="nonPermanentResident">Non-Permanent Resident</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="married">Married</SelectItem>
+                    <SelectItem value="separated">Separated</SelectItem>
+                    <SelectItem value="unmarried">Unmarried</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Borrower Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
-
-        {/* Current Address */}
-        <TabsContent value="address">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Current Address</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="currentAddress">Street Address</Label>
-                <Input
-                  id="currentAddress"
-                  name="currentAddress"
-                  value={formData.currentAddress}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dependents">Dependents (number and ages)</Label>
+                <Input 
+                  id="dependents"
+                  placeholder="e.g., 2 (10, 12)"
+                  value={borrowerForm.dependents}
+                  onChange={(e) => setBorrowerForm({...borrowerForm, dependents: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
+              <div className="space-y-2">
+                <Label htmlFor="citizenship">Citizenship Status</Label>
+                <Select 
+                  value={borrowerForm.citizenship} 
+                  onValueChange={(value) => setBorrowerForm({...borrowerForm, citizenship: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="citizenship">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="usaCitizen">U.S. Citizen</SelectItem>
+                    <SelectItem value="permanentResident">Permanent Resident</SelectItem>
+                    <SelectItem value="nonPermanentResident">Non-Permanent Resident</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('borrower', borrowerForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Borrower Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* Address Section */}
+          <TabsContent value="address" className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="streetAddress">Street Address</Label>
+                <Input 
+                  id="streetAddress"
+                  placeholder="123 Main St"
+                  value={addressForm.streetAddress}
+                  onChange={(e) => setAddressForm({...addressForm, streetAddress: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="cityStateZip">City, State, ZIP</Label>
-                <Input
+                <Input 
                   id="cityStateZip"
-                  name="cityStateZip"
-                  value={formData.cityStateZip}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="Los Angeles, CA 90001"
+                  placeholder="Anytown, CA 12345"
+                  value={addressForm.cityStateZip}
+                  onChange={(e) => setAddressForm({...addressForm, cityStateZip: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="durationAtAddress">Duration at Address</Label>
-                  <Input
-                    id="durationAtAddress"
-                    name="durationAtAddress"
-                    value={formData.durationAtAddress}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                    placeholder="Example: 5 years 2 months"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="housingStatus">Housing Status</Label>
-                  <Select
-                    value={formData.housingStatus}
-                    onValueChange={(value) => handleSelectChange("housingStatus", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="housingStatus">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="rent">Rent</SelectItem>
-                      <SelectItem value="own">Own</SelectItem>
-                      <SelectItem value="living_rent_free">Living Rent Free</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="durationAtAddress">Years at Address</Label>
+                <Input 
+                  id="durationAtAddress"
+                  placeholder="e.g., 5 years"
+                  value={addressForm.durationAtAddress}
+                  onChange={(e) => setAddressForm({...addressForm, durationAtAddress: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
-              
-              <div>
-                <Label htmlFor="monthlyHousingExpense">Monthly Housing Expense ($)</Label>
-                <Input
+              <div className="space-y-2">
+                <Label htmlFor="housingStatus">Housing Status</Label>
+                <Select 
+                  value={addressForm.housingStatus} 
+                  onValueChange={(value) => setAddressForm({...addressForm, housingStatus: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="housingStatus">
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="own">Own</SelectItem>
+                    <SelectItem value="rent">Rent</SelectItem>
+                    <SelectItem value="liveWithFamily">Live with Family</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="monthlyHousingExpense">Monthly Housing Expense</Label>
+                <Input 
                   id="monthlyHousingExpense"
-                  name="monthlyHousingExpense"
-                  value={formData.monthlyHousingExpense}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="0.00"
+                  placeholder="$1,500"
+                  value={addressForm.monthlyHousingExpense}
+                  onChange={(e) => setAddressForm({...addressForm, monthlyHousingExpense: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Address Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('currentAddress', addressForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Address Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
 
-        {/* Employment Information */}
-        <TabsContent value="employment">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Employment Information</h3>
-            
-            <div className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="isSelfEmployed"
-                  checked={formData.isSelfEmployed}
-                  onCheckedChange={(checked) => handleSwitchChange("isSelfEmployed", checked)}
-                  disabled={!isEditable}
-                />
-                <Label htmlFor="isSelfEmployed">Self-employed</Label>
-              </div>
-              
-              <div>
+          {/* Employment Section */}
+          <TabsContent value="employment" className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="employerName">Employer Name</Label>
-                <Input
+                <Input 
                   id="employerName"
-                  name="employerName"
-                  value={formData.employerName}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
+                  placeholder="ABC Company"
+                  value={employmentForm.employerName}
+                  onChange={(e) => setEmploymentForm({...employmentForm, employerName: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="employerAddress">Employer Address and Phone</Label>
-                <Textarea
+              <div className="space-y-2">
+                <Label htmlFor="employerAddress">Employer Address</Label>
+                <Input 
                   id="employerAddress"
-                  name="employerAddress"
-                  value={formData.employerAddress}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  rows={2}
+                  placeholder="123 Business Ave, City, ST 12345"
+                  value={employmentForm.employerAddress}
+                  onChange={(e) => setEmploymentForm({...employmentForm, employerAddress: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="jobTitle">Job Title/Position</Label>
-                <Input
+                <Input 
                   id="jobTitle"
-                  name="jobTitle"
-                  value={formData.jobTitle}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
+                  placeholder="Senior Manager"
+                  value={employmentForm.jobTitle}
+                  onChange={(e) => setEmploymentForm({...employmentForm, jobTitle: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    name="startDate"
-                    type="date"
-                    value={formData.startDate}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="endDate">End Date (if applicable)</Label>
-                  <Input
-                    id="endDate"
-                    name="endDate"
-                    type="date"
-                    value={formData.endDate}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="startDate">Start Date</Label>
+                <Input 
+                  id="startDate"
+                  type="date"
+                  value={employmentForm.startDate}
+                  onChange={(e) => setEmploymentForm({...employmentForm, startDate: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
-              
-              <div>
-                <Label htmlFor="monthlyIncome">Monthly Income ($)</Label>
-                <Input
+              <div className="space-y-2">
+                <Label htmlFor="endDate">End Date (if applicable)</Label>
+                <Input 
+                  id="endDate"
+                  type="date"
+                  value={employmentForm.endDate}
+                  onChange={(e) => setEmploymentForm({...employmentForm, endDate: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="monthlyIncome">Monthly Income</Label>
+                <Input 
                   id="monthlyIncome"
-                  name="monthlyIncome"
-                  value={formData.monthlyIncome}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="0.00"
+                  placeholder="$5,000"
+                  value={employmentForm.monthlyIncome}
+                  onChange={(e) => setEmploymentForm({...employmentForm, monthlyIncome: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="space-y-2 flex items-end">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="isSelfEmployed"
+                    checked={employmentForm.isSelfEmployed}
+                    onCheckedChange={(checked) => setEmploymentForm({...employmentForm, isSelfEmployed: checked})}
+                    disabled={!isEditable || isSaving}
+                  />
+                  <Label htmlFor="isSelfEmployed">Self-Employed</Label>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('employment', employmentForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Employment Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* Income Section */}
+          <TabsContent value="income" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="baseIncome">Base Income (monthly)</Label>
+                <Input 
+                  id="baseIncome"
+                  placeholder="$5,000"
+                  value={incomeForm.baseIncome}
+                  onChange={(e) => setIncomeForm({...incomeForm, baseIncome: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="overtimeIncome">Overtime Income (monthly)</Label>
+                <Input 
+                  id="overtimeIncome"
+                  placeholder="$500"
+                  value={incomeForm.overtimeIncome}
+                  onChange={(e) => setIncomeForm({...incomeForm, overtimeIncome: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="otherIncome">Other Income (monthly)</Label>
+                <Input 
+                  id="otherIncome"
+                  placeholder="$1,000"
+                  value={incomeForm.otherIncome}
+                  onChange={(e) => setIncomeForm({...incomeForm, otherIncome: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Employment Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('income', incomeForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Income Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
 
-        {/* Income and Assets */}
-        <TabsContent value="incomeAssets">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Income and Assets</h3>
-            
-            <div className="space-y-6">
-              <div>
-                <h4 className="text-md font-medium mb-3">Monthly Income</h4>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="baseIncome">Base Income ($)</Label>
-                    <Input
-                      id="baseIncome"
-                      name="baseIncome"
-                      value={formData.baseIncome}
-                      onChange={handleInputChange}
-                      disabled={!isEditable}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="overtimeIncome">Overtime, Bonuses, Commissions ($)</Label>
-                    <Input
-                      id="overtimeIncome"
-                      name="overtimeIncome"
-                      value={formData.overtimeIncome}
-                      onChange={handleInputChange}
-                      disabled={!isEditable}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="otherIncome">Other Income ($)</Label>
-                    <Input
-                      id="otherIncome"
-                      name="otherIncome"
-                      value={formData.otherIncome}
-                      onChange={handleInputChange}
-                      disabled={!isEditable}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
+          {/* Assets Section */}
+          <TabsContent value="assets" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="bankAccounts">Bank Accounts (total)</Label>
+                <Input 
+                  id="bankAccounts"
+                  placeholder="$25,000"
+                  value={assetsForm.bankAccounts}
+                  onChange={(e) => setAssetsForm({...assetsForm, bankAccounts: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
-              
-              <div>
-                <h4 className="text-md font-medium mb-3">Assets</h4>
-                <div className="space-y-3">
-                  <div>
-                    <Label htmlFor="bankAccounts">Bank Account Balances ($)</Label>
-                    <Input
-                      id="bankAccounts"
-                      name="bankAccounts"
-                      value={formData.bankAccounts}
-                      onChange={handleInputChange}
-                      disabled={!isEditable}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="investments">Investment Accounts ($)</Label>
-                    <Input
-                      id="investments"
-                      name="investments"
-                      value={formData.investments}
-                      onChange={handleInputChange}
-                      disabled={!isEditable}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="realEstateAssets">Real Estate Assets ($)</Label>
-                    <Input
-                      id="realEstateAssets"
-                      name="realEstateAssets"
-                      value={formData.realEstateAssets}
-                      onChange={handleInputChange}
-                      disabled={!isEditable}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="otherAssets">Other Assets ($)</Label>
-                    <Input
-                      id="otherAssets"
-                      name="otherAssets"
-                      value={formData.otherAssets}
-                      onChange={handleInputChange}
-                      disabled={!isEditable}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="investments">Investments (total)</Label>
+                <Input 
+                  id="investments"
+                  placeholder="$50,000"
+                  value={assetsForm.investments}
+                  onChange={(e) => setAssetsForm({...assetsForm, investments: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Income & Assets Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="realEstateAssets">Real Estate Assets (total)</Label>
+                <Input 
+                  id="realEstateAssets"
+                  placeholder="$250,000"
+                  value={assetsForm.realEstateAssets}
+                  onChange={(e) => setAssetsForm({...assetsForm, realEstateAssets: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="otherAssets">Other Assets (total)</Label>
+                <Input 
+                  id="otherAssets"
+                  placeholder="$15,000"
+                  value={assetsForm.otherAssets}
+                  onChange={(e) => setAssetsForm({...assetsForm, otherAssets: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('assets', assetsForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Assets Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
 
-        {/* Liabilities */}
-        <TabsContent value="liabilities">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Liabilities</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="creditCards">Credit Cards</Label>
-                <Textarea
+          {/* Liabilities Section */}
+          <TabsContent value="liabilities" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="creditCards">Credit Cards (total)</Label>
+                <Input 
                   id="creditCards"
-                  name="creditCards"
-                  value={formData.creditCards}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="Balance and payment details"
-                  rows={2}
+                  placeholder="$5,000"
+                  value={liabilitiesForm.creditCards}
+                  onChange={(e) => setLiabilitiesForm({...liabilitiesForm, creditCards: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="autoLoans">Auto Loans</Label>
-                <Textarea
+              <div className="space-y-2">
+                <Label htmlFor="autoLoans">Auto Loans (total)</Label>
+                <Input 
                   id="autoLoans"
-                  name="autoLoans"
-                  value={formData.autoLoans}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="Balance and payment details"
-                  rows={2}
+                  placeholder="$15,000"
+                  value={liabilitiesForm.autoLoans}
+                  onChange={(e) => setLiabilitiesForm({...liabilitiesForm, autoLoans: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="studentLoans">Student Loans</Label>
-                <Textarea
+              <div className="space-y-2">
+                <Label htmlFor="studentLoans">Student Loans (total)</Label>
+                <Input 
                   id="studentLoans"
-                  name="studentLoans"
-                  value={formData.studentLoans}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="Balance and payment details"
-                  rows={2}
+                  placeholder="$25,000"
+                  value={liabilitiesForm.studentLoans}
+                  onChange={(e) => setLiabilitiesForm({...liabilitiesForm, studentLoans: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="otherMortgages">Other Mortgages</Label>
-                <Textarea
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="otherMortgages">Other Mortgages (total)</Label>
+                <Input 
                   id="otherMortgages"
-                  name="otherMortgages"
-                  value={formData.otherMortgages}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="Balance and payment details"
-                  rows={2}
+                  placeholder="$200,000"
+                  value={liabilitiesForm.otherMortgages}
+                  onChange={(e) => setLiabilitiesForm({...liabilitiesForm, otherMortgages: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="personalLoans">Personal Loans</Label>
-                <Textarea
+              <div className="space-y-2">
+                <Label htmlFor="personalLoans">Personal Loans (total)</Label>
+                <Input 
                   id="personalLoans"
-                  name="personalLoans"
-                  value={formData.personalLoans}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="Balance and payment details"
-                  rows={2}
+                  placeholder="$10,000"
+                  value={liabilitiesForm.personalLoans}
+                  onChange={(e) => setLiabilitiesForm({...liabilitiesForm, personalLoans: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="monthlyPayments">Total Monthly Payments ($)</Label>
-                <Input
+              <div className="space-y-2">
+                <Label htmlFor="monthlyPayments">Monthly Payments (total)</Label>
+                <Input 
                   id="monthlyPayments"
-                  name="monthlyPayments"
-                  value={formData.monthlyPayments}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
-                  placeholder="0.00"
+                  placeholder="$1,200"
+                  value={liabilitiesForm.monthlyPayments}
+                  onChange={(e) => setLiabilitiesForm({...liabilitiesForm, monthlyPayments: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Liabilities Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('liabilities', liabilitiesForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Liabilities Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
 
-        {/* Property Information */}
-        <TabsContent value="property">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Property Information</h3>
-            
-            <div className="space-y-4">
-              <div>
+          {/* Property Section */}
+          <TabsContent value="property" className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="subjectPropertyAddress">Subject Property Address</Label>
-                <Input
+                <Input 
                   id="subjectPropertyAddress"
-                  name="subjectPropertyAddress"
-                  value={formData.subjectPropertyAddress}
-                  onChange={handleInputChange}
-                  disabled={!isEditable}
+                  placeholder="123 Property St, City, ST 12345"
+                  value={propertyForm.subjectPropertyAddress}
+                  onChange={(e) => setPropertyForm({...propertyForm, subjectPropertyAddress: e.target.value})}
+                  disabled={!isEditable || isSaving}
                 />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="propertyValue">Property Value ($)</Label>
-                  <Input
-                    id="propertyValue"
-                    name="propertyValue"
-                    value={formData.propertyValue}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                    placeholder="0.00"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="loanAmount">Loan Amount ($)</Label>
-                  <Input
-                    id="loanAmount"
-                    name="loanAmount"
-                    value={formData.loanAmount}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                    placeholder="0.00"
-                  />
-                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="propertyValue">Estimated Property Value</Label>
+                <Input 
+                  id="propertyValue"
+                  placeholder="$350,000"
+                  value={propertyForm.propertyValue}
+                  onChange={(e) => setPropertyForm({...propertyForm, propertyValue: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="loanPurpose">Loan Purpose</Label>
-                  <Select
-                    value={formData.loanPurpose}
-                    onValueChange={(value) => handleSelectChange("loanPurpose", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="loanPurpose">
-                      <SelectValue placeholder="Select purpose" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="purchase">Purchase</SelectItem>
-                      <SelectItem value="refinance">Refinance</SelectItem>
-                      <SelectItem value="construction">Construction</SelectItem>
-                      <SelectItem value="cashOut">Cash-Out Refinance</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="propertyType">Property Type</Label>
-                  <Select
-                    value={formData.propertyType}
-                    onValueChange={(value) => handleSelectChange("propertyType", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="propertyType">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="singleFamily">Single Family</SelectItem>
-                      <SelectItem value="condo">Condominium</SelectItem>
-                      <SelectItem value="townhouse">Townhouse</SelectItem>
-                      <SelectItem value="multifamily">Multifamily</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="occupancy">Intended Occupancy</Label>
-                  <Select
-                    value={formData.occupancy}
-                    onValueChange={(value) => handleSelectChange("occupancy", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="occupancy">
-                      <SelectValue placeholder="Select occupancy" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="primary">Primary Residence</SelectItem>
-                      <SelectItem value="secondary">Secondary Residence</SelectItem>
-                      <SelectItem value="investment">Investment Property</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="titleType">How Property Will Be Titled</Label>
-                  <Input
-                    id="titleType"
-                    name="titleType"
-                    value={formData.titleType}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                    placeholder="Individual, Joint, Trust, etc."
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="loanAmount">Requested Loan Amount</Label>
+                <Input 
+                  id="loanAmount"
+                  placeholder="$280,000"
+                  value={propertyForm.loanAmount}
+                  onChange={(e) => setPropertyForm({...propertyForm, loanAmount: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Property Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="loanPurpose">Loan Purpose</Label>
+                <Select 
+                  value={propertyForm.loanPurpose} 
+                  onValueChange={(value) => setPropertyForm({...propertyForm, loanPurpose: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="loanPurpose">
+                    <SelectValue placeholder="Select purpose" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="purchase">Purchase</SelectItem>
+                    <SelectItem value="refinance">Refinance</SelectItem>
+                    <SelectItem value="cashOutRefinance">Cash-Out Refinance</SelectItem>
+                    <SelectItem value="construction">Construction</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="propertyType">Property Type</Label>
+                <Select 
+                  value={propertyForm.propertyType} 
+                  onValueChange={(value) => setPropertyForm({...propertyForm, propertyType: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="propertyType">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="singleFamily">Single Family</SelectItem>
+                    <SelectItem value="condo">Condo</SelectItem>
+                    <SelectItem value="townhouse">Townhouse</SelectItem>
+                    <SelectItem value="multiFamily">Multi-Family (2-4 units)</SelectItem>
+                    <SelectItem value="commercial">Commercial</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="occupancy">Intended Occupancy</Label>
+                <Select 
+                  value={propertyForm.occupancy} 
+                  onValueChange={(value) => setPropertyForm({...propertyForm, occupancy: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="occupancy">
+                    <SelectValue placeholder="Select occupancy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="primaryResidence">Primary Residence</SelectItem>
+                    <SelectItem value="secondaryHome">Secondary Home</SelectItem>
+                    <SelectItem value="investment">Investment Property</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="titleType">Title will be held as</Label>
+                <Select 
+                  value={propertyForm.titleType} 
+                  onValueChange={(value) => setPropertyForm({...propertyForm, titleType: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="titleType">
+                    <SelectValue placeholder="Select title type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="soleOwnership">Sole Ownership</SelectItem>
+                    <SelectItem value="jointTenancy">Joint Tenancy</SelectItem>
+                    <SelectItem value="tenancyInCommon">Tenancy In Common</SelectItem>
+                    <SelectItem value="trust">Trust</SelectItem>
+                    <SelectItem value="llc">LLC</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('property', propertyForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Property Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
 
-        {/* Declarations */}
-        <TabsContent value="declarations">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Declarations</h3>
-            
+          {/* Declarations Section */}
+          <TabsContent value="declarations" className="space-y-4">
             <div className="space-y-4">
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="hasBankruptcies">Have you had any bankruptcies, foreclosures, or judgments?</Label>
                 <Switch
                   id="hasBankruptcies"
-                  checked={formData.hasBankruptcies}
-                  onCheckedChange={(checked) => handleSwitchChange("hasBankruptcies", checked)}
-                  disabled={!isEditable}
+                  checked={declarationsForm.hasBankruptcies}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, hasBankruptcies: checked})}
+                  disabled={!isEditable || isSaving}
                 />
-                <Label htmlFor="hasBankruptcies">Has bankruptcies, foreclosures, or lawsuits</Label>
               </div>
-              
-              <div className="flex items-center space-x-2">
+              <Separator />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="hasAlimonyObligation">Are you obligated to pay alimony or child support?</Label>
                 <Switch
                   id="hasAlimonyObligation"
-                  checked={formData.hasAlimonyObligation}
-                  onCheckedChange={(checked) => handleSwitchChange("hasAlimonyObligation", checked)}
-                  disabled={!isEditable}
+                  checked={declarationsForm.hasAlimonyObligation}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, hasAlimonyObligation: checked})}
+                  disabled={!isEditable || isSaving}
                 />
-                <Label htmlFor="hasAlimonyObligation">Obligated to pay alimony/child support</Label>
               </div>
-              
-              <div className="flex items-center space-x-2">
+              <Separator />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isCoSigner">Are you a co-signer on any other loans?</Label>
                 <Switch
                   id="isCoSigner"
-                  checked={formData.isCoSigner}
-                  onCheckedChange={(checked) => handleSwitchChange("isCoSigner", checked)}
-                  disabled={!isEditable}
+                  checked={declarationsForm.isCoSigner}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, isCoSigner: checked})}
+                  disabled={!isEditable || isSaving}
                 />
-                <Label htmlFor="isCoSigner">Co-signer on any loan</Label>
               </div>
-              
-              <div className="flex items-center space-x-2">
+              <Separator />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="intendToOccupy">Do you intend to occupy the property as your primary residence?</Label>
                 <Switch
                   id="intendToOccupy"
-                  checked={formData.intendToOccupy}
-                  onCheckedChange={(checked) => handleSwitchChange("intendToOccupy", checked)}
-                  disabled={!isEditable}
+                  checked={declarationsForm.intendToOccupy}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, intendToOccupy: checked})}
+                  disabled={!isEditable || isSaving}
                 />
-                <Label htmlFor="intendToOccupy">Intends to occupy the property</Label>
               </div>
-              
-              <div className="flex items-center space-x-2">
+              <Separator />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isCitizen">Are you a U.S. citizen or permanent resident alien?</Label>
                 <Switch
                   id="isCitizen"
-                  checked={formData.isCitizen}
-                  onCheckedChange={(checked) => handleSwitchChange("isCitizen", checked)}
-                  disabled={!isEditable}
+                  checked={declarationsForm.isCitizen}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, isCitizen: checked})}
+                  disabled={!isEditable || isSaving}
                 />
-                <Label htmlFor="isCitizen">U.S. Citizen or Permanent Resident</Label>
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Declarations'}
-            </Button>
-          </CardContent>
-        </TabsContent>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('declarations', declarationsForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Declaration Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
 
-        {/* Demographic Information */}
-        <TabsContent value="demographic">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Demographic Information (HMDA)</h3>
-            <p className="text-sm text-gray-500 mb-4">This information is collected for government reporting purposes under the Home Mortgage Disclosure Act. Providing this information is voluntary.</p>
-            
-            <div className="space-y-4">
-              <div>
+          {/* Demographic Section */}
+          <TabsContent value="demographic" className="space-y-4">
+            <div className="p-3 bg-blue-50 rounded-lg text-blue-800 text-sm">
+              This demographic information is collected for government monitoring purposes under the Home Mortgage Disclosure Act (HMDA). Providing this information is voluntary.
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="ethnicity">Ethnicity</Label>
-                <Select
-                  value={formData.ethnicity}
-                  onValueChange={(value) => handleSelectChange("ethnicity", value)}
-                  disabled={!isEditable}
+                <Select 
+                  value={demographicForm.ethnicity} 
+                  onValueChange={(value) => setDemographicForm({...demographicForm, ethnicity: value})}
+                  disabled={!isEditable || isSaving}
                 >
                   <SelectTrigger id="ethnicity">
                     <SelectValue placeholder="Select ethnicity" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="hispanic">Hispanic or Latino</SelectItem>
-                    <SelectItem value="not_hispanic">Not Hispanic or Latino</SelectItem>
-                    <SelectItem value="not_provided">I do not wish to provide this information</SelectItem>
+                    <SelectItem value="hispanicOrLatino">Hispanic or Latino</SelectItem>
+                    <SelectItem value="notHispanicOrLatino">Not Hispanic or Latino</SelectItem>
+                    <SelectItem value="doNotWishToProvide">I do not wish to provide this information</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="race">Race</Label>
-                <Select
-                  value={formData.race}
-                  onValueChange={(value) => handleSelectChange("race", value)}
-                  disabled={!isEditable}
+                <Select 
+                  value={demographicForm.race} 
+                  onValueChange={(value) => setDemographicForm({...demographicForm, race: value})}
+                  disabled={!isEditable || isSaving}
                 >
                   <SelectTrigger id="race">
                     <SelectValue placeholder="Select race" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="american_indian">American Indian or Alaska Native</SelectItem>
+                    <SelectItem value="americanIndianOrAlaskaNative">American Indian or Alaska Native</SelectItem>
                     <SelectItem value="asian">Asian</SelectItem>
-                    <SelectItem value="black">Black or African American</SelectItem>
-                    <SelectItem value="pacific_islander">Native Hawaiian or Other Pacific Islander</SelectItem>
+                    <SelectItem value="blackOrAfricanAmerican">Black or African American</SelectItem>
+                    <SelectItem value="nativeHawaiianOrOtherPacificIslander">Native Hawaiian or Other Pacific Islander</SelectItem>
                     <SelectItem value="white">White</SelectItem>
-                    <SelectItem value="not_provided">I do not wish to provide this information</SelectItem>
+                    <SelectItem value="doNotWishToProvide">I do not wish to provide this information</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="sex">Sex</Label>
-                <Select
-                  value={formData.sex}
-                  onValueChange={(value) => handleSelectChange("sex", value)}
-                  disabled={!isEditable}
+                <Select 
+                  value={demographicForm.sex} 
+                  onValueChange={(value) => setDemographicForm({...demographicForm, sex: value})}
+                  disabled={!isEditable || isSaving}
                 >
                   <SelectTrigger id="sex">
                     <SelectValue placeholder="Select sex" />
@@ -998,48 +925,57 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
                   <SelectContent>
                     <SelectItem value="female">Female</SelectItem>
                     <SelectItem value="male">Male</SelectItem>
-                    <SelectItem value="not_provided">I do not wish to provide this information</SelectItem>
+                    <SelectItem value="doNotWishToProvide">I do not wish to provide this information</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div>
-                <Label htmlFor="collectionMethod">Information Collection Method</Label>
-                <Select
-                  value={formData.collectionMethod}
-                  onValueChange={(value) => handleSelectChange("collectionMethod", value)}
-                  disabled={!isEditable}
+              <div className="space-y-2">
+                <Label htmlFor="collectionMethod">Method of Collection</Label>
+                <Select 
+                  value={demographicForm.collectionMethod} 
+                  onValueChange={(value) => setDemographicForm({...demographicForm, collectionMethod: value})}
+                  disabled={!isEditable || isSaving}
                 >
                   <SelectTrigger id="collectionMethod">
                     <SelectValue placeholder="Select method" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="applicant-provided">Applicant provided information</SelectItem>
-                    <SelectItem value="visual">Based on visual observation</SelectItem>
-                    <SelectItem value="surname">Based on surname</SelectItem>
+                    <SelectItem value="Applicant Provided">Applicant Provided</SelectItem>
+                    <SelectItem value="Visual Observation">Visual Observation</SelectItem>
+                    <SelectItem value="Surname">Surname</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Demographic Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('demographic', demographicForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Demographic Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
 
-        {/* Loan Information */}
-        <TabsContent value="loan">
-          <CardContent className="space-y-4 pt-4">
-            <h3 className="text-lg font-semibold text-blue-600">Loan and Product Information</h3>
-            
-            <div className="space-y-4">
-              <div>
+          {/* Loan Section */}
+          <TabsContent value="loan" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="loanType">Loan Type</Label>
-                <Select
-                  value={formData.loanType}
-                  onValueChange={(value) => handleSelectChange("loanType", value)}
-                  disabled={!isEditable}
+                <Select 
+                  value={loanForm.loanType} 
+                  onValueChange={(value) => setLoanForm({...loanForm, loanType: value})}
+                  disabled={!isEditable || isSaving}
                 >
                   <SelectTrigger id="loanType">
                     <SelectValue placeholder="Select loan type" />
@@ -1050,93 +986,91 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
                     <SelectItem value="va">VA</SelectItem>
                     <SelectItem value="usda">USDA</SelectItem>
                     <SelectItem value="jumbo">Jumbo</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="mortgageTerm">Mortgage Term (years)</Label>
-                  <Select
-                    value={formData.mortgageTerm}
-                    onValueChange={(value) => handleSelectChange("mortgageTerm", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="mortgageTerm">
-                      <SelectValue placeholder="Select term" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="15">15 years</SelectItem>
-                      <SelectItem value="20">20 years</SelectItem>
-                      <SelectItem value="30">30 years</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div>
-                  <Label htmlFor="amortizationType">Amortization Type</Label>
-                  <Select
-                    value={formData.amortizationType}
-                    onValueChange={(value) => handleSelectChange("amortizationType", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="amortizationType">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fixed">Fixed Rate</SelectItem>
-                      <SelectItem value="arm">Adjustable Rate (ARM)</SelectItem>
-                      <SelectItem value="interest_only">Interest Only</SelectItem>
-                      <SelectItem value="balloon">Balloon</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="interestRate">Interest Rate (%)</Label>
-                  <Input
-                    id="interestRate"
-                    name="interestRate"
-                    value={formData.interestRate}
-                    onChange={handleInputChange}
-                    disabled={!isEditable}
-                    placeholder="0.00%"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="mortgageInsurance">Mortgage Insurance</Label>
-                  <Select
-                    value={formData.mortgageInsurance}
-                    onValueChange={(value) => handleSelectChange("mortgageInsurance", value)}
-                    disabled={!isEditable}
-                  >
-                    <SelectTrigger id="mortgageInsurance">
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      <SelectItem value="pmi">Private Mortgage Insurance (PMI)</SelectItem>
-                      <SelectItem value="mip">Mortgage Insurance Premium (MIP)</SelectItem>
-                      <SelectItem value="va_funding">VA Funding Fee</SelectItem>
-                      <SelectItem value="other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="mortgageTerm">Mortgage Term</Label>
+                <Select 
+                  value={loanForm.mortgageTerm} 
+                  onValueChange={(value) => setLoanForm({...loanForm, mortgageTerm: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="mortgageTerm">
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30">30 Year</SelectItem>
+                    <SelectItem value="20">20 Year</SelectItem>
+                    <SelectItem value="15">15 Year</SelectItem>
+                    <SelectItem value="10">10 Year</SelectItem>
+                    <SelectItem value="5">5 Year</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            
-            <Button onClick={handleSaveSection} disabled={!isEditable || isSaving}>
-              {isSaving ? 'Saving...' : 'Save Loan Information'}
-            </Button>
-          </CardContent>
-        </TabsContent>
-      </Tabs>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amortizationType">Amortization Type</Label>
+                <Select 
+                  value={loanForm.amortizationType} 
+                  onValueChange={(value) => setLoanForm({...loanForm, amortizationType: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="amortizationType">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fixed">Fixed Rate</SelectItem>
+                    <SelectItem value="arm3">3/1 ARM</SelectItem>
+                    <SelectItem value="arm5">5/1 ARM</SelectItem>
+                    <SelectItem value="arm7">7/1 ARM</SelectItem>
+                    <SelectItem value="arm10">10/1 ARM</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="interestRate">Interest Rate</Label>
+                <Input 
+                  id="interestRate"
+                  placeholder="3.25%"
+                  value={loanForm.interestRate}
+                  onChange={(e) => setLoanForm({...loanForm, interestRate: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mortgageInsurance">Mortgage Insurance</Label>
+                <Input 
+                  id="mortgageInsurance"
+                  placeholder="0.55%"
+                  value={loanForm.mortgageInsurance}
+                  onChange={(e) => setLoanForm({...loanForm, mortgageInsurance: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('loan', loanForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Loan Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
     </Card>
   );
 };

@@ -84,6 +84,7 @@ export type Database = {
           id: number
           last_name: string | null
           mailing_address: string | null
+          mortgage_data: Json | null
           phone1: string | null
           phone2: string | null
           property_address: string | null
@@ -100,6 +101,7 @@ export type Database = {
           id: number
           last_name?: string | null
           mailing_address?: string | null
+          mortgage_data?: Json | null
           phone1?: string | null
           phone2?: string | null
           property_address?: string | null
@@ -116,6 +118,7 @@ export type Database = {
           id?: number
           last_name?: string | null
           mailing_address?: string | null
+          mortgage_data?: Json | null
           phone1?: string | null
           phone2?: string | null
           property_address?: string | null
