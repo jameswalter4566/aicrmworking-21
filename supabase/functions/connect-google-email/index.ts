@@ -13,8 +13,19 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Content-Type': 'application/json' // Always set JSON content type
+  'Content-Type': 'application/json'
 };
+
+// Validate required environment variables
+if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error('Missing required environment variables:', {
+    hasClientId: !!CLIENT_ID,
+    hasClientSecret: !!CLIENT_SECRET,
+    hasRedirectUri: !!REDIRECT_URI,
+    hasSupabaseUrl: !!SUPABASE_URL,
+    hasSupabaseAnonKey: !!SUPABASE_ANON_KEY
+  });
+}
 
 // Create a single supabase client for interacting with your database
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -39,12 +50,18 @@ serve(async (req) => {
     if (action === 'authorize') {
       console.log("Creating authorization URL");
       
-      // Check required environment variables
+      // Validate required environment variables
       if (!CLIENT_ID || !REDIRECT_URI) {
-        console.error('Missing required env variables for authorization:', { hasClientId: !!CLIENT_ID, hasRedirectUri: !!REDIRECT_URI });
+        console.error('Missing required environment variables for authorization');
         return new Response(
-          JSON.stringify({ error: 'Server configuration error', details: 'Missing required OAuth configuration' }),
-          { status: 500, headers: corsHeaders }
+          JSON.stringify({ 
+            error: 'Server configuration error', 
+            details: 'Missing required OAuth configuration' 
+          }),
+          { 
+            status: 500, 
+            headers: corsHeaders 
+          }
         );
       }
       
@@ -61,10 +78,13 @@ serve(async (req) => {
         
       console.log("Generated auth URL (partial):", authUrl.substring(0, 100) + "...");
       
-      // Return JSON with the correct headers
+      // Ensure we're properly returning JSON with the correct headers
       return new Response(
         JSON.stringify({ url: authUrl }),
-        { headers: corsHeaders }
+        { 
+          headers: corsHeaders,
+          status: 200
+        }
       );
     }
     
@@ -99,15 +119,15 @@ serve(async (req) => {
         }),
       });
 
-      // Check if the response is JSON
+      // Handle non-JSON responses from Google
       const contentType = tokenResponse.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const errorText = await tokenResponse.text();
-        console.error('Non-JSON response from Google:', errorText.substring(0, 200));
+        console.error('Unexpected response from Google:', tokenResponse.status, contentType, errorText.substring(0, 200));
         return new Response(
           JSON.stringify({ 
             error: 'Failed to exchange authorization code', 
-            details: `Non-JSON response from Google (${tokenResponse.status})` 
+            details: `Unexpected response from Google: ${tokenResponse.status}` 
           }),
           { 
             status: 502, 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -11,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { customSupabase } from "@/utils/supabase-custom-client";
+
+const SUPABASE_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
 
 const Settings = () => {
   const { activeIndustry, setActiveIndustry } = useIndustry();
@@ -32,7 +33,7 @@ const Settings = () => {
           
           const token = await getAuthToken();
           
-          const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=callback&code=${code}`, {
+          const response = await fetch(`${SUPABASE_URL}/functions/v1/connect-google-email?action=callback&code=${code}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -40,6 +41,8 @@ const Settings = () => {
           });
           
           if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Error response:", response.status, errorText);
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
           
@@ -146,9 +149,8 @@ const Settings = () => {
   const connectGoogleEmail = async () => {
     setLoading(true);
     try {
-      // Use the full URL to ensure we're calling the edge function directly
-      const functionUrl = `${window.location.origin}/functions/v1/connect-google-email?action=authorize`;
-      console.log("Calling function:", functionUrl);
+      const functionUrl = `${SUPABASE_URL}/functions/v1/connect-google-email?action=authorize`;
+      console.log("Calling Supabase function:", functionUrl);
       
       const response = await fetch(functionUrl);
       
@@ -207,7 +209,7 @@ const Settings = () => {
     try {
       const token = await getAuthToken();
       
-      const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=disconnect`, {
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/connect-google-email?action=disconnect`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
