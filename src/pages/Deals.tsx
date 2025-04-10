@@ -57,7 +57,7 @@ const Deals = () => {
     setLoading(true);
     try {
       // Default real estate deals for now - in the future, this would be from the database
-      const defaultDeals = [
+      const defaultDeals: Deal[] = [
         {
           id: 1,
           name: "123 Main St. Listing",
