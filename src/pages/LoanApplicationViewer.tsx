@@ -4,6 +4,7 @@ import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoanApplicationSidebar from "@/components/mortgage/LoanApplicationSidebar";
+import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -17,6 +18,7 @@ interface LoanApplication {
   loanStatus: string;
   loanId: string;
   mortgageData?: any;
+  currentStep?: string;
 }
 
 const LoanApplicationViewer = () => {
@@ -60,6 +62,20 @@ const LoanApplicationViewer = () => {
       const lead = data.data[0];
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
+      
+      // Determine the current step based on loan status or other data
+      let currentStep = "applicationCreated"; // Default to first step
+      
+      if (lead.mortgageData?.loan?.status) {
+        const status = lead.mortgageData.loan.status.toLowerCase();
+        if (status.includes("processing")) currentStep = "processing";
+        else if (status.includes("approved")) currentStep = "approved";
+        else if (status.includes("closing")) currentStep = "closing";
+        else if (status.includes("funded")) currentStep = "funded";
+        else if (status.includes("submitted")) currentStep = "submitted";
+      }
+      
+      // You may need more complex logic based on your actual data structure
 
       setLoanApplication({
         id: lead.id,
@@ -69,7 +85,8 @@ const LoanApplicationViewer = () => {
         loanAmount: loanAmount,
         loanStatus: lead.mortgageData?.loan?.status || "Processing",
         loanId: lead.mortgageData?.loan?.loanNumber || `ML-${lead.id}`,
-        mortgageData: lead.mortgageData || {}
+        mortgageData: lead.mortgageData || {},
+        currentStep: currentStep
       });
     } catch (error) {
       console.error("Error in fetchLoanApplicationData:", error);
@@ -212,6 +229,9 @@ const LoanApplicationViewer = () => {
           Back
         </Button>
       </div>
+
+      {/* Loan Progress Tracker */}
+      <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">

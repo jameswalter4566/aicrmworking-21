@@ -1,0 +1,103 @@
+
+import React from "react";
+import { cn } from "@/lib/utils";
+import { Progress } from "@/components/ui/progress";
+import {
+  FileText,
+  Send,
+  FileCheck,
+  Upload,
+  Settings,
+  Check,
+  FilePlus,
+  FileUp,
+  DoorClosed,
+  BanknoteIcon,
+  BadgeCheck
+} from "lucide-react";
+
+interface CheckpointProps {
+  label: string;
+  isCompleted: boolean;
+  isActive: boolean;
+  icon: React.ElementType;
+}
+
+interface LoanProgressTrackerProps {
+  currentStep: string;
+}
+
+const checkpoints = [
+  { id: "applicationCreated", label: "Application Created", icon: FileText },
+  { id: "disclosuresSent", label: "Disclosures Sent", icon: Send },
+  { id: "disclosuresSigned", label: "Disclosures Signed", icon: FileCheck },
+  { id: "submitted", label: "Submitted", icon: Upload },
+  { id: "processing", label: "Processing", icon: Settings },
+  { id: "approved", label: "Approved", icon: BadgeCheck },
+  { id: "closingDisclosureGenerated", label: "CD Generated", icon: FilePlus },
+  { id: "closingDisclosureSigned", label: "CD Signed", icon: FileCheck },
+  { id: "ctc", label: "CTC", icon: Check },
+  { id: "docsOut", label: "Docs Out", icon: FileUp },
+  { id: "closing", label: "Closing", icon: DoorClosed },
+  { id: "funded", label: "FUNDED", icon: BanknoteIcon },
+];
+
+const Checkpoint: React.FC<CheckpointProps> = ({ label, isCompleted, isActive, icon: Icon }) => {
+  return (
+    <div className="flex flex-col items-center">
+      <span className="text-xs font-medium mb-2 text-gray-700">
+        {label}
+      </span>
+      <div
+        className={cn(
+          "w-8 h-8 rounded-full flex items-center justify-center z-10 transition-colors",
+          isCompleted || isActive
+            ? "bg-mortgage-purple text-white"
+            : "bg-white border-2 border-gray-300 text-gray-400"
+        )}
+      >
+        <Icon className="w-4 h-4" />
+      </div>
+    </div>
+  );
+};
+
+const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({ currentStep }) => {
+  // Find the index of the current step
+  const currentIndex = checkpoints.findIndex((checkpoint) => checkpoint.id === currentStep);
+  
+  // If current step is not found, default to first step
+  const activeIndex = currentIndex >= 0 ? currentIndex : 0;
+  
+  // Calculate progress percentage
+  const progressPercentage = ((activeIndex + 1) / checkpoints.length) * 100;
+
+  return (
+    <div className="w-full px-8 py-6 bg-white">
+      <h3 className="text-lg font-semibold mb-6 text-mortgage-darkPurple">Loan Progress</h3>
+      
+      {/* Progress bar */}
+      <div className="relative mb-2">
+        <Progress 
+          value={progressPercentage} 
+          className="h-2 bg-gray-200"
+        />
+      </div>
+      
+      {/* Checkpoints */}
+      <div className="flex justify-between mt-[-16px]">
+        {checkpoints.map((checkpoint, index) => (
+          <Checkpoint
+            key={checkpoint.id}
+            label={checkpoint.label}
+            icon={checkpoint.icon}
+            isActive={index === activeIndex}
+            isCompleted={index < activeIndex}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+export default LoanProgressTracker;
