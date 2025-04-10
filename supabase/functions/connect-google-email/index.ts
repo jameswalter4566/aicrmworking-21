@@ -8,6 +8,7 @@ const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
 const REDIRECT_URI = 'https://preview--aicrmworking.lovable.app/settings';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // Improved CORS headers with explicit content type
 const corsHeaders = {
@@ -18,18 +19,22 @@ const corsHeaders = {
 };
 
 // Validate required environment variables
-if (!CLIENT_ID || !CLIENT_SECRET || !SUPABASE_URL || !SUPABASE_ANON_KEY) {
+if (!CLIENT_ID || !CLIENT_SECRET || !SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing required environment variables:', {
     hasClientId: !!CLIENT_ID,
     hasClientSecret: !!CLIENT_SECRET,
     hasRedirectUri: !!REDIRECT_URI,
     hasSupabaseUrl: !!SUPABASE_URL,
-    hasSupabaseAnonKey: !!SUPABASE_ANON_KEY
+    hasSupabaseAnonKey: !!SUPABASE_ANON_KEY,
+    hasSupabaseServiceRoleKey: !!SUPABASE_SERVICE_ROLE_KEY
   });
 }
 
-// Create a single supabase client for interacting with your database
+// Create a supabase client with the anon key for auth verification
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Create a supabase admin client with the service role key for bypassing RLS
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 serve(async (req) => {
   console.log("Function invoked with URL:", req.url);
@@ -209,9 +214,9 @@ serve(async (req) => {
         );
       }
       
-      // Store the tokens in the database
-      console.log("Storing tokens in database");
-      const { data, error } = await supabase
+      // Store the tokens in the database using the admin client to bypass RLS
+      console.log("Storing tokens in database with admin client");
+      const { data, error } = await supabaseAdmin
         .from('user_email_connections')
         .upsert({
           user_id: user.id,
@@ -284,7 +289,7 @@ serve(async (req) => {
       
       // Get the connection to revoke
       console.log("Finding connection to revoke");
-      const { data: connection } = await supabase
+      const { data: connection } = await supabaseAdmin
         .from('user_email_connections')
         .select('*')
         .eq('user_id', user.id)
@@ -307,9 +312,9 @@ serve(async (req) => {
         }
       }
       
-      // Delete the connection from the database
-      console.log("Deleting connection from database");
-      const { error } = await supabase
+      // Delete the connection from the database using admin client to bypass RLS
+      console.log("Deleting connection from database with admin client");
+      const { error } = await supabaseAdmin
         .from('user_email_connections')
         .delete()
         .eq('user_id', user.id)
