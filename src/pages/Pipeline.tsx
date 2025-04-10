@@ -26,6 +26,8 @@ interface MortgageLead {
   trend: "up" | "down";
   isMortgageLead?: boolean;
   client: string;
+  loanStatus?: string;
+  loanId?: string;
 }
 
 const Pipeline = () => {
@@ -92,7 +94,9 @@ const Pipeline = () => {
             listedDate: new Date(lead.addedToPipelineAt || lead.updatedAt || lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             probability: lead.mortgageData?.loan?.probability || 80,
             trend: "up",
-            client: `${lead.firstName || ''} ${lead.lastName || ''}`.trim()
+            client: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
+            loanStatus: lead.mortgageData?.loan?.status || "Processing",
+            loanId: lead.mortgageData?.loan?.loanNumber || `ML-${lead.id}`
           };
         });
 
@@ -244,6 +248,12 @@ const Pipeline = () => {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Probability
                   </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Loan Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Loan ID
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -284,6 +294,14 @@ const Pipeline = () => {
                           <ArrowDownRight className="h-4 w-4 text-red-500 ml-1" />
                         )}
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-mortgage-lightPurple text-mortgage-darkPurple">
+                        {listing.loanStatus}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {listing.loanId}
                     </td>
                   </tr>
                 ))}
