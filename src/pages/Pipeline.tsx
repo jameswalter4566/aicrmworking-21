@@ -42,7 +42,7 @@ const Pipeline = () => {
     activeCount: 0,
     thisMonthCount: 0,
     lastMonthCount: 0,
-    ytdCount: 4
+    ytdCount: 0
   });
 
   useEffect(() => {
@@ -101,18 +101,59 @@ const Pipeline = () => {
       console.log("Processed mortgage leads:", mortgageLeads);
       setListings(mortgageLeads);
       
-      // Calculate stats
+      // Calculate stats from actual data
       const totalValue = mortgageLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
+      
+      // Initialize counters
+      let thisMonthValue = 0;
+      let thisMonthCount = 0;
+      let lastMonthValue = 0;
+      let lastMonthCount = 0;
+      let ytdValue = 0;
+      let ytdCount = 0;
+
+      // Get current date information
+      const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      
+      // Process each lead for statistics
+      mortgageLeads.forEach(lead => {
+        const leadDate = new Date(lead.listedDate);
+        const leadMonth = leadDate.getMonth();
+        const leadYear = leadDate.getFullYear();
+        
+        // This month stats
+        if (leadMonth === currentMonth && leadYear === currentYear) {
+          thisMonthValue += lead.value;
+          thisMonthCount++;
+        }
+        
+        // Last month stats
+        const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+        const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+        
+        if (leadMonth === lastMonth && leadYear === lastMonthYear) {
+          lastMonthValue += lead.value;
+          lastMonthCount++;
+        }
+        
+        // Year to date stats
+        if (leadYear === currentYear) {
+          ytdValue += lead.value;
+          ytdCount++;
+        }
+      });
       
       setStats({
         activeListings: totalValue,
-        thisMonth: 0, // You would calculate this based on date filtering
-        lastMonth: 350000, // Example value
-        ytd: 1250000, // Example value
+        thisMonth: thisMonthValue,
+        lastMonth: lastMonthValue,
+        ytd: ytdValue,
         activeCount: mortgageLeads.length,
-        thisMonthCount: 0,
-        lastMonthCount: 1,
-        ytdCount: 4
+        thisMonthCount: thisMonthCount,
+        lastMonthCount: lastMonthCount,
+        ytdCount: ytdCount
       });
     } catch (error) {
       console.error("Error in fetchMortgageLeads:", error);

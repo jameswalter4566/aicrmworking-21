@@ -164,14 +164,12 @@ const LeadProfile = () => {
     try {
       setIsSaving(true);
       
-      // Create updated mortgage data by merging the new section data with existing data
       const currentMortgageData = lead.mortgageData || {};
       const updatedMortgageData = {
         ...currentMortgageData,
         [section]: data
       };
       
-      // Update the lead with the new mortgage data
       const updatedLeadData = { 
         ...lead, 
         mortgageData: updatedMortgageData 
@@ -343,7 +341,8 @@ const LeadProfile = () => {
             )}
             {!lead.isMortgageLead && activeIndustry === 'mortgage' && (
               <Button 
-                variant="outline" 
+                className="bg-blue-500 hover:bg-blue-600 text-white border border-blue-400 shadow-lg animate-pulse-glow"
+                variant="outline"
                 onClick={handlePushToMortgagePipeline}
                 disabled={isSaving}
               >
@@ -573,7 +572,6 @@ const LeadProfile = () => {
           </Card>
         </div>
 
-        {/* Mortgage 1003 Form - Only show for mortgage industry */}
         {activeIndustry === 'mortgage' && (
           <Mortgage1003Form 
             lead={lead} 
