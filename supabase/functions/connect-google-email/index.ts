@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
+// Make sure this EXACTLY matches what you've configured in Google Cloud Console
 const REDIRECT_URI = Deno.env.get('REDIRECT_URI') || 'https://imrmboyczebjlbnkgjns.lovableproject.com/settings';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
@@ -64,6 +65,9 @@ serve(async (req) => {
           }
         );
       }
+      
+      // Logging the exact redirect URI being used
+      console.log("Using redirect URI:", REDIRECT_URI);
       
       // Create a new auth URL for Google
       const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
