@@ -171,6 +171,10 @@ const Pipeline = () => {
     toast.success("Starting new mortgage application");
   };
 
+  const handleListingClick = (listing: MortgageLead) => {
+    navigate(`/loan-application/${listing.id}`);
+  };
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
@@ -258,7 +262,11 @@ const Pipeline = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {listings.map((listing) => (
-                  <tr key={listing.id} className="table-row">
+                  <tr 
+                    key={listing.id} 
+                    className="table-row hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => handleListingClick(listing)}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-mortgage-purple">
                       {listing.propertyAddress}
                     </td>

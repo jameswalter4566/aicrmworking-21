@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -44,7 +43,6 @@ const Deals = () => {
   });
   
   useEffect(() => {
-    // Redirect to mortgage pipeline page if in mortgage industry
     if (activeIndustry === 'mortgage') {
       navigate('/pipeline');
       return;
@@ -56,7 +54,6 @@ const Deals = () => {
   const fetchDeals = async () => {
     setLoading(true);
     try {
-      // Default real estate deals for now - in the future, this would be from the database
       const defaultDeals: Deal[] = [
         {
           id: 1,
@@ -103,8 +100,6 @@ const Deals = () => {
   const calculateStats = (dealsData: Deal[]) => {
     const totalPipeline = dealsData.reduce((sum, deal) => sum + deal.value, 0);
     
-    // In a real app, these would be calculated based on date filtering
-    // For now, use sample data
     setStats({
       totalPipeline,
       thisMonth: 0,
@@ -117,7 +112,6 @@ const Deals = () => {
     });
   };
 
-  // Formatting function for currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -126,10 +120,17 @@ const Deals = () => {
     }).format(amount);
   };
 
+  const handleDealClick = (deal: Deal) => {
+    if (activeIndustry === 'mortgage') {
+      navigate(`/loan-application/${deal.id}`);
+    } else {
+      toast.info("Deal details view coming soon");
+    }
+  };
+
   const handleNewDeal = () => {
-    // Navigate to a form for new deal
     toast.success("Creating new deal");
-    // navigate("/new-deal"); // Uncomment when this route exists
+    // navigate("/new-deal");
   };
 
   return (
@@ -211,7 +212,11 @@ const Deals = () => {
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {deals.map((deal) => (
-                  <tr key={deal.id} className="table-row">
+                  <tr 
+                    key={deal.id} 
+                    className="table-row hover:bg-gray-50 cursor-pointer transition-colors"
+                    onClick={() => handleDealClick(deal)}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-crm-blue">
                       {deal.name}
                     </td>
