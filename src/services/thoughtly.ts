@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 
@@ -263,7 +264,6 @@ export const thoughtlyService = {
     page?: number;
     limit?: number;
     source?: string;
-    leadType?: string;
   }) {
     try {
       console.log('Retrieving leads from Supabase with options:', options);
@@ -287,8 +287,7 @@ export const thoughtlyService = {
       const requestBody = {
         source: options?.source || 'all',
         page: options?.page || 1,
-        limit: options?.limit || 10,
-        leadType: options?.leadType || null
+        limit: options?.limit || 10
       };
       
       console.log('Calling retrieve-leads edge function...', requestBody);

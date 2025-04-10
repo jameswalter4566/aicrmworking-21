@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface LeadProfile {
@@ -88,7 +87,6 @@ export interface LeadProfile {
       amortizationType?: string;
       interestRate?: string;
       mortgageInsurance?: string;
-      status?: string;
     };
   };
   isMortgageLead?: boolean;

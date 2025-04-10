@@ -57,7 +57,7 @@ Deno.serve(async (req) => {
     }
     
     // Extract request body parameters
-    let requestBody = { source: 'all', leadType: null };
+    let requestBody = { source: 'all' };
     try {
       if (req.headers.get('content-type')?.includes('application/json')) {
         const body = await req.json().catch(() => ({}));
@@ -102,10 +102,10 @@ Deno.serve(async (req) => {
     let leads = [];
     if (isAuthenticated && userLeadCount === 0 && totalLeadCount > 0) {
       console.log("User has no leads but there are leads in the database. Fetching all leads for testing purposes.");
-      leads = await fetchAllLeads(userId, requestBody.source, requestBody.leadType);
+      leads = await fetchAllLeads(userId, requestBody.source);
     } else {
       // Otherwise, fetch leads normally (user-specific or all depending on authentication)
-      leads = await fetchLeadsFromSupabase(userId, requestBody.source, requestBody.leadType);
+      leads = await fetchLeadsFromSupabase(userId, requestBody.source);
     }
     
     console.log(`Successfully retrieved ${leads.length} leads out of ${userId ? userLeadCount : totalLeadCount} total`);
@@ -120,7 +120,6 @@ Deno.serve(async (req) => {
           totalLeadCount: totalLeadCount || 0,
           userLeadCount: userLeadCount || 0,
           source: requestBody.source,
-          leadType: requestBody.leadType,
           retrievedCount: leads.length
         }
       }),
@@ -152,9 +151,9 @@ Deno.serve(async (req) => {
 });
 
 // Function to fetch leads from Supabase with user filtering
-async function fetchLeadsFromSupabase(userId, source = 'all', leadType = null) {
+async function fetchLeadsFromSupabase(userId, source = 'all') {
   try {
-    console.log(`Starting fetchLeadsFromSupabase - userId: ${userId || 'anonymous'}, source: ${source}, leadType: ${leadType}`);
+    console.log(`Starting fetchLeadsFromSupabase - userId: ${userId || 'anonymous'}, source: ${source}`);
     
     // Initialize query to the leads table
     let query = supabase.from('leads').select('*');
@@ -166,12 +165,6 @@ async function fetchLeadsFromSupabase(userId, source = 'all', leadType = null) {
     if (source !== 'all') {
       console.log(`Filtering by source: ${source}`);
       // Implement source filtering logic if needed
-    }
-    
-    // Apply lead type filtering if specified
-    if (leadType === 'mortgage') {
-      console.log('Filtering for mortgage leads only');
-      query = query.eq('is_mortgage_lead', true);
     }
     
     // If user is authenticated, filter by their user ID
@@ -213,9 +206,7 @@ async function fetchLeadsFromSupabase(userId, source = 'all', leadType = null) {
       tags: lead.tags,
       createdAt: lead.created_at,
       updatedAt: lead.updated_at,
-      createdBy: lead.created_by,
-      isMortgageLead: lead.is_mortgage_lead,
-      addedToPipelineAt: lead.added_to_pipeline_at
+      createdBy: lead.created_by
     }));
     
     console.log(`Transformed ${transformedLeads.length} leads`);
@@ -230,7 +221,7 @@ async function fetchLeadsFromSupabase(userId, source = 'all', leadType = null) {
 
 // Function to fetch all leads regardless of user ID for testing purposes
 // Only used when a user has no leads but there are leads in the database
-async function fetchAllLeads(userId, source = 'all', leadType = null) {
+async function fetchAllLeads(userId, source = 'all') {
   try {
     console.log(`Starting fetchAllLeads (testing mode) for user: ${userId || 'anonymous'}`);
     
@@ -244,12 +235,6 @@ async function fetchAllLeads(userId, source = 'all', leadType = null) {
     if (source !== 'all') {
       console.log(`Filtering by source: ${source}`);
       // Implement source filtering logic if needed
-    }
-    
-    // Apply lead type filtering if specified
-    if (leadType === 'mortgage') {
-      console.log('Filtering for mortgage leads only');
-      query = query.eq('is_mortgage_lead', true);
     }
     
     // Don't filter by user ID to return all leads
@@ -286,9 +271,7 @@ async function fetchAllLeads(userId, source = 'all', leadType = null) {
       tags: lead.tags,
       createdAt: lead.created_at,
       updatedAt: lead.updated_at,
-      createdBy: lead.created_by,
-      isMortgageLead: lead.is_mortgage_lead,
-      addedToPipelineAt: lead.added_to_pipeline_at
+      createdBy: lead.created_by
     }));
     
     console.log(`Transformed ${transformedLeads.length} leads for testing purposes`);
