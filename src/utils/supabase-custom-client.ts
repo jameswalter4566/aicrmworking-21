@@ -6,3 +6,42 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 // Create a custom instance of the supabase client to bypass typed schema constraints
 export const customSupabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// Create helper methods for predictive dialer functionality
+export const predictiveDialer = {
+  customSupabase,
+  
+  // Contact methods
+  getContacts() {
+    return customSupabase.from('predictive_dialer_contacts');
+  },
+  
+  async fetchContacts() {
+    const { data, error } = await customSupabase
+      .from('predictive_dialer_contacts')
+      .select('*')
+      .order('name');
+    
+    if (error) {
+      console.error('Error fetching contacts:', error);
+      throw error;
+    }
+    
+    return data || [];
+  },
+  
+  // Agent methods
+  getAgents() {
+    return customSupabase.from('predictive_dialer_agents');
+  },
+  
+  // Call methods
+  getCalls() {
+    return customSupabase.from('predictive_dialer_calls');
+  },
+  
+  // Queue methods
+  getCallQueue() {
+    return customSupabase.from('predictive_dialer_call_queue');
+  }
+};
