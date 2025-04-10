@@ -149,10 +149,21 @@ const Settings = () => {
   const connectGoogleEmail = async () => {
     setLoading(true);
     try {
-      const functionUrl = `${SUPABASE_URL}/functions/v1/connect-google-email?action=authorize`;
+      const token = await getAuthToken();
+      if (!token) {
+        throw new Error('You must be logged in to connect your email account');
+      }
+      
+      const functionUrl = `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/connect-google-email?action=authorize`;
       console.log("Calling Supabase function:", functionUrl);
       
-      const response = await fetch(functionUrl);
+      const response = await fetch(functionUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
       if (!response.ok) {
         const errorText = await response.text();
