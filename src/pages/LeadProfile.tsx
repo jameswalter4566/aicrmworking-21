@@ -271,6 +271,9 @@ const LeadProfile = () => {
           <p className="text-gray-500">Lead ID: {lead.id}</p>
         </div>
         <div className="flex space-x-2">
+          {activeIndustry === 'mortgage' && lead.id && (
+            <PushToPipelineButton leadId={lead.id} />
+          )}
           <Button 
             variant={editMode ? "destructive" : "outline"}
             onClick={toggleEditMode}
@@ -308,17 +311,11 @@ const LeadProfile = () => {
                 />
               </div>
             ) : (
-              <>
-                <DispositionSelector 
-                  currentDisposition={lead.disposition || 'Not Contacted'} 
-                  onDispositionChange={handleDispositionChange}
-                  disabled={isSaving}
-                />
-                
-                {activeIndustry === 'mortgage' && lead.id && (
-                  <PushToPipelineButton leadId={lead.id} />
-                )}
-              </>
+              <DispositionSelector 
+                currentDisposition={lead.disposition || 'Not Contacted'} 
+                onDispositionChange={handleDispositionChange}
+                disabled={isSaving}
+              />
             )}
           </CardContent>
         </Card>
