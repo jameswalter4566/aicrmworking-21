@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -245,7 +246,7 @@ export const PersonalInfoForm: React.FC<PersonalInfoFormProps> = ({
                 <SelectValue placeholder="Select suffix" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 <SelectItem value="Jr.">Jr.</SelectItem>
                 <SelectItem value="Sr.">Sr.</SelectItem>
                 <SelectItem value="II">II</SelectItem>

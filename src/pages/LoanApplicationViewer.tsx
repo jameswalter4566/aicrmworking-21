@@ -364,6 +364,165 @@ const LoanApplicationViewer = () => {
       </div>
     </div>
   );
-};
+
+  function renderContent() {
+    // First, determine the main tab
+    const mainTab = activeTab.includes("-") ? activeTab.split("-")[0] : activeTab;
+    const subSection = activeTab.includes("-") ? activeTab.split("-")[1] : null;
+    
+    switch(mainTab) {
+      case "1003":
+        if (subSection) {
+          return render1003Section(subSection);
+        }
+        return render1003Section("personal"); // Default to personal info
+        
+      case "products":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Products and Pricing</h2>
+            <p className="text-gray-600">
+              View available loan products and pricing options.
+            </p>
+          </div>
+        );
+      case "processor":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Processor Assist</h2>
+            <p className="text-gray-600">
+              Get assistance with loan processing tasks.
+            </p>
+          </div>
+        );
+      case "pitchDeck":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Pitch Deck Pro</h2>
+            <p className="text-gray-600">
+              Create and manage presentation materials for this loan.
+            </p>
+          </div>
+        );
+      case "aiLoanOfficer":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">AI Loan Officer</h2>
+            <p className="text-gray-600">
+              Get AI assistance with loan officer tasks.
+            </p>
+          </div>
+        );
+      case "fees":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Fees</h2>
+            <p className="text-gray-600">
+              View and manage loan fees.
+            </p>
+          </div>
+        );
+      case "documents":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Document Manager</h2>
+            <p className="text-gray-600">
+              Manage loan documents and paperwork.
+            </p>
+          </div>
+        );
+      case "conditions":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Conditions</h2>
+            <p className="text-gray-600">
+              View and manage loan conditions.
+            </p>
+          </div>
+        );
+      case "withdraw":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Withdraw / Cancel Loan</h2>
+            <p className="text-gray-600">
+              Options to withdraw or cancel this loan application.
+            </p>
+          </div>
+        );
+      default:
+        return <div className="p-6">Select an option from the sidebar</div>;
+    }
+  }
+
+  // Helper function to render the appropriate 1003 section
+  function render1003Section(section: string) {
+    const sectionTitles = {
+      personal: "Personal Information",
+      employment: "Employment & Income",
+      assets: "Assets",
+      liabilities: "Liabilities",
+      realEstate: "Real Estate Owned",
+      loanInfo: "Loan Information",
+      housing: "Housing Expenses",
+      transaction: "Details of Transaction",
+      declarations: "Declarations",
+      government: "Government Monitoring"
+    };
+    
+    const title = sectionTitles[section as keyof typeof sectionTitles] || "Loan Application";
+    
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
+        
+        {/* Render the appropriate form based on the selected section */}
+        {section === "personal" && loanApplication && (
+          <PersonalInfoForm 
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section !== "personal" && (
+          <div className="mt-4 p-4 border rounded-md bg-gray-50">
+            <p className="text-gray-500 italic">
+              This section has not been implemented yet. It will contain fields for {title.toLowerCase()}.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Helper function to get descriptions for each section
+  function getDescription(section: string): string {
+    switch(section) {
+      case "personal":
+        return "Basic information about the borrower including name, address, and contact details.";
+      case "employment":
+        return "Information about current and previous employment, income sources, and verification.";
+      case "assets":
+        return "Details about financial assets including bank accounts, investments, and other holdings.";
+      case "liabilities":
+        return "Information about existing debts and financial obligations.";
+      case "realEstate":
+        return "Details about properties currently owned by the borrower.";
+      case "loanInfo":
+        return "Specific information about the loan being requested.";
+      case "housing":
+        return "Current housing expenses and projected expenses after the loan.";
+      case "transaction":
+        return "Breakdown of the purchase transaction including costs and sources of funds.";
+      case "declarations":
+        return "Legal declarations required for mortgage applications.";
+      case "government":
+        return "Government-required monitoring information for fair lending purposes.";
+      default:
+        return "Complete the form to continue with your loan application.";
+    }
+  }
+}
 
 export default LoanApplicationViewer;
