@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -44,6 +45,8 @@ const Settings = () => {
           
           const contentType = response.headers.get("content-type");
           if (!contentType || !contentType.includes("application/json")) {
+            const textResponse = await response.text();
+            console.error("Non-JSON response received:", textResponse.substring(0, 200));
             throw new Error(`Expected JSON response but got ${contentType || 'unknown content type'}`);
           }
           
@@ -143,20 +146,29 @@ const Settings = () => {
   const connectGoogleEmail = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=authorize`);
+      // Use the full URL to ensure we're calling the edge function directly
+      const functionUrl = `${window.location.origin}/functions/v1/connect-google-email?action=authorize`;
+      console.log("Calling function:", functionUrl);
+      
+      const response = await fetch(functionUrl);
       
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", response.status, errorText.substring(0, 200));
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
       
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text();
+        console.error("Non-JSON response received:", textResponse.substring(0, 200));
         throw new Error(`Expected JSON response but got ${contentType || 'unknown content type'}`);
       }
       
       const data = await response.json();
       
       if (data.url) {
+        console.log("Redirecting to:", data.url.substring(0, 100) + "...");
         window.location.href = data.url;
       } else {
         throw new Error("Failed to generate authorization URL");
@@ -210,12 +222,16 @@ const Settings = () => {
           const errorData = await response.json();
           throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
         } else {
+          const errorText = await response.text();
+          console.error("Non-JSON error response:", errorText.substring(0, 200));
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
       }
       
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text();
+        console.error("Non-JSON response for disconnect:", textResponse.substring(0, 200));
         throw new Error(`Expected JSON response but got ${contentType || 'unknown content type'}`);
       }
       

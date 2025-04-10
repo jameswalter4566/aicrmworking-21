@@ -8,9 +8,11 @@ const REDIRECT_URI = Deno.env.get('REDIRECT_URI') || 'https://imrmboyczebjlbnkgj
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
+// Improved CORS headers with explicit content type
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Content-Type': 'application/json' // Always set JSON content type
 };
 
@@ -37,6 +39,15 @@ serve(async (req) => {
     if (action === 'authorize') {
       console.log("Creating authorization URL");
       
+      // Check required environment variables
+      if (!CLIENT_ID || !REDIRECT_URI) {
+        console.error('Missing required env variables for authorization:', { hasClientId: !!CLIENT_ID, hasRedirectUri: !!REDIRECT_URI });
+        return new Response(
+          JSON.stringify({ error: 'Server configuration error', details: 'Missing required OAuth configuration' }),
+          { status: 500, headers: corsHeaders }
+        );
+      }
+      
       // Create a new auth URL for Google
       const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
       
@@ -50,6 +61,7 @@ serve(async (req) => {
         
       console.log("Generated auth URL (partial):", authUrl.substring(0, 100) + "...");
       
+      // Return JSON with the correct headers
       return new Response(
         JSON.stringify({ url: authUrl }),
         { headers: corsHeaders }
@@ -87,6 +99,23 @@ serve(async (req) => {
         }),
       });
 
+      // Check if the response is JSON
+      const contentType = tokenResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await tokenResponse.text();
+        console.error('Non-JSON response from Google:', errorText.substring(0, 200));
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to exchange authorization code', 
+            details: `Non-JSON response from Google (${tokenResponse.status})` 
+          }),
+          { 
+            status: 502, 
+            headers: corsHeaders 
+          }
+        );
+      }
+
       const tokenData = await tokenResponse.json();
       console.log("Token response status:", tokenResponse.status);
       
@@ -108,6 +137,23 @@ serve(async (req) => {
           Authorization: `Bearer ${tokenData.access_token}`,
         },
       });
+      
+      // Check if the userInfo response is JSON
+      const userInfoContentType = userInfoResponse.headers.get('content-type');
+      if (!userInfoContentType || !userInfoContentType.includes('application/json')) {
+        const errorText = await userInfoResponse.text();
+        console.error('Non-JSON response from Google userInfo:', errorText.substring(0, 200));
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to get user info', 
+            details: `Non-JSON response from Google userInfo (${userInfoResponse.status})` 
+          }),
+          { 
+            status: 502, 
+            headers: corsHeaders 
+          }
+        );
+      }
       
       const userInfo = await userInfoResponse.json();
       const email = userInfo.email;
