@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import MainLayout from "@/components/layouts/MainLayout";
 import { leadProfileService, type LeadProfile as LeadProfileType, LeadNote, LeadActivity } from "@/services/leadProfile";
+import { useIndustry } from "@/context/IndustryContext";
 import {
   Card,
   CardContent,
@@ -34,6 +35,7 @@ import type { LeadProfile as LeadProfileInterface } from "@/services/leadProfile
 
 const LeadProfile = () => {
   const { id } = useParams<{ id: string }>();
+  const { activeIndustry } = useIndustry();
   const [lead, setLead] = useState<LeadProfileType | null>(null);
   const [notes, setNotes] = useState<LeadNote[]>([]);
   const [activities, setActivities] = useState<LeadActivity[]>([]);
@@ -124,6 +126,20 @@ const LeadProfile = () => {
     }
   };
 
+  // Function to determine the outline color based on industry
+  const getIndustryOutlineColor = () => {
+    switch(activeIndustry) {
+      case "mortgage":
+        return "border-blue-500";
+      case "realEstate":
+        return "border-green-500";
+      case "debtSettlement":
+        return "border-purple-500";
+      default:
+        return "border-gray-200"; // Default border color
+    }
+  };
+
   if (loading) {
     return (
       <MainLayout>
@@ -208,7 +224,9 @@ const LeadProfile = () => {
 
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="col-span-2">
+          <Card 
+            className={`col-span-2 ${getIndustryOutlineColor()} border-2`}
+          >
             <CardHeader>
               <CardTitle>Contact Information</CardTitle>
               <CardDescription>Basic details and contact information</CardDescription>
