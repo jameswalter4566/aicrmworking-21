@@ -23,6 +23,7 @@ Deno.serve(async (req) => {
     
     if (authToken) {
       authToken = authToken.replace('Bearer ', '');
+      console.log("Using Authorization header token");
     } else if (token) {
       authToken = token;
       console.log("Using token from request body");
@@ -74,14 +75,18 @@ Deno.serve(async (req) => {
       }
     });
     
-    if (pdfResponse.error) {
-      console.error('PDF generation error:', pdfResponse.error);
-      throw new Error(`Failed to generate PDF: ${pdfResponse.error.message || 'Unknown error'}`);
+    if (!pdfResponse.data || pdfResponse.error) {
+      console.error('PDF generation error:', pdfResponse.error || 'Invalid response format');
+      throw new Error(`Failed to generate PDF: ${
+        pdfResponse.error?.message || 
+        pdfResponse.error || 
+        'Invalid response format'
+      }`);
     }
     
-    if (!pdfResponse.data || !pdfResponse.data.pdfData) {
+    if (!pdfResponse.data.pdfData) {
       console.error('Invalid PDF response format:', pdfResponse);
-      throw new Error('Failed to generate PDF: Invalid response format or missing PDF data');
+      throw new Error('Failed to generate PDF: Missing PDF data in response');
     }
     
     console.log("PDF successfully generated, preparing to send email...");
