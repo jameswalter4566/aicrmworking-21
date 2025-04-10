@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -832,7 +831,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
                 <Switch
                   id="intendToOccupy"
                   checked={declarationsForm.intendToOccupy}
-                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, intendToOccupy: checked})}
+                  onCheckedChange={(checked: boolean) => setDeclarationsForm({...declarationsForm, intendToOccupy: checked})}
                   disabled={!isEditable || isSaving}
                 />
               </div>
@@ -842,7 +841,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
                 <Switch
                   id="isCitizen"
                   checked={declarationsForm.isCitizen}
-                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, isCitizen: checked})}
+                  onCheckedChange={(checked: boolean) => setDeclarationsForm({...declarationsForm, isCitizen: checked})}
                   disabled={!isEditable || isSaving}
                 />
               </div>
