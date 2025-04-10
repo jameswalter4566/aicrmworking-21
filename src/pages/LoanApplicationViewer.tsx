@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from "react";
-import { useParams, useLocation } from "react-router-dom";
-import MainLayout from "@/components/layouts/MainLayout";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoanApplicationSidebar from "@/components/mortgage/LoanApplicationSidebar";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2 } from "lucide-react";
+import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 
 interface LoanApplication {
@@ -22,6 +22,7 @@ interface LoanApplication {
 const LoanApplicationViewer = () => {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("1003");
@@ -76,6 +77,10 @@ const LoanApplicationViewer = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const goBack = () => {
+    navigate(-1);
   };
 
   const renderContent = () => {
@@ -174,28 +179,42 @@ const LoanApplicationViewer = () => {
 
   if (loading) {
     return (
-      <MainLayout>
-        <div className="flex justify-center items-center h-[calc(100vh-100px)]">
-          <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
-        </div>
-      </MainLayout>
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+      </div>
     );
   }
 
   if (!loanApplication) {
     return (
-      <MainLayout>
-        <div className="text-center p-6">
-          <h2 className="text-2xl font-bold text-gray-700">Loan application not found</h2>
-          <p className="mt-2 text-gray-500">The requested loan application could not be found.</p>
-        </div>
-      </MainLayout>
+      <div className="flex flex-col items-center justify-center h-screen">
+        <h2 className="text-2xl font-bold text-gray-700">Loan application not found</h2>
+        <p className="mt-2 text-gray-500">The requested loan application could not be found.</p>
+        <Button onClick={goBack} className="mt-4" variant="outline">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go Back
+        </Button>
+      </div>
     );
   }
 
   return (
-    <MainLayout>
-      <div className="flex h-[calc(100vh-100px)]">
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Back Button Header */}
+      <div className="bg-white shadow-sm p-4">
+        <Button 
+          onClick={goBack} 
+          variant="outline" 
+          size="sm" 
+          className="rounded-full"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex flex-1 overflow-hidden">
         <LoanApplicationSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <div className="flex-1 overflow-auto bg-white border-l">
           <div className="p-6 border-b bg-gray-50">
@@ -212,7 +231,7 @@ const LoanApplicationViewer = () => {
           {renderContent()}
         </div>
       </div>
-    </MainLayout>
+    </div>
   );
 };
 
