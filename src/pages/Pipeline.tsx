@@ -25,6 +25,7 @@ interface MortgageLead {
   probability: number;
   trend: "up" | "down";
   isMortgageLead?: boolean;
+  client: string; // Add the client property to fix the TypeScript error
 }
 
 const Pipeline = () => {
@@ -80,7 +81,9 @@ const Pipeline = () => {
             listedDate: new Date(lead.addedToPipelineAt || lead.updatedAt || lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             probability: lead.mortgageData?.loan?.probability || 80,
             trend: "up",
-            propertyAddress: lead.propertyAddress || 'No address provided'
+            propertyAddress: lead.propertyAddress || 'No address provided',
+            firstName: lead.firstName || '',
+            lastName: lead.lastName || ''
           }));
 
         setListings(mortgageLeads);
