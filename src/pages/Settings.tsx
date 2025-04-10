@@ -7,11 +7,10 @@ import { Settings as SettingsIcon, Home, Building, DollarSign, UserRound, Mail, 
 import { ColoredSwitch } from "@/components/ui/colored-switch";
 import { useIndustry, IndustryType } from "@/context/IndustryContext";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { customSupabase } from "@/utils/supabase-custom-client";
 
 const Settings = () => {
   const { activeIndustry, setActiveIndustry } = useIndustry();
@@ -80,7 +79,8 @@ const Settings = () => {
     const checkExistingConnections = async () => {
       if (user) {
         try {
-          const { data, error } = await supabase
+          // Use the customSupabase client to access the user_email_connections table
+          const { data, error } = await customSupabase
             .from('user_email_connections')
             .select('provider, email')
             .eq('user_id', user.id);
