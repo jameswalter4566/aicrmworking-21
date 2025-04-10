@@ -1,16 +1,13 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
-// Update the REDIRECT_URI to match the new preview URL
 const REDIRECT_URI = 'https://preview--aicrmworking.lovable.app/settings';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-// Improved CORS headers with explicit content type
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -18,7 +15,6 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
-// Validate required environment variables
 if (!CLIENT_ID || !CLIENT_SECRET || !SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('Missing required environment variables:', {
     hasClientId: !!CLIENT_ID,
@@ -30,17 +26,13 @@ if (!CLIENT_ID || !CLIENT_SECRET || !SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPA
   });
 }
 
-// Create a supabase client with the anon key for auth verification
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Create a supabase admin client with the service role key for bypassing RLS
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 serve(async (req) => {
   console.log("Function invoked with URL:", req.url);
   console.log("Using REDIRECT_URI:", REDIRECT_URI);
   
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
       headers: corsHeaders,
@@ -53,11 +45,9 @@ serve(async (req) => {
     const action = url.searchParams.get('action');
     console.log("Requested action:", action);
     
-    // Handle authorization url generation
     if (action === 'authorize') {
       console.log("Creating authorization URL");
       
-      // Validate required environment variables
       if (!CLIENT_ID) {
         console.error('Missing required environment variables for authorization');
         return new Response(
@@ -72,11 +62,13 @@ serve(async (req) => {
         );
       }
       
-      // Logging the exact redirect URI being used
       console.log("Using redirect URI:", REDIRECT_URI);
       
-      // Create a new auth URL for Google
-      const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
+      const scope = encodeURIComponent(
+        'https://www.googleapis.com/auth/gmail.send ' +
+        'https://www.googleapis.com/auth/gmail.readonly ' + 
+        'https://www.googleapis.com/auth/userinfo.email'
+      );
       
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${CLIENT_ID}` + 
@@ -88,7 +80,6 @@ serve(async (req) => {
         
       console.log("Generated auth URL (partial):", authUrl.substring(0, 100) + "...");
       
-      // Ensure we're properly returning JSON with the correct headers
       return new Response(
         JSON.stringify({ url: authUrl }),
         { 
@@ -98,7 +89,6 @@ serve(async (req) => {
       );
     }
     
-    // Handle callback with auth code
     if (action === 'callback') {
       const code = url.searchParams.get('code');
       console.log("Received callback with code present:", !!code);
@@ -113,8 +103,6 @@ serve(async (req) => {
         );
       }
 
-      // Exchange the code for tokens
-      console.log("Exchanging code for tokens");
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -129,7 +117,6 @@ serve(async (req) => {
         }),
       });
 
-      // Handle non-JSON responses from Google
       const contentType = tokenResponse.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
         const errorText = await tokenResponse.text();
@@ -160,15 +147,12 @@ serve(async (req) => {
         );
       }
 
-      // Get user info to retrieve email address
-      console.log("Getting user info");
       const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: {
           Authorization: `Bearer ${tokenData.access_token}`,
         },
       });
       
-      // Check if the userInfo response is JSON
       const userInfoContentType = userInfoResponse.headers.get('content-type');
       if (!userInfoContentType || !userInfoContentType.includes('application/json')) {
         const errorText = await userInfoResponse.text();
@@ -189,7 +173,6 @@ serve(async (req) => {
       const email = userInfo.email;
       console.log("Retrieved user email:", email);
       
-      // Get user ID from authorization header
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
         return new Response(
@@ -214,8 +197,6 @@ serve(async (req) => {
         );
       }
       
-      // Store the tokens in the database using the admin client to bypass RLS
-      console.log("Storing tokens in database with admin client");
       const { data, error } = await supabaseAdmin
         .from('user_email_connections')
         .upsert({
@@ -246,7 +227,6 @@ serve(async (req) => {
       );
     }
     
-    // Handle disconnecting an account
     if (action === 'disconnect') {
       const body = await req.json();
       const { provider } = body;
@@ -262,7 +242,6 @@ serve(async (req) => {
         );
       }
       
-      // Get user ID from authorization header
       const authHeader = req.headers.get('Authorization');
       if (!authHeader) {
         return new Response(
@@ -287,8 +266,6 @@ serve(async (req) => {
         );
       }
       
-      // Get the connection to revoke
-      console.log("Finding connection to revoke");
       const { data: connection } = await supabaseAdmin
         .from('user_email_connections')
         .select('*')
@@ -298,8 +275,6 @@ serve(async (req) => {
       
       if (connection?.access_token) {
         try {
-          // Revoke the token with Google
-          console.log("Revoking token with Google");
           await fetch(`https://oauth2.googleapis.com/revoke?token=${connection.access_token}`, {
             method: 'POST',
             headers: {
@@ -308,12 +283,9 @@ serve(async (req) => {
           });
         } catch (error) {
           console.error('Error revoking token:', error);
-          // Continue with deletion even if revocation fails
         }
       }
       
-      // Delete the connection from the database using admin client to bypass RLS
-      console.log("Deleting connection from database with admin client");
       const { error } = await supabaseAdmin
         .from('user_email_connections')
         .delete()
