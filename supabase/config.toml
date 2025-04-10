@@ -21,3 +21,6 @@ verify_jwt = false
 
 [edge_functions.update-lead]
 verify_jwt = false
+
+[edge_functions.bulk-update-disposition]
+verify_jwt = false

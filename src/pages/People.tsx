@@ -61,6 +61,8 @@ import { Progress } from "@/components/ui/progress";
 import { thoughtlyService } from "@/services/thoughtly";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { bulkLeadUpdates } from "@/services/bulkLeadUpdates";
+import DispositionSelector from "@/components/DispositionSelector";
 
 const fallbackLeadsData = [
   {
@@ -266,9 +268,43 @@ const People = () => {
     selectedLeads.includes(lead.id)
   );
 
-  const bulkUpdateDisposition = (newDisposition: string) => {
-    updateLeadDisposition(selectedLeads, newDisposition);
-    setSelectedLeads([]);
+  const bulkUpdateDisposition = async (newDisposition: string) => {
+    if (selectedLeads.length === 0) {
+      toast.error("No leads selected");
+      return;
+    }
+
+    if (selectedLeads.length > 50) {
+      toast.error("Maximum of 50 leads can be updated at once");
+      return;
+    }
+
+    try {
+      toast.loading("Updating leads...");
+      
+      const result = await bulkLeadUpdates.updateDisposition(selectedLeads, newDisposition);
+      
+      if (!result.success) {
+        toast.dismiss();
+        toast.error(result.error || "Failed to update leads");
+        return;
+      }
+      
+      toast.dismiss();
+      toast.success(result.message || `${selectedLeads.length} leads updated to ${newDisposition}`);
+      
+      setLeads(prevLeads => 
+        prevLeads.map(lead => 
+          selectedLeads.includes(lead.id) ? { ...lead, disposition: newDisposition } : lead
+        )
+      );
+      
+      setSelectedLeads([]);
+    } catch (error) {
+      toast.dismiss();
+      console.error("Error in bulk update:", error);
+      toast.error("Failed to update leads");
+    }
   };
 
   const getDispositionClass = (disposition: string) => {
@@ -511,6 +547,11 @@ const People = () => {
         <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-center justify-start gap-4">
           <span className="text-sm font-medium text-gray-700">
             {selectedLeads.length} {selectedLeads.length === 1 ? 'lead' : 'leads'} selected
+            {selectedLeads.length > 50 && (
+              <span className="ml-2 text-red-500 font-semibold">
+                (Max 50 allowed for bulk updates)
+              </span>
+            )}
           </span>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
