@@ -9,3 +9,6 @@ verify_jwt = false
 
 [functions.send-pitch-deck]
 verify_jwt = false
+
+[functions.send-gmail]
+verify_jwt = false

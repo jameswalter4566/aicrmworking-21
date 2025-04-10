@@ -73,6 +73,8 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         throw new Error("You must be logged in to send pitch decks");
       }
 
+      toast.info("Generating PDF and preparing email...");
+
       // Send the pitch deck with the session token
       const { data, error } = await supabase.functions.invoke("send-pitch-deck", {
         body: {

@@ -167,22 +167,30 @@ Deno.serve(async (req) => {
       console.log("Using token from request body");
     }
     
-    if (!authToken) {
-      throw new Error('Missing authorization token');
-    }
+    let userId = null;
     
-    // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(authToken);
-    
-    if (userError || !user) {
-      console.error('Auth error:', userError);
-      throw new Error('Unauthorized: Invalid user token');
+    // Get user from token if provided
+    if (authToken) {
+      try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser(authToken);
+        
+        if (!userError && user) {
+          userId = user.id;
+          console.log(`Authenticated as user: ${userId}`);
+        } else {
+          console.log('Token provided but user not found or error occurred');
+          // Continue without user ID for public access endpoints
+        }
+      } catch (error) {
+        console.log('Error verifying token:', error.message);
+        // Continue without user ID for public access endpoints
+      }
     }
     
     let responseData;
     let pdfData = null;
     
-    console.log(`Action: ${action}, User ID: ${user.id}`);
+    console.log(`Action: ${action}, User ID: ${userId || 'Not authenticated'}`);
     
     switch (action) {
       case 'save':
@@ -191,16 +199,21 @@ Deno.serve(async (req) => {
           // Update existing pitch deck
           console.log(`Updating pitch deck ${pitchDeckId}`);
           
-          const { data: updatedDeck, error: updateError } = await supabase
+          // If userId is available, check ownership
+          const query = supabase
             .from('pitch_decks')
             .update({ 
               ...pitchDeckData, 
               updated_at: new Date().toISOString() 
             })
-            .eq('id', pitchDeckId)
-            .eq('created_by', user.id)
-            .select('*')
-            .single();
+            .eq('id', pitchDeckId);
+          
+          // Add user check if userId is available
+          if (userId) {
+            query.eq('created_by', userId);
+          }
+            
+          const { data: updatedDeck, error: updateError } = await query.select('*').single();
             
           if (updateError) {
             console.error('Update error details:', updateError);
@@ -219,15 +232,15 @@ Deno.serve(async (req) => {
               // Continue without throwing to return the updated deck data
             }
           }
-        } else {
-          // Create new pitch deck
+        } else if (userId) {
+          // Create new pitch deck - requires authentication
           console.log('Creating new pitch deck');
           
           const { data: newDeck, error: createError } = await supabase
             .from('pitch_decks')
             .insert({
               ...pitchDeckData,
-              created_by: user.id,
+              created_by: userId,
             })
             .select('*')
             .single();
@@ -249,6 +262,8 @@ Deno.serve(async (req) => {
               // Continue without throwing to return the created deck data
             }
           }
+        } else {
+          throw new Error('Authentication required to create a pitch deck');
         }
         break;
         
@@ -260,11 +275,17 @@ Deno.serve(async (req) => {
           throw new Error('Missing required parameter: pitchDeckId');
         }
         
-        const { data: deckData, error: getError } = await supabase
+        const deckQuery = supabase
           .from('pitch_decks')
           .select('*')
-          .eq('id', pitchDeckId)
-          .single();
+          .eq('id', pitchDeckId);
+        
+        // Add user check if userId is available  
+        if (userId) {
+          deckQuery.eq('created_by', userId);
+        }
+        
+        const { data: deckData, error: getError } = await deckQuery.single();
           
         if (getError) {
           console.error('Error fetching pitch deck:', getError);
