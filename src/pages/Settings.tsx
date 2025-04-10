@@ -1,8 +1,9 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Home, Building, DollarSign, UserRound, Mail, Link, AlertCircle } from "lucide-react";
+import { Settings as SettingsIcon, Home, Building, DollarSign, UserRound, Mail, AlertCircle } from "lucide-react";
 import { ColoredSwitch } from "@/components/ui/colored-switch";
 import { useIndustry, IndustryType } from "@/context/IndustryContext";
 import { useAuth } from "@/context/AuthContext";
@@ -14,27 +15,92 @@ import { Input } from "@/components/ui/input";
 
 const Settings = () => {
   const { activeIndustry, setActiveIndustry } = useIndustry();
-  const { user, userRole } = useAuth();
+  const { user, userRole, getAuthToken } = useAuth();
   const [loading, setLoading] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
   const [outlookConnected, setOutlookConnected] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
-
+  const [processingOAuth, setProcessingOAuth] = useState(false);
+  
   useEffect(() => {
+    // Process OAuth callback if code is present in URL
+    const processOAuthCallback = async () => {
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      if (code) {
+        setProcessingOAuth(true);
+        try {
+          // Clean up URL
+          window.history.replaceState({}, document.title, "/settings");
+          
+          // Get auth token for API call
+          const token = await getAuthToken();
+          
+          // Call our edge function to exchange code for tokens
+          const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=callback&code=${code}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            setGoogleConnected(true);
+            setEmailAddress(data.email);
+            toast({
+              title: "Google Email Connected",
+              description: "Your Google email has been successfully connected.",
+              duration: 3000,
+            });
+          } else {
+            toast({
+              title: "Connection Failed",
+              description: data.error || "Failed to connect Google account.",
+              variant: "destructive",
+              duration: 3000,
+            });
+          }
+        } catch (error) {
+          console.error("Error processing OAuth callback:", error);
+          toast({
+            title: "Connection Error",
+            description: "There was a problem connecting your Google account.",
+            variant: "destructive",
+            duration: 3000,
+          });
+        } finally {
+          setProcessingOAuth(false);
+        }
+      }
+    };
+
     // Check if email connections are already established
     const checkExistingConnections = async () => {
-      // This would be replaced with actual API calls to check connections
       if (user) {
         try {
-          // For demonstration, we're using localStorage, but in a real app,
-          // this would be stored in your database
-          const googleStatus = localStorage.getItem(`google_connected_${user.id}`);
-          const outlookStatus = localStorage.getItem(`outlook_connected_${user.id}`);
-          const savedEmail = localStorage.getItem(`connected_email_${user.id}`);
+          const { data, error } = await supabase
+            .from('user_email_connections')
+            .select('provider, email')
+            .eq('user_id', user.id);
+            
+          if (error) throw error;
           
-          setGoogleConnected(googleStatus === 'true');
-          setOutlookConnected(outlookStatus === 'true');
-          setEmailAddress(savedEmail || "");
+          if (data && data.length > 0) {
+            const googleConnection = data.find(conn => conn.provider === 'google');
+            const outlookConnection = data.find(conn => conn.provider === 'outlook');
+            
+            if (googleConnection) {
+              setGoogleConnected(true);
+              setEmailAddress(googleConnection.email);
+            }
+            
+            if (outlookConnection) {
+              setOutlookConnected(true);
+              setEmailAddress(outlookConnection.email);
+            }
+          }
         } catch (error) {
           console.error("Failed to check connection status:", error);
         }
@@ -42,7 +108,8 @@ const Settings = () => {
     };
     
     checkExistingConnections();
-  }, [user]);
+    processOAuthCallback();
+  }, [user, getAuthToken]);
 
   // Handler that ensures only one industry can be active at a time
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
@@ -75,36 +142,40 @@ const Settings = () => {
     }
   };
 
-  // Mock function to connect to Google email
-  const connectGoogleEmail = () => {
+  // Function to connect to Google email
+  const connectGoogleEmail = async () => {
     setLoading(true);
-    
-    // Simulate OAuth flow with a timeout
-    setTimeout(() => {
-      if (user) {
-        localStorage.setItem(`google_connected_${user.id}`, 'true');
-        localStorage.setItem(`connected_email_${user.id}`, emailAddress);
-        setGoogleConnected(true);
+    try {
+      const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=authorize`);
+      const { url } = await response.json();
+      
+      if (url) {
+        // Redirect to Google OAuth flow
+        window.location.href = url;
+      } else {
+        throw new Error("Failed to generate authorization URL");
       }
-      setLoading(false);
+    } catch (error) {
+      console.error("Error initiating Google OAuth flow:", error);
       toast({
-        title: "Google Email Connected",
-        description: "Your Google email has been successfully connected.",
+        title: "Connection Error",
+        description: "Failed to start the Google connection process.",
+        variant: "destructive",
         duration: 3000,
       });
-    }, 1500);
+      setLoading(false);
+    }
   };
 
-  // Mock function to connect to Microsoft Outlook
+  // Function to connect to Microsoft Outlook
   const connectOutlookEmail = () => {
     setLoading(true);
     
     // Simulate OAuth flow with a timeout
     setTimeout(() => {
       if (user) {
-        localStorage.setItem(`outlook_connected_${user.id}`, 'true');
-        localStorage.setItem(`connected_email_${user.id}`, emailAddress);
         setOutlookConnected(true);
+        setEmailAddress("user@outlook.com");  // This would come from the actual OAuth flow
       }
       setLoading(false);
       toast({
@@ -116,23 +187,53 @@ const Settings = () => {
   };
 
   // Function to disconnect Google email
-  const disconnectGoogleEmail = () => {
-    if (user) {
-      localStorage.removeItem(`google_connected_${user.id}`);
-      setGoogleConnected(false);
+  const disconnectGoogleEmail = async () => {
+    setLoading(true);
+    try {
+      const token = await getAuthToken();
+      
+      const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=disconnect`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ provider: 'google' })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setGoogleConnected(false);
+        setEmailAddress("");
+        toast({
+          title: "Google Email Disconnected",
+          description: "Your Google email has been disconnected.",
+          duration: 3000,
+        });
+      } else {
+        throw new Error(data.error || "Failed to disconnect");
+      }
+    } catch (error) {
+      console.error("Error disconnecting Google account:", error);
       toast({
-        title: "Google Email Disconnected",
-        description: "Your Google email has been disconnected.",
+        title: "Disconnection Error",
+        description: "Failed to disconnect your Google account.",
+        variant: "destructive",
         duration: 3000,
       });
+    } finally {
+      setLoading(false);
     }
   };
 
   // Function to disconnect Microsoft Outlook
   const disconnectOutlookEmail = () => {
     if (user) {
-      localStorage.removeItem(`outlook_connected_${user.id}`);
       setOutlookConnected(false);
+      if (!googleConnected) {
+        setEmailAddress("");
+      }
       toast({
         title: "Microsoft Outlook Disconnected",
         description: "Your Microsoft Outlook email has been disconnected.",
@@ -303,7 +404,19 @@ const Settings = () => {
                 Your connection will remain active until you manually disconnect.
               </p>
               
-              {!googleConnected && !outlookConnected && (
+              {processingOAuth && (
+                <div className="flex justify-center p-6">
+                  <div className="flex flex-col items-center">
+                    <svg className="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p className="text-blue-600 font-medium">Connecting your account...</p>
+                  </div>
+                </div>
+              )}
+              
+              {!processingOAuth && !googleConnected && !outlookConnected && (
                 <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
                   <Button
                     onClick={connectGoogleEmail}
@@ -374,9 +487,10 @@ const Settings = () => {
                         variant="outline" 
                         size="sm"
                         onClick={disconnectGoogleEmail}
+                        disabled={loading}
                         className="text-red-500 hover:text-red-600"
                       >
-                        Disconnect
+                        {loading ? "Disconnecting..." : "Disconnect"}
                       </Button>
                     </div>
                   )}
@@ -397,9 +511,10 @@ const Settings = () => {
                         variant="outline" 
                         size="sm"
                         onClick={disconnectOutlookEmail}
+                        disabled={loading}
                         className="text-red-500 hover:text-red-600"
                       >
-                        Disconnect
+                        {loading ? "Disconnecting..." : "Disconnect"}
                       </Button>
                     </div>
                   )}

@@ -24,3 +24,6 @@ verify_jwt = false
 
 [edge_functions.bulk-update-disposition]
 verify_jwt = false
+
+[edge_functions.connect-google-email]
+verify_jwt = false
