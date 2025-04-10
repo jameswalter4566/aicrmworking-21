@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 // Define CORS headers
@@ -47,6 +46,10 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Add handling for mortgage lead designation
+    const isMortgageLead = leadData.isMortgageLead || false;
+    const addedToPipelineAt = isMortgageLead ? new Date().toISOString() : null;
+
     // Transform the lead data from camelCase to snake_case for database
     const transformedData = {
       first_name: leadData.firstName,
@@ -66,6 +69,9 @@ Deno.serve(async (req) => {
     }
 
     // Update the lead in the database
+    transformedData.is_mortgage_lead = isMortgageLead;
+    transformedData.added_to_pipeline_at = addedToPipelineAt;
+
     const { data, error } = await supabase
       .from('leads')
       .update(transformedData)

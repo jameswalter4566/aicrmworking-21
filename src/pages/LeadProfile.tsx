@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import MainLayout from "@/components/layouts/MainLayout";
@@ -26,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { 
   ArrowLeft, Phone, Mail, MapPin, Tag, Calendar, FileText, 
   Clock, UserCircle, ChevronRight, Send, Edit, Save, X,
-  MessageSquare, Activity
+  MessageSquare, Activity, Rocket
 } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
@@ -213,6 +212,34 @@ const LeadProfile = () => {
     }
   };
 
+  const handlePushToMortgagePipeline = async () => {
+    if (!id || !lead) return;
+    
+    try {
+      const updatedLead = await leadProfileService.updateLead(id, {
+        ...lead,
+        isMortgageLead: true
+      });
+      
+      setLead(updatedLead);
+      
+      const pipelineActivity = {
+        id: crypto.randomUUID(),
+        lead_id: Number(id),
+        type: "Pipeline",
+        description: "Lead pushed to Mortgage Pipeline",
+        timestamp: new Date().toISOString()
+      };
+      
+      setActivities(prev => [pipelineActivity, ...prev]);
+      
+      toast.success("Lead added to Mortgage Pipeline");
+    } catch (err) {
+      console.error("Error pushing lead to pipeline:", err);
+      toast.error("Failed to add lead to pipeline");
+    }
+  };
+
   if (loading) {
     return (
       <MainLayout>
@@ -297,7 +324,7 @@ const LeadProfile = () => {
             <CardTitle>Disposition Status</CardTitle>
             <CardDescription>Current status of this lead in your pipeline</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex justify-between items-center">
             {editMode ? (
               <div>
                 <label className="text-sm text-gray-500 mb-2 block">Select Disposition</label>
@@ -313,6 +340,16 @@ const LeadProfile = () => {
                 onDispositionChange={handleDispositionChange}
                 disabled={isSaving}
               />
+            )}
+            {!lead.isMortgageLead && activeIndustry === 'mortgage' && (
+              <Button 
+                variant="outline" 
+                onClick={handlePushToMortgagePipeline}
+                disabled={isSaving}
+              >
+                <Rocket className="mr-2 h-4 w-4" />
+                Push to Pipeline
+              </Button>
             )}
           </CardContent>
         </Card>
@@ -613,6 +650,7 @@ const LeadProfile = () => {
                         {activity.type === "Edit" && <Edit className="h-5 w-5 text-blue-600" />}
                         {activity.type === "Disposition Change" && <Activity className="h-5 w-5 text-blue-600" />}
                         {activity.type === "Mortgage Information Update" && <FileText className="h-5 w-5 text-blue-600" />}
+                        {activity.type === "Pipeline" && <Rocket className="h-5 w-5 text-blue-600" />}
                       </div>
                       {index < activities.length - 1 && (
                         <div className="absolute top-10 left-5 w-0.5 h-full bg-gray-200" />

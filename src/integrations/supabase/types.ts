@@ -75,6 +75,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          added_to_pipeline_at: string | null
           avatar: string | null
           created_at: string | null
           created_by: string | null
@@ -82,6 +83,7 @@ export type Database = {
           email: string | null
           first_name: string | null
           id: number
+          is_mortgage_lead: boolean | null
           last_name: string | null
           mailing_address: string | null
           mortgage_data: Json | null
@@ -92,6 +94,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          added_to_pipeline_at?: string | null
           avatar?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -99,6 +102,7 @@ export type Database = {
           email?: string | null
           first_name?: string | null
           id: number
+          is_mortgage_lead?: boolean | null
           last_name?: string | null
           mailing_address?: string | null
           mortgage_data?: Json | null
@@ -109,6 +113,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          added_to_pipeline_at?: string | null
           avatar?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -116,6 +121,7 @@ export type Database = {
           email?: string | null
           first_name?: string | null
           id?: number
+          is_mortgage_lead?: boolean | null
           last_name?: string | null
           mailing_address?: string | null
           mortgage_data?: Json | null
@@ -126,6 +132,77 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      mortgage_deals: {
+        Row: {
+          closing_date: string | null
+          created_at: string | null
+          created_by: string | null
+          disposition: string | null
+          email: string | null
+          first_name: string | null
+          id: string
+          last_name: string | null
+          lead_id: number | null
+          mailing_address: string | null
+          mortgage_data: Json | null
+          phone1: string | null
+          phone2: string | null
+          probability: number | null
+          property_address: string | null
+          stage: string | null
+          updated_at: string | null
+          value: number | null
+        }
+        Insert: {
+          closing_date?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          disposition?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          lead_id?: number | null
+          mailing_address?: string | null
+          mortgage_data?: Json | null
+          phone1?: string | null
+          phone2?: string | null
+          probability?: number | null
+          property_address?: string | null
+          stage?: string | null
+          updated_at?: string | null
+          value?: number | null
+        }
+        Update: {
+          closing_date?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          disposition?: string | null
+          email?: string | null
+          first_name?: string | null
+          id?: string
+          last_name?: string | null
+          lead_id?: number | null
+          mailing_address?: string | null
+          mortgage_data?: Json | null
+          phone1?: string | null
+          phone2?: string | null
+          probability?: number | null
+          property_address?: string | null
+          stage?: string | null
+          updated_at?: string | null
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mortgage_deals_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       power_dialer_agents: {
         Row: {
