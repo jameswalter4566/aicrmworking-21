@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoanApplicationSidebar from "@/components/mortgage/LoanApplicationSidebar";
 import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
+import { PersonalInfoForm } from "@/components/mortgage/1003/PersonalInfoForm";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -28,6 +29,7 @@ const LoanApplicationViewer = () => {
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("1003-personal");
+  const [isSaving, setIsSaving] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -91,6 +93,52 @@ const LoanApplicationViewer = () => {
       toast.error("An unexpected error occurred");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveFormData = async (sectionData: any) => {
+    if (!id) return;
+
+    setIsSaving(true);
+    try {
+      const { section, data } = sectionData;
+      
+      // Get the current mortgage data
+      const { mortgageData = {} } = loanApplication || {};
+      
+      // Merge the new data with existing mortgage data
+      const updatedMortgageData = {
+        ...mortgageData,
+        ...data
+      };
+      
+      // Update the lead with new mortgage data
+      const { data: responseData, error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId: id,
+          leadData: { mortgageData: updatedMortgageData }
+        }
+      });
+      
+      if (error || !responseData.success) {
+        throw new Error(error || responseData?.error || "Failed to update loan application");
+      }
+      
+      // Update the local state with new data
+      setLoanApplication(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          mortgageData: updatedMortgageData
+        };
+      });
+      
+      toast.success(`${section.charAt(0).toUpperCase() + section.slice(1)} information saved successfully`);
+    } catch (error) {
+      console.error("Error saving form data:", error);
+      toast.error("Failed to save information");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -207,37 +255,24 @@ const LoanApplicationViewer = () => {
     return (
       <div className="p-6">
         <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
-        <p className="text-gray-600 mb-4">
-          {getDescription(section)}
-        </p>
         
-        {/* Placeholder for actual form sections - would be replaced with actual form components */}
-        <div className="mt-4 p-4 border rounded-md bg-gray-50">
-          {section === "personal" && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium mb-1">First Name</p>
-                  <p>{loanApplication?.firstName || 'Not provided'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium mb-1">Last Name</p>
-                  <p>{loanApplication?.lastName || 'Not provided'}</p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-1">Property Address</p>
-                <p>{loanApplication?.propertyAddress || 'Not provided'}</p>
-              </div>
-            </div>
-          )}
-          
-          {section !== "personal" && (
+        {/* Render the appropriate form based on the selected section */}
+        {section === "personal" && loanApplication && (
+          <PersonalInfoForm 
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section !== "personal" && (
+          <div className="mt-4 p-4 border rounded-md bg-gray-50">
             <p className="text-gray-500 italic">
               This section has not been implemented yet. It will contain fields for {title.toLowerCase()}.
             </p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   };
