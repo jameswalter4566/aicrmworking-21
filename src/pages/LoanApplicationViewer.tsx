@@ -27,7 +27,7 @@ const LoanApplicationViewer = () => {
   const navigate = useNavigate();
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("1003");
+  const [activeTab, setActiveTab] = useState("1003-personal");
   
   useEffect(() => {
     if (id) {
@@ -75,8 +75,6 @@ const LoanApplicationViewer = () => {
         else if (status.includes("submitted")) currentStep = "submitted";
       }
       
-      // You may need more complex logic based on your actual data structure
-
       setLoanApplication({
         id: lead.id,
         firstName: lead.firstName || '',
@@ -101,22 +99,17 @@ const LoanApplicationViewer = () => {
   };
 
   const renderContent = () => {
-    switch(activeTab) {
+    // First, determine the main tab
+    const mainTab = activeTab.includes("-") ? activeTab.split("-")[0] : activeTab;
+    const subSection = activeTab.includes("-") ? activeTab.split("-")[1] : null;
+    
+    switch(mainTab) {
       case "1003":
-        return (
-          <div className="p-6">
-            <h2 className="text-2xl font-semibold mb-4">1003 Loan Application</h2>
-            <p className="text-gray-600">
-              Form 1003 is the standard form used by borrowers to apply for a mortgage loan.
-            </p>
-            {/* Placeholder for actual 1003 form component */}
-            <div className="mt-4 p-4 border rounded-md bg-gray-50">
-              <p>Borrower: {loanApplication?.firstName} {loanApplication?.lastName}</p>
-              <p>Property Address: {loanApplication?.propertyAddress}</p>
-              <p>Loan Amount: ${loanApplication?.loanAmount.toLocaleString()}</p>
-            </div>
-          </div>
-        );
+        if (subSection) {
+          return render1003Section(subSection);
+        }
+        return render1003Section("personal"); // Default to personal info
+        
       case "products":
         return (
           <div className="p-6">
@@ -191,6 +184,89 @@ const LoanApplicationViewer = () => {
         );
       default:
         return <div className="p-6">Select an option from the sidebar</div>;
+    }
+  };
+
+  // Helper function to render the appropriate 1003 section
+  const render1003Section = (section: string) => {
+    const sectionTitles = {
+      personal: "Personal Information",
+      employment: "Employment & Income",
+      assets: "Assets",
+      liabilities: "Liabilities",
+      realEstate: "Real Estate Owned",
+      loanInfo: "Loan Information",
+      housing: "Housing Expenses",
+      transaction: "Details of Transaction",
+      declarations: "Declarations",
+      government: "Government Monitoring"
+    };
+    
+    const title = sectionTitles[section as keyof typeof sectionTitles] || "Loan Application";
+    
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
+        <p className="text-gray-600 mb-4">
+          {getDescription(section)}
+        </p>
+        
+        {/* Placeholder for actual form sections - would be replaced with actual form components */}
+        <div className="mt-4 p-4 border rounded-md bg-gray-50">
+          {section === "personal" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium mb-1">First Name</p>
+                  <p>{loanApplication?.firstName || 'Not provided'}</p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-1">Last Name</p>
+                  <p>{loanApplication?.lastName || 'Not provided'}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm font-medium mb-1">Property Address</p>
+                <p>{loanApplication?.propertyAddress || 'Not provided'}</p>
+              </div>
+            </div>
+          )}
+          
+          {section !== "personal" && (
+            <p className="text-gray-500 italic">
+              This section has not been implemented yet. It will contain fields for {title.toLowerCase()}.
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Helper function to get descriptions for each section
+  const getDescription = (section: string): string => {
+    switch(section) {
+      case "personal":
+        return "Basic information about the borrower including name, address, and contact details.";
+      case "employment":
+        return "Information about current and previous employment, income sources, and verification.";
+      case "assets":
+        return "Details about financial assets including bank accounts, investments, and other holdings.";
+      case "liabilities":
+        return "Information about existing debts and financial obligations.";
+      case "realEstate":
+        return "Details about properties currently owned by the borrower.";
+      case "loanInfo":
+        return "Specific information about the loan being requested.";
+      case "housing":
+        return "Current housing expenses and projected expenses after the loan.";
+      case "transaction":
+        return "Breakdown of the purchase transaction including costs and sources of funds.";
+      case "declarations":
+        return "Legal declarations required for mortgage applications.";
+      case "government":
+        return "Government-required monitoring information for fair lending purposes.";
+      default:
+        return "Complete the form to continue with your loan application.";
     }
   };
 
