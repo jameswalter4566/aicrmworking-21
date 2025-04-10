@@ -25,7 +25,7 @@ interface MortgageLead {
   probability: number;
   trend: "up" | "down";
   isMortgageLead?: boolean;
-  client: string; // Add the client property to fix the TypeScript error
+  client: string;
 }
 
 const Pipeline = () => {

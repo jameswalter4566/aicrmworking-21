@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -797,4 +798,286 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
           <TabsContent value="declarations" className="space-y-4">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <Label htmlFor="hasBankruptcies">Have you had any bankruptcies,
+                <Label htmlFor="hasBankruptcies">Have you had any bankruptcies, foreclosures, or judgments in the past 7 years?</Label>
+                <Switch 
+                  id="hasBankruptcies"
+                  checked={declarationsForm.hasBankruptcies}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, hasBankruptcies: checked})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="hasAlimonyObligation">Are you obligated to pay alimony, child support, or separate maintenance?</Label>
+                <Switch 
+                  id="hasAlimonyObligation"
+                  checked={declarationsForm.hasAlimonyObligation}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, hasAlimonyObligation: checked})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isCoSigner">Are you a co-signer or guarantor on any debt or loan?</Label>
+                <Switch 
+                  id="isCoSigner"
+                  checked={declarationsForm.isCoSigner}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, isCoSigner: checked})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="intendToOccupy">Do you intend to occupy the property as your primary residence?</Label>
+                <Switch 
+                  id="intendToOccupy"
+                  checked={declarationsForm.intendToOccupy}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, intendToOccupy: checked})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="isCitizen">Are you a U.S. citizen or permanent resident alien?</Label>
+                <Switch 
+                  id="isCitizen"
+                  checked={declarationsForm.isCitizen}
+                  onCheckedChange={(checked) => setDeclarationsForm({...declarationsForm, isCitizen: checked})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('declarations', declarationsForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Declarations
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* Demographic Section */}
+          <TabsContent value="demographic" className="space-y-4">
+            <div className="text-sm text-gray-500 mb-4">
+              The following information is requested by the Federal Government to monitor compliance with Federal statutes. You are not required to provide this information.
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ethnicity">Ethnicity</Label>
+                <Select 
+                  value={demographicForm.ethnicity}
+                  onValueChange={(value) => setDemographicForm({...demographicForm, ethnicity: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="ethnicity">
+                    <SelectValue placeholder="Select ethnicity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hispanicOrLatino">Hispanic or Latino</SelectItem>
+                    <SelectItem value="notHispanicOrLatino">Not Hispanic or Latino</SelectItem>
+                    <SelectItem value="doNotWishToProvide">I do not wish to provide this information</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="race">Race</Label>
+                <Select 
+                  value={demographicForm.race}
+                  onValueChange={(value) => setDemographicForm({...demographicForm, race: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="race">
+                    <SelectValue placeholder="Select race" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="americanIndianOrAlaskaNative">American Indian or Alaska Native</SelectItem>
+                    <SelectItem value="asian">Asian</SelectItem>
+                    <SelectItem value="blackOrAfricanAmerican">Black or African American</SelectItem>
+                    <SelectItem value="nativeHawaiianOrPacificIslander">Native Hawaiian or Other Pacific Islander</SelectItem>
+                    <SelectItem value="white">White</SelectItem>
+                    <SelectItem value="doNotWishToProvide">I do not wish to provide this information</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="sex">Sex</Label>
+                <Select 
+                  value={demographicForm.sex}
+                  onValueChange={(value) => setDemographicForm({...demographicForm, sex: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="sex">
+                    <SelectValue placeholder="Select sex" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="doNotWishToProvide">I do not wish to provide this information</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="collectionMethod">Information Collection Method</Label>
+                <Select 
+                  value={demographicForm.collectionMethod}
+                  onValueChange={(value) => setDemographicForm({...demographicForm, collectionMethod: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="collectionMethod">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Applicant Provided">Applicant Provided</SelectItem>
+                    <SelectItem value="Visual Observation">Visual Observation</SelectItem>
+                    <SelectItem value="Surname">Surname</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('demographic', demographicForm)}
+                disabled={!isEditable || isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Demographic Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* Loan Section */}
+          <TabsContent value="loan" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="loanType">Loan Type</Label>
+                <Select 
+                  value={loanForm.loanType}
+                  onValueChange={(value) => setLoanForm({...loanForm, loanType: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="loanType">
+                    <SelectValue placeholder="Select loan type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="conventional">Conventional</SelectItem>
+                    <SelectItem value="fha">FHA</SelectItem>
+                    <SelectItem value="va">VA</SelectItem>
+                    <SelectItem value="usda">USDA</SelectItem>
+                    <SelectItem value="jumbo">Jumbo</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mortgageTerm">Mortgage Term</Label>
+                <Select 
+                  value={loanForm.mortgageTerm}
+                  onValueChange={(value) => setLoanForm({...loanForm, mortgageTerm: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="mortgageTerm">
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="30year">30-Year</SelectItem>
+                    <SelectItem value="20year">20-Year</SelectItem>
+                    <SelectItem value="15year">15-Year</SelectItem>
+                    <SelectItem value="10year">10-Year</SelectItem>
+                    <SelectItem value="5year">5-Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amortizationType">Amortization Type</Label>
+                <Select 
+                  value={loanForm.amortizationType}
+                  onValueChange={(value) => setLoanForm({...loanForm, amortizationType: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="amortizationType">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fixed">Fixed Rate</SelectItem>
+                    <SelectItem value="adjustable">Adjustable Rate (ARM)</SelectItem>
+                    <SelectItem value="balloon">Balloon</SelectItem>
+                    <SelectItem value="interestOnly">Interest-Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="interestRate">Interest Rate</Label>
+                <Input 
+                  id="interestRate"
+                  placeholder="4.25%"
+                  value={loanForm.interestRate}
+                  onChange={(e) => setLoanForm({...loanForm, interestRate: e.target.value})}
+                  disabled={!isEditable || isSaving}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="mortgageInsurance">Mortgage Insurance</Label>
+                <Select 
+                  value={loanForm.mortgageInsurance}
+                  onValueChange={(value) => setLoanForm({...loanForm, mortgageInsurance: value})}
+                  disabled={!isEditable || isSaving}
+                >
+                  <SelectTrigger id="mortgageInsurance">
+                    <SelectValue placeholder="Select insurance" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pmi">Private Mortgage Insurance (PMI)</SelectItem>
+                    <SelectItem value="mip">FHA Mortgage Insurance Premium (MIP)</SelectItem>
+                    <SelectItem value="fundingFee">VA Funding Fee</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button 
+                onClick={() => handleSaveSection('loan', loanForm)}
+                disabled={!isEditable || isSaving}
+                className="bg-blue-500 hover:bg-blue-600 text-white animate-pulse-glow"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Loan Information
+                  </>
+                )}
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default Mortgage1003Form;
