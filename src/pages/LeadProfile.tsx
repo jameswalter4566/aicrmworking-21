@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import MainLayout from "@/components/layouts/MainLayout";
@@ -32,7 +33,6 @@ import { Separator } from "@/components/ui/separator";
 import { format, formatDistanceToNow } from "date-fns";
 import DispositionSelector from "@/components/DispositionSelector";
 import Mortgage1003Form from "@/components/mortgage/Mortgage1003Form";
-import PushToPipelineButton from "@/components/PushToPipelineButton";
 
 const LeadProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -165,12 +165,14 @@ const LeadProfile = () => {
     try {
       setIsSaving(true);
       
+      // Create updated mortgage data by merging the new section data with existing data
       const currentMortgageData = lead.mortgageData || {};
       const updatedMortgageData = {
         ...currentMortgageData,
         [section]: data
       };
       
+      // Update the lead with the new mortgage data
       const updatedLeadData = { 
         ...lead, 
         mortgageData: updatedMortgageData 
@@ -270,28 +272,23 @@ const LeadProfile = () => {
           </h1>
           <p className="text-gray-500">Lead ID: {lead.id}</p>
         </div>
-        <div className="flex space-x-2">
-          {activeIndustry === 'mortgage' && lead.id && (
-            <PushToPipelineButton leadId={lead.id} />
+        <Button 
+          variant={editMode ? "destructive" : "outline"}
+          onClick={toggleEditMode}
+          disabled={isSaving}
+        >
+          {editMode ? (
+            <>
+              <X className="mr-2 h-4 w-4" />
+              Cancel
+            </>
+          ) : (
+            <>
+              <Edit className="mr-2 h-4 w-4" />
+              Edit Lead
+            </>
           )}
-          <Button 
-            variant={editMode ? "destructive" : "outline"}
-            onClick={toggleEditMode}
-            disabled={isSaving}
-          >
-            {editMode ? (
-              <>
-                <X className="mr-2 h-4 w-4" />
-                Cancel
-              </>
-            ) : (
-              <>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Lead
-              </>
-            )}
-          </Button>
-        </div>
+        </Button>
       </div>
 
       <div className="space-y-6">
@@ -539,6 +536,7 @@ const LeadProfile = () => {
           </Card>
         </div>
 
+        {/* Mortgage 1003 Form - Only show for mortgage industry */}
         {activeIndustry === 'mortgage' && (
           <Mortgage1003Form 
             lead={lead} 
