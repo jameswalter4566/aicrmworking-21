@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -26,13 +27,20 @@ const Settings = () => {
     const processOAuthCallback = async () => {
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
+      
+      // Clear the URL parameters to avoid issues on page refresh
       if (code) {
         setProcessingOAuth(true);
+        // First, remove the code from URL without triggering a navigation
+        window.history.replaceState({}, document.title, "/settings");
+        
         try {
-          window.history.replaceState({}, document.title, "/settings");
-          
           const token = await getAuthToken();
+          if (!token) {
+            throw new Error("Authentication required");
+          }
           
+          // Make API call to the Supabase Edge Function with the code
           const response = await fetch(`${SUPABASE_URL}/functions/v1/connect-google-email?action=callback&code=${code}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -42,10 +50,11 @@ const Settings = () => {
           
           if (!response.ok) {
             const errorText = await response.text();
-            console.error("Error response:", response.status, errorText);
+            console.error("Error response:", response.status, errorText.substring(0, 200));
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
           
+          // Validate response is JSON
           const contentType = response.headers.get("content-type");
           if (!contentType || !contentType.includes("application/json")) {
             const textResponse = await response.text();
@@ -115,7 +124,10 @@ const Settings = () => {
       }
     };
     
+    // First check for existing connections
     checkExistingConnections();
+    
+    // Then process any OAuth callback if present
     processOAuthCallback();
   }, [user, getAuthToken]);
 
@@ -154,7 +166,7 @@ const Settings = () => {
         throw new Error('You must be logged in to connect your email account');
       }
       
-      const functionUrl = `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/connect-google-email?action=authorize`;
+      const functionUrl = `${SUPABASE_URL}/functions/v1/connect-google-email?action=authorize`;
       console.log("Calling Supabase function:", functionUrl);
       
       const response = await fetch(functionUrl, {
