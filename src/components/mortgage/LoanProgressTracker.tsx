@@ -45,7 +45,7 @@ const checkpoints = [
 const Checkpoint: React.FC<CheckpointProps> = ({ label, isCompleted, isActive, icon: Icon }) => {
   return (
     <div className="flex flex-col items-center">
-      <span className="text-xs font-medium mb-2 text-gray-700">
+      <span className="text-xs font-bold mb-2 text-gray-700 text-center">
         {label}
       </span>
       <div
@@ -74,18 +74,18 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({ currentStep }
 
   return (
     <div className="w-full px-8 py-6 bg-white">
-      <h3 className="text-lg font-semibold mb-6 text-mortgage-darkPurple">Loan Progress</h3>
+      <h3 className="text-lg font-bold mb-6 text-mortgage-darkPurple">Loan Progress</h3>
       
-      {/* Progress bar */}
-      <div className="relative mb-2">
+      {/* Progress bar container with increased vertical spacing */}
+      <div className="relative mb-8">
         <Progress 
           value={progressPercentage} 
-          className="h-2 bg-gray-200"
+          className="h-3 bg-gray-200" // Increased height from h-2 to h-3
         />
       </div>
       
       {/* Checkpoints */}
-      <div className="flex justify-between mt-[-16px]">
+      <div className="flex justify-between mt-[-24px]"> {/* Adjusted negative margin */}
         {checkpoints.map((checkpoint, index) => (
           <Checkpoint
             key={checkpoint.id}
