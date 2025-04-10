@@ -16,6 +16,80 @@ export interface LeadProfile {
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
+  mortgageData?: {
+    borrower?: {
+      fullLegalName?: string;
+      dateOfBirth?: string;
+      socialSecurityNumber?: string;
+      maritalStatus?: string;
+      dependents?: string;
+      citizenship?: string;
+    };
+    currentAddress?: {
+      streetAddress?: string;
+      cityStateZip?: string;
+      durationAtAddress?: string;
+      housingStatus?: string;
+      monthlyHousingExpense?: string;
+    };
+    employment?: {
+      employerName?: string;
+      employerAddress?: string;
+      jobTitle?: string;
+      startDate?: string;
+      endDate?: string;
+      monthlyIncome?: string;
+      isSelfEmployed?: boolean;
+    };
+    income?: {
+      baseIncome?: string;
+      overtimeIncome?: string;
+      otherIncome?: string;
+    };
+    assets?: {
+      bankAccounts?: string;
+      investments?: string;
+      realEstateAssets?: string;
+      otherAssets?: string;
+    };
+    liabilities?: {
+      creditCards?: string;
+      autoLoans?: string;
+      studentLoans?: string;
+      otherMortgages?: string;
+      personalLoans?: string;
+      monthlyPayments?: string;
+    };
+    property?: {
+      subjectPropertyAddress?: string;
+      propertyValue?: string;
+      loanAmount?: string;
+      loanPurpose?: string;
+      propertyType?: string;
+      occupancy?: string;
+      titleType?: string;
+    };
+    declarations?: {
+      hasBankruptcies?: boolean;
+      hasAlimonyObligation?: boolean;
+      isCoSigner?: boolean;
+      intendToOccupy?: boolean;
+      isCitizen?: boolean;
+    };
+    demographic?: {
+      ethnicity?: string;
+      race?: string;
+      sex?: string;
+      collectionMethod?: string;
+    };
+    loan?: {
+      loanType?: string;
+      mortgageTerm?: string;
+      amortizationType?: string;
+      interestRate?: string;
+      mortgageInsurance?: string;
+    };
+  };
 }
 
 export interface LeadNote {
@@ -229,6 +303,41 @@ export const leadProfileService = {
       return this.updateLead(leadId, { disposition });
     } catch (error) {
       console.error('Error in updateDisposition:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Update mortgage-specific data for a lead
+   * @param leadId The ID of the lead
+   * @param section The mortgage section to update (borrower, address, etc.)
+   * @param sectionData The data for the mortgage section
+   */
+  async updateMortgageData(
+    leadId: number | string, 
+    section: string, 
+    sectionData: Record<string, any>
+  ): Promise<LeadProfile> {
+    try {
+      console.log(`Updating ${section} data for lead ${leadId}`);
+      
+      // Get the current lead data first
+      const currentLead = await this.getLeadById(leadId);
+      
+      // Create updated mortgage data
+      const currentMortgageData = currentLead.mortgageData || {};
+      const updatedMortgageData = {
+        ...currentMortgageData,
+        [section]: sectionData
+      };
+      
+      // Update the lead with the new mortgage data
+      return this.updateLead(leadId, {
+        ...currentLead,
+        mortgageData: updatedMortgageData
+      });
+    } catch (error) {
+      console.error(`Error updating mortgage ${section} data:`, error);
       throw error;
     }
   }

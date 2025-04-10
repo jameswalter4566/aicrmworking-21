@@ -60,6 +60,11 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     };
 
+    // Handle mortgage data if provided
+    if (leadData.mortgageData) {
+      transformedData.mortgage_data = leadData.mortgageData;
+    }
+
     // Update the lead in the database
     const { data, error } = await supabase
       .from('leads')
@@ -94,6 +99,24 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Record mortgage data updates in activity log if present
+    if (leadData.mortgageData) {
+      const mortgageActivityData = {
+        lead_id: leadId,
+        type: 'Mortgage Information Update',
+        description: `Mortgage information updated`,
+        timestamp: new Date().toISOString()
+      };
+
+      const { error: mortgageActivityError } = await supabase
+        .from('lead_activities')
+        .insert(mortgageActivityData);
+
+      if (mortgageActivityError) {
+        console.error('Error recording mortgage update activity:', mortgageActivityError.message);
+      }
+    }
+
     // Transform the updated lead back to camelCase for the frontend
     const updatedLead = {
       id: data.id,
@@ -109,7 +132,8 @@ Deno.serve(async (req) => {
       tags: data.tags,
       createdAt: data.created_at,
       updatedAt: data.updated_at,
-      createdBy: data.created_by
+      createdBy: data.created_by,
+      mortgageData: data.mortgage_data
     };
 
     // Return the updated lead

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import MainLayout from "@/components/layouts/MainLayout";
@@ -31,8 +32,7 @@ import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { format, formatDistanceToNow } from "date-fns";
 import DispositionSelector from "@/components/DispositionSelector";
-
-import type { LeadProfile as LeadProfileInterface } from "@/services/leadProfile";
+import Mortgage1003Form from "@/components/mortgage/Mortgage1003Form";
 
 const LeadProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -159,22 +159,44 @@ const LeadProfile = () => {
     }
   };
 
-  const getDispositionColor = (disposition?: string) => {
-    switch(disposition) {
-      case "Not Contacted":
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
-      case "Contacted":
-        return "bg-blue-100 text-blue-800 hover:bg-blue-200";
-      case "Appointment Set":
-        return "bg-purple-100 text-purple-800 hover:bg-purple-200";
-      case "Submitted":
-        return "bg-green-100 text-green-800 hover:bg-green-200";
-      case "Dead":
-        return "bg-red-100 text-red-800 hover:bg-red-200";
-      case "DNC":
-        return "bg-yellow-100 text-yellow-800 hover:bg-yellow-200";
-      default:
-        return "bg-gray-100 text-gray-800 hover:bg-gray-200";
+  const handleMortgageDataSave = async (section: string, data: Record<string, any>) => {
+    if (!id || !lead) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Create updated mortgage data by merging the new section data with existing data
+      const currentMortgageData = lead.mortgageData || {};
+      const updatedMortgageData = {
+        ...currentMortgageData,
+        [section]: data
+      };
+      
+      // Update the lead with the new mortgage data
+      const updatedLeadData = { 
+        ...lead, 
+        mortgageData: updatedMortgageData 
+      };
+      
+      const updatedLead = await leadProfileService.updateLead(id, updatedLeadData);
+      setLead(updatedLead);
+      
+      const updatedActivity = {
+        id: crypto.randomUUID(),
+        lead_id: Number(id),
+        type: "Mortgage Information Update",
+        description: `Updated ${section} information`,
+        timestamp: new Date().toISOString()
+      };
+      
+      setActivities(prev => [updatedActivity, ...prev]);
+      
+      toast.success(`Mortgage ${section} information updated successfully`);
+    } catch (err) {
+      console.error("Error updating mortgage data:", err);
+      toast.error(`Failed to update ${section} information`);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -513,6 +535,16 @@ const LeadProfile = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Mortgage 1003 Form - Only show for mortgage industry */}
+        {activeIndustry === 'mortgage' && (
+          <Mortgage1003Form 
+            lead={lead} 
+            onSave={handleMortgageDataSave}
+            isEditable={!editMode} 
+            isSaving={isSaving}
+          />
+        )}
         
         <Card>
           <CardHeader>
@@ -578,6 +610,8 @@ const LeadProfile = () => {
                         {activity.type === "Call" && <Phone className="h-5 w-5 text-blue-600" />}
                         {activity.type === "Text" && <MessageSquare className="h-5 w-5 text-blue-600" />}
                         {activity.type === "Meeting" && <Calendar className="h-5 w-5 text-blue-600" />}
+                        {activity.type === "Edit" && <Edit className="h-5 w-5 text-blue-600" />}
+                        {activity.type === "Mortgage Information Update" && <FileText className="h-5 w-5 text-blue-600" />}
                       </div>
                       {index < activities.length - 1 && (
                         <div className="absolute top-10 left-5 w-0.5 h-full bg-gray-200" />
