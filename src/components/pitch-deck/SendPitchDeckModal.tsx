@@ -67,13 +67,21 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         subject 
       });
 
-      // Send the pitch deck
+      // Get the auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("You must be logged in to send pitch decks");
+      }
+
+      // Send the pitch deck with the session token
       const { data, error } = await supabase.functions.invoke("send-pitch-deck", {
         body: {
           pitchDeckId: pitchDeck.id,
           recipientEmail,
           subject,
           message,
+          // Pass auth token explicitly to ensure it's available in the function
+          token: session.access_token
         },
       });
 
@@ -90,6 +98,8 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       toast.success(`Pitch deck sent to ${recipientEmail}`);
       onClose();
       setRecipientEmail("");
+      setSubject("");
+      setMessage("");
     } catch (error: any) {
       console.error("Error sending pitch deck:", error);
       toast.error(`Failed to send: ${error.message}`);

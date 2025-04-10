@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { jsPDF } from 'https://esm.sh/jspdf@2.5.1'
 import autoTable from 'https://esm.sh/jspdf-autotable@3.8.2'

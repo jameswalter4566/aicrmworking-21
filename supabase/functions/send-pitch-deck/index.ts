@@ -7,11 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Create Supabase client with service role key to bypass RLS
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 // Main function to handle requests
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -20,32 +15,41 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get auth token from request headers
-    const authHeader = req.headers.get('Authorization');
+    // Parse request body
+    const { pitchDeckId, recipientEmail, subject, message, token } = await req.json();
     
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    // Get auth token from request headers or body
+    let authToken = req.headers.get('Authorization');
+    
+    if (authToken) {
+      authToken = authToken.replace('Bearer ', '');
+    } else if (token) {
+      authToken = token;
+      console.log("Using token from request body");
     }
     
-    // Extract JWT token
-    const token = authHeader.replace('Bearer ', '');
+    if (!authToken) {
+      throw new Error('Missing authorization header or token');
+    }
+    
+    console.log(`Processing request to send pitch deck ${pitchDeckId} to ${recipientEmail}`);
+
+    // Create Supabase client with service role key to bypass RLS
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(authToken);
     
     if (userError || !user) {
       console.error('Auth error:', userError);
       throw new Error('Unauthorized: Invalid user token');
     }
     
-    // Parse request body
-    const { pitchDeckId, recipientEmail, subject, message } = await req.json();
-    
     if (!pitchDeckId || !recipientEmail) {
       throw new Error('Missing required parameters: pitchDeckId and recipientEmail are required');
     }
-    
-    console.log(`Sending pitch deck ${pitchDeckId} to ${recipientEmail}`);
     
     // Get the pitch deck
     const { data: pitchDeck, error: pitchDeckError } = await supabase
@@ -60,13 +64,13 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to fetch pitch deck: ${pitchDeckError?.message || 'Not found'}`);
     }
     
-    // Generate PDF for the pitch deck
-    console.log("Calling save-pitch-deck function to generate PDF...");
+    // First, generate the PDF directly in this function
+    console.log("Generating PDF for pitch deck...");
     const pdfResponse = await supabase.functions.invoke('save-pitch-deck', {
       body: {
         action: 'get-pdf',
         pitchDeckId,
-        token  // Pass the token directly
+        token: authToken // Pass the auth token
       }
     });
     
@@ -76,7 +80,7 @@ Deno.serve(async (req) => {
     }
     
     if (!pdfResponse.data || !pdfResponse.data.pdfData) {
-      console.error('Invalid PDF response:', pdfResponse.data);
+      console.error('Invalid PDF response format:', pdfResponse);
       throw new Error('Failed to generate PDF: Invalid response format or missing PDF data');
     }
     
