@@ -45,8 +45,8 @@ const PitchDeckPro = () => {
     const fetchPitchDecks = async () => {
       setLoading(true);
       try {
-        const { data, error } = await supabase.functions.invoke('create-pitch-deck', {
-          body: { action: 'list' }
+        const { data, error } = await supabase.functions.invoke('retrieve-pitch-deck', {
+          body: { limit: 50 }
         });
         
         if (error) {
@@ -90,9 +90,9 @@ const PitchDeckPro = () => {
   const createPitchDeck = async (template: Template) => {
     setCreatingDeck(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-pitch-deck', {
+      const { data, error } = await supabase.functions.invoke('save-pitch-deck', {
         body: {
-          action: 'create',
+          action: 'save',
           pitchDeckData: {
             title: template.name,
             description: template.description,

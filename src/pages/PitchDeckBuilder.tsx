@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -71,7 +70,6 @@ const PitchDeckBuilder = () => {
   const [searching, setSearching] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
   
-  // Initialize with default mortgage data structure to prevent null reference errors
   const [pitchDeck, setPitchDeck] = useState<PitchDeck>({
     id: id || "",
     title: "",
@@ -115,9 +113,7 @@ const PitchDeckBuilder = () => {
     }
   }, [id]);
 
-  // Calculate mortgage payments and savings when data changes
   useEffect(() => {
-    // Make sure mortgage_data and its nested objects exist before accessing properties
     if (pitchDeck.mortgage_data && 
         pitchDeck.mortgage_data.currentLoan && 
         pitchDeck.mortgage_data.proposedLoan) {
@@ -177,7 +173,6 @@ const PitchDeckBuilder = () => {
       }
       
       if (data.success && data.data) {
-        // Ensure mortgage_data has all required nested objects
         const fetchedDeck = {
           ...data.data,
           mortgage_data: data.data.mortgage_data || {
@@ -206,7 +201,6 @@ const PitchDeckBuilder = () => {
           }
         };
         
-        // Now ensure nested objects within mortgage_data are initialized
         if (!fetchedDeck.mortgage_data.currentLoan) {
           fetchedDeck.mortgage_data.currentLoan = {
             balance: 0,
@@ -243,7 +237,6 @@ const PitchDeckBuilder = () => {
         
         setPitchDeck(fetchedDeck);
         
-        // If there's a lead ID, fetch the lead details
         if (fetchedDeck.lead_id) {
           fetchLeadDetails(fetchedDeck.lead_id);
         }
@@ -311,7 +304,6 @@ const PitchDeckBuilder = () => {
     setSelectedLead(lead);
     setSearchOpen(false);
     
-    // Update pitch deck with lead data
     setPitchDeck(prev => ({
       ...prev,
       lead_id: lead.id,
@@ -321,7 +313,6 @@ const PitchDeckBuilder = () => {
           ...prev.mortgage_data.property,
           address: lead.propertyAddress || ''
         },
-        // If lead has mortgage data, use it for current loan
         ...(lead.mortgageData?.loan ? {
           currentLoan: {
             balance: parseFloat(lead.mortgageData.loan.balance || '0'),
@@ -335,12 +326,12 @@ const PitchDeckBuilder = () => {
     }));
   };
 
-  const savePitchDeck = async () => {
+  const savePitchDeck = async (generatePdf = false) => {
     setSaving(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-pitch-deck', {
+      const { data, error } = await supabase.functions.invoke('save-pitch-deck', {
         body: {
-          action: id ? 'update' : 'create',
+          action: 'save',
           pitchDeckId: id,
           pitchDeckData: {
             title: pitchDeck.title,
@@ -348,7 +339,8 @@ const PitchDeckBuilder = () => {
             lead_id: selectedLead?.id || null,
             mortgage_data: pitchDeck.mortgage_data,
             template_type: pitchDeck.template_type
-          }
+          },
+          generatePdf
         }
       });
       
@@ -358,6 +350,18 @@ const PitchDeckBuilder = () => {
       
       if (data.success) {
         toast.success(`Pitch deck ${id ? 'updated' : 'created'} successfully`);
+        
+        if (data.pdfData) {
+          const link = document.createElement('a');
+          link.href = data.pdfData;
+          link.download = `${pitchDeck.title || 'pitch-deck'}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          
+          toast.success("PDF downloaded successfully");
+        }
+        
         if (!id && data.data) {
           navigate(`/pitch-deck/builder/${data.data.id}`);
         }
@@ -367,6 +371,40 @@ const PitchDeckBuilder = () => {
       toast.error(`Failed to ${id ? 'update' : 'create'} pitch deck`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const downloadPdf = async () => {
+    if (!id) {
+      toast.error("Please save the pitch deck first");
+      return;
+    }
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('save-pitch-deck', {
+        body: {
+          action: 'get-pdf',
+          pitchDeckId: id
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (data.success && data.pdfData) {
+        const link = document.createElement('a');
+        link.href = data.pdfData;
+        link.download = `${pitchDeck.title || 'pitch-deck'}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success("PDF downloaded successfully");
+      }
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast.error("Failed to download PDF");
     }
   };
 
@@ -428,7 +466,6 @@ const PitchDeckBuilder = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <div className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
@@ -459,16 +496,16 @@ const PitchDeckBuilder = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => {}}
-                disabled
+                onClick={downloadPdf}
+                disabled={!id}
               >
                 <Download className="h-4 w-4 mr-1" />
-                Export
+                Export PDF
               </Button>
               <Button 
                 variant="default" 
                 size="sm"
-                onClick={savePitchDeck}
+                onClick={() => savePitchDeck(false)}
                 disabled={saving}
                 className="bg-blue-600 hover:bg-blue-700"
               >
@@ -489,10 +526,8 @@ const PitchDeckBuilder = () => {
         </div>
       </div>
 
-      {/* Main content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left sidebar - Client info */}
           <div>
             <Card>
               <CardContent className="p-4">
@@ -617,7 +652,6 @@ const PitchDeckBuilder = () => {
             </Card>
           </div>
 
-          {/* Main content area */}
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardContent className="p-4">
@@ -630,7 +664,6 @@ const PitchDeckBuilder = () => {
                   
                   <TabsContent value="info">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Current Loan */}
                       <div className="space-y-4 border rounded-lg p-4">
                         <h3 className="font-semibold text-lg flex items-center">
                           <Home className="h-4 w-4 mr-2 text-gray-500" /> Current Loan
@@ -707,7 +740,6 @@ const PitchDeckBuilder = () => {
                         </div>
                       </div>
                       
-                      {/* Proposed Loan */}
                       <div className="space-y-4 border rounded-lg p-4">
                         <h3 className="font-semibold text-lg flex items-center">
                           <DollarSign className="h-4 w-4 mr-2 text-green-500" /> Proposed Loan

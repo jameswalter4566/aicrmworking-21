@@ -1,32 +1,8 @@
 
 project_id = "imrmboyczebjlbnkgjns"
 
-[api]
-enabled = true
-
-[db]
-enabled = true
-
-[storage]
-enabled = true
-
-[edge_functions]
-enabled = true
-
-[edge_functions.lead-profile]
+[functions.save-pitch-deck]
 verify_jwt = false
 
-[edge_functions.add-lead-note]
-verify_jwt = false
-
-[edge_functions.update-lead]
-verify_jwt = false
-
-[edge_functions.bulk-update-disposition]
-verify_jwt = false
-
-[edge_functions.connect-google-email]
-verify_jwt = false
-
-[edge_functions.create-pitch-deck]
+[functions.retrieve-pitch-deck]
 verify_jwt = false
