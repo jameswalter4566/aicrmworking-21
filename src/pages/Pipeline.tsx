@@ -13,6 +13,7 @@ import {
 import { useIndustry } from "@/context/IndustryContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface MortgageLead {
   id: number;
@@ -32,6 +33,7 @@ const Pipeline = () => {
   const { activeIndustry } = useIndustry();
   const [listings, setListings] = useState<MortgageLead[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     activeListings: 0,
     thisMonth: 0,
@@ -44,73 +46,88 @@ const Pipeline = () => {
   });
 
   useEffect(() => {
-    const fetchLeads = async () => {
-      setLoading(true);
-      try {
-        // Call the retrieve-leads function with a parameter to filter for mortgage leads
-        const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-          body: { 
-            source: 'all',
-            industryFilter: 'mortgage'
-          }
-        });
-
-        if (error) {
-          console.error("Error fetching mortgage leads:", error);
-          toast.error("Failed to load mortgage leads");
-          return;
-        }
-
-        if (!data.success) {
-          console.error("API returned error:", data.error);
-          toast.error(data.error || "Failed to load mortgage leads");
-          return;
-        }
-
-        // Process the leads to match the listing format
-        const mortgageLeads = data.data
-          .filter((lead: any) => lead.isMortgageLead)
-          .map((lead: any) => ({
-            id: lead.id,
-            name: `${lead.propertyAddress || 'Property'} Mortgage`,
-            client: `${lead.firstName || ''} ${lead.lastName || ''}`.trim(),
-            value: lead.mortgageData?.property?.loanAmount ? 
-              parseFloat(lead.mortgageData.property.loanAmount) : 
-              0,
-            stage: lead.mortgageData?.loan?.status || "Active",
-            listedDate: new Date(lead.addedToPipelineAt || lead.updatedAt || lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            probability: lead.mortgageData?.loan?.probability || 80,
-            trend: "up",
-            propertyAddress: lead.propertyAddress || 'No address provided',
-            firstName: lead.firstName || '',
-            lastName: lead.lastName || ''
-          }));
-
-        setListings(mortgageLeads);
-        
-        // Calculate stats
-        const totalValue = mortgageLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
-        
-        setStats({
-          activeListings: totalValue,
-          thisMonth: 0, // You would calculate this based on date filtering
-          lastMonth: 350000, // Example value
-          ytd: 1250000, // Example value
-          activeCount: mortgageLeads.length,
-          thisMonthCount: 0,
-          lastMonthCount: 1,
-          ytdCount: 4
-        });
-      } catch (error) {
-        console.error("Error in fetchLeads:", error);
-        toast.error("An unexpected error occurred");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeads();
+    // Only fetch mortgage leads if we're in the mortgage industry
+    if (activeIndustry === 'mortgage') {
+      fetchMortgageLeads();
+    }
   }, [activeIndustry]);
+
+  const fetchMortgageLeads = async () => {
+    setLoading(true);
+    try {
+      console.log("Fetching mortgage leads...");
+      
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
+        body: { 
+          source: 'all',
+          industryFilter: 'mortgage'
+        }
+      });
+
+      if (error) {
+        console.error("Error fetching mortgage leads:", error);
+        toast.error("Failed to load mortgage leads");
+        setLoading(false);
+        return;
+      }
+
+      if (!data.success) {
+        console.error("API returned error:", data.error);
+        toast.error(data.error || "Failed to load mortgage leads");
+        setLoading(false);
+        return;
+      }
+
+      console.log("Retrieved leads data:", data);
+      
+      // Process mortgage leads
+      const mortgageLeads = data.data
+        .filter((lead: any) => lead.isMortgageLead)
+        .map((lead: any) => ({
+          id: lead.id,
+          firstName: lead.firstName || '',
+          lastName: lead.lastName || '',
+          propertyAddress: lead.propertyAddress || 'No address provided',
+          value: lead.mortgageData?.property?.loanAmount ? 
+            parseFloat(lead.mortgageData.property.loanAmount) : 
+            0,
+          stage: lead.mortgageData?.loan?.status || "Active",
+          listedDate: new Date(lead.addedToPipelineAt || lead.updatedAt || lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          probability: lead.mortgageData?.loan?.probability || 80,
+          trend: "up",
+          client: `${lead.firstName || ''} ${lead.lastName || ''}`.trim()
+        }));
+
+      console.log("Processed mortgage leads:", mortgageLeads);
+      setListings(mortgageLeads);
+      
+      // Calculate stats
+      const totalValue = mortgageLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
+      
+      setStats({
+        activeListings: totalValue,
+        thisMonth: 0, // You would calculate this based on date filtering
+        lastMonth: 350000, // Example value
+        ytd: 1250000, // Example value
+        activeCount: mortgageLeads.length,
+        thisMonthCount: 0,
+        lastMonthCount: 1,
+        ytdCount: 4
+      });
+    } catch (error) {
+      console.error("Error in fetchMortgageLeads:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Redirect to deals page if not in mortgage industry
+  useEffect(() => {
+    if (activeIndustry !== 'mortgage') {
+      navigate('/deals');
+    }
+  }, [activeIndustry, navigate]);
 
   // Formatting function for currency
   const formatCurrency = (amount: number) => {
@@ -121,11 +138,20 @@ const Pipeline = () => {
     }).format(amount);
   };
 
+  const handleNewApplication = () => {
+    // Navigate to a form for new mortgage application
+    navigate('/mortgage-application');
+    toast.success("Starting new mortgage application");
+  };
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Mortgage Pipeline</h1>
-        <Button className="bg-[#9b87f5] hover:bg-[#7E69AB] text-white">
+        <Button 
+          className="bg-mortgage-purple hover:bg-mortgage-darkPurple text-white"
+          onClick={handleNewApplication}
+        >
           <PlusCircle className="h-4 w-4 mr-2" />
           New Mortgage Application
         </Button>
@@ -165,7 +191,7 @@ const Pipeline = () => {
         </div>
         {loading ? (
           <div className="flex justify-center items-center py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-[#9b87f5]" />
+            <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
           </div>
         ) : listings.length === 0 ? (
           <div className="py-10 text-center text-gray-500">
@@ -200,7 +226,7 @@ const Pipeline = () => {
               <tbody className="divide-y divide-gray-200">
                 {listings.map((listing) => (
                   <tr key={listing.id} className="table-row">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-[#9b87f5]">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-mortgage-purple">
                       {listing.propertyAddress}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -213,7 +239,7 @@ const Pipeline = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-[#e9e3ff] text-[#6E59A5]">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-mortgage-lightPurple text-mortgage-darkPurple">
                         {listing.stage}
                       </span>
                     </td>
@@ -224,7 +250,7 @@ const Pipeline = () => {
                       <div className="flex items-center">
                         <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
                           <div 
-                            className="bg-[#9b87f5] h-2 rounded-full" 
+                            className="bg-mortgage-purple h-2 rounded-full" 
                             style={{ width: `${listing.probability}%` }}
                           ></div>
                         </div>

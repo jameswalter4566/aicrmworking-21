@@ -63,6 +63,7 @@ Deno.serve(async (req) => {
       if (req.headers.get('content-type')?.includes('application/json')) {
         const body = await req.json().catch(() => ({}));
         requestBody = { ...requestBody, ...body };
+        console.log('Request body:', JSON.stringify(requestBody));
       }
     } catch (parseError) {
       console.error('Error parsing request body:', parseError);
@@ -110,6 +111,7 @@ Deno.serve(async (req) => {
     
     console.log(`Successfully retrieved ${leads.length} leads out of ${userId ? userLeadCount : totalLeadCount} total`);
     
+    // Return the response
     return new Response(
       JSON.stringify({ 
         success: true, 
@@ -220,6 +222,7 @@ async function fetchLeadsFromSupabase(userId, source = 'all', industryFilter = n
     }));
     
     console.log(`Transformed ${transformedLeads.length} leads`);
+    console.log("Sample transformed lead:", transformedLeads.length > 0 ? JSON.stringify(transformedLeads[0]) : "No leads");
     
     return transformedLeads;
   } catch (error) {
