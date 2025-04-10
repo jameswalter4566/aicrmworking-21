@@ -1,12 +1,13 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoanApplicationSidebar from "@/components/mortgage/LoanApplicationSidebar";
 import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import Mortgage1003Form from "@/components/mortgage/Mortgage1003Form";
 
 interface LoanApplication {
   id: string;
@@ -26,7 +27,7 @@ const LoanApplicationViewer = () => {
   const navigate = useNavigate();
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("1003:personalInfo");
+  const [activeTab, setActiveTab] = useState("1003");
   
   useEffect(() => {
     if (id) {
@@ -95,63 +96,27 @@ const LoanApplicationViewer = () => {
     }
   };
 
-  const handleUpdateLoanData = async (sectionName: string, formData: any) => {
-    if (!loanApplication) return;
-    
-    try {
-      const updatedMortgageData = {
-        ...loanApplication.mortgageData,
-        [sectionName]: {
-          ...(loanApplication.mortgageData?.[sectionName] || {}),
-          ...formData
-        }
-      };
-      
-      const { error } = await supabase.functions.invoke('update-lead', {
-        body: {
-          leadId: loanApplication.id,
-          updates: {
-            mortgageData: updatedMortgageData
-          }
-        }
-      });
-      
-      if (error) throw error;
-      
-      // Update local state
-      setLoanApplication(prev => prev ? {
-        ...prev,
-        mortgageData: updatedMortgageData
-      } : null);
-      
-      toast.success("Loan information updated");
-    } catch (error) {
-      console.error("Error updating loan data:", error);
-      toast.error("Failed to update loan information");
-    }
-  };
-
   const goBack = () => {
     navigate(-1);
   };
 
   const renderContent = () => {
-    // Split the active tab to get the main tab and section (if applicable)
-    const [mainTab, section] = activeTab.includes(':') ? activeTab.split(':') : [activeTab, null];
-    
-    // If it's a 1003 section, render the appropriate form section
-    if (mainTab === "1003" && section) {
-      return (
-        <Mortgage1003Form 
-          section={section}
-          loanData={loanApplication?.mortgageData}
-          onSave={(formData) => handleUpdateLoanData(section, formData)}
-        />
-      );
-    }
-    
-    // Otherwise, render based on the main tab
-    switch(mainTab) {
+    switch(activeTab) {
+      case "1003":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">1003 Loan Application</h2>
+            <p className="text-gray-600">
+              Form 1003 is the standard form used by borrowers to apply for a mortgage loan.
+            </p>
+            {/* Placeholder for actual 1003 form component */}
+            <div className="mt-4 p-4 border rounded-md bg-gray-50">
+              <p>Borrower: {loanApplication?.firstName} {loanApplication?.lastName}</p>
+              <p>Property Address: {loanApplication?.propertyAddress}</p>
+              <p>Loan Amount: ${loanApplication?.loanAmount.toLocaleString()}</p>
+            </div>
+          </div>
+        );
       case "products":
         return (
           <div className="p-6">
