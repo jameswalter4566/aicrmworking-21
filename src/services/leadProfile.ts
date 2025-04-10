@@ -19,16 +19,16 @@ export interface LeadProfile {
 }
 
 export interface LeadNote {
-  id: number;
-  leadId: number;
+  id: string;
+  lead_id: number;
   content: string;
-  createdBy: string;
-  createdAt: string;
+  created_by: string;
+  created_at: string;
 }
 
 export interface LeadActivity {
-  id: number;
-  leadId: number;
+  id: string;
+  lead_id: number;
   type: string;
   description: string;
   timestamp: string;
@@ -38,7 +38,7 @@ export const leadProfileService = {
   /**
    * Get a single lead by ID
    * @param leadId The ID of the lead to retrieve
-   * @returns Lead profile data
+   * @returns Lead profile data along with notes and activities
    */
   async getLeadById(leadId: number | string): Promise<LeadProfile> {
     try {
@@ -59,8 +59,8 @@ export const leadProfileService = {
         throw new Error(data.error || 'Failed to fetch lead');
       }
 
-      console.log('Retrieved lead:', data);
-      return data.data;
+      console.log('Retrieved lead data:', data);
+      return data.data.lead;
     } catch (error) {
       console.error('Error in getLeadById:', error);
       throw error;
@@ -68,82 +68,61 @@ export const leadProfileService = {
   },
 
   /**
-   * Mock function to simulate getting lead notes
-   * In a real application, this would call a backend API
+   * Get notes for a lead
    * @param leadId The ID of the lead
    */
   async getLeadNotes(leadId: number | string): Promise<LeadNote[]> {
-    // For now, we'll return mock data
-    // In a production app, this would fetch from a real API endpoint
-    return [
-      {
-        id: 1,
-        leadId: Number(leadId),
-        content: "Initial contact made. Lead expressed interest in property listings in the downtown area.",
-        createdBy: "Agent 1",
-        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 2,
-        leadId: Number(leadId),
-        content: "Followed up with email about new listings. Awaiting response.",
-        createdBy: "Agent 1",
-        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 3,
-        leadId: Number(leadId),
-        content: "Lead requested more information about financing options.",
-        createdBy: "Agent 2",
-        createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    try {
+      console.log('Fetching notes for lead ID:', leadId);
+      
+      const { data, error } = await supabase.functions.invoke('lead-profile', {
+        body: { id: leadId }
+      });
+
+      if (error) {
+        console.error('Error fetching lead notes:', error);
+        throw error;
       }
-    ];
+
+      if (!data.success) {
+        console.error('Error in response:', data.error);
+        throw new Error(data.error || 'Failed to fetch lead notes');
+      }
+
+      return data.data.notes;
+    } catch (error) {
+      console.error('Error in getLeadNotes:', error);
+      throw error;
+    }
   },
 
   /**
-   * Mock function to simulate getting lead activities
-   * In a real application, this would call a backend API
+   * Get activities for a lead
    * @param leadId The ID of the lead
    */
   async getLeadActivities(leadId: number | string): Promise<LeadActivity[]> {
-    // Mock data for now
-    return [
-      {
-        id: 1,
-        leadId: Number(leadId),
-        type: "Email",
-        description: "Sent welcome email with property listings",
-        timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 2,
-        leadId: Number(leadId),
-        type: "Call",
-        description: "Outbound call - discussed preferences",
-        timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 3,
-        leadId: Number(leadId),
-        type: "Email",
-        description: "Lead opened listing email",
-        timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 4,
-        leadId: Number(leadId),
-        type: "Text",
-        description: "Sent appointment reminder",
-        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
-      },
-      {
-        id: 5,
-        leadId: Number(leadId),
-        type: "Meeting",
-        description: "Property showing",
-        timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    try {
+      console.log('Fetching activities for lead ID:', leadId);
+      
+      const { data, error } = await supabase.functions.invoke('lead-profile', {
+        body: { id: leadId }
+      });
+
+      if (error) {
+        console.error('Error fetching lead activities:', error);
+        throw error;
       }
-    ];
+
+      if (!data.success) {
+        console.error('Error in response:', data.error);
+        throw new Error(data.error || 'Failed to fetch lead activities');
+      }
+
+      return data.data.activities;
+    } catch (error) {
+      console.error('Error in getLeadActivities:', error);
+      throw error;
+    }
   },
 
   /**
@@ -152,17 +131,32 @@ export const leadProfileService = {
    * @param content The note content
    */
   async addNote(leadId: number | string, content: string): Promise<LeadNote> {
-    // In a real application, this would save to a database
-    // For now, we'll just return a mock response
-    const newNote = {
-      id: Math.floor(Math.random() * 10000),
-      leadId: Number(leadId),
-      content,
-      createdBy: "Current User",
-      createdAt: new Date().toISOString()
-    };
-    
-    console.log('Added note:', newNote);
-    return newNote;
+    try {
+      console.log('Adding note to lead ID:', leadId);
+      
+      const { data, error } = await supabase.functions.invoke('add-lead-note', {
+        body: { 
+          leadId, 
+          content,
+          createdBy: "Current User" // In a real app, this should be the authenticated user
+        }
+      });
+
+      if (error) {
+        console.error('Error adding note:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('Error in response:', data.error);
+        throw new Error(data.error || 'Failed to add note');
+      }
+
+      console.log('Note added successfully:', data.data);
+      return data.data;
+    } catch (error) {
+      console.error('Error in addNote:', error);
+      throw error;
+    }
   }
 };

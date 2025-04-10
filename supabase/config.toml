@@ -3,92 +3,18 @@ project_id = "imrmboyczebjlbnkgjns"
 
 [api]
 enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
 
 [db]
-port = 54322
-
-[studio]
 enabled = true
-port = 54323
-api_url = "http://localhost"
-
-[inbucket]
-enabled = true
-port = 54324
 
 [storage]
 enabled = true
-bucket_size = 100
 
-[auth]
+[edge_functions]
 enabled = true
-site_url = "http://localhost:3000"
 
-[analytics]
-enabled = false
-
-[experimental]
-multisite = false
-
-[functions]
-[functions.send-sms]
+[edge_functions.lead-profile]
 verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 
-[functions.add-to-addressbook]
+[edge_functions.add-lead-note]
 verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.start-predictive-dialer]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.stop-predictive-dialer]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.predictive-dialer-webhook]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.predictive-dialer-machine-detection]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.connect-call-to-agent]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.initiate-manual-call]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.dialer-start]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.dialer-webhook]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.dialer-machine-detection]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.dialer-agent-connect]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.store-leads]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.retrieve-leads]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
-
-[functions.lead-profile]
-verify_jwt = false
-invoker_roles = ["anon", "service_role", "authenticated", "postgres"]

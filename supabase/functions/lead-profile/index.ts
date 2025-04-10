@@ -32,15 +32,15 @@ Deno.serve(async (req) => {
     console.log(`Fetching lead with ID: ${id}`);
 
     // Query the leads table for a specific lead
-    const { data: lead, error } = await supabase
+    const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select('*')
       .eq('id', id)
       .single();
 
-    if (error) {
-      console.error('Error fetching lead:', error.message);
-      throw new Error(`Failed to fetch lead: ${error.message}`);
+    if (leadError) {
+      console.error('Error fetching lead:', leadError.message);
+      throw new Error(`Failed to fetch lead: ${leadError.message}`);
     }
 
     if (!lead) {
@@ -55,6 +55,30 @@ Deno.serve(async (req) => {
           status: 404,
         }
       );
+    }
+
+    // Fetch notes for this lead
+    const { data: notes, error: notesError } = await supabase
+      .from('lead_notes')
+      .select('*')
+      .eq('lead_id', id)
+      .order('created_at', { ascending: false });
+
+    if (notesError) {
+      console.error('Error fetching notes:', notesError.message);
+      throw new Error(`Failed to fetch notes: ${notesError.message}`);
+    }
+
+    // Fetch activities for this lead
+    const { data: activities, error: activitiesError } = await supabase
+      .from('lead_activities')
+      .select('*')
+      .eq('lead_id', id)
+      .order('timestamp', { ascending: false });
+
+    if (activitiesError) {
+      console.error('Error fetching activities:', activitiesError.message);
+      throw new Error(`Failed to fetch activities: ${activitiesError.message}`);
     }
 
     // Format lead data to match the expected structure
@@ -77,11 +101,15 @@ Deno.serve(async (req) => {
 
     console.log(`Successfully retrieved lead: ${formattedLead.firstName} ${formattedLead.lastName}`);
 
-    // Return the lead data
+    // Return the lead data along with notes and activities
     return new Response(
       JSON.stringify({ 
         success: true, 
-        data: formattedLead,
+        data: {
+          lead: formattedLead,
+          notes: notes || [],
+          activities: activities || []
+        },
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
