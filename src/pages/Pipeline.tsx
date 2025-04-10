@@ -49,8 +49,11 @@ const Pipeline = () => {
     // Only fetch mortgage leads if we're in the mortgage industry
     if (activeIndustry === 'mortgage') {
       fetchMortgageLeads();
+    } else {
+      // Redirect to deals page if not in mortgage industry
+      navigate('/deals');
     }
-  }, [activeIndustry]);
+  }, [activeIndustry, navigate]);
 
   const fetchMortgageLeads = async () => {
     setLoading(true);
@@ -162,13 +165,6 @@ const Pipeline = () => {
       setLoading(false);
     }
   };
-
-  // Redirect to deals page if not in mortgage industry
-  useEffect(() => {
-    if (activeIndustry !== 'mortgage') {
-      navigate('/deals');
-    }
-  }, [activeIndustry, navigate]);
 
   // Formatting function for currency
   const formatCurrency = (amount: number) => {
