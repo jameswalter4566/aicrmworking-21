@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -22,26 +21,26 @@ const Settings = () => {
   const [processingOAuth, setProcessingOAuth] = useState(false);
   
   useEffect(() => {
-    // Process OAuth callback if code is present in URL
     const processOAuthCallback = async () => {
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
       if (code) {
         setProcessingOAuth(true);
         try {
-          // Clean up URL
           window.history.replaceState({}, document.title, "/settings");
           
-          // Get auth token for API call
           const token = await getAuthToken();
           
-          // Call our edge function to exchange code for tokens
           const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=callback&code=${code}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           });
+          
+          if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+          }
           
           const data = await response.json();
           
@@ -75,11 +74,9 @@ const Settings = () => {
       }
     };
 
-    // Check if email connections are already established
     const checkExistingConnections = async () => {
       if (user) {
         try {
-          // Use the customSupabase client to access the user_email_connections table
           const { data, error } = await customSupabase
             .from('user_email_connections')
             .select('provider, email')
@@ -111,10 +108,8 @@ const Settings = () => {
     processOAuthCallback();
   }, [user, getAuthToken]);
 
-  // Handler that ensures only one industry can be active at a time
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
     if (isChecked) {
-      // If turning on, make this the only active industry
       setActiveIndustry(industry);
       toast({
         title: "Industry Mode Changed",
@@ -122,7 +117,6 @@ const Settings = () => {
         duration: 3000,
       });
     } else if (activeIndustry === industry) {
-      // If turning off the currently active industry, set to null
       setActiveIndustry(null);
       toast({
         title: "Industry Mode Deactivated",
@@ -132,7 +126,6 @@ const Settings = () => {
     }
   };
 
-  // Helper function to get the formatted industry name
   const getIndustryName = (industry: IndustryType): string => {
     switch (industry) {
       case "mortgage": return "Mortgage Sales Pro";
@@ -142,16 +135,24 @@ const Settings = () => {
     }
   };
 
-  // Function to connect to Google email
   const connectGoogleEmail = async () => {
     setLoading(true);
     try {
       const response = await fetch(`${window.location.origin}/functions/v1/connect-google-email?action=authorize`);
-      const { url } = await response.json();
       
-      if (url) {
-        // Redirect to Google OAuth flow
-        window.location.href = url;
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Expected JSON response but got ${contentType}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.url) {
+        window.location.href = data.url;
       } else {
         throw new Error("Failed to generate authorization URL");
       }
@@ -159,7 +160,7 @@ const Settings = () => {
       console.error("Error initiating Google OAuth flow:", error);
       toast({
         title: "Connection Error",
-        description: "Failed to start the Google connection process.",
+        description: "Failed to start the Google connection process. Please try again.",
         variant: "destructive",
         duration: 3000,
       });
@@ -167,15 +168,13 @@ const Settings = () => {
     }
   };
 
-  // Function to connect to Microsoft Outlook
   const connectOutlookEmail = () => {
     setLoading(true);
     
-    // Simulate OAuth flow with a timeout
     setTimeout(() => {
       if (user) {
         setOutlookConnected(true);
-        setEmailAddress("user@outlook.com");  // This would come from the actual OAuth flow
+        setEmailAddress("user@outlook.com");
       }
       setLoading(false);
       toast({
@@ -186,7 +185,6 @@ const Settings = () => {
     }, 1500);
   };
 
-  // Function to disconnect Google email
   const disconnectGoogleEmail = async () => {
     setLoading(true);
     try {
@@ -200,6 +198,10 @@ const Settings = () => {
         },
         body: JSON.stringify({ provider: 'google' })
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
       
       const data = await response.json();
       
@@ -227,7 +229,6 @@ const Settings = () => {
     }
   };
 
-  // Function to disconnect Microsoft Outlook
   const disconnectOutlookEmail = () => {
     if (user) {
       setOutlookConnected(false);
@@ -250,7 +251,6 @@ const Settings = () => {
           <h1 className="text-2xl font-bold">Settings</h1>
         </div>
 
-        {/* User Account Card */}
         <Card>
           <CardHeader>
             <CardTitle>User Account</CardTitle>
@@ -278,7 +278,6 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* CRM Configuration Card */}
         <Card>
           <CardHeader>
             <CardTitle>CRM Configuration</CardTitle>
@@ -294,7 +293,6 @@ const Settings = () => {
               </p>
               
               <div className="space-y-5">
-                {/* Mortgage Sales Pro */}
                 <div className="flex items-center justify-between rounded-lg border p-4 shadow-sm">
                   <div className="flex space-x-3">
                     <div className="bg-blue-500 p-2 rounded-md">
@@ -323,7 +321,6 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* Real Estate Sales Pro */}
                 <div className="flex items-center justify-between rounded-lg border p-4 shadow-sm">
                   <div className="flex space-x-3">
                     <div className="bg-green-500 p-2 rounded-md">
@@ -352,7 +349,6 @@ const Settings = () => {
                   </div>
                 </div>
 
-                {/* Debt Sales Pro */}
                 <div className="flex items-center justify-between rounded-lg border p-4 shadow-sm">
                   <div className="flex space-x-3">
                     <div className="bg-purple-500 p-2 rounded-md">
@@ -385,7 +381,6 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Email Integration Card */}
         <Card>
           <CardHeader>
             <CardTitle>Email Integration</CardTitle>
@@ -467,7 +462,6 @@ const Settings = () => {
                 </div>
               )}
               
-              {/* Connected Accounts */}
               {(googleConnected || outlookConnected) && (
                 <div className="space-y-4">
                   <h4 className="font-medium">Connected Accounts</h4>
@@ -519,7 +513,6 @@ const Settings = () => {
                     </div>
                   )}
                   
-                  {/* Connection Info */}
                   <div className="flex items-center space-x-2 p-4 bg-blue-50 rounded-md">
                     <AlertCircle className="h-5 w-5 text-blue-500" />
                     <p className="text-sm text-blue-700">
