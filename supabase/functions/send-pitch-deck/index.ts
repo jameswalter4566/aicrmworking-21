@@ -66,8 +66,7 @@ Deno.serve(async (req) => {
       body: {
         action: 'get-pdf',
         pitchDeckId,
-        // Pass the token to maintain authentication
-        token,
+        token  // Pass the token directly
       }
     });
     
@@ -78,14 +77,17 @@ Deno.serve(async (req) => {
     
     if (!pdfResponse.data || !pdfResponse.data.pdfData) {
       console.error('Invalid PDF response:', pdfResponse.data);
-      throw new Error('Failed to generate PDF: Invalid response format');
+      throw new Error('Failed to generate PDF: Invalid response format or missing PDF data');
     }
     
+    console.log("PDF successfully generated, preparing to send email...");
+    
     // Extract the base64 PDF data
-    const pdfBase64 = pdfResponse.data.pdfData.split(',')[1]; // Remove data:application/pdf;base64, prefix
+    const pdfData = pdfResponse.data.pdfData;
+    const pdfBase64 = pdfData.split(',')[1]; // Remove data:application/pdf;base64, prefix
     
     if (!pdfBase64) {
-      throw new Error('Failed to extract PDF data');
+      throw new Error('Failed to extract PDF data: Invalid format');
     }
     
     // Set email subject and body
@@ -115,6 +117,8 @@ Deno.serve(async (req) => {
       console.error('Email sending error:', emailResponse.error);
       throw new Error(`Failed to send email: ${emailResponse.error.message || 'Unknown error'}`);
     }
+    
+    console.log("Email sent successfully to:", recipientEmail);
     
     // Update the pitch deck with sent info
     await supabase

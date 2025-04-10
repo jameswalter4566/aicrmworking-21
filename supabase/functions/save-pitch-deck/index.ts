@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 import { jsPDF } from 'https://esm.sh/jspdf@2.5.1'
 import autoTable from 'https://esm.sh/jspdf-autotable@3.8.2'
@@ -154,6 +153,8 @@ Deno.serve(async (req) => {
   try {
     // Parse request body
     const requestBody = await req.json();
+    console.log("Received request with action:", requestBody.action);
+    
     const { action, pitchDeckData, pitchDeckId, generatePdf, token } = requestBody;
     
     // Check for token - either from headers or from the request body (for function-to-function calls)
@@ -162,6 +163,7 @@ Deno.serve(async (req) => {
       authToken = authToken.replace('Bearer ', '');
     } else if (token) {
       authToken = token;
+      console.log("Using token from request body");
     }
     
     if (!authToken) {
@@ -261,7 +263,6 @@ Deno.serve(async (req) => {
           .from('pitch_decks')
           .select('*')
           .eq('id', pitchDeckId)
-          .eq('created_by', user.id)
           .single();
           
         if (getError) {
@@ -273,8 +274,11 @@ Deno.serve(async (req) => {
           throw new Error(`Pitch deck not found with ID: ${pitchDeckId}`);
         }
         
+        console.log("Pitch deck found, generating PDF...");
+        
         try {
           pdfData = await generatePDF(deckData);
+          console.log("PDF generated successfully, length:", pdfData.length);
           responseData = { success: true, data: { id: pitchDeckId } };
         } catch (pdfError) {
           console.error('PDF generation error:', pdfError);
@@ -305,7 +309,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ success: false, error: error.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 500,
       }
     );
   }

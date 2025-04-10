@@ -89,6 +89,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
 
       toast.success(`Pitch deck sent to ${recipientEmail}`);
       onClose();
+      setRecipientEmail("");
     } catch (error: any) {
       console.error("Error sending pitch deck:", error);
       toast.error(`Failed to send: ${error.message}`);
