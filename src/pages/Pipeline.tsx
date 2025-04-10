@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -46,11 +45,9 @@ const Pipeline = () => {
   });
 
   useEffect(() => {
-    // Only fetch mortgage leads if we're in the mortgage industry
     if (activeIndustry === 'mortgage') {
       fetchMortgageLeads();
     } else {
-      // Redirect to deals page if not in mortgage industry
       navigate('/deals');
     }
   }, [activeIndustry, navigate]);
@@ -58,8 +55,6 @@ const Pipeline = () => {
   const fetchMortgageLeads = async () => {
     setLoading(true);
     try {
-      console.log("Fetching mortgage leads...");
-      
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { 
           source: 'all',
@@ -81,33 +76,31 @@ const Pipeline = () => {
         return;
       }
 
-      console.log("Retrieved leads data:", data);
-      
-      // Process mortgage leads
       const mortgageLeads = data.data
         .filter((lead: any) => lead.isMortgageLead)
-        .map((lead: any) => ({
-          id: lead.id,
-          firstName: lead.firstName || '',
-          lastName: lead.lastName || '',
-          propertyAddress: lead.propertyAddress || 'No address provided',
-          value: lead.mortgageData?.property?.loanAmount ? 
-            parseFloat(lead.mortgageData.property.loanAmount) : 
-            0,
-          stage: lead.mortgageData?.loan?.status || "Active",
-          listedDate: new Date(lead.addedToPipelineAt || lead.updatedAt || lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          probability: lead.mortgageData?.loan?.probability || 80,
-          trend: "up",
-          client: `${lead.firstName || ''} ${lead.lastName || ''}`.trim()
-        }));
+        .map((lead: any) => {
+          const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
+          const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
+
+          return {
+            id: lead.id,
+            firstName: lead.firstName || '',
+            lastName: lead.lastName || '',
+            propertyAddress: lead.propertyAddress || 'No address provided',
+            value: loanAmount,
+            stage: lead.mortgageData?.loan?.status || "Active",
+            listedDate: new Date(lead.addedToPipelineAt || lead.updatedAt || lead.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            probability: lead.mortgageData?.loan?.probability || 80,
+            trend: "up",
+            client: `${lead.firstName || ''} ${lead.lastName || ''}`.trim()
+          };
+        });
 
       console.log("Processed mortgage leads:", mortgageLeads);
       setListings(mortgageLeads);
       
-      // Calculate stats from actual data
-      const totalValue = mortgageLeads.reduce((sum, lead) => sum + (lead.value || 0), 0);
+      const totalValue = mortgageLeads.reduce((sum, lead) => sum + lead.value, 0);
       
-      // Initialize counters
       let thisMonthValue = 0;
       let thisMonthCount = 0;
       let lastMonthValue = 0;
@@ -115,24 +108,20 @@ const Pipeline = () => {
       let ytdValue = 0;
       let ytdCount = 0;
 
-      // Get current date information
       const now = new Date();
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       
-      // Process each lead for statistics
       mortgageLeads.forEach(lead => {
         const leadDate = new Date(lead.listedDate);
         const leadMonth = leadDate.getMonth();
         const leadYear = leadDate.getFullYear();
         
-        // This month stats
         if (leadMonth === currentMonth && leadYear === currentYear) {
           thisMonthValue += lead.value;
           thisMonthCount++;
         }
         
-        // Last month stats
         const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
         const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
         
@@ -141,7 +130,6 @@ const Pipeline = () => {
           lastMonthCount++;
         }
         
-        // Year to date stats
         if (leadYear === currentYear) {
           ytdValue += lead.value;
           ytdCount++;
@@ -166,7 +154,6 @@ const Pipeline = () => {
     }
   };
 
-  // Formatting function for currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -176,7 +163,6 @@ const Pipeline = () => {
   };
 
   const handleNewApplication = () => {
-    // Navigate to a form for new mortgage application
     navigate('/mortgage-application');
     toast.success("Starting new mortgage application");
   };
