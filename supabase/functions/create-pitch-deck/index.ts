@@ -42,20 +42,28 @@ Deno.serve(async (req) => {
     
     let responseData;
     
+    // Debug logs to track the flow
+    console.log(`Action: ${action}, User ID: ${user.id}`);
+    
     // Handle different actions
     switch (action) {
       case 'create':
         // Create new pitch deck with explicit created_by user ID
+        console.log('Creating new pitch deck with data:', { ...pitchDeckData, created_by: user.id });
+        
         const { data: newDeckData, error: createError } = await supabase
           .from('pitch_decks')
           .insert({
             ...pitchDeckData,
-            created_by: user.id,  // Explicitly set the created_by field to the user ID
+            created_by: user.id,
           })
           .select('*')
           .single();
           
-        if (createError) throw new Error(`Failed to create pitch deck: ${createError.message}`);
+        if (createError) {
+          console.error('Create error details:', createError);
+          throw new Error(`Failed to create pitch deck: ${createError.message}`);
+        }
         responseData = { success: true, data: newDeckData };
         break;
         
