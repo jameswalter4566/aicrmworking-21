@@ -44,6 +44,7 @@ const LeadProfile = () => {
   const [newNote, setNewNote] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editedLead, setEditedLead] = useState<LeadProfileType>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchLeadData = async () => {
@@ -97,10 +98,32 @@ const LeadProfile = () => {
     setEditMode(!editMode);
   };
 
-  const handleSaveChanges = () => {
-    setLead(editedLead);
-    setEditMode(false);
-    toast.success("Lead information updated");
+  const handleSaveChanges = async () => {
+    if (!id || !editedLead) return;
+    
+    try {
+      setIsSaving(true);
+      const updatedLead = await leadProfileService.updateLead(id, editedLead);
+      setLead(updatedLead);
+      setEditMode(false);
+      
+      const updatedActivity = {
+        id: crypto.randomUUID(),
+        lead_id: Number(id),
+        type: "Edit",
+        description: "Lead information was updated",
+        timestamp: new Date().toISOString()
+      };
+      
+      setActivities(prev => [updatedActivity, ...prev]);
+      
+      toast.success("Lead information updated successfully");
+    } catch (err) {
+      console.error("Error updating lead:", err);
+      toast.error("Failed to update lead information");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleEditChange = (field: keyof LeadProfileType, value: string) => {
@@ -126,7 +149,6 @@ const LeadProfile = () => {
     }
   };
 
-  // Function to determine the outline color based on industry
   const getIndustryOutlineColor = () => {
     switch(activeIndustry) {
       case "mortgage":
@@ -136,7 +158,7 @@ const LeadProfile = () => {
       case "debtSettlement":
         return "border-purple-500";
       default:
-        return "border-gray-200"; // Default border color
+        return "border-gray-200";
     }
   };
 
@@ -207,6 +229,7 @@ const LeadProfile = () => {
         <Button 
           variant={editMode ? "destructive" : "outline"}
           onClick={toggleEditMode}
+          disabled={isSaving}
         >
           {editMode ? (
             <>
@@ -409,9 +432,18 @@ const LeadProfile = () => {
             </CardContent>
             {editMode && (
               <CardFooter>
-                <Button onClick={handleSaveChanges}>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
+                <Button onClick={handleSaveChanges} disabled={isSaving}>
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="mr-2 h-4 w-4" />
+                      Save Changes
+                    </>
+                  )}
                 </Button>
               </CardFooter>
             )}

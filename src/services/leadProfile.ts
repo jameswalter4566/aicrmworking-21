@@ -158,5 +158,39 @@ export const leadProfileService = {
       console.error('Error in addNote:', error);
       throw error;
     }
+  },
+
+  /**
+   * Update a lead's information
+   * @param leadId The ID of the lead to update
+   * @param leadData The updated lead data
+   */
+  async updateLead(leadId: number | string, leadData: LeadProfile): Promise<LeadProfile> {
+    try {
+      console.log('Updating lead with ID:', leadId);
+      
+      const { data, error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId, 
+          leadData
+        }
+      });
+
+      if (error) {
+        console.error('Error updating lead:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('Error in response:', data.error);
+        throw new Error(data.error || 'Failed to update lead');
+      }
+
+      console.log('Lead updated successfully:', data.data);
+      return data.data;
+    } catch (error) {
+      console.error('Error in updateLead:', error);
+      throw error;
+    }
   }
 };
