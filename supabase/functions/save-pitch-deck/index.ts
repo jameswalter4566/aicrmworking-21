@@ -26,113 +26,122 @@ const formatCurrency = (value: number) => {
 
 // Generate PDF from pitch deck data
 async function generatePDF(pitchDeck: any) {
-  // Create new PDF document
-  const doc = new jsPDF();
-  
-  // Add title
-  doc.setFontSize(20);
-  doc.text(pitchDeck.title, 105, 20, { align: 'center' });
-  
-  // Add description if available
-  if (pitchDeck.description) {
-    doc.setFontSize(12);
-    doc.text(`Description: ${pitchDeck.description}`, 20, 35);
-  }
-  
-  // Add a divider
-  doc.setDrawColor(200);
-  doc.line(20, 40, 190, 40);
-  
-  // Client information if available
-  doc.setFontSize(16);
-  doc.text("Loan Details", 20, 50);
-  
-  // Current loan data
-  if (pitchDeck.mortgage_data?.currentLoan) {
-    doc.setFontSize(14);
-    doc.text("Current Loan", 20, 60);
+  try {
+    console.log("Starting PDF generation for pitch deck:", pitchDeck.id);
     
-    const currentLoan = pitchDeck.mortgage_data.currentLoan;
-    doc.setFontSize(10);
-    doc.text(`Loan Balance: ${formatCurrency(currentLoan.balance || 0)}`, 25, 70);
-    doc.text(`Interest Rate: ${(currentLoan.rate || 0).toFixed(3)}%`, 25, 77);
-    doc.text(`Monthly Payment: ${formatCurrency(currentLoan.payment || 0)}`, 25, 84);
-    doc.text(`Term: ${currentLoan.term || 30} years`, 25, 91);
-    doc.text(`Type: ${currentLoan.type || 'Conventional'}`, 25, 98);
-  }
-  
-  // Proposed loan data
-  if (pitchDeck.mortgage_data?.proposedLoan) {
-    doc.setFontSize(14);
-    doc.text("Proposed Loan", 110, 60);
+    // Create new PDF document
+    const doc = new jsPDF();
     
-    const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
-    doc.setFontSize(10);
-    doc.text(`Loan Amount: ${formatCurrency(proposedLoan.amount || 0)}`, 115, 70);
-    doc.text(`Interest Rate: ${(proposedLoan.rate || 0).toFixed(3)}%`, 115, 77);
-    doc.text(`Monthly Payment: ${formatCurrency(proposedLoan.payment || 0)}`, 115, 84);
-    doc.text(`Term: ${proposedLoan.term || 30} years`, 115, 91);
-    doc.text(`Type: ${proposedLoan.type || 'Conventional'}`, 115, 98);
-  }
-  
-  // Savings information
-  if (pitchDeck.mortgage_data?.savings) {
+    // Add title
+    doc.setFontSize(20);
+    doc.text(pitchDeck.title, 105, 20, { align: 'center' });
+    
+    // Add description if available
+    if (pitchDeck.description) {
+      doc.setFontSize(12);
+      doc.text(`Description: ${pitchDeck.description}`, 20, 35);
+    }
+    
+    // Add a divider
+    doc.setDrawColor(200);
+    doc.line(20, 40, 190, 40);
+    
+    // Client information if available
     doc.setFontSize(16);
-    doc.text("Savings", 20, 115);
+    doc.text("Loan Details", 20, 50);
     
-    const savings = pitchDeck.mortgage_data.savings;
-    doc.setFontSize(10);
-    doc.text(`Monthly Savings: ${formatCurrency(savings.monthly || 0)}`, 25, 125);
-    doc.text(`Lifetime Savings: ${formatCurrency(savings.lifetime || 0)}`, 25, 132);
+    // Current loan data
+    if (pitchDeck.mortgage_data?.currentLoan) {
+      doc.setFontSize(14);
+      doc.text("Current Loan", 20, 60);
+      
+      const currentLoan = pitchDeck.mortgage_data.currentLoan;
+      doc.setFontSize(10);
+      doc.text(`Loan Balance: ${formatCurrency(currentLoan.balance || 0)}`, 25, 70);
+      doc.text(`Interest Rate: ${(currentLoan.rate || 0).toFixed(3)}%`, 25, 77);
+      doc.text(`Monthly Payment: ${formatCurrency(currentLoan.payment || 0)}`, 25, 84);
+      doc.text(`Term: ${currentLoan.term || 30} years`, 25, 91);
+      doc.text(`Type: ${currentLoan.type || 'Conventional'}`, 25, 98);
+    }
+    
+    // Proposed loan data
+    if (pitchDeck.mortgage_data?.proposedLoan) {
+      doc.setFontSize(14);
+      doc.text("Proposed Loan", 110, 60);
+      
+      const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
+      doc.setFontSize(10);
+      doc.text(`Loan Amount: ${formatCurrency(proposedLoan.amount || 0)}`, 115, 70);
+      doc.text(`Interest Rate: ${(proposedLoan.rate || 0).toFixed(3)}%`, 115, 77);
+      doc.text(`Monthly Payment: ${formatCurrency(proposedLoan.payment || 0)}`, 115, 84);
+      doc.text(`Term: ${proposedLoan.term || 30} years`, 115, 91);
+      doc.text(`Type: ${proposedLoan.type || 'Conventional'}`, 115, 98);
+    }
+    
+    // Savings information
+    if (pitchDeck.mortgage_data?.savings) {
+      doc.setFontSize(16);
+      doc.text("Savings", 20, 115);
+      
+      const savings = pitchDeck.mortgage_data.savings;
+      doc.setFontSize(10);
+      doc.text(`Monthly Savings: ${formatCurrency(savings.monthly || 0)}`, 25, 125);
+      doc.text(`Lifetime Savings: ${formatCurrency(savings.lifetime || 0)}`, 25, 132);
+    }
+    
+    // Create comparison table
+    if (pitchDeck.mortgage_data?.currentLoan && pitchDeck.mortgage_data?.proposedLoan) {
+      doc.setFontSize(16);
+      doc.text("Loan Comparison", 20, 150);
+      
+      const currentLoan = pitchDeck.mortgage_data.currentLoan;
+      const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
+      
+      autoTable(doc, {
+        startY: 155,
+        head: [['Feature', 'Current Loan', 'Proposed Loan', 'Difference']],
+        body: [
+          [
+            'Principal', 
+            formatCurrency(currentLoan.balance || 0),
+            formatCurrency(proposedLoan.amount || 0),
+            formatCurrency((proposedLoan.amount || 0) - (currentLoan.balance || 0))
+          ],
+          [
+            'Interest Rate', 
+            (currentLoan.rate || 0).toFixed(3) + '%',
+            (proposedLoan.rate || 0).toFixed(3) + '%',
+            ((proposedLoan.rate || 0) - (currentLoan.rate || 0)).toFixed(3) + '%'
+          ],
+          [
+            'Monthly Payment', 
+            formatCurrency(currentLoan.payment || 0),
+            formatCurrency(proposedLoan.payment || 0),
+            formatCurrency((proposedLoan.payment || 0) - (currentLoan.payment || 0))
+          ],
+          [
+            'Term', 
+            (currentLoan.term || 30) + ' years',
+            (proposedLoan.term || 30) + ' years',
+            ((proposedLoan.term || 0) - (currentLoan.term || 0)) + ' years'
+          ]
+        ],
+      });
+    }
+    
+    // Add date at the bottom
+    const dateStr = new Date().toLocaleDateString();
+    doc.setFontSize(8);
+    doc.text(`Generated on: ${dateStr}`, 20, 285);
+    
+    console.log("PDF generation completed successfully");
+    
+    // Return the PDF as a base64 string
+    return doc.output('datauristring');
+  } catch (err) {
+    console.error("Error generating PDF:", err);
+    throw new Error(`PDF generation failed: ${err.message}`);
   }
-  
-  // Create comparison table
-  if (pitchDeck.mortgage_data?.currentLoan && pitchDeck.mortgage_data?.proposedLoan) {
-    doc.setFontSize(16);
-    doc.text("Loan Comparison", 20, 150);
-    
-    const currentLoan = pitchDeck.mortgage_data.currentLoan;
-    const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
-    
-    autoTable(doc, {
-      startY: 155,
-      head: [['Feature', 'Current Loan', 'Proposed Loan', 'Difference']],
-      body: [
-        [
-          'Principal', 
-          formatCurrency(currentLoan.balance || 0),
-          formatCurrency(proposedLoan.amount || 0),
-          formatCurrency((proposedLoan.amount || 0) - (currentLoan.balance || 0))
-        ],
-        [
-          'Interest Rate', 
-          (currentLoan.rate || 0).toFixed(3) + '%',
-          (proposedLoan.rate || 0).toFixed(3) + '%',
-          ((proposedLoan.rate || 0) - (currentLoan.rate || 0)).toFixed(3) + '%'
-        ],
-        [
-          'Monthly Payment', 
-          formatCurrency(currentLoan.payment || 0),
-          formatCurrency(proposedLoan.payment || 0),
-          formatCurrency((proposedLoan.payment || 0) - (currentLoan.payment || 0))
-        ],
-        [
-          'Term', 
-          (currentLoan.term || 30) + ' years',
-          (proposedLoan.term || 30) + ' years',
-          ((proposedLoan.term || 0) - (currentLoan.term || 0)) + ' years'
-        ]
-      ],
-    });
-  }
-  
-  // Add date at the bottom
-  const dateStr = new Date().toLocaleDateString();
-  doc.setFontSize(8);
-  doc.text(`Generated on: ${dateStr}`, 20, 285);
-  
-  // Return the PDF as a base64 string
-  return doc.output('datauristring');
 }
 
 // Main function to handle requests
@@ -143,31 +152,34 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get auth token from request headers
-    const authHeader = req.headers.get('Authorization');
+    // Parse request body
+    const requestBody = await req.json();
+    const { action, pitchDeckData, pitchDeckId, generatePdf, token } = requestBody;
     
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
+    // Check for token - either from headers or from the request body (for function-to-function calls)
+    let authToken = req.headers.get('Authorization');
+    if (authToken) {
+      authToken = authToken.replace('Bearer ', '');
+    } else if (token) {
+      authToken = token;
     }
     
-    // Extract JWT token
-    const token = authHeader.replace('Bearer ', '');
+    if (!authToken) {
+      throw new Error('Missing authorization token');
+    }
     
     // Get user from token
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(authToken);
     
     if (userError || !user) {
       console.error('Auth error:', userError);
       throw new Error('Unauthorized: Invalid user token');
     }
     
-    // Parse request body
-    const { action, pitchDeckData, pitchDeckId, generatePdf } = await req.json();
-    
     let responseData;
     let pdfData = null;
     
-    console.log(`Action: ${action}, User ID: ${user.id}, Generate PDF: ${generatePdf}`);
+    console.log(`Action: ${action}, User ID: ${user.id}`);
     
     switch (action) {
       case 'save':
@@ -197,7 +209,12 @@ Deno.serve(async (req) => {
           
           // Generate PDF if requested
           if (generatePdf && updatedDeck) {
-            pdfData = await generatePDF(updatedDeck);
+            try {
+              pdfData = await generatePDF(updatedDeck);
+            } catch (pdfError) {
+              console.error('PDF generation error:', pdfError);
+              // Continue without throwing to return the updated deck data
+            }
           }
         } else {
           // Create new pitch deck
@@ -222,7 +239,12 @@ Deno.serve(async (req) => {
           
           // Generate PDF if requested
           if (generatePdf && newDeck) {
-            pdfData = await generatePDF(newDeck);
+            try {
+              pdfData = await generatePDF(newDeck);
+            } catch (pdfError) {
+              console.error('PDF generation error:', pdfError);
+              // Continue without throwing to return the created deck data
+            }
           }
         }
         break;
@@ -230,6 +252,10 @@ Deno.serve(async (req) => {
       case 'get-pdf':
         // Get pitch deck and generate PDF
         console.log(`Generating PDF for pitch deck ${pitchDeckId}`);
+        
+        if (!pitchDeckId) {
+          throw new Error('Missing required parameter: pitchDeckId');
+        }
         
         const { data: deckData, error: getError } = await supabase
           .from('pitch_decks')
@@ -239,12 +265,20 @@ Deno.serve(async (req) => {
           .single();
           
         if (getError) {
+          console.error('Error fetching pitch deck:', getError);
           throw new Error(`Failed to get pitch deck: ${getError.message}`);
         }
         
-        if (deckData) {
+        if (!deckData) {
+          throw new Error(`Pitch deck not found with ID: ${pitchDeckId}`);
+        }
+        
+        try {
           pdfData = await generatePDF(deckData);
           responseData = { success: true, data: { id: pitchDeckId } };
+        } catch (pdfError) {
+          console.error('PDF generation error:', pdfError);
+          throw new Error(`Failed to generate PDF: ${pdfError.message}`);
         }
         break;
         

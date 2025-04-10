@@ -50,11 +50,22 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         .eq("provider", "google")
         .limit(1);
 
-      if (connectionsError || !connections || connections.length === 0) {
+      if (connectionsError) {
+        console.error("Error checking email connections:", connectionsError);
+        throw new Error("Failed to check email connection status");
+      }
+
+      if (!connections || connections.length === 0) {
         toast.error("No email connection found. Please connect your Gmail account in the Settings page.");
         onClose();
         return;
       }
+
+      console.log("Sending pitch deck:", { 
+        pitchDeckId: pitchDeck.id, 
+        recipientEmail, 
+        subject 
+      });
 
       // Send the pitch deck
       const { data, error } = await supabase.functions.invoke("send-pitch-deck", {
@@ -67,7 +78,13 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       });
 
       if (error) {
-        throw error;
+        console.error("Error response from send-pitch-deck:", error);
+        throw new Error(`Function error: ${error.message}`);
+      }
+
+      if (!data || data.success === false) {
+        console.error("Error in response data:", data);
+        throw new Error(data?.error || "Unknown error occurred");
       }
 
       toast.success(`Pitch deck sent to ${recipientEmail}`);

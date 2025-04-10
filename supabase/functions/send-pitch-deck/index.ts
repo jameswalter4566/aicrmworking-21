@@ -61,20 +61,32 @@ Deno.serve(async (req) => {
     }
     
     // Generate PDF for the pitch deck
-    const { data: pdfResponse, error: pdfError } = await supabase.functions.invoke('save-pitch-deck', {
+    console.log("Calling save-pitch-deck function to generate PDF...");
+    const pdfResponse = await supabase.functions.invoke('save-pitch-deck', {
       body: {
         action: 'get-pdf',
         pitchDeckId,
+        // Pass the token to maintain authentication
+        token,
       }
     });
     
-    if (pdfError || !pdfResponse || !pdfResponse.pdfData) {
-      console.error('PDF generation error:', pdfError);
-      throw new Error(`Failed to generate PDF: ${pdfError?.message || 'Unknown error'}`);
+    if (pdfResponse.error) {
+      console.error('PDF generation error:', pdfResponse.error);
+      throw new Error(`Failed to generate PDF: ${pdfResponse.error.message || 'Unknown error'}`);
+    }
+    
+    if (!pdfResponse.data || !pdfResponse.data.pdfData) {
+      console.error('Invalid PDF response:', pdfResponse.data);
+      throw new Error('Failed to generate PDF: Invalid response format');
     }
     
     // Extract the base64 PDF data
-    const pdfBase64 = pdfResponse.pdfData.split(',')[1]; // Remove data:application/pdf;base64, prefix
+    const pdfBase64 = pdfResponse.data.pdfData.split(',')[1]; // Remove data:application/pdf;base64, prefix
+    
+    if (!pdfBase64) {
+      throw new Error('Failed to extract PDF data');
+    }
     
     // Set email subject and body
     const emailSubject = subject || `Mortgage Proposal: ${pitchDeck.title}`;
@@ -82,6 +94,7 @@ Deno.serve(async (req) => {
       `Dear Client,\n\nI'm excited to share this mortgage proposal with you.\n\n${pitchDeck.description || ''}\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${user.email}`;
     
     // Send email using our Gmail connector
+    console.log("Calling send-gmail function...");
     const emailResponse = await supabase.functions.invoke('send-gmail', {
       body: {
         to: recipientEmail,
@@ -100,7 +113,7 @@ Deno.serve(async (req) => {
     
     if (emailResponse.error) {
       console.error('Email sending error:', emailResponse.error);
-      throw new Error(`Failed to send email: ${emailResponse.error.message}`);
+      throw new Error(`Failed to send email: ${emailResponse.error.message || 'Unknown error'}`);
     }
     
     // Update the pitch deck with sent info
