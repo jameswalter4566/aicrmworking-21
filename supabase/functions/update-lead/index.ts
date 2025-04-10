@@ -30,6 +30,23 @@ Deno.serve(async (req) => {
     console.log(`Updating lead with ID: ${leadId}`);
     console.log('Update data:', JSON.stringify(leadData));
 
+    // Check if disposition is being updated
+    let oldDisposition = null;
+    if (leadData.disposition) {
+      // Fetch the current lead to get the old disposition value
+      const { data: currentLead, error: fetchError } = await supabase
+        .from('leads')
+        .select('disposition')
+        .eq('id', leadId)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching current lead:', fetchError.message);
+      } else if (currentLead) {
+        oldDisposition = currentLead.disposition;
+      }
+    }
+
     // Transform the lead data from camelCase to snake_case for database
     const transformedData = {
       first_name: leadData.firstName,
@@ -57,6 +74,25 @@ Deno.serve(async (req) => {
     }
 
     console.log('Lead updated successfully:', data);
+
+    // If disposition was changed, record it in the activity log
+    if (oldDisposition && leadData.disposition && oldDisposition !== leadData.disposition) {
+      const activityData = {
+        lead_id: leadId,
+        type: 'Disposition Change',
+        description: `Disposition changed from ${oldDisposition} to ${leadData.disposition}`,
+        timestamp: new Date().toISOString()
+      };
+
+      const { error: activityError } = await supabase
+        .from('lead_activities')
+        .insert(activityData);
+
+      if (activityError) {
+        console.error('Error recording disposition change activity:', activityError.message);
+        // Don't throw error here, as the main update was successful
+      }
+    }
 
     // Transform the updated lead back to camelCase for the frontend
     const updatedLead = {

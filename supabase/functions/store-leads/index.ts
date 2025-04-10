@@ -14,6 +14,21 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Validate disposition value
+const validateDisposition = (disposition: string): string => {
+  const validDispositions = [
+    'Not Contacted',
+    'Contacted',
+    'Appointment Set',
+    'Submitted',
+    'Dead',
+    'DNC'
+  ];
+  
+  return validDispositions.includes(disposition) ? 
+    disposition : 'Not Contacted';
+};
+
 // Main function to handle requests
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -139,23 +154,29 @@ Deno.serve(async (req) => {
 async function storeLeadsInSupabase(leads, userId) {
   try {
     // Process the leads to ensure they have the correct format for our database
-    const processedLeads = leads.map(lead => ({
-      id: lead.id || crypto.randomUUID(), // Use provided ID or generate a UUID
-      first_name: lead.firstName || '',
-      last_name: lead.lastName || '',
-      email: lead.email || '',
-      phone1: lead.phone1 || '',
-      phone2: lead.phone2 || '',
-      disposition: lead.disposition || 'Not Contacted',
-      avatar: lead.avatar || '',
-      mailing_address: lead.mailingAddress || '',
-      property_address: lead.propertyAddress || '',
-      tags: lead.tags || [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      // Track which user created this lead (can be null for anonymous)
-      created_by: userId
-    }));
+    const processedLeads = leads.map(lead => {
+      // Validate and normalize disposition
+      const disposition = lead.disposition ? 
+        validateDisposition(lead.disposition) : 'Not Contacted';
+
+      return {
+        id: lead.id || crypto.randomUUID(), // Use provided ID or generate a UUID
+        first_name: lead.firstName || '',
+        last_name: lead.lastName || '',
+        email: lead.email || '',
+        phone1: lead.phone1 || '',
+        phone2: lead.phone2 || '',
+        disposition: disposition,
+        avatar: lead.avatar || '',
+        mailing_address: lead.mailingAddress || '',
+        property_address: lead.propertyAddress || '',
+        tags: lead.tags || [],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        // Track which user created this lead (can be null for anonymous)
+        created_by: userId
+      };
+    });
     
     console.log('Processed leads for database storage');
     console.log('First processed lead:', JSON.stringify(processedLeads[0], null, 2));

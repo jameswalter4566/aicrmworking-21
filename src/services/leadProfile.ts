@@ -34,6 +34,16 @@ export interface LeadActivity {
   timestamp: string;
 }
 
+// Valid disposition values
+export const VALID_DISPOSITIONS = [
+  'Not Contacted',
+  'Contacted',
+  'Appointment Set',
+  'Submitted',
+  'Dead',
+  'DNC'
+];
+
 export const leadProfileService = {
   /**
    * Get a single lead by ID
@@ -169,6 +179,12 @@ export const leadProfileService = {
     try {
       console.log('Updating lead with ID:', leadId);
       
+      // Validate disposition if provided
+      if (leadData.disposition && !VALID_DISPOSITIONS.includes(leadData.disposition)) {
+        console.warn(`Invalid disposition value: ${leadData.disposition}. Defaulting to "Not Contacted"`);
+        leadData.disposition = 'Not Contacted';
+      }
+      
       const { data, error } = await supabase.functions.invoke('update-lead', {
         body: { 
           leadId, 
@@ -190,6 +206,29 @@ export const leadProfileService = {
       return data.data;
     } catch (error) {
       console.error('Error in updateLead:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Update just the disposition of a lead
+   * @param leadId The ID of the lead
+   * @param disposition The new disposition value
+   */
+  async updateDisposition(leadId: number | string, disposition: string): Promise<LeadProfile> {
+    try {
+      console.log(`Updating disposition for lead ${leadId} to "${disposition}"`);
+
+      // Validate the disposition
+      if (!VALID_DISPOSITIONS.includes(disposition)) {
+        console.warn(`Invalid disposition value: ${disposition}. Defaulting to "Not Contacted"`);
+        disposition = 'Not Contacted';
+      }
+      
+      // We'll reuse the updateLead function but only pass the disposition
+      return this.updateLead(leadId, { disposition });
+    } catch (error) {
+      console.error('Error in updateDisposition:', error);
       throw error;
     }
   }

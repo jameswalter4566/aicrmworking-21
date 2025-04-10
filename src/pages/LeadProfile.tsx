@@ -30,6 +30,7 @@ import {
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { format, formatDistanceToNow } from "date-fns";
+import DispositionSelector from "@/components/DispositionSelector";
 
 import type { LeadProfile as LeadProfileInterface } from "@/services/leadProfile";
 
@@ -130,6 +131,34 @@ const LeadProfile = () => {
     setEditedLead(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleDispositionChange = async (disposition: string) => {
+    if (!id || !lead || lead.disposition === disposition) return;
+    
+    try {
+      setIsSaving(true);
+      const updatedLeadData = { ...lead, disposition };
+      const updatedLead = await leadProfileService.updateLead(id, updatedLeadData);
+      setLead(updatedLead);
+      
+      const updatedActivity = {
+        id: crypto.randomUUID(),
+        lead_id: Number(id),
+        type: "Disposition Change",
+        description: `Disposition updated to ${disposition}`,
+        timestamp: new Date().toISOString()
+      };
+      
+      setActivities(prev => [updatedActivity, ...prev]);
+      
+      toast.success(`Disposition updated to ${disposition}`);
+    } catch (err) {
+      console.error("Error updating disposition:", err);
+      toast.error("Failed to update lead disposition");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const getDispositionColor = (disposition?: string) => {
     switch(disposition) {
       case "Not Contacted":
@@ -216,13 +245,8 @@ const LeadProfile = () => {
 
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h1 className="text-3xl font-bold flex items-center">
+          <h1 className="text-3xl font-bold">
             {lead.firstName} {lead.lastName}
-            <Badge 
-              className={`ml-4 ${getDispositionColor(lead.disposition)}`}
-            >
-              {lead.disposition}
-            </Badge>
           </h1>
           <p className="text-gray-500">Lead ID: {lead.id}</p>
         </div>
@@ -246,6 +270,31 @@ const LeadProfile = () => {
       </div>
 
       <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Disposition Status</CardTitle>
+            <CardDescription>Current status of this lead in your pipeline</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {editMode ? (
+              <div>
+                <label className="text-sm text-gray-500 mb-2 block">Select Disposition</label>
+                <DispositionSelector 
+                  currentDisposition={editedLead.disposition || ''} 
+                  onDispositionChange={(value) => handleEditChange('disposition', value)}
+                  disabled={isSaving}
+                />
+              </div>
+            ) : (
+              <DispositionSelector 
+                currentDisposition={lead.disposition || 'Not Contacted'} 
+                onDispositionChange={handleDispositionChange}
+                disabled={isSaving}
+              />
+            )}
+          </CardContent>
+        </Card>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card 
             className={`col-span-2 ${getIndustryOutlineColor()} border-2`}
@@ -290,30 +339,6 @@ const LeadProfile = () => {
                       {lead.firstName} {lead.lastName}
                     </h3>
                   )}
-                  
-                  <div className="mt-1">
-                    {editMode ? (
-                      <div>
-                        <label className="text-sm text-gray-500">Disposition</label>
-                        <select
-                          value={editedLead.disposition || 'Not Contacted'}
-                          onChange={(e) => handleEditChange('disposition', e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-md mt-1"
-                        >
-                          <option value="Not Contacted">Not Contacted</option>
-                          <option value="Contacted">Contacted</option>
-                          <option value="Appointment Set">Appointment Set</option>
-                          <option value="Submitted">Submitted</option>
-                          <option value="Dead">Dead</option>
-                          <option value="DNC">DNC</option>
-                        </select>
-                      </div>
-                    ) : (
-                      <Badge className={`${getDispositionColor(lead.disposition)}`}>
-                        {lead.disposition}
-                      </Badge>
-                    )}
-                  </div>
                 </div>
               </div>
               
