@@ -139,11 +139,20 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({ lead, onSave, isEdi
           <Button 
             type="button" 
             variant="dialer" 
-            className="bg-crm-blue hover:bg-crm-blue/90 
-              transition-all duration-300 
-              shadow-lg shadow-blue-500/50 
+            className="
+              bg-blue-600 
+              text-white 
+              hover:bg-blue-700 
+              transition-all 
+              duration-300 
+              shadow-lg 
+              shadow-blue-500/50 
               hover:shadow-blue-500/70 
-              animate-pulse-glow" 
+              animate-pulse-glow 
+              border 
+              border-blue-500 
+              hover:border-blue-600
+            " 
             onClick={handlePushToPipeline} 
             disabled={pushingToPipeline}
           >
