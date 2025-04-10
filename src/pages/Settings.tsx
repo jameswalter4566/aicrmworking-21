@@ -42,6 +42,11 @@ const Settings = () => {
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
           
+          const contentType = response.headers.get("content-type");
+          if (!contentType || !contentType.includes("application/json")) {
+            throw new Error(`Expected JSON response but got ${contentType}`);
+          }
+          
           const data = await response.json();
           
           if (data.success) {
@@ -200,7 +205,13 @@ const Settings = () => {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+        } else {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
       }
       
       const data = await response.json();

@@ -11,6 +11,7 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json' // Always set JSON content type
 };
 
 // Create a single supabase client for interacting with your database
@@ -44,12 +45,7 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ url: authUrl }),
-        { 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
+        { headers: corsHeaders }
       );
     }
     
@@ -61,10 +57,7 @@ serve(async (req) => {
           JSON.stringify({ error: 'No authorization code provided' }),
           { 
             status: 400, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
@@ -92,10 +85,7 @@ serve(async (req) => {
           JSON.stringify({ error: 'Failed to exchange authorization code for tokens' }),
           { 
             status: 400, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
@@ -117,10 +107,7 @@ serve(async (req) => {
           JSON.stringify({ error: 'Missing authorization header' }),
           { 
             status: 401, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
@@ -130,13 +117,10 @@ serve(async (req) => {
       
       if (authError || !user) {
         return new Response(
-          JSON.stringify({ error: 'Authentication failed' }),
+          JSON.stringify({ error: 'Authentication failed', details: authError }),
           { 
             status: 401, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
@@ -158,31 +142,34 @@ serve(async (req) => {
       if (error) {
         console.error('Error storing tokens:', error);
         return new Response(
-          JSON.stringify({ error: 'Failed to store connection information' }),
+          JSON.stringify({ error: 'Failed to store connection information', details: error }),
           { 
             status: 500, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
       
       return new Response(
         JSON.stringify({ success: true, email }),
-        { 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
+        { headers: corsHeaders }
       );
     }
     
     // Handle disconnecting an account
     if (action === 'disconnect') {
-      const { provider } = await req.json();
+      const body = await req.json();
+      const { provider } = body;
+      
+      if (!provider) {
+        return new Response(
+          JSON.stringify({ error: 'Provider is required' }),
+          { 
+            status: 400, 
+            headers: corsHeaders 
+          }
+        );
+      }
       
       // Get user ID from authorization header
       const authHeader = req.headers.get('Authorization');
@@ -191,10 +178,7 @@ serve(async (req) => {
           JSON.stringify({ error: 'Missing authorization header' }),
           { 
             status: 401, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
@@ -204,13 +188,10 @@ serve(async (req) => {
       
       if (authError || !user) {
         return new Response(
-          JSON.stringify({ error: 'Authentication failed' }),
+          JSON.stringify({ error: 'Authentication failed', details: authError }),
           { 
             status: 401, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
@@ -224,13 +205,18 @@ serve(async (req) => {
         .single();
       
       if (connection?.access_token) {
-        // Revoke the token with Google
-        await fetch(`https://oauth2.googleapis.com/revoke?token=${connection.access_token}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-        });
+        try {
+          // Revoke the token with Google
+          await fetch(`https://oauth2.googleapis.com/revoke?token=${connection.access_token}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+          });
+        } catch (error) {
+          console.error('Error revoking token:', error);
+          // Continue with deletion even if revocation fails
+        }
       }
       
       // Delete the connection from the database
@@ -242,25 +228,17 @@ serve(async (req) => {
       
       if (error) {
         return new Response(
-          JSON.stringify({ error: 'Failed to remove connection' }),
+          JSON.stringify({ error: 'Failed to remove connection', details: error }),
           { 
             status: 500, 
-            headers: { 
-              ...corsHeaders, 
-              'Content-Type': 'application/json' 
-            } 
+            headers: corsHeaders 
           }
         );
       }
       
       return new Response(
         JSON.stringify({ success: true }),
-        { 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json' 
-          } 
-        }
+        { headers: corsHeaders }
       );
     }
     
@@ -268,22 +246,16 @@ serve(async (req) => {
       JSON.stringify({ error: 'Invalid action' }),
       { 
         status: 400, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: corsHeaders 
       }
     );
   } catch (error) {
     console.error('Error in connect-google-email function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, stack: error.stack }),
       { 
         status: 500, 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
+        headers: corsHeaders 
       }
     );
   }
