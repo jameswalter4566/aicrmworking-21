@@ -71,6 +71,7 @@ const PitchDeckBuilder = () => {
   const [searching, setSearching] = useState(false);
   const [activeTab, setActiveTab] = useState("info");
   
+  // Initialize with default mortgage data structure to prevent null reference errors
   const [pitchDeck, setPitchDeck] = useState<PitchDeck>({
     id: id || "",
     title: "",
@@ -116,7 +117,11 @@ const PitchDeckBuilder = () => {
 
   // Calculate mortgage payments and savings when data changes
   useEffect(() => {
-    if (pitchDeck.mortgage_data.currentLoan && pitchDeck.mortgage_data.proposedLoan) {
+    // Make sure mortgage_data and its nested objects exist before accessing properties
+    if (pitchDeck.mortgage_data && 
+        pitchDeck.mortgage_data.currentLoan && 
+        pitchDeck.mortgage_data.proposedLoan) {
+      
       const currentPayment = calculateMonthlyPayment(
         pitchDeck.mortgage_data.currentLoan.balance || 0,
         pitchDeck.mortgage_data.currentLoan.rate || 0,
@@ -152,12 +157,12 @@ const PitchDeckBuilder = () => {
       }));
     }
   }, [
-    pitchDeck.mortgage_data.currentLoan?.balance,
-    pitchDeck.mortgage_data.currentLoan?.rate,
-    pitchDeck.mortgage_data.currentLoan?.term,
-    pitchDeck.mortgage_data.proposedLoan?.amount,
-    pitchDeck.mortgage_data.proposedLoan?.rate,
-    pitchDeck.mortgage_data.proposedLoan?.term
+    pitchDeck.mortgage_data?.currentLoan?.balance,
+    pitchDeck.mortgage_data?.currentLoan?.rate,
+    pitchDeck.mortgage_data?.currentLoan?.term,
+    pitchDeck.mortgage_data?.proposedLoan?.amount,
+    pitchDeck.mortgage_data?.proposedLoan?.rate,
+    pitchDeck.mortgage_data?.proposedLoan?.term
   ]);
 
   const fetchPitchDeck = async () => {
@@ -172,11 +177,75 @@ const PitchDeckBuilder = () => {
       }
       
       if (data.success && data.data) {
-        setPitchDeck(data.data);
+        // Ensure mortgage_data has all required nested objects
+        const fetchedDeck = {
+          ...data.data,
+          mortgage_data: data.data.mortgage_data || {
+            currentLoan: {
+              balance: 0,
+              rate: 0,
+              payment: 0,
+              term: 30,
+              type: "Conventional"
+            },
+            proposedLoan: {
+              amount: 0,
+              rate: 0,
+              payment: 0,
+              term: 30,
+              type: "Conventional"
+            },
+            savings: {
+              monthly: 0,
+              lifetime: 0
+            },
+            property: {
+              value: 0,
+              address: ""
+            }
+          }
+        };
+        
+        // Now ensure nested objects within mortgage_data are initialized
+        if (!fetchedDeck.mortgage_data.currentLoan) {
+          fetchedDeck.mortgage_data.currentLoan = {
+            balance: 0,
+            rate: 0,
+            payment: 0,
+            term: 30,
+            type: "Conventional"
+          };
+        }
+        
+        if (!fetchedDeck.mortgage_data.proposedLoan) {
+          fetchedDeck.mortgage_data.proposedLoan = {
+            amount: 0,
+            rate: 0,
+            payment: 0,
+            term: 30,
+            type: "Conventional"
+          };
+        }
+        
+        if (!fetchedDeck.mortgage_data.savings) {
+          fetchedDeck.mortgage_data.savings = {
+            monthly: 0,
+            lifetime: 0
+          };
+        }
+        
+        if (!fetchedDeck.mortgage_data.property) {
+          fetchedDeck.mortgage_data.property = {
+            value: 0,
+            address: ""
+          };
+        }
+        
+        setPitchDeck(fetchedDeck);
         
         // If there's a lead ID, fetch the lead details
-        if (data.data.lead_id) {
-          fetchLeadDetails(data.data.lead_id);
+        if (fetchedDeck.lead_id) {
+          fetchLeadDetails(fetchedDeck.lead_id);
         }
       }
     } catch (error) {
