@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
 import { 
@@ -9,6 +9,7 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from "lucide-react";
+import { useIndustry } from "@/context/IndustryContext";
 
 const deals = [
   {
@@ -44,11 +45,23 @@ const deals = [
 ];
 
 const Deals = () => {
+  const { activeIndustry } = useIndustry();
+  const buttonColor = activeIndustry === 'mortgage' ? 'bg-[#9b87f5] hover:bg-[#7E69AB]' : 'bg-crm-blue hover:bg-crm-blue/90';
+  
+  // Formatting function for currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
   return (
     <MainLayout>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Deals</h1>
-        <Button className="bg-crm-blue hover:bg-crm-blue/90">
+        <Button className={buttonColor}>
           <PlusCircle className="h-4 w-4 mr-2" />
           New Deal
         </Button>
@@ -58,22 +71,22 @@ const Deals = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="p-4 border rounded-md">
             <div className="text-lg font-semibold text-gray-700">Total Pipeline</div>
-            <div className="text-2xl font-bold mt-2">$1,400,000</div>
+            <div className="text-2xl font-bold mt-2">{formatCurrency(1400000)}</div>
             <div className="text-sm text-gray-500 mt-1">3 active deals</div>
           </div>
           <div className="p-4 border rounded-md">
             <div className="text-lg font-semibold text-gray-700">This Month</div>
-            <div className="text-2xl font-bold mt-2">$0</div>
+            <div className="text-2xl font-bold mt-2">{formatCurrency(0)}</div>
             <div className="text-sm text-gray-500 mt-1">0 closed deals</div>
           </div>
           <div className="p-4 border rounded-md">
             <div className="text-lg font-semibold text-gray-700">Last Month</div>
-            <div className="text-2xl font-bold mt-2">$350,000</div>
+            <div className="text-2xl font-bold mt-2">{formatCurrency(350000)}</div>
             <div className="text-sm text-gray-500 mt-1">1 closed deal</div>
           </div>
           <div className="p-4 border rounded-md">
             <div className="text-lg font-semibold text-gray-700">YTD</div>
-            <div className="text-2xl font-bold mt-2">$1,250,000</div>
+            <div className="text-2xl font-bold mt-2">{formatCurrency(1250000)}</div>
             <div className="text-sm text-gray-500 mt-1">4 closed deals</div>
           </div>
         </div>
@@ -122,7 +135,7 @@ const Deals = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center">
                       <DollarSign className="h-4 w-4 text-gray-400" />
-                      <span className="font-medium">{deal.value.toLocaleString()}</span>
+                      <span className="font-medium">{formatCurrency(deal.value)}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">

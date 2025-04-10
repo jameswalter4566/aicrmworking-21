@@ -1,3 +1,4 @@
+
 import type { Config } from "tailwindcss";
 
 export default {
@@ -59,6 +60,12 @@ export default {
           darkGray: '#8E9196',
           red: '#ea384c',
         },
+        mortgage: {
+          purple: '#9b87f5',
+          lightPurple: '#e9e3ff',
+          darkPurple: '#7E69AB',
+          vividPurple: '#8B5CF6',
+        },
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar-background))',
           foreground: 'hsl(var(--sidebar-foreground))',
@@ -91,11 +98,20 @@ export default {
           to: {
             height: '0'
           }
+        },
+        'pulse-glow': {
+          '0%, 100%': {
+            boxShadow: '0 0 0 0 rgba(155, 135, 245, 0.4)'
+          },
+          '50%': {
+            boxShadow: '0 0 10px 2px rgba(155, 135, 245, 0.6)'
+          }
         }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out'
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
       },
       fontFamily: {
         sans: ['Poppins', 'ui-sans-serif', 'system-ui'],
