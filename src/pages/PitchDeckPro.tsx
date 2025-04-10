@@ -1,18 +1,37 @@
 
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useIndustry } from "@/context/IndustryContext";
 import { useNavigate } from "react-router-dom";
-import { Presentation, Download, Copy, ChevronRight, FileText } from "lucide-react";
+import { Presentation, Download, Copy, ChevronRight, FileText, Plus, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface PitchDeck {
+  id: string;
+  title: string;
+  description: string;
+  template_type: string;
+  created_at: string;
+}
+
+interface Template {
+  name: string;
+  slides: number;
+  description: string;
+}
 
 const PitchDeckPro = () => {
   const navigate = useNavigate();
   const { activeIndustry } = useIndustry();
   const [activeTab, setActiveTab] = useState("purchase");
+  const [pitchDecks, setPitchDecks] = useState<PitchDeck[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [creatingDeck, setCreatingDeck] = useState(false);
 
   // Redirect if not mortgage industry
   useEffect(() => {
@@ -20,6 +39,33 @@ const PitchDeckPro = () => {
       navigate("/settings");
     }
   }, [activeIndustry, navigate]);
+
+  // Fetch existing pitch decks
+  useEffect(() => {
+    const fetchPitchDecks = async () => {
+      setLoading(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('create-pitch-deck', {
+          body: { action: 'list' }
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        if (data.success && Array.isArray(data.data)) {
+          setPitchDecks(data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching pitch decks:", error);
+        toast.error("Failed to load pitch decks");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchPitchDecks();
+  }, []);
 
   // Template types for different scenarios
   const templates = {
@@ -38,6 +84,37 @@ const PitchDeckPro = () => {
       { name: "FHA Loan Overview", slides: 9, description: "Great for first-time buyers with credit challenges" },
       { name: "Jumbo Loan Options", slides: 12, description: "For high-value properties exceeding conforming limits" },
     ],
+  };
+
+  // Handle creating a new pitch deck
+  const createPitchDeck = async (template: Template) => {
+    setCreatingDeck(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-pitch-deck', {
+        body: {
+          action: 'create',
+          pitchDeckData: {
+            title: template.name,
+            description: template.description,
+            template_type: activeTab,
+          }
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (data.success && data.data) {
+        toast.success("Created new pitch deck");
+        navigate(`/pitch-deck/builder/${data.data.id}`);
+      }
+    } catch (error) {
+      console.error("Error creating pitch deck:", error);
+      toast.error("Failed to create pitch deck");
+    } finally {
+      setCreatingDeck(false);
+    }
   };
 
   return (
@@ -81,14 +158,14 @@ const PitchDeckPro = () => {
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-gray-500">{template.slides} slides</span>
                             <div className="flex space-x-2">
-                              <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              <Button size="sm" className="h-8 w-8 p-0 bg-blue-500 hover:bg-blue-600">
-                                <ChevronRight className="h-4 w-4" />
+                              <Button 
+                                size="sm" 
+                                className="h-8 px-2 bg-blue-500 hover:bg-blue-600 text-white"
+                                onClick={() => createPitchDeck(template)}
+                                disabled={creatingDeck}
+                              >
+                                {creatingDeck ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+                                Create
                               </Button>
                             </div>
                           </div>
@@ -110,12 +187,54 @@ const PitchDeckPro = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center justify-center h-40 border border-dashed rounded-md bg-gray-50">
-              <div className="text-center">
-                <p className="text-gray-500">No saved presentations yet</p>
-                <Button variant="link" className="mt-2">Create your first presentation</Button>
+            {loading ? (
+              <div className="flex items-center justify-center h-40">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
               </div>
-            </div>
+            ) : pitchDecks.length > 0 ? (
+              <div className="grid md:grid-cols-3 gap-4">
+                {pitchDecks.map((deck) => (
+                  <Card key={deck.id} className="overflow-hidden hover:shadow-md">
+                    <div className={`h-2 ${
+                      deck.template_type === 'purchase' ? 'bg-blue-500' :
+                      deck.template_type === 'refinance' ? 'bg-green-500' :
+                      'bg-purple-500'
+                    }`} />
+                    <CardContent className="pt-4">
+                      <h3 className="font-semibold text-lg">{deck.title}</h3>
+                      <p className="text-sm text-gray-500 mb-2 line-clamp-2">{deck.description}</p>
+                      <div className="flex items-center justify-between mt-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {deck.template_type.charAt(0).toUpperCase() + deck.template_type.slice(1)}
+                        </Badge>
+                        <span className="text-xs text-gray-500">
+                          {new Date(deck.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </CardContent>
+                    <CardFooter className="flex justify-end gap-2 pt-0 pb-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="px-2 py-0 h-8"
+                        onClick={() => navigate(`/pitch-deck/builder/${deck.id}`)}
+                      >
+                        Edit <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-40 border border-dashed rounded-md bg-gray-50">
+                <div className="text-center">
+                  <p className="text-gray-500">No saved presentations yet</p>
+                  <Button variant="link" className="mt-2" onClick={() => document.getElementById('purchase-tab')?.click()}>
+                    Create your first presentation
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
