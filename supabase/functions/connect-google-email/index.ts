@@ -4,8 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID') || '';
 const CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET') || '';
-// Make sure this EXACTLY matches what you've configured in Google Cloud Console
-const REDIRECT_URI = 'https://imrmboyczebjlbnkgjns.lovableproject.com/settings';
+// Update the REDIRECT_URI to match the new preview URL
+const REDIRECT_URI = 'https://preview--aicrmworking.lovable.app/settings';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
