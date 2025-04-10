@@ -45,12 +45,12 @@ Deno.serve(async (req) => {
     // Handle different actions
     switch (action) {
       case 'create':
-        // Create new pitch deck
+        // Create new pitch deck with explicit created_by user ID
         const { data: newDeckData, error: createError } = await supabase
           .from('pitch_decks')
           .insert({
             ...pitchDeckData,
-            created_by: user.id,
+            created_by: user.id,  // Explicitly set the created_by field to the user ID
           })
           .select('*')
           .single();
