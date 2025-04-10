@@ -44,7 +44,7 @@ const Settings = () => {
           
           const contentType = response.headers.get("content-type");
           if (!contentType || !contentType.includes("application/json")) {
-            throw new Error(`Expected JSON response but got ${contentType}`);
+            throw new Error(`Expected JSON response but got ${contentType || 'unknown content type'}`);
           }
           
           const data = await response.json();
@@ -151,7 +151,7 @@ const Settings = () => {
       
       const contentType = response.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
-        throw new Error(`Expected JSON response but got ${contentType}`);
+        throw new Error(`Expected JSON response but got ${contentType || 'unknown content type'}`);
       }
       
       const data = await response.json();
@@ -165,7 +165,7 @@ const Settings = () => {
       console.error("Error initiating Google OAuth flow:", error);
       toast({
         title: "Connection Error",
-        description: "Failed to start the Google connection process. Please try again.",
+        description: "Failed to start the Google connection process. Please try again later.",
         variant: "destructive",
         duration: 3000,
       });
@@ -214,6 +214,11 @@ const Settings = () => {
         }
       }
       
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        throw new Error(`Expected JSON response but got ${contentType || 'unknown content type'}`);
+      }
+      
       const data = await response.json();
       
       if (data.success) {
@@ -231,7 +236,7 @@ const Settings = () => {
       console.error("Error disconnecting Google account:", error);
       toast({
         title: "Disconnection Error",
-        description: "Failed to disconnect your Google account.",
+        description: "Failed to disconnect your Google account. Please try again later.",
         variant: "destructive",
         duration: 3000,
       });

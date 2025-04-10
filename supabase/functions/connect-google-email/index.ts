@@ -18,6 +18,8 @@ const corsHeaders = {
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 serve(async (req) => {
+  console.log("Function invoked with URL:", req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
@@ -29,9 +31,12 @@ serve(async (req) => {
   try {
     const url = new URL(req.url);
     const action = url.searchParams.get('action');
+    console.log("Requested action:", action);
     
     // Handle authorization url generation
     if (action === 'authorize') {
+      console.log("Creating authorization URL");
+      
       // Create a new auth URL for Google
       const scope = encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email');
       
@@ -42,7 +47,9 @@ serve(async (req) => {
         `&scope=${scope}` +
         `&access_type=offline` +
         `&prompt=consent`;
-
+        
+      console.log("Generated auth URL (partial):", authUrl.substring(0, 100) + "...");
+      
       return new Response(
         JSON.stringify({ url: authUrl }),
         { headers: corsHeaders }
@@ -52,6 +59,8 @@ serve(async (req) => {
     // Handle callback with auth code
     if (action === 'callback') {
       const code = url.searchParams.get('code');
+      console.log("Received callback with code present:", !!code);
+      
       if (!code) {
         return new Response(
           JSON.stringify({ error: 'No authorization code provided' }),
@@ -63,6 +72,7 @@ serve(async (req) => {
       }
 
       // Exchange the code for tokens
+      console.log("Exchanging code for tokens");
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -78,11 +88,12 @@ serve(async (req) => {
       });
 
       const tokenData = await tokenResponse.json();
+      console.log("Token response status:", tokenResponse.status);
       
       if (tokenData.error) {
         console.error('Error exchanging code for tokens:', tokenData);
         return new Response(
-          JSON.stringify({ error: 'Failed to exchange authorization code for tokens' }),
+          JSON.stringify({ error: 'Failed to exchange authorization code for tokens', details: tokenData.error }),
           { 
             status: 400, 
             headers: corsHeaders 
@@ -91,6 +102,7 @@ serve(async (req) => {
       }
 
       // Get user info to retrieve email address
+      console.log("Getting user info");
       const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
         headers: {
           Authorization: `Bearer ${tokenData.access_token}`,
@@ -99,6 +111,7 @@ serve(async (req) => {
       
       const userInfo = await userInfoResponse.json();
       const email = userInfo.email;
+      console.log("Retrieved user email:", email);
       
       // Get user ID from authorization header
       const authHeader = req.headers.get('Authorization');
@@ -126,6 +139,7 @@ serve(async (req) => {
       }
       
       // Store the tokens in the database
+      console.log("Storing tokens in database");
       const { data, error } = await supabase
         .from('user_email_connections')
         .upsert({
@@ -160,6 +174,7 @@ serve(async (req) => {
     if (action === 'disconnect') {
       const body = await req.json();
       const { provider } = body;
+      console.log("Disconnecting provider:", provider);
       
       if (!provider) {
         return new Response(
@@ -197,6 +212,7 @@ serve(async (req) => {
       }
       
       // Get the connection to revoke
+      console.log("Finding connection to revoke");
       const { data: connection } = await supabase
         .from('user_email_connections')
         .select('*')
@@ -207,6 +223,7 @@ serve(async (req) => {
       if (connection?.access_token) {
         try {
           // Revoke the token with Google
+          console.log("Revoking token with Google");
           await fetch(`https://oauth2.googleapis.com/revoke?token=${connection.access_token}`, {
             method: 'POST',
             headers: {
@@ -220,6 +237,7 @@ serve(async (req) => {
       }
       
       // Delete the connection from the database
+      console.log("Deleting connection from database");
       const { error } = await supabase
         .from('user_email_connections')
         .delete()
