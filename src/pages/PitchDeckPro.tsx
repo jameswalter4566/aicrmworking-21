@@ -6,10 +6,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useIndustry } from "@/context/IndustryContext";
 import { useNavigate } from "react-router-dom";
-import { Presentation, Download, Copy, ChevronRight, FileText, Plus, Loader2 } from "lucide-react";
+import { Presentation, Download, Copy, ChevronRight, FileText, Plus, Loader2, Send } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import SendPitchDeckModal from "@/components/pitch-deck/SendPitchDeckModal";
 
 interface PitchDeck {
   id: string;
@@ -17,6 +18,8 @@ interface PitchDeck {
   description: string;
   template_type: string;
   created_at: string;
+  last_sent_to?: string;
+  last_sent_at?: string;
 }
 
 interface Template {
@@ -32,6 +35,8 @@ const PitchDeckPro = () => {
   const [pitchDecks, setPitchDecks] = useState<PitchDeck[]>([]);
   const [loading, setLoading] = useState(false);
   const [creatingDeck, setCreatingDeck] = useState(false);
+  const [selectedPitchDeck, setSelectedPitchDeck] = useState<PitchDeck | null>(null);
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
 
   // Redirect if not mortgage industry
   useEffect(() => {
@@ -115,6 +120,47 @@ const PitchDeckPro = () => {
     } finally {
       setCreatingDeck(false);
     }
+  };
+
+  // Handle pitch deck download
+  const handleDownloadPDF = async (pitchDeckId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke("save-pitch-deck", {
+        body: {
+          action: "get-pdf",
+          pitchDeckId: pitchDeckId,
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (data && data.pdfData) {
+        // Find the deck to get the title
+        const deck = pitchDecks.find(d => d.id === pitchDeckId);
+        const title = deck ? deck.title : "pitch-deck";
+        
+        // Create a download link for the PDF
+        const link = document.createElement("a");
+        link.href = data.pdfData;
+        link.download = `${title.replace(/\s+/g, "_")}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        toast.success("PDF downloaded successfully");
+      }
+    } catch (error: any) {
+      console.error("Error downloading PDF:", error);
+      toast.error(`Failed to download PDF: ${error.message}`);
+    }
+  };
+
+  // Open the send pitch deck modal
+  const handleOpenSendModal = (pitchDeck: PitchDeck) => {
+    setSelectedPitchDeck(pitchDeck);
+    setIsSendModalOpen(true);
   };
 
   return (
@@ -211,13 +257,42 @@ const PitchDeckPro = () => {
                           {new Date(deck.created_at).toLocaleDateString()}
                         </span>
                       </div>
+                      {deck.last_sent_to && (
+                        <div className="mt-2 text-xs text-gray-500">
+                          <span>Last sent to: {deck.last_sent_to}</span>
+                          {deck.last_sent_at && (
+                            <span className="block">
+                              on {new Date(deck.last_sent_at).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                     <CardFooter className="flex justify-end gap-2 pt-0 pb-3">
                       <Button 
                         variant="outline" 
                         size="sm" 
                         className="px-2 py-0 h-8"
+                        onClick={() => handleDownloadPDF(deck.id)}
+                        title="Download PDF"
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="px-2 py-0 h-8"
+                        onClick={() => handleOpenSendModal(deck)}
+                        title="Send to Client"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="px-2 py-0 h-8"
                         onClick={() => navigate(`/pitch-deck/builder/${deck.id}`)}
+                        title="Edit Pitch Deck"
                       >
                         Edit <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
@@ -238,6 +313,13 @@ const PitchDeckPro = () => {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Send to client modal */}
+      <SendPitchDeckModal
+        isOpen={isSendModalOpen}
+        onClose={() => setIsSendModalOpen(false)} 
+        pitchDeck={selectedPitchDeck}
+      />
     </MainLayout>
   );
 };

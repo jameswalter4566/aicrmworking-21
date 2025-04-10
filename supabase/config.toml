@@ -6,3 +6,6 @@ verify_jwt = false
 
 [functions.retrieve-pitch-deck]
 verify_jwt = false
+
+[functions.send-pitch-deck]
+verify_jwt = false

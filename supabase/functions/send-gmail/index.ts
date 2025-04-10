@@ -73,7 +73,7 @@ serve(async (req) => {
     }
 
     // Parse the request body
-    const { to, subject, body } = await req.json();
+    const { to, subject, body, attachments } = await req.json();
 
     if (!to || !subject || !body) {
       return new Response(
@@ -85,6 +85,54 @@ serve(async (req) => {
       );
     }
 
+    // Create the email parts for multipart/mixed emails (if attachments present)
+    let emailContent;
+    let contentType = 'text/plain';
+    
+    if (attachments && attachments.length > 0) {
+      // Generate a boundary for multipart content
+      const boundary = `boundary_${Math.random().toString(36).substring(2)}`;
+      contentType = `multipart/mixed; boundary=${boundary}`;
+      
+      // Start building multipart email
+      let parts = [
+        `--${boundary}`,
+        'Content-Type: text/plain; charset=UTF-8',
+        '',
+        body,
+      ];
+      
+      // Add each attachment
+      for (const attachment of attachments) {
+        parts = parts.concat([
+          `--${boundary}`,
+          `Content-Type: ${attachment.mimeType || 'application/octet-stream'}`,
+          'Content-Transfer-Encoding: base64',
+          `Content-Disposition: attachment; filename="${attachment.filename}"`,
+          '',
+          attachment.content
+        ]);
+      }
+      
+      // Close the boundary
+      parts.push(`--${boundary}--`);
+      
+      emailContent = parts.join('\r\n');
+    } else {
+      // Simple email without attachments
+      emailContent = body;
+    }
+
+    // Create the email raw content
+    const emailRaw = [
+      `From: ${connection.email}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      `Content-Type: ${contentType}`,
+      '',
+      emailContent
+    ].join('\r\n');
+
     // Send email via Gmail API
     const emailResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
@@ -93,13 +141,19 @@ serve(async (req) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        raw: btoa(`To: ${to}\nSubject: ${subject}\n\n${body}`)
+        raw: btoa(emailRaw)
       })
     });
 
     if (!emailResponse.ok) {
       const errorText = await emailResponse.text();
       console.error('Gmail API error:', emailResponse.status, errorText);
+      
+      // Check if token expired (401 response)
+      if (emailResponse.status === 401) {
+        // Implement token refresh logic here if needed
+        console.log('Access token likely expired, needs refreshing');
+      }
       
       return new Response(
         JSON.stringify({ 
