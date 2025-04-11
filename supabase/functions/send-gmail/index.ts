@@ -54,7 +54,10 @@ serve(async (req) => {
     if (connectionError || !connection) {
       console.error('No Google email connection found:', connectionError);
       return new Response(
-        JSON.stringify({ error: 'No Google email connection found' }),
+        JSON.stringify({ 
+          error: 'No Google email connection found',
+          details: 'Please connect your Google account in the Settings page'
+        }),
         { 
           status: 404, 
           headers: corsHeaders 
@@ -105,11 +108,6 @@ serve(async (req) => {
       emailContent = body;
     }
 
-    // Check if we need to refresh the token
-    let accessToken = connection.access_token;
-    const tokenExpiresAt = new Date(connection.expires_at || '').getTime();
-    const now = Date.now();
-    
     // Always refresh the token to ensure we have the right scopes
     console.log("Refreshing access token to ensure proper scopes...");
       
@@ -118,6 +116,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Email connection refresh token not available',
+          code: 'REFRESH_TOKEN_MISSING',
           message: 'Please reconnect your Gmail account in the Settings page with the proper scopes'
         }),
         { 
@@ -142,13 +141,18 @@ serve(async (req) => {
         })
       });
       
+      let refreshData;
+      let refreshError;
+      
       if (!refreshResponse.ok) {
-        const refreshError = await refreshResponse.text();
+        refreshError = await refreshResponse.text();
         console.error('Token refresh error:', refreshResponse.status, refreshError);
+        
         return new Response(
           JSON.stringify({ 
             error: 'Failed to refresh access token', 
             details: refreshError,
+            code: 'TOKEN_REFRESH_FAILED',
             message: 'Please reconnect your Gmail account in the Settings page'
           }),
           { 
@@ -156,12 +160,12 @@ serve(async (req) => {
             headers: corsHeaders 
           }
         );
+      } else {
+        refreshData = await refreshResponse.json();
+        console.log("Access token refreshed successfully");
       }
       
-      const refreshData = await refreshResponse.json();
-      accessToken = refreshData.access_token;
-      
-      console.log("Access token refreshed successfully");
+      const accessToken = refreshData.access_token;
       
       // Update the stored token
       await supabaseAdmin
@@ -171,13 +175,83 @@ serve(async (req) => {
           expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
         })
         .eq('id', connection.id);
-    } catch (refreshError) {
-      console.error('Error refreshing token:', refreshError);
+    
+      console.log("Sending email via Gmail API...");
+      
+      // Create the email raw content
+      const emailRaw = [
+        `From: ${connection.email}`,
+        `To: ${to}`,
+        `Subject: ${subject}`,
+        `Content-Type: ${contentType}`,
+        '',
+        emailContent
+      ].join('\r\n');
+
+      // Send email via Gmail API
+      const emailResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          raw: btoa(unescape(encodeURIComponent(emailRaw)))
+        })
+      });
+
+      if (!emailResponse.ok) {
+        const errorText = await emailResponse.text();
+        console.error('Gmail API error:', emailResponse.status, errorText);
+        
+        // Check if it's a permissions error
+        if (errorText.includes("insufficient") || errorText.includes("permission")) {
+          return new Response(
+            JSON.stringify({ 
+              error: 'Gmail API permission error',
+              details: errorText,
+              code: 'INSUFFICIENT_PERMISSIONS',
+              message: 'Gmail requires additional permissions. Please reconnect your Gmail account with full access in the Settings page.'
+            }),
+            { 
+              status: 403, 
+              headers: corsHeaders 
+            }
+          );
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            error: `Gmail API error (${emailResponse.status})`, 
+            details: errorText 
+          }),
+          { 
+            status: 502, 
+            headers: corsHeaders 
+          }
+        );
+      }
+
+      const result = await emailResponse.json();
+      console.log("Email sent successfully, message ID:", result.id);
+
       return new Response(
         JSON.stringify({ 
-          error: 'Failed to refresh access token', 
+          success: true, 
+          messageId: result.id 
+        }),
+        { 
+          headers: corsHeaders 
+        }
+      );
+    } catch (refreshError) {
+      console.error('Error during token refresh or email sending:', refreshError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed during token refresh or email sending', 
           details: refreshError.message,
-          message: 'Please reconnect your Gmail account in the Settings page'
+          code: 'EMAIL_SEND_ERROR',
+          message: 'Please reconnect your Gmail account in the Settings page with the proper scopes'
         }),
         { 
           status: 500, 
@@ -185,81 +259,12 @@ serve(async (req) => {
         }
       );
     }
-
-    console.log("Sending email via Gmail API...");
-    
-    // Create the email raw content
-    const emailRaw = [
-      `From: ${connection.email}`,
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      `Content-Type: ${contentType}`,
-      '',
-      emailContent
-    ].join('\r\n');
-
-    // Send email via Gmail API
-    const emailResponse = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        raw: btoa(unescape(encodeURIComponent(emailRaw)))
-      })
-    });
-
-    if (!emailResponse.ok) {
-      const errorText = await emailResponse.text();
-      console.error('Gmail API error:', emailResponse.status, errorText);
-      
-      // Check if it's a permissions error
-      if (errorText.includes("insufficient")) {
-        return new Response(
-          JSON.stringify({ 
-            error: `Gmail API permission error: You need to reconnect your Gmail account with the proper scopes`,
-            details: errorText,
-            code: 'INSUFFICIENT_PERMISSIONS'
-          }),
-          { 
-            status: 403, 
-            headers: corsHeaders 
-          }
-        );
-      }
-      
-      return new Response(
-        JSON.stringify({ 
-          error: `Gmail API error (${emailResponse.status})`, 
-          details: errorText 
-        }),
-        { 
-          status: 502, 
-          headers: corsHeaders 
-        }
-      );
-    }
-
-    const result = await emailResponse.json();
-    console.log("Email sent successfully, message ID:", result.id);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        messageId: result.id 
-      }),
-      { 
-        headers: corsHeaders 
-      }
-    );
-
   } catch (error) {
     console.error('Error in send-gmail function:', error);
     return new Response(
       JSON.stringify({ 
-        error: error.message, 
-        stack: error.stack 
+        error: 'Failed to send email', 
+        details: error.message 
       }),
       { 
         status: 500, 

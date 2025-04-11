@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface SendPitchDeckModalProps {
@@ -102,8 +102,10 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         const errorMessage = data?.error || "Unknown error occurred";
         
         // Check for Gmail permission errors
-        if (errorMessage.includes("permissions") || errorMessage.includes("Gmail needs additional permissions")) {
-          setError("Your Gmail account needs additional permissions to send emails with attachments. Please go to Settings and reconnect your Gmail account.");
+        if (errorMessage.toLowerCase().includes("permissions") || 
+            errorMessage.toLowerCase().includes("reconnect") || 
+            errorMessage.toLowerCase().includes("gmail")) {
+          setError("Your Gmail account needs additional permissions to send emails with attachments. Please go to Settings and reconnect your Gmail account with full access.");
           return;
         }
         
@@ -117,13 +119,16 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       setMessage("");
     } catch (error: any) {
       console.error("Error sending pitch deck:", error);
-      toast.error(`Failed to send: ${error.message}`);
       
       // Set specific error message
-      if (error.message.includes("permissions") || error.message.includes("reconnect")) {
-        setError("Your Gmail connection needs additional permissions. Please go to the Settings page and reconnect your Gmail account.");
+      if (error.message.toLowerCase().includes("permissions") || 
+          error.message.toLowerCase().includes("reconnect") || 
+          error.message.toLowerCase().includes("gmail")) {
+        setError("Your Gmail connection needs additional permissions. Please go to the Settings page and reconnect your Gmail account with full access permission.");
+        toast.error("Email permissions issue detected");
       } else {
         setError(error.message);
+        toast.error(`Failed to send: ${error.message}`);
       }
     } finally {
       setLoading(false);
@@ -143,8 +148,14 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         {error && (
           <Alert variant="destructive" className="mb-4">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              {error}
+            <AlertDescription className="flex flex-col gap-2">
+              <span>{error}</span>
+              {error.toLowerCase().includes("gmail") && (
+                <span className="text-xs mt-1">
+                  This is typically because Gmail requires additional permissions for sending attachments.
+                  Please go to Settings and reconnect your Gmail account.
+                </span>
+              )}
             </AlertDescription>
           </Alert>
         )}

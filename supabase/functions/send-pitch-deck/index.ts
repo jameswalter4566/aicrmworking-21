@@ -101,6 +101,17 @@ Deno.serve(async (req) => {
     const emailBody = message || 
       `Dear Client,\n\nI'm excited to share this mortgage proposal with you.\n\n${pitchDeck.description || ''}\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${user.email}`;
     
+    // Check if email connection exists
+    const { data: connections, error: connectionsError } = await supabase
+      .from("user_email_connections")
+      .select("*")
+      .eq("provider", "google")
+      .limit(1);
+
+    if (connectionsError || !connections || connections.length === 0) {
+      throw new Error("No email connection found. Please connect your Gmail account in the Settings page.");
+    }
+    
     // Send email using our Gmail connector
     console.log("Calling send-gmail function...");
     const emailResponse = await supabase.functions.invoke('send-gmail', {
@@ -119,16 +130,27 @@ Deno.serve(async (req) => {
       }
     });
     
-    // Better error handling for email sending
+    // Enhanced error handling for email sending
     if (emailResponse.error) {
       console.error('Email sending error:', emailResponse.error);
+      throw new Error(`Failed to send email: ${emailResponse.error}`);
+    }
+    
+    // Check for specific error codes in the response
+    if (emailResponse.data && !emailResponse.data.success) {
+      console.error('Email API error:', emailResponse.data);
       
-      // Check if it's a permissions issue
-      if (emailResponse.data && emailResponse.data.code === 'INSUFFICIENT_PERMISSIONS') {
-        throw new Error(`Gmail needs additional permissions. Please go to Settings and reconnect your Gmail account.`);
+      // Check for permissions issue
+      if (emailResponse.data.code === 'INSUFFICIENT_PERMISSIONS') {
+        throw new Error("Gmail needs additional permissions. Please go to Settings and reconnect your Gmail account with full access.");
       }
       
-      throw new Error(`Failed to send email: ${emailResponse.error}`);
+      // Check for refresh token issue
+      if (emailResponse.data.code === 'REFRESH_TOKEN_MISSING' || emailResponse.data.code === 'TOKEN_REFRESH_FAILED') {
+        throw new Error("Gmail account needs to be reconnected. Please go to Settings and reconnect your Gmail account.");
+      }
+      
+      throw new Error(emailResponse.data.message || `Failed to send email: ${emailResponse.data.error}`);
     }
     
     console.log("Email sent successfully to:", recipientEmail);
