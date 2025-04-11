@@ -10,6 +10,40 @@ import { Send, Copy, Check, Loader2 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
 import { useForm } from 'react-hook-form';
 
+interface MortgageData {
+  propertyValue?: number;
+  currentLoan?: {
+    balance: number;
+    rate: number;
+    payment: number;
+    term: number;
+    type: string;
+    paymentBreakdown?: {
+      principal: number;
+      interest: number;
+      taxes: number;
+      insurance: number;
+    };
+  };
+  proposedLoan?: {
+    amount: number;
+    rate: number;
+    payment: number;
+    term: number;
+    type: string;
+    paymentBreakdown?: {
+      principal: number;
+      interest: number;
+      taxes: number;
+      insurance: number;
+    };
+  };
+  savings?: {
+    monthly: number;
+    lifetime: number;
+  };
+}
+
 interface SendPitchDeckModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -17,9 +51,7 @@ interface SendPitchDeckModalProps {
     id: string;
     title: string;
     description?: string;
-    mortgage_data?: {
-      propertyValue?: number;
-    };
+    mortgage_data?: MortgageData;
   } | null;
 }
 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,45 +9,45 @@ import PropertyInsightsSection from "@/components/pitch-deck/PropertyInsightsSec
 import LoanComparisonSection from "@/components/pitch-deck/LoanComparisonSection";
 import DocumentUploadSection from "@/components/pitch-deck/DocumentUploadSection";
 
-// Define the PitchDeck type including the slug property
+interface PaymentBreakdown {
+  principal: number;
+  interest: number;
+  taxes: number;
+  insurance: number;
+}
+
+interface LoanDetails {
+  balance: number;
+  rate: number;
+  payment: number;
+  term: number;
+  type: string;
+  paymentBreakdown?: PaymentBreakdown;
+}
+
+interface MortgageData {
+  propertyValue?: number;
+  currentLoan?: LoanDetails;
+  proposedLoan?: {
+    amount: number;
+    rate: number;
+    payment: number;
+    term: number;
+    type: string;
+    paymentBreakdown?: PaymentBreakdown;
+  };
+  savings?: {
+    monthly: number;
+    lifetime: number;
+  };
+}
+
 interface PitchDeck {
   id: string;
   title: string;
   description?: string;
   slug?: string;
-  mortgage_data: {
-    currentLoan?: {
-      balance: number;
-      rate: number;
-      payment: number;
-      term: number;
-      type: string;
-      paymentBreakdown?: {
-        principal: number;
-        interest: number;
-        taxes: number;
-        insurance: number;
-      };
-    };
-    proposedLoan?: {
-      amount: number;
-      rate: number;
-      payment: number;
-      term: number;
-      type: string;
-      paymentBreakdown?: {
-        principal: number;
-        interest: number;
-        taxes: number;
-        insurance: number;
-      };
-    };
-    savings?: {
-      monthly: number;
-      lifetime: number;
-    };
-    propertyValue?: number;
-  };
+  mortgage_data: MortgageData;
   created_at: string;
   updated_at: string;
 }
@@ -60,7 +59,6 @@ const YourHomeSolution = () => {
   const [downloading, setDownloading] = useState(false);
   const [pitchDeck, setPitchDeck] = useState<PitchDeck | null>(null);
   
-  // Extract pitch deck ID from URL path
   useEffect(() => {
     const fetchPitchDeck = async () => {
       setLoading(true);
@@ -68,16 +66,13 @@ const YourHomeSolution = () => {
       try {
         let pitchDeckId = id;
         
-        // Try to extract ID from various URL formats
         if (!pitchDeckId) {
           const path = location.pathname;
           
-          // Format: /your-home-solution/ID1234
           if (path.includes('/your-home-solution/')) {
             const parts = path.split('/');
             pitchDeckId = parts[parts.length - 1];
           }
-          // Format: /yourhomesolutionID1234
           else if (path.includes('/yourhomesolution')) {
             const match = path.match(/yourhomesolution(.*)/);
             if (match && match[1]) {
@@ -104,34 +99,37 @@ const YourHomeSolution = () => {
         if (data) {
           console.log("Pitch deck found:", data);
           
-          // Ensure we have default payment breakdown data if it's missing
-          const enhancedData = {
+          const mortgageData: MortgageData = typeof data.mortgage_data === 'string' 
+            ? JSON.parse(data.mortgage_data) 
+            : (data.mortgage_data as MortgageData) || {};
+          
+          const enhancedData: PitchDeck = {
             ...data,
             mortgage_data: {
-              ...data.mortgage_data,
-              propertyValue: data.mortgage_data.propertyValue || (data.mortgage_data.currentLoan?.balance ? data.mortgage_data.currentLoan.balance * 1.25 : 500000),
-              currentLoan: data.mortgage_data.currentLoan ? {
-                ...data.mortgage_data.currentLoan,
-                paymentBreakdown: data.mortgage_data.currentLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
-                  data.mortgage_data.currentLoan.payment,
-                  data.mortgage_data.currentLoan.balance,
-                  data.mortgage_data.currentLoan.rate,
-                  data.mortgage_data.currentLoan.term
+              propertyValue: mortgageData.propertyValue || (mortgageData.currentLoan?.balance ? mortgageData.currentLoan.balance * 1.25 : 500000),
+              currentLoan: mortgageData.currentLoan ? {
+                ...mortgageData.currentLoan,
+                paymentBreakdown: mortgageData.currentLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
+                  mortgageData.currentLoan.payment,
+                  mortgageData.currentLoan.balance,
+                  mortgageData.currentLoan.rate,
+                  mortgageData.currentLoan.term
                 )
               } : undefined,
-              proposedLoan: data.mortgage_data.proposedLoan ? {
-                ...data.mortgage_data.proposedLoan,
-                paymentBreakdown: data.mortgage_data.proposedLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
-                  data.mortgage_data.proposedLoan.payment,
-                  data.mortgage_data.proposedLoan.amount,
-                  data.mortgage_data.proposedLoan.rate,
-                  data.mortgage_data.proposedLoan.term
+              proposedLoan: mortgageData.proposedLoan ? {
+                ...mortgageData.proposedLoan,
+                paymentBreakdown: mortgageData.proposedLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
+                  mortgageData.proposedLoan.payment,
+                  mortgageData.proposedLoan.amount,
+                  mortgageData.proposedLoan.rate,
+                  mortgageData.proposedLoan.term
                 )
-              } : undefined
+              } : undefined,
+              savings: mortgageData.savings
             }
           };
           
-          setPitchDeck(enhancedData as PitchDeck);
+          setPitchDeck(enhancedData);
         }
       } catch (error: any) {
         console.error("Error fetching pitch deck:", error);
@@ -144,24 +142,20 @@ const YourHomeSolution = () => {
     fetchPitchDeck();
   }, [id, location.pathname]);
   
-  // Calculate default payment breakdown if not provided
   const calculateDefaultPaymentBreakdown = (
     totalPayment: number,
     loanAmount: number,
     interestRate: number,
     term: number
-  ) => {
-    // Simple estimation - in reality this would be more complex
+  ): PaymentBreakdown => {
     const monthlyRate = interestRate / 100 / 12;
     const totalMonths = term * 12;
     const principalAndInterest = (loanAmount * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / 
                                (Math.pow(1 + monthlyRate, totalMonths) - 1);
     
-    // Estimate insurance and taxes based on typical percentages
-    const taxes = loanAmount * 0.015 / 12; // Approx 1.5% of loan amount annually
-    const insurance = loanAmount * 0.0035 / 12; // Approx 0.35% of loan amount annually
+    const taxes = loanAmount * 0.015 / 12;
+    const insurance = loanAmount * 0.0035 / 12;
     
-    // Calculate principal and interest split based on amortization
     const interest = loanAmount * monthlyRate;
     const principal = principalAndInterest - interest;
     
@@ -190,7 +184,6 @@ const YourHomeSolution = () => {
       }
       
       if (data && data.pdfData) {
-        // Create a download link for the PDF
         const link = document.createElement("a");
         link.href = data.pdfData;
         link.download = `${pitchDeck.title.replace(/\s+/g, "_")}.pdf`;
@@ -236,7 +229,6 @@ const YourHomeSolution = () => {
   const savings = pitchDeck.mortgage_data.savings;
   const propertyValue = pitchDeck.mortgage_data.propertyValue || (currentLoan ? currentLoan.balance * 1.25 : 0);
 
-  // Format currency
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -266,7 +258,6 @@ const YourHomeSolution = () => {
           <p className="text-gray-600 mb-8">{pitchDeck.description}</p>
         )}
         
-        {/* Property Insights Section with Current Loan Details */}
         {currentLoan && currentLoan.paymentBreakdown && (
           <PropertyInsightsSection
             propertyValue={propertyValue}
@@ -276,7 +267,6 @@ const YourHomeSolution = () => {
           />
         )}
         
-        {/* Loan Comparison Section */}
         {currentLoan && proposedLoan && savings && 
          currentLoan.paymentBreakdown && proposedLoan.paymentBreakdown && (
           <LoanComparisonSection
@@ -293,7 +283,6 @@ const YourHomeSolution = () => {
           />
         )}
         
-        {/* Original Content */}
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>Loan Details</CardTitle>
@@ -475,7 +464,6 @@ const YourHomeSolution = () => {
           </CardContent>
         </Card>
         
-        {/* Document Upload Section */}
         <DocumentUploadSection pitchDeckId={pitchDeck.id} />
         
         <div className="mt-8 text-center">
