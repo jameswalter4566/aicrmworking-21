@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +34,8 @@ interface PitchDeckData {
       lifetime: number;
     };
   };
+  lead_id?: string;
+  template_type?: string;
 }
 
 interface UserProfile {
@@ -70,7 +71,14 @@ const PitchDeckLandingPage = () => {
           throw new Error('Pitch deck not found');
         }
         
-        setPitchDeck(deckData as PitchDeckData);
+        // Cast to correct type with all required properties
+        if (!deckData.slug) {
+          throw new Error('Pitch deck slug is missing');
+        }
+
+        // Cast to the proper PitchDeckData type
+        const completePitchDeck = deckData as unknown as PitchDeckData;
+        setPitchDeck(completePitchDeck);
         
         // Fetch the agent profile
         if (deckData.created_by) {

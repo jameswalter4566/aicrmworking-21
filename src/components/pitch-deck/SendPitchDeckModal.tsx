@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -39,7 +38,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     sendingEmail: false
   });
 
-  // Reset form when modal opens
   React.useEffect(() => {
     if (isOpen && pitchDeck) {
       setSubject(`Mortgage Proposal: ${pitchDeck.title}`);
@@ -66,7 +64,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     setError(null);
     
     try {
-      // Step 1: Check if email is connected
       setStepStatus({ ...stepStatus, checkingEmail: true });
       const { data: connections, error: connectionsError } = await supabase
         .from("user_email_connections")
@@ -85,7 +82,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         return;
       }
 
-      // Step 2: Create landing page and prepare to send email
       setStepStatus({ ...stepStatus, checkingEmail: false, creatingPage: true });
       toast.info("Creating personalized landing page and preparing email...");
 
@@ -95,23 +91,19 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         subject 
       });
 
-      // Get the auth token
       const authToken = await getAuthToken();
       if (!authToken) {
         throw new Error("You must be logged in to send pitch decks");
       }
 
-      // Step 3: Send the email with landing page link
       setStepStatus({ ...stepStatus, creatingPage: false, sendingEmail: true });
       
-      // Send the pitch deck with the session token
       const { data, error } = await supabase.functions.invoke("send-pitch-deck", {
         body: {
           pitchDeckId: pitchDeck.id,
           recipientEmail,
           subject,
           message,
-          // Pass auth token explicitly to ensure it's available in the function
           token: authToken
         },
       });
@@ -125,7 +117,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         console.error("Error in response data:", data);
         const errorMessage = data?.error || "Unknown error occurred";
         
-        // Check for Gmail permission errors
         if (errorMessage.toLowerCase().includes("permissions") || 
             errorMessage.toLowerCase().includes("reconnect") || 
             errorMessage.toLowerCase().includes("gmail")) {
@@ -136,7 +127,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         throw new Error(errorMessage);
       }
 
-      // Store the landing page URL for display
       if (data.landingPageUrl) {
         setLandingPageUrl(data.landingPageUrl);
       }
@@ -145,7 +135,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     } catch (error: any) {
       console.error("Error sending pitch deck:", error);
       
-      // Set specific error message
       if (error.message.toLowerCase().includes("permissions") || 
           error.message.toLowerCase().includes("reconnect") || 
           error.message.toLowerCase().includes("gmail")) {
@@ -205,7 +194,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
 
         {landingPageUrl ? (
           <div className="space-y-4 py-4">
-            <Alert variant="success" className="bg-green-50 border-green-200">
+            <Alert variant="default" className="bg-green-50 border-green-200">
               <Info className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
                 Your proposal has been successfully sent to {recipientEmail}
