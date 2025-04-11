@@ -12,6 +12,3 @@ verify_jwt = false
 
 [functions.send-gmail]
 verify_jwt = false
-
-[functions.twilio-token]
-verify_jwt = false
