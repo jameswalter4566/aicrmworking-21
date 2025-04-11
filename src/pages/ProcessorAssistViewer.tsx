@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Briefcase, FileText, HomeIcon, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import EmailConditionsParser from "@/components/mortgage/EmailConditionsParser";
 
 interface LoanApplication {
   id: string;
@@ -30,9 +31,16 @@ interface ProcessorTask {
 }
 
 interface LoanCondition {
-  id: string;
+  id?: string;
   description: string;
   status: "pending" | "cleared" | "waived";
+}
+
+interface ImportedConditions {
+  masterConditions: LoanCondition[];
+  generalConditions: LoanCondition[];
+  priorToFinalConditions: LoanCondition[];
+  complianceConditions: LoanCondition[];
 }
 
 const ProcessorAssistViewer = () => {
@@ -41,6 +49,12 @@ const ProcessorAssistViewer = () => {
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("employment");
+  const [conditions, setConditions] = useState<ImportedConditions>({
+    masterConditions: [],
+    generalConditions: [],
+    priorToFinalConditions: [],
+    complianceConditions: []
+  });
   
   const tasks: Record<string, ProcessorTask[]> = {
     employment: [
@@ -191,26 +205,36 @@ const ProcessorAssistViewer = () => {
     navigate('/processor');
   };
 
+  const handleConditionsLoaded = (importedConditions: ImportedConditions) => {
+    setConditions({
+      masterConditions: importedConditions.masterConditions || [],
+      generalConditions: importedConditions.generalConditions || [],
+      priorToFinalConditions: importedConditions.priorToFinalConditions || [],
+      complianceConditions: importedConditions.complianceConditions || []
+    });
+    toast.success("Conditions have been imported successfully");
+  };
+
   const renderTaskSection = (taskCategory: string) => {
     const categoryTasks = tasks[taskCategory] || [];
     
     return (
       <div className="space-y-4">
         {categoryTasks.map(task => (
-          <div key={task.id} className="bg-white rounded-md border border-gray-200 p-4">
+          <div key={task.id} className="bg-blue-900 rounded-lg border border-blue-700 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="bg-mortgage-lightPurple p-2 rounded-full">
+                <div className="bg-blue-800 p-2 rounded-full">
                   {task.icon}
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">{task.name}</h3>
-                  <p className="text-sm text-gray-500">{task.description}</p>
+                  <h3 className="font-medium text-white">{task.name}</h3>
+                  <p className="text-sm text-blue-300">{task.description}</p>
                 </div>
               </div>
               <Button 
                 onClick={() => handleTaskAction(task.id)}
-                className="bg-mortgage-purple hover:bg-mortgage-darkPurple text-white"
+                className="bg-blue-700 hover:bg-blue-600 text-white"
               >
                 Initiate
               </Button>
@@ -221,10 +245,36 @@ const ProcessorAssistViewer = () => {
     );
   };
 
+  const renderConditionsList = (conditions: LoanCondition[]) => {
+    if (!conditions || conditions.length === 0) {
+      return (
+        <div className="text-sm text-blue-300 italic">
+          No conditions found. Use the email parser above to import conditions from approval letter.
+        </div>
+      );
+    }
+
+    return (
+      <ul className="space-y-2">
+        {conditions.map((condition, index) => (
+          <li key={condition.id || `cond-${index}`} className="flex items-start gap-2 p-2 rounded-lg bg-blue-800">
+            <div className="flex-shrink-0 mt-1">
+              <div className="w-4 h-4 border-2 border-blue-300 rounded-full"></div>
+            </div>
+            <div>
+              <p className="text-white">{condition.description}</p>
+              <p className="text-xs text-blue-300 mt-1">Status: {condition.status}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -262,12 +312,12 @@ const ProcessorAssistViewer = () => {
 
       {/* Main Content */}
       <div className="flex-1 p-6">
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-2xl font-bold text-orange-700 mb-2">
+        <div className="bg-blue-900 rounded-lg shadow-sm p-6 mb-6">
+          <h1 className="text-2xl font-bold text-white mb-2">
             Processor Tasks: {loanApplication.loanId}
           </h1>
-          <div className="flex items-center mt-2 text-sm text-gray-600">
-            <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium mr-2">
+          <div className="flex items-center mt-2 text-sm text-blue-300">
+            <span className="px-2 py-1 rounded-full bg-blue-800 text-blue-100 text-xs font-medium mr-2">
               {loanApplication.loanStatus}
             </span>
             <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
@@ -275,108 +325,107 @@ const ProcessorAssistViewer = () => {
           </div>
         </div>
 
+        {/* Email Parser Component */}
+        <EmailConditionsParser 
+          borrowerLastName={loanApplication.lastName}
+          loanId={loanApplication.loanId}
+          onConditionsLoaded={handleConditionsLoaded}
+        />
+
         {/* Borrower's Remaining Conditions Section */}
-        <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-orange-800 mb-4">
+        <div className="bg-blue-900 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-white mb-4">
             Borrower's Remaining Conditions
           </h2>
           
           <div className="grid grid-cols-1 gap-6">
             {/* Master Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-700 pb-2 rounded-t-lg">
+                <CardTitle className="text-lg font-medium text-white">Master Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No master conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
+              <CardContent className="pt-4 bg-blue-800 rounded-b-lg">
+                {renderConditionsList(conditions.masterConditions)}
               </CardContent>
             </Card>
             
             {/* General Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-700 pb-2 rounded-t-lg">
+                <CardTitle className="text-lg font-medium text-white">General Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No general conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
+              <CardContent className="pt-4 bg-blue-800 rounded-b-lg">
+                {renderConditionsList(conditions.generalConditions)}
               </CardContent>
             </Card>
             
             {/* Prior to Final Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-700 pb-2 rounded-t-lg">
+                <CardTitle className="text-lg font-medium text-white">Prior to Final Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
+              <CardContent className="pt-4 bg-blue-800 rounded-b-lg">
+                {renderConditionsList(conditions.priorToFinalConditions)}
               </CardContent>
             </Card>
             
             {/* Compliance Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-700 pb-2 rounded-t-lg">
+                <CardTitle className="text-lg font-medium text-white">Compliance Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No compliance conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
+              <CardContent className="pt-4 bg-blue-800 rounded-b-lg">
+                {renderConditionsList(conditions.complianceConditions)}
               </CardContent>
             </Card>
           </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-4 bg-orange-50">
+          <TabsList className="grid grid-cols-4 mb-4 bg-blue-900 text-white">
             <TabsTrigger 
               value="employment" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="text-white data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Employment Verification
             </TabsTrigger>
             <TabsTrigger 
               value="title" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="text-white data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Title Order
             </TabsTrigger>
             <TabsTrigger 
               value="appraisal" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="text-white data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Appraisal Order
             </TabsTrigger>
             <TabsTrigger 
               value="documents" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="text-white data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Document Handler
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="employment" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Employment Verification Tasks</h2>
+          <TabsContent value="employment" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Employment Verification Tasks</h2>
             {renderTaskSection("employment")}
           </TabsContent>
           
-          <TabsContent value="title" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Title Order Tasks</h2>
+          <TabsContent value="title" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Title Order Tasks</h2>
             {renderTaskSection("title")}
           </TabsContent>
           
-          <TabsContent value="appraisal" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Appraisal Order Tasks</h2>
+          <TabsContent value="appraisal" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Appraisal Order Tasks</h2>
             {renderTaskSection("appraisal")}
           </TabsContent>
           
-          <TabsContent value="documents" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Document Handler Tasks</h2>
+          <TabsContent value="documents" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Document Handler Tasks</h2>
             {renderTaskSection("documents")}
           </TabsContent>
         </Tabs>
