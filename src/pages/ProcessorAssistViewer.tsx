@@ -36,111 +36,125 @@ interface LoanCondition {
 }
 
 const ProcessorAssistViewer = () => {
-  const {
-    id
-  } = useParams<{
-    id: string;
-  }>();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("employment");
-
+  
   const tasks: Record<string, ProcessorTask[]> = {
-    employment: [{
-      id: "employment-verification",
-      name: "Employment Verification",
-      description: "Verify borrower's employment and income information",
-      status: "pending",
-      icon: <Briefcase className="h-5 w-5" />
-    }, {
-      id: "income-documentation",
-      name: "Income Documentation",
-      description: "Collect and organize income documentation",
-      status: "pending",
-      icon: <FileText className="h-5 w-5" />
-    }],
-    title: [{
-      id: "title-search",
-      name: "Order Title Search",
-      description: "Request title search from title company",
-      status: "pending",
-      icon: <FileText className="h-5 w-5" />
-    }, {
-      id: "title-insurance",
-      name: "Title Insurance",
-      description: "Process title insurance requirements",
-      status: "pending",
-      icon: <ClipboardCheck className="h-5 w-5" />
-    }],
-    appraisal: [{
-      id: "order-appraisal",
-      name: "Order Appraisal",
-      description: "Request property appraisal from approved vendor",
-      status: "pending",
-      icon: <HomeIcon className="h-5 w-5" />
-    }, {
-      id: "appraisal-followup",
-      name: "Appraisal Follow-up",
-      description: "Track and follow up on appraisal status",
-      status: "pending",
-      icon: <ClipboardCheck className="h-5 w-5" />
-    }],
-    documents: [{
-      id: "document-collection",
-      name: "Document Collection",
-      description: "Track required documentation from borrower",
-      status: "pending",
-      icon: <FileText className="h-5 w-5" />
-    }, {
-      id: "document-organization",
-      name: "Document Organization",
-      description: "Organize and classify loan documentation",
-      status: "pending",
-      icon: <ClipboardCheck className="h-5 w-5" />
-    }]
+    employment: [
+      {
+        id: "employment-verification",
+        name: "Employment Verification",
+        description: "Verify borrower's employment and income information",
+        status: "pending",
+        icon: <Briefcase className="h-5 w-5" />
+      },
+      {
+        id: "income-documentation",
+        name: "Income Documentation",
+        description: "Collect and organize income documentation",
+        status: "pending",
+        icon: <FileText className="h-5 w-5" />
+      }
+    ],
+    title: [
+      {
+        id: "title-search",
+        name: "Order Title Search",
+        description: "Request title search from title company",
+        status: "pending",
+        icon: <FileText className="h-5 w-5" />
+      },
+      {
+        id: "title-insurance",
+        name: "Title Insurance",
+        description: "Process title insurance requirements",
+        status: "pending",
+        icon: <ClipboardCheck className="h-5 w-5" />
+      }
+    ],
+    appraisal: [
+      {
+        id: "order-appraisal",
+        name: "Order Appraisal",
+        description: "Request property appraisal from approved vendor",
+        status: "pending",
+        icon: <HomeIcon className="h-5 w-5" />
+      },
+      {
+        id: "appraisal-followup",
+        name: "Appraisal Follow-up",
+        description: "Track and follow up on appraisal status",
+        status: "pending",
+        icon: <ClipboardCheck className="h-5 w-5" />
+      }
+    ],
+    documents: [
+      {
+        id: "document-collection",
+        name: "Document Collection",
+        description: "Track required documentation from borrower",
+        status: "pending",
+        icon: <FileText className="h-5 w-5" />
+      },
+      {
+        id: "document-organization",
+        name: "Document Organization",
+        description: "Organize and classify loan documentation",
+        status: "pending",
+        icon: <ClipboardCheck className="h-5 w-5" />
+      }
+    ]
   };
-
+  
   useEffect(() => {
     if (id) {
       fetchLoanApplicationData(id);
     }
   }, [id]);
-
+  
   const fetchLoanApplicationData = async (leadId: string) => {
     setLoading(true);
     try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('retrieve-leads', {
-        body: {
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
+        body: { 
           leadId,
           industryFilter: 'mortgage'
         }
       });
+
       if (error) {
         console.error("Error fetching loan application:", error);
         toast.error("Failed to load loan application details");
         setLoading(false);
         return;
       }
+
       if (!data.success || !data.data || data.data.length === 0) {
         console.error("API returned error or no data:", data.error);
         toast.error(data.error || "Failed to load loan application details");
         setLoading(false);
         return;
       }
+
       const lead = data.data[0];
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
-
-      let currentStep = "applicationCreated";
-
+      
+      // Determine the current step based on loan status or other data
+      let currentStep = "applicationCreated"; // Default to first step
+      
       if (lead.mortgageData?.loan?.status) {
         const status = lead.mortgageData.loan.status.toLowerCase();
-        if (status.includes("processing")) currentStep = "processing";else if (status.includes("approved")) currentStep = "approved";else if (status.includes("closing")) currentStep = "closing";else if (status.includes("funded")) currentStep = "funded";else if (status.includes("submitted")) currentStep = "submitted";
+        if (status.includes("processing")) currentStep = "processing";
+        else if (status.includes("approved")) currentStep = "approved";
+        else if (status.includes("closing")) currentStep = "closing";
+        else if (status.includes("funded")) currentStep = "funded";
+        else if (status.includes("submitted")) currentStep = "submitted";
       }
+      
       setLoanApplication({
         id: lead.id,
         firstName: lead.firstName || '',
@@ -170,6 +184,7 @@ const ProcessorAssistViewer = () => {
 
   const handleTaskAction = (taskId: string) => {
     toast.success(`Task ${taskId} initiated`);
+    // Here you would implement the actual task processing logic
   };
 
   const goBack = () => {
@@ -178,118 +193,138 @@ const ProcessorAssistViewer = () => {
 
   const renderTaskSection = (taskCategory: string) => {
     const categoryTasks = tasks[taskCategory] || [];
-    return <div className="space-y-4">
-        {categoryTasks.map(task => <div 
-          key={task.id} 
-          className="bg-sidebar-primary text-white rounded-lg border border-sidebar-border p-4"
-        >
+    
+    return (
+      <div className="space-y-4">
+        {categoryTasks.map(task => (
+          <div key={task.id} className="bg-white rounded-md border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="bg-sidebar-accent p-2 rounded-full">
+                <div className="bg-mortgage-lightPurple p-2 rounded-full">
                   {task.icon}
                 </div>
                 <div>
-                  <h3 className="font-medium">{task.name}</h3>
-                  <p className="text-sm text-white/70">{task.description}</p>
+                  <h3 className="font-medium text-gray-900">{task.name}</h3>
+                  <p className="text-sm text-gray-500">{task.description}</p>
                 </div>
               </div>
               <Button 
-                onClick={() => handleTaskAction(task.id)} 
-                className="bg-sidebar-accent hover:bg-sidebar-accent/80 text-white"
+                onClick={() => handleTaskAction(task.id)}
+                className="bg-mortgage-purple hover:bg-mortgage-darkPurple text-white"
               >
                 Initiate
               </Button>
             </div>
-          </div>)}
-      </div>;
+          </div>
+        ))}
+      </div>
+    );
   };
 
   if (loading) {
-    return <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      </div>;
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+      </div>
+    );
   }
 
   if (!loanApplication) {
-    return <div className="flex flex-col items-center justify-center h-screen">
+    return (
+      <div className="flex flex-col items-center justify-center h-screen">
         <h2 className="text-2xl font-bold text-gray-700">Loan application not found</h2>
         <p className="mt-2 text-gray-500">The requested loan application could not be found.</p>
         <Button onClick={goBack} className="mt-4" variant="outline">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Go Back
         </Button>
-      </div>;
+      </div>
+    );
   }
 
-  return <div className="flex flex-col min-h-screen bg-gray-50">
+  return (
+    <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Back Button Header */}
       <div className="bg-white shadow-sm p-4">
-        <Button onClick={goBack} variant="outline" size="sm" className="rounded-full">
+        <Button 
+          onClick={goBack} 
+          variant="outline" 
+          size="sm" 
+          className="rounded-full"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back to Processor Assist
         </Button>
       </div>
 
+      {/* Loan Progress Tracker */}
       <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
 
+      {/* Main Content */}
       <div className="flex-1 p-6">
-        <div className="bg-sidebar-primary rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-2xl font-bold text-white mb-2">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h1 className="text-2xl font-bold text-orange-700 mb-2">
             Processor Tasks: {loanApplication.loanId}
           </h1>
-          <div className="flex items-center mt-2 text-sm text-white/80">
-            <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium mr-2">
+          <div className="flex items-center mt-2 text-sm text-gray-600">
+            <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium mr-2">
               {loanApplication.loanStatus}
             </span>
-            <span className="text-white">{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
-            <span className="ml-4 font-medium text-white">{formatCurrency(loanApplication.loanAmount)}</span>
+            <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
+            <span className="ml-4 font-medium">{formatCurrency(loanApplication.loanAmount)}</span>
           </div>
         </div>
 
-        <div className="rounded-lg shadow-sm p-6 mb-6 bg-sidebar-primary">
-          <h2 className="text-xl font-bold text-white mb-4">
+        {/* Borrower's Remaining Conditions Section */}
+        <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-orange-800 mb-4">
             Borrower's Remaining Conditions
           </h2>
           
           <div className="grid grid-cols-1 gap-6">
-            <Card className="bg-sidebar-accent rounded-lg">
-              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
-                <CardTitle className="text-lg font-medium text-white">Master Conditions</CardTitle>
+            {/* Master Conditions */}
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
-                <div className="text-sm text-white/70 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No master conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-sidebar-accent rounded-lg">
-              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
-                <CardTitle className="text-lg font-medium text-white">General Conditions</CardTitle>
+            {/* General Conditions */}
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
-                <div className="text-sm text-white/70 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No general conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-sidebar-accent rounded-lg">
-              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
-                <CardTitle className="text-lg font-medium text-white">Prior to Final Conditions</CardTitle>
+            {/* Prior to Final Conditions */}
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
-                <div className="text-sm text-white/70 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-sidebar-accent rounded-lg">
-              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
-                <CardTitle className="text-lg font-medium text-white">Compliance Conditions</CardTitle>
+            {/* Compliance Conditions */}
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
-                <div className="text-sm text-white/70 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No compliance conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
@@ -298,55 +333,56 @@ const ProcessorAssistViewer = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-4 bg-sidebar-primary rounded-lg">
+          <TabsList className="grid grid-cols-4 mb-4 bg-orange-50">
             <TabsTrigger 
               value="employment" 
-              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
             >
               Employment Verification
             </TabsTrigger>
             <TabsTrigger 
               value="title" 
-              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
             >
               Title Order
             </TabsTrigger>
             <TabsTrigger 
               value="appraisal" 
-              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
             >
               Appraisal Order
             </TabsTrigger>
             <TabsTrigger 
               value="documents" 
-              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
             >
               Document Handler
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="employment" className="rounded-lg shadow-sm p-6 bg-sidebar-primary">
-            <h2 className="text-xl font-semibold mb-4 text-white">Employment Verification Tasks</h2>
+          <TabsContent value="employment" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Employment Verification Tasks</h2>
             {renderTaskSection("employment")}
           </TabsContent>
           
-          <TabsContent value="title" className="bg-sidebar-primary rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-white">Title Order Tasks</h2>
+          <TabsContent value="title" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Title Order Tasks</h2>
             {renderTaskSection("title")}
           </TabsContent>
           
-          <TabsContent value="appraisal" className="bg-sidebar-primary rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-white">Appraisal Order Tasks</h2>
+          <TabsContent value="appraisal" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Appraisal Order Tasks</h2>
             {renderTaskSection("appraisal")}
           </TabsContent>
           
-          <TabsContent value="documents" className="bg-sidebar-primary rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-white">Document Handler Tasks</h2>
+          <TabsContent value="documents" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Document Handler Tasks</h2>
             {renderTaskSection("documents")}
           </TabsContent>
         </Tabs>
       </div>
-    </div>;
+    </div>
+  );
 };
 
 export default ProcessorAssistViewer;
