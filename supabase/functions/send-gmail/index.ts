@@ -28,7 +28,7 @@ serve(async (req) => {
     console.log("Received email sending request");
     
     // Parse the request body
-    const { to, subject, body, attachments } = await req.json();
+    const { to, subject, body, attachments, userId } = await req.json();
 
     if (!to || !subject || !body) {
       console.error("Missing required email fields");
@@ -48,12 +48,18 @@ serve(async (req) => {
     console.log(`Preparing to send email to: ${to}`);
 
     // Retrieve a Google email connection from the database
-    const { data: connection, error: connectionError } = await supabaseAdmin
+    // If userId is provided, get the specific user's connection
+    let connectionQuery = supabaseAdmin
       .from('user_email_connections')
       .select('*')
-      .eq('provider', 'google')
-      .limit(1)
-      .single();
+      .eq('provider', 'google');
+      
+    if (userId) {
+      console.log(`Looking for email connection for user ${userId}`);
+      connectionQuery = connectionQuery.eq('user_id', userId);
+    }
+    
+    const { data: connection, error: connectionError } = await connectionQuery.limit(1).single();
 
     if (connectionError || !connection) {
       console.error('No Google email connection found:', connectionError);
@@ -71,7 +77,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Using email connection for: ${connection.email}`);
+    console.log(`Using email connection for: ${connection.email} (User: ${connection.user_id})`);
 
     // Create the email parts for multipart/mixed emails (if attachments present)
     let emailContent;

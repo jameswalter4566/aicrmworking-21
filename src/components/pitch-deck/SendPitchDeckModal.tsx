@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2, AlertTriangle, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/context/AuthContext";
 
 interface SendPitchDeckModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface SendPitchDeckModalProps {
 }
 
 const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose, pitchDeck }) => {
+  const { getAuthToken } = useAuth();
   const [recipientEmail, setRecipientEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -92,8 +94,8 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       });
 
       // Get the auth token
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      const authToken = await getAuthToken();
+      if (!authToken) {
         throw new Error("You must be logged in to send pitch decks");
       }
 
@@ -108,7 +110,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
           subject,
           message,
           // Pass auth token explicitly to ensure it's available in the function
-          token: session.access_token
+          token: authToken
         },
       });
 

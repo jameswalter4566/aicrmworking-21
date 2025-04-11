@@ -113,10 +113,11 @@ Deno.serve(async (req) => {
       .from("user_email_connections")
       .select("*")
       .eq("provider", "google")
+      .eq("user_id", user.id) // Make sure we get the specific user's connection
       .limit(1);
 
     if (connectionsError || !connections || connections.length === 0) {
-      throw new Error("No email connection found. Please connect your Gmail account in the Settings page.");
+      throw new Error("No email connection found for your account. Please connect your Gmail account in the Settings page.");
     }
     
     // Send email using our Gmail connector with improved error handling
@@ -128,6 +129,7 @@ Deno.serve(async (req) => {
           to: recipientEmail,
           subject: emailSubject,
           body: emailBody,
+          userId: user.id, // Pass the user ID to ensure we use the correct connection
           attachments: [
             {
               filename: `${pitchDeck.title.replace(/\s+/g, '_')}_Proposal.pdf`,
