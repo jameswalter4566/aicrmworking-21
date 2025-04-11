@@ -270,7 +270,7 @@ const PitchDeckBuilder = () => {
       setPitchDeck(prev => ({
         ...prev,
         [section]: {
-          ...((prev[section as keyof typeof prev] || {}) as object),
+          ...Object.assign({}, prev[section as keyof typeof prev] || {}),
           [subField]: value
         }
       }));
