@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Download, ArrowLeft } from "lucide-react";
 
-// Define the PitchDeck type
+// Define the PitchDeck type including the slug property
 interface PitchDeck {
   id: string;
   title: string;
-  description: string;
-  slug: string;
+  description?: string;
+  slug?: string;
   mortgage_data: {
     currentLoan?: {
       balance: number;
@@ -63,7 +63,9 @@ const PitchDeckLandingPage = () => {
         }
         
         if (data) {
-          setPitchDeck(data as PitchDeck);
+          // Make sure we're handling the type correctly
+          const pitchDeckData = data as unknown as PitchDeck;
+          setPitchDeck(pitchDeckData);
         }
       } catch (error: any) {
         console.error("Error fetching pitch deck:", error);
