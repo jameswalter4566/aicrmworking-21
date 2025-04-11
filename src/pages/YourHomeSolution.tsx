@@ -72,6 +72,21 @@ interface PitchDeck {
   template_type?: string;
 }
 
+interface PitchDeckRaw {
+  id: string;
+  title: string;
+  description?: string;
+  slug?: string;
+  mortgage_data: any;
+  client_info?: any;
+  loan_officer_info?: any;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  lead_id?: string;
+  template_type?: string;
+}
+
 const YourHomeSolution = () => {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
@@ -94,7 +109,7 @@ const YourHomeSolution = () => {
             pitchDeckId = parts[parts.length - 1];
           }
           else if (path.includes('/yourhomesolution')) {
-            const match = path.match(/yourhomesolution(.*)/);
+            const match = path.match(/yourhomesolution\/?(.+)/);
             if (match && match[1]) {
               pitchDeckId = match[1];
             }
@@ -107,34 +122,50 @@ const YourHomeSolution = () => {
         
         console.log("Fetching pitch deck by ID:", pitchDeckId);
         
-        const { data, error } = await supabase
+        let query = supabase
           .from('pitch_decks')
           .select('*')
-          .eq('id', pitchDeckId)
-          .single();
+          .eq('id', pitchDeckId);
+          
+        let { data, error } = await query.single();
         
         if (error) {
           console.error("Error fetching pitch deck with ID:", error);
-          throw new Error(error.message);
+          try {
+            const { data: publicData, error: publicError } = await supabase.functions.invoke("retrieve-pitch-deck", {
+              body: { pitchDeckId }
+            });
+            
+            if (publicError || !publicData || !publicData.data) {
+              throw new Error(publicError?.message || "Failed to retrieve public pitch deck");
+            }
+            
+            data = publicData.data;
+          } catch (funcError) {
+            console.error("Error fetching public pitch deck:", funcError);
+            throw new Error("Pitch deck not found or access denied");
+          }
         }
         
         if (data) {
           console.log("Pitch deck found:", data);
           
-          const mortgageData: MortgageData = typeof data.mortgage_data === 'string' 
-            ? JSON.parse(data.mortgage_data) 
-            : (data.mortgage_data as MortgageData) || {};
+          const rawData = data as PitchDeckRaw;
           
-          const clientInfo = data.client_info ? 
-            (typeof data.client_info === 'string' ? JSON.parse(data.client_info) : data.client_info) as ClientInfo : 
-            {} as ClientInfo;
+          const mortgageData: MortgageData = typeof rawData.mortgage_data === 'string' 
+            ? JSON.parse(rawData.mortgage_data) 
+            : (rawData.mortgage_data as MortgageData) || {};
           
-          const loanOfficerInfo = data.loan_officer_info ?
-            (typeof data.loan_officer_info === 'string' ? JSON.parse(data.loan_officer_info) : data.loan_officer_info) as LoanOfficerInfo :
-            {} as LoanOfficerInfo;
+          const clientInfo = rawData.client_info ? 
+            (typeof rawData.client_info === 'string' ? JSON.parse(rawData.client_info) : rawData.client_info) as ClientInfo : 
+            undefined; 
+          
+          const loanOfficerInfo = rawData.loan_officer_info ?
+            (typeof rawData.loan_officer_info === 'string' ? JSON.parse(rawData.loan_officer_info) : rawData.loan_officer_info) as LoanOfficerInfo :
+            undefined;
           
           const enhancedData: PitchDeck = {
-            ...data,
+            ...rawData,
             mortgage_data: {
               propertyValue: mortgageData.propertyValue || (mortgageData.currentLoan?.balance ? mortgageData.currentLoan.balance * 1.25 : 500000),
               currentLoan: mortgageData.currentLoan ? {
