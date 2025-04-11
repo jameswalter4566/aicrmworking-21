@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -121,6 +120,9 @@ const YourHomeSolution = () => {
             ? JSON.parse(data.mortgage_data) 
             : (data.mortgage_data as MortgageData) || {};
           
+          const clientInfo = data.client_info || {};
+          const loanOfficerInfo = data.loan_officer_info || {};
+          
           const enhancedData: PitchDeck = {
             ...data,
             mortgage_data: {
@@ -145,8 +147,8 @@ const YourHomeSolution = () => {
               } : undefined,
               savings: mortgageData.savings
             },
-            client_info: data.client_info || undefined,
-            loan_officer_info: data.loan_officer_info || undefined
+            client_info: clientInfo as ClientInfo,
+            loan_officer_info: loanOfficerInfo as LoanOfficerInfo
           };
           
           setPitchDeck(enhancedData);
