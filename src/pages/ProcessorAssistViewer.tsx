@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -275,55 +276,55 @@ const ProcessorAssistViewer = () => {
         </div>
 
         {/* Borrower's Remaining Conditions Section */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-orange-700 mb-4">
+        <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-orange-800 mb-4">
             Borrower's Remaining Conditions
           </h2>
           
           <div className="grid grid-cols-1 gap-6">
             {/* Master Conditions */}
-            <Card>
-              <CardHeader className="bg-orange-100/20 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-800">Master Conditions</CardTitle>
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-sm text-gray-500 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No master conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
             {/* General Conditions */}
-            <Card>
-              <CardHeader className="bg-orange-100/20 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-800">General Conditions</CardTitle>
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-sm text-gray-500 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No general conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
             {/* Prior to Final Conditions */}
-            <Card>
-              <CardHeader className="bg-orange-100/20 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-800">Prior to Final Conditions</CardTitle>
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-sm text-gray-500 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
             {/* Compliance Conditions */}
-            <Card>
-              <CardHeader className="bg-orange-100/20 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-800">Compliance Conditions</CardTitle>
+            <Card className="bg-orange-100">
+              <CardHeader className="bg-orange-200 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="text-sm text-gray-500 italic">
+              <CardContent className="pt-4 bg-orange-100">
+                <div className="text-sm text-orange-800 italic">
                   No compliance conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
@@ -359,23 +360,23 @@ const ProcessorAssistViewer = () => {
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="employment" className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4">Employment Verification Tasks</h2>
+          <TabsContent value="employment" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Employment Verification Tasks</h2>
             {renderTaskSection("employment")}
           </TabsContent>
           
-          <TabsContent value="title" className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4">Title Order Tasks</h2>
+          <TabsContent value="title" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Title Order Tasks</h2>
             {renderTaskSection("title")}
           </TabsContent>
           
-          <TabsContent value="appraisal" className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4">Appraisal Order Tasks</h2>
+          <TabsContent value="appraisal" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Appraisal Order Tasks</h2>
             {renderTaskSection("appraisal")}
           </TabsContent>
           
-          <TabsContent value="documents" className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4">Document Handler Tasks</h2>
+          <TabsContent value="documents" className="bg-orange-50 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-orange-800">Document Handler Tasks</h2>
             {renderTaskSection("documents")}
           </TabsContent>
         </Tabs>
