@@ -71,13 +71,37 @@ const PitchDeckLandingPage = () => {
           throw new Error('Pitch deck not found');
         }
 
-        // Check if slug exists and handle type conversion properly
+        // Type checking and conversion
         if (!deckData.slug) {
           throw new Error('Pitch deck slug is missing');
         }
         
-        // Cast to the proper PitchDeckData type - use type assertion after ensuring slug exists
-        setPitchDeck(deckData as unknown as PitchDeckData);
+        // Safely convert to PitchDeckData type with type assertion
+        const typedPitchDeck = {
+          ...deckData,
+          mortgage_data: deckData.mortgage_data || {
+            currentLoan: {
+              balance: 0,
+              rate: 0,
+              payment: 0,
+              term: 0,
+              type: ""
+            },
+            proposedLoan: {
+              amount: 0,
+              rate: 0,
+              payment: 0,
+              term: 0,
+              type: ""
+            },
+            savings: {
+              monthly: 0,
+              lifetime: 0
+            }
+          }
+        } as PitchDeckData;
+        
+        setPitchDeck(typedPitchDeck);
         
         // Fetch the agent profile
         if (deckData.created_by) {
