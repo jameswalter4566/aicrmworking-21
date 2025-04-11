@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Copy, Check, Loader2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
 
 interface SendPitchDeckModalProps {
   isOpen: boolean;
@@ -14,6 +17,9 @@ interface SendPitchDeckModalProps {
     id: string;
     title: string;
     description?: string;
+    mortgage_data?: {
+      propertyValue?: number;
+    };
   } | null;
 }
 
@@ -25,6 +31,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   const [isCreatingLandingPage, setIsCreatingLandingPage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [landingPageUrl, setLandingPageUrl] = useState<string | null>(null);
+  const [propertyValue, setPropertyValue] = useState<string>('');
   
   React.useEffect(() => {
     if (isOpen) {
@@ -34,6 +41,21 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
           pitchDeck?.description ? `\n\n${pitchDeck.description}` : ''
         }\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\nYour Mortgage Professional`
       );
+      
+      // Set property value from pitch deck or default
+      if (pitchDeck?.mortgage_data?.propertyValue) {
+        setPropertyValue(pitchDeck.mortgage_data.propertyValue.toString());
+      } else {
+        // Try to estimate from mortgage data if available
+        const currentLoan = pitchDeck?.mortgage_data?.currentLoan;
+        if (currentLoan?.balance) {
+          // Default estimate: loan balance × 1.25 (assuming 80% LTV)
+          setPropertyValue((currentLoan.balance * 1.25).toString());
+        } else {
+          setPropertyValue('');
+        }
+      }
+      
       setRecipientEmail('');
       setIsSending(false);
       setIsCreatingLandingPage(false);
@@ -57,6 +79,21 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     setIsCreatingLandingPage(true);
 
     try {
+      // Update pitch deck with property value if provided
+      if (propertyValue && !isNaN(Number(propertyValue))) {
+        const propertyValueNumber = Number(propertyValue);
+        
+        await supabase
+          .from('pitch_decks')
+          .update({
+            mortgage_data: {
+              ...pitchDeck.mortgage_data,
+              propertyValue: propertyValueNumber
+            }
+          })
+          .eq('id', pitchDeck.id);
+      }
+
       toast.info('Creating landing page and generating PDF...');
       
       const { data, error } = await supabase.functions.invoke('send-pitch-deck', {
@@ -116,6 +153,27 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       });
   };
 
+  const formatCurrency = (value: string): string => {
+    // Remove non-digit characters
+    const digitsOnly = value.replace(/\D/g, '');
+    
+    // Convert to number and format
+    const num = parseInt(digitsOnly, 10);
+    if (isNaN(num)) return '';
+    
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(num).replace('$', '');
+  };
+
+  const handlePropertyValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatted = formatCurrency(e.target.value);
+    setPropertyValue(formatted);
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -173,6 +231,24 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
           </div>
         ) : (
           <div className="space-y-4">
+            <div>
+              <label htmlFor="propertyValue" className="block text-sm font-medium mb-1">Property Value</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                <Input
+                  id="propertyValue"
+                  type="text"
+                  value={propertyValue}
+                  onChange={handlePropertyValueChange}
+                  placeholder="500,000"
+                  className="pl-7"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                This helps create accurate property equity visualizations
+              </p>
+            </div>
+            
             <div>
               <label htmlFor="email" className="block text-sm font-medium mb-1">Recipient Email</label>
               <Input
