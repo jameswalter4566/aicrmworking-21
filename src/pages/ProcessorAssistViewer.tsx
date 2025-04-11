@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Briefcase, FileText, HomeIcon, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import EmailConditionsParser from "@/components/mortgage/EmailConditionsParser";
 
 interface LoanApplication {
   id: string;
@@ -35,13 +35,106 @@ interface LoanCondition {
   status: "pending" | "cleared" | "waived";
 }
 
+interface ParsedConditions {
+  masterConditions: LoanCondition[];
+  generalConditions: LoanCondition[];
+  priorToFinalConditions: LoanCondition[];
+  complianceConditions: LoanCondition[];
+}
+
 const ProcessorAssistViewer = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("employment");
+  const [parsedConditions, setParsedConditions] = useState<ParsedConditions | null>(null);
   
+  useEffect(() => {
+    if (id) {
+      fetchLoanApplicationData(id);
+    }
+  }, [id]);
+  
+  const fetchLoanApplicationData = async (leadId: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
+        body: { 
+          leadId,
+          industryFilter: 'mortgage'
+        }
+      });
+
+      if (error) {
+        console.error("Error fetching loan application:", error);
+        toast.error("Failed to load loan application details");
+        setLoading(false);
+        return;
+      }
+
+      if (!data.success || !data.data || data.data.length === 0) {
+        console.error("API returned error or no data:", data.error);
+        toast.error(data.error || "Failed to load loan application details");
+        setLoading(false);
+        return;
+      }
+
+      const lead = data.data[0];
+      const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
+      const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
+      
+      let currentStep = "applicationCreated"; // Default to first step
+      
+      if (lead.mortgageData?.loan?.status) {
+        const status = lead.mortgageData.loan.status.toLowerCase();
+        if (status.includes("processing")) currentStep = "processing";
+        else if (status.includes("approved")) currentStep = "approved";
+        else if (status.includes("closing")) currentStep = "closing";
+        else if (status.includes("funded")) currentStep = "funded";
+        else if (status.includes("submitted")) currentStep = "submitted";
+      }
+      
+      setLoanApplication({
+        id: lead.id,
+        firstName: lead.firstName || '',
+        lastName: lead.lastName || '',
+        propertyAddress: lead.propertyAddress || 'No address provided',
+        loanAmount: loanAmount,
+        loanStatus: lead.mortgageData?.loan?.status || "Processing",
+        loanId: lead.mortgageData?.loan?.loanNumber || `ML-${lead.id}`,
+        mortgageData: lead.mortgageData || {},
+        currentStep: currentStep
+      });
+    } catch (error) {
+      console.error("Error in fetchLoanApplicationData:", error);
+      toast.error("An unexpected error occurred");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0
+    }).format(amount);
+  };
+
+  const handleTaskAction = (taskId: string) => {
+    toast.success(`Task ${taskId} initiated`);
+    // Here you would implement the actual task processing logic
+  };
+
+  const goBack = () => {
+    navigate('/processor');
+  };
+
+  const handleConditionsFound = (conditions: ParsedConditions) => {
+    setParsedConditions(conditions);
+  };
+
   const tasks: Record<string, ProcessorTask[]> = {
     employment: [
       {
@@ -108,88 +201,6 @@ const ProcessorAssistViewer = () => {
       }
     ]
   };
-  
-  useEffect(() => {
-    if (id) {
-      fetchLoanApplicationData(id);
-    }
-  }, [id]);
-  
-  const fetchLoanApplicationData = async (leadId: string) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { 
-          leadId,
-          industryFilter: 'mortgage'
-        }
-      });
-
-      if (error) {
-        console.error("Error fetching loan application:", error);
-        toast.error("Failed to load loan application details");
-        setLoading(false);
-        return;
-      }
-
-      if (!data.success || !data.data || data.data.length === 0) {
-        console.error("API returned error or no data:", data.error);
-        toast.error(data.error || "Failed to load loan application details");
-        setLoading(false);
-        return;
-      }
-
-      const lead = data.data[0];
-      const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
-      const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
-      
-      // Determine the current step based on loan status or other data
-      let currentStep = "applicationCreated"; // Default to first step
-      
-      if (lead.mortgageData?.loan?.status) {
-        const status = lead.mortgageData.loan.status.toLowerCase();
-        if (status.includes("processing")) currentStep = "processing";
-        else if (status.includes("approved")) currentStep = "approved";
-        else if (status.includes("closing")) currentStep = "closing";
-        else if (status.includes("funded")) currentStep = "funded";
-        else if (status.includes("submitted")) currentStep = "submitted";
-      }
-      
-      setLoanApplication({
-        id: lead.id,
-        firstName: lead.firstName || '',
-        lastName: lead.lastName || '',
-        propertyAddress: lead.propertyAddress || 'No address provided',
-        loanAmount: loanAmount,
-        loanStatus: lead.mortgageData?.loan?.status || "Processing",
-        loanId: lead.mortgageData?.loan?.loanNumber || `ML-${lead.id}`,
-        mortgageData: lead.mortgageData || {},
-        currentStep: currentStep
-      });
-    } catch (error) {
-      console.error("Error in fetchLoanApplicationData:", error);
-      toast.error("An unexpected error occurred");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const handleTaskAction = (taskId: string) => {
-    toast.success(`Task ${taskId} initiated`);
-    // Here you would implement the actual task processing logic
-  };
-
-  const goBack = () => {
-    navigate('/processor');
-  };
 
   const renderTaskSection = (taskCategory: string) => {
     const categoryTasks = tasks[taskCategory] || [];
@@ -244,7 +255,6 @@ const ProcessorAssistViewer = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Back Button Header */}
       <div className="bg-white shadow-sm p-4">
         <Button 
           onClick={goBack} 
@@ -257,10 +267,8 @@ const ProcessorAssistViewer = () => {
         </Button>
       </div>
 
-      {/* Loan Progress Tracker */}
       <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
 
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-orange-700 mb-2">
@@ -275,61 +283,152 @@ const ProcessorAssistViewer = () => {
           </div>
         </div>
 
-        {/* Borrower's Remaining Conditions Section */}
         <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
           <h2 className="text-xl font-bold text-orange-800 mb-4">
             Borrower's Remaining Conditions
           </h2>
           
-          <div className="grid grid-cols-1 gap-6">
-            {/* Master Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No master conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* General Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No general conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Prior to Final Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Compliance Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
-                  No compliance conditions found. Conditions will appear here when the approval letter is parsed.
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          {parsedConditions ? (
+            <div className="grid grid-cols-1 gap-6">
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  {parsedConditions.masterConditions?.length > 0 ? (
+                    <ul className="space-y-2">
+                      {parsedConditions.masterConditions.map((condition, index) => (
+                        <li key={index} className="text-sm text-orange-800">
+                          • {condition.description}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-orange-800 italic">
+                      No master conditions found.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  {parsedConditions.generalConditions?.length > 0 ? (
+                    <ul className="space-y-2">
+                      {parsedConditions.generalConditions.map((condition, index) => (
+                        <li key={index} className="text-sm text-orange-800">
+                          • {condition.description}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-orange-800 italic">
+                      No general conditions found.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  {parsedConditions.priorToFinalConditions?.length > 0 ? (
+                    <ul className="space-y-2">
+                      {parsedConditions.priorToFinalConditions.map((condition, index) => (
+                        <li key={index} className="text-sm text-orange-800">
+                          • {condition.description}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-orange-800 italic">
+                      No prior to final conditions found.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  {parsedConditions.complianceConditions?.length > 0 ? (
+                    <ul className="space-y-2">
+                      {parsedConditions.complianceConditions.map((condition, index) => (
+                        <li key={index} className="text-sm text-orange-800">
+                          • {condition.description}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-orange-800 italic">
+                      No compliance conditions found.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-6">
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  <div className="text-sm text-orange-800 italic">
+                    No master conditions found. Conditions will appear here when the approval letter is parsed.
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  <div className="text-sm text-orange-800 italic">
+                    No general conditions found. Conditions will appear here when the approval letter is parsed.
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  <div className="text-sm text-orange-800 italic">
+                    No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-orange-100">
+                <CardHeader className="bg-orange-200 pb-2">
+                  <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 bg-orange-100">
+                  <div className="text-sm text-orange-800 italic">
+                    No compliance conditions found. Conditions will appear here when the approval letter is parsed.
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
+          <EmailConditionsParser 
+            clientLastName={loanApplication.lastName} 
+            loanNumber={loanApplication.loanId}
+            onConditionsFound={handleConditionsFound}
+          />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

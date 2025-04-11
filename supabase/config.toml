@@ -15,3 +15,9 @@ verify_jwt = false
 
 [functions.twilio-token]
 verify_jwt = false
+
+[functions.search-approval-emails]
+verify_jwt = true
+
+[functions.parse-approval-document]
+verify_jwt = true
