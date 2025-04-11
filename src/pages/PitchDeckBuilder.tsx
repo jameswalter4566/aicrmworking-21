@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { useNavigate, useParams } from "react-router-dom";
@@ -811,3 +812,112 @@ const PitchDeckBuilder = () => {
                             <div className="space-y-1">
                               <p className="text-sm flex justify-between">
                                 <span className="text-gray-600">Loan Balance:</span>
+                                <span>${(pitchDeck.mortgage_data?.currentLoan?.balance || 0).toLocaleString()}</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Interest Rate:</span>
+                                <span>{(pitchDeck.mortgage_data?.currentLoan?.rate || 0).toFixed(3)}%</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Monthly Payment:</span>
+                                <span>${(pitchDeck.mortgage_data?.currentLoan?.payment || 0).toLocaleString()}</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Term:</span>
+                                <span>{pitchDeck.mortgage_data?.currentLoan?.term || 0} years</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Loan Type:</span>
+                                <span>{pitchDeck.mortgage_data?.currentLoan?.type || ''}</span>
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <h4 className="font-medium mb-2">Proposed Loan</h4>
+                            <div className="space-y-1">
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Loan Amount:</span>
+                                <span>${(pitchDeck.mortgage_data?.proposedLoan?.amount || 0).toLocaleString()}</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Interest Rate:</span>
+                                <span>{(pitchDeck.mortgage_data?.proposedLoan?.rate || 0).toFixed(3)}%</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Monthly Payment:</span>
+                                <span>${(pitchDeck.mortgage_data?.proposedLoan?.payment || 0).toLocaleString()}</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Term:</span>
+                                <span>{pitchDeck.mortgage_data?.proposedLoan?.term || 0} years</span>
+                              </p>
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Loan Type:</span>
+                                <span>{pitchDeck.mortgage_data?.proposedLoan?.type || ''}</span>
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="border-t pt-6">
+                        <h3 className="text-xl font-semibold mb-4">Potential Savings</h3>
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div className="p-4 bg-green-50 rounded-lg text-center">
+                            <p className="text-green-600 text-lg font-semibold">
+                              ${pitchDeck.mortgage_data?.savings?.monthly || 0}
+                            </p>
+                            <p className="text-sm text-gray-600">Monthly Savings</p>
+                          </div>
+                          
+                          <div className="p-4 bg-green-50 rounded-lg text-center">
+                            <p className="text-green-600 text-lg font-semibold">
+                              ${(pitchDeck.mortgage_data?.savings?.lifetime || 0).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-gray-600">Lifetime Savings</p>
+                          </div>
+                          
+                          <div className="p-4 bg-green-50 rounded-lg text-center">
+                            <p className="text-green-600 text-lg font-semibold">
+                              {(
+                                (pitchDeck.mortgage_data?.currentLoan?.rate || 0) -
+                                (pitchDeck.mortgage_data?.proposedLoan?.rate || 0)
+                              ).toFixed(3)}%
+                            </p>
+                            <p className="text-sm text-gray-600">Rate Reduction</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {pitchDeck.loan_officer_info && Object.values(pitchDeck.loan_officer_info).some(val => val) && (
+                        <div className="mt-8 pt-6 border-t text-center">
+                          <h3 className="text-lg font-medium mb-2">Contact Information</h3>
+                          <p>{pitchDeck.loan_officer_info.name}</p>
+                          {pitchDeck.loan_officer_info.nmls_id && <p>NMLS# {pitchDeck.loan_officer_info.nmls_id}</p>}
+                          {pitchDeck.loan_officer_info.company && <p>{pitchDeck.loan_officer_info.company}</p>}
+                          {pitchDeck.loan_officer_info.phone && <p>{pitchDeck.loan_officer_info.phone}</p>}
+                          {pitchDeck.loan_officer_info.email && <p>{pitchDeck.loan_officer_info.email}</p>}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {isSendModalOpen && (
+        <SendPitchDeckModal
+          pitchDeckId={id!}
+          clientInfo={pitchDeck.client_info}
+          onClose={() => setIsSendModalOpen(false)}
+        />
+      )}
+    </MainLayout>
+  );
+};
+
+export default PitchDeckBuilder;
