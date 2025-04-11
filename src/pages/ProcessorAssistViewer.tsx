@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Briefcase, FileText, HomeIcon, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+
 interface LoanApplication {
   id: string;
   firstName: string;
@@ -18,6 +19,7 @@ interface LoanApplication {
   mortgageData?: any;
   currentStep?: string;
 }
+
 interface ProcessorTask {
   id: string;
   name: string;
@@ -25,11 +27,13 @@ interface ProcessorTask {
   status: "pending" | "in_progress" | "completed" | "cancelled";
   icon: React.ReactNode;
 }
+
 interface LoanCondition {
   id: string;
   description: string;
   status: "pending" | "cleared" | "waived";
 }
+
 const ProcessorAssistViewer = () => {
   const {
     id
@@ -40,6 +44,7 @@ const ProcessorAssistViewer = () => {
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("employment");
+
   const tasks: Record<string, ProcessorTask[]> = {
     employment: [{
       id: "employment-verification",
@@ -94,11 +99,13 @@ const ProcessorAssistViewer = () => {
       icon: <ClipboardCheck className="h-5 w-5" />
     }]
   };
+
   useEffect(() => {
     if (id) {
       fetchLoanApplicationData(id);
     }
   }, [id]);
+
   const fetchLoanApplicationData = async (leadId: string) => {
     setLoading(true);
     try {
@@ -127,8 +134,7 @@ const ProcessorAssistViewer = () => {
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
 
-      // Determine the current step based on loan status or other data
-      let currentStep = "applicationCreated"; // Default to first step
+      let currentStep = "applicationCreated";
 
       if (lead.mortgageData?.loan?.status) {
         const status = lead.mortgageData.loan.status.toLowerCase();
@@ -152,6 +158,7 @@ const ProcessorAssistViewer = () => {
       setLoading(false);
     }
   };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -159,39 +166,49 @@ const ProcessorAssistViewer = () => {
       maximumFractionDigits: 0
     }).format(amount);
   };
+
   const handleTaskAction = (taskId: string) => {
     toast.success(`Task ${taskId} initiated`);
-    // Here you would implement the actual task processing logic
   };
+
   const goBack = () => {
     navigate('/processor');
   };
+
   const renderTaskSection = (taskCategory: string) => {
     const categoryTasks = tasks[taskCategory] || [];
     return <div className="space-y-4">
-        {categoryTasks.map(task => <div key={task.id} className="bg-blue-800 text-white rounded-md border border-blue-700 p-4">
+        {categoryTasks.map(task => <div 
+          key={task.id} 
+          className="bg-sidebar-primary text-white rounded-lg border border-sidebar-border p-4"
+        >
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="bg-blue-700 p-2 rounded-full">
+                <div className="bg-sidebar-accent p-2 rounded-full">
                   {task.icon}
                 </div>
                 <div>
                   <h3 className="font-medium">{task.name}</h3>
-                  <p className="text-sm text-blue-200">{task.description}</p>
+                  <p className="text-sm text-white/70">{task.description}</p>
                 </div>
               </div>
-              <Button onClick={() => handleTaskAction(task.id)} className="bg-blue-600 hover:bg-blue-500 text-white">
+              <Button 
+                onClick={() => handleTaskAction(task.id)} 
+                className="bg-sidebar-accent hover:bg-sidebar-accent/80 text-white"
+              >
                 Initiate
               </Button>
             </div>
           </div>)}
       </div>;
   };
+
   if (loading) {
     return <div className="flex justify-center items-center h-screen">
         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>;
   }
+
   if (!loanApplication) {
     return <div className="flex flex-col items-center justify-center h-screen">
         <h2 className="text-2xl font-bold text-gray-700">Loan application not found</h2>
@@ -202,8 +219,8 @@ const ProcessorAssistViewer = () => {
         </Button>
       </div>;
   }
+
   return <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Back Button Header */}
       <div className="bg-white shadow-sm p-4">
         <Button onClick={goBack} variant="outline" size="sm" className="rounded-full">
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -211,10 +228,8 @@ const ProcessorAssistViewer = () => {
         </Button>
       </div>
 
-      {/* Loan Progress Tracker */}
       <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
 
-      {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-blue-800 mb-2">
@@ -229,56 +244,51 @@ const ProcessorAssistViewer = () => {
           </div>
         </div>
 
-        {/* Borrower's Remaining Conditions Section */}
-        <div className="rounded-lg shadow-sm p-6 mb-6 bg-slate-50">
+        <div className="rounded-lg shadow-sm p-6 mb-6 bg-sidebar-primary">
           <h2 className="text-xl font-bold text-white mb-4">
             Borrower's Remaining Conditions
           </h2>
           
           <div className="grid grid-cols-1 gap-6">
-            {/* Master Conditions */}
-            <Card className="bg-blue-800">
-              <CardHeader className="bg-blue-800 pb-2">
+            <Card className="bg-sidebar-primary rounded-lg">
+              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">Master Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-blue-800">
-                <div className="text-sm text-blue-200 italic">
+              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+                <div className="text-sm text-white/70 italic">
                   No master conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            {/* General Conditions */}
-            <Card className="bg-blue-800">
-              <CardHeader className="bg-blue-800 pb-2">
+            <Card className="bg-sidebar-primary rounded-lg">
+              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">General Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-blue-800">
-                <div className="text-sm text-blue-200 italic">
+              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+                <div className="text-sm text-white/70 italic">
                   No general conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            {/* Prior to Final Conditions */}
-            <Card className="bg-blue-800">
-              <CardHeader className="bg-blue-800 pb-2">
+            <Card className="bg-sidebar-primary rounded-lg">
+              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">Prior to Final Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-blue-800">
-                <div className="text-sm text-blue-200 italic">
+              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+                <div className="text-sm text-white/70 italic">
                   No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            {/* Compliance Conditions */}
-            <Card className="bg-blue-800">
-              <CardHeader className="bg-blue-800 pb-2">
+            <Card className="bg-sidebar-primary rounded-lg">
+              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">Compliance Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-blue-800">
-                <div className="text-sm text-blue-200 italic">
+              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+                <div className="text-sm text-white/70 italic">
                   No compliance conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
@@ -287,37 +297,49 @@ const ProcessorAssistViewer = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-4 bg-blue-900">
-            <TabsTrigger value="employment" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+          <TabsList className="grid grid-cols-4 mb-4 bg-sidebar-primary rounded-lg">
+            <TabsTrigger 
+              value="employment" 
+              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+            >
               Employment Verification
             </TabsTrigger>
-            <TabsTrigger value="title" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+            <TabsTrigger 
+              value="title" 
+              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+            >
               Title Order
             </TabsTrigger>
-            <TabsTrigger value="appraisal" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+            <TabsTrigger 
+              value="appraisal" 
+              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+            >
               Appraisal Order
             </TabsTrigger>
-            <TabsTrigger value="documents" className="data-[state=active]:bg-blue-700 data-[state=active]:text-white">
+            <TabsTrigger 
+              value="documents" 
+              className="data-[state=active]:bg-sidebar-accent data-[state=active]:text-white text-white hover:text-white rounded-lg"
+            >
               Document Handler
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="employment" className="rounded-lg shadow-sm p-6 bg-blue-50">
+          <TabsContent value="employment" className="rounded-lg shadow-sm p-6 bg-sidebar-primary">
             <h2 className="text-xl font-semibold mb-4 text-white">Employment Verification Tasks</h2>
             {renderTaskSection("employment")}
           </TabsContent>
           
-          <TabsContent value="title" className="bg-blue-900 rounded-lg shadow-sm p-6">
+          <TabsContent value="title" className="bg-sidebar-primary rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-semibold mb-4 text-white">Title Order Tasks</h2>
             {renderTaskSection("title")}
           </TabsContent>
           
-          <TabsContent value="appraisal" className="bg-blue-900 rounded-lg shadow-sm p-6">
+          <TabsContent value="appraisal" className="bg-sidebar-primary rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-semibold mb-4 text-white">Appraisal Order Tasks</h2>
             {renderTaskSection("appraisal")}
           </TabsContent>
           
-          <TabsContent value="documents" className="bg-blue-900 rounded-lg shadow-sm p-6">
+          <TabsContent value="documents" className="bg-sidebar-primary rounded-lg shadow-sm p-6">
             <h2 className="text-xl font-semibold mb-4 text-white">Document Handler Tasks</h2>
             {renderTaskSection("documents")}
           </TabsContent>
@@ -325,4 +347,5 @@ const ProcessorAssistViewer = () => {
       </div>
     </div>;
 };
+
 export default ProcessorAssistViewer;
