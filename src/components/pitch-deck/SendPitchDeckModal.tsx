@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Copy, Check, Loader2 } from 'lucide-react';
+import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
+import { useForm } from 'react-hook-form';
 
 interface MortgageData {
   propertyValue?: number;
@@ -39,87 +41,6 @@ interface MortgageData {
   savings?: {
     monthly: number;
     lifetime: number;
-  };
-  borrowerInfo?: {
-    maritalStatus: string;
-    subjectState: string;
-    isForeverHome: string;
-    currentRate: number;
-    isInvestment: string;
-  };
-  monthlyHousingExpenses?: {
-    rent: number;
-    firstMortgage: number;
-    otherFinancing: number;
-    hazardInsurance: number;
-    realEstateTaxes: number;
-    mortgageInsurance: number;
-    hoaDues: number;
-    other: number;
-    presentTotal: number;
-    subjectPropTotal: number;
-    proposedTotal: number;
-  };
-  grossMonthlyIncome?: {
-    borrowerBase: number;
-    coBorrowerBase: number;
-    borrowerOvertime: number;
-    coBorrowerOvertime: number;
-    borrowerBonuses: number;
-    coBorrowerBonuses: number;
-    borrowerCommissions: number;
-    coBorrowerCommissions: number;
-    borrowerDividends: number;
-    coBorrowerDividends: number;
-    borrowerRentalIncome: number;
-    coBorrowerRentalIncome: number;
-    borrowerOther1: number;
-    coBorrowerOther1: number;
-    borrowerOther2: number;
-    coBorrowerOther2: number;
-    borrowerTotal: number;
-    coBorrowerTotal: number;
-    combinedTotal: number;
-  };
-  liabilities?: Array<{
-    companyName: string;
-    type: string;
-    balance: number;
-    payment: number;
-    monthsLeft: number;
-    isPaidOff: boolean;
-  }>;
-  transactionDetails?: {
-    purchasePrice: number;
-    alterations: number;
-    land: number;
-    refinance: number;
-    prepaidItems: number;
-    closingCosts: number;
-    pmiMipFundingFee: number;
-    discount: number;
-    totalCosts: number;
-    subordinateFinancing: number;
-    sellerCredits: number;
-    otherCredits: Array<{
-      description: string;
-      amount: number;
-    }>;
-    loanAmount: number;
-    interestRate: number;
-    term: number;
-    pmiMipFinanced: number;
-    totalLoanAmount: number;
-    totalCredits: number;
-    cashFromBorrower: number;
-  };
-  borrowerGoals?: {
-    lowCostOption: string;
-    rate: string;
-    buydown: string;
-    lowestRateAmount: number;
-    lowCostAmount: number;
-    currentOption: string;
   };
 }
 
