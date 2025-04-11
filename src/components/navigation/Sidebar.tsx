@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { 
@@ -9,7 +10,8 @@ import {
   Phone,
   LineChart,
   Calculator,
-  Brain
+  Brain,
+  LogOut
 } from "lucide-react";
 import { useIndustry } from "@/context/IndustryContext";
 import { 
@@ -28,7 +30,7 @@ interface SidebarProps {
 const Sidebar = ({ className }: SidebarProps) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
   const { activeIndustry, setActiveIndustry } = useIndustry();
   const [isExpanded, setIsExpanded] = useState(true);
 
@@ -67,13 +69,17 @@ const Sidebar = ({ className }: SidebarProps) => {
   ];
 
   const handleIndustryChange = (industry: string) => {
-    setActiveIndustry(industry);
+    // Convert string to IndustryType
+    const industryType = industry === 'mortgage' ? 'mortgage' : 
+                        industry === 'real_estate' ? 'realEstate' : null;
+    
+    setActiveIndustry(industryType);
     localStorage.setItem('activeIndustry', industry);
     navigate('/');
   };
 
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate('/auth');
   };
 
@@ -99,7 +105,7 @@ const Sidebar = ({ className }: SidebarProps) => {
           <h3 className="font-medium text-sm text-gray-400">Industry</h3>
           <select
             className="bg-gray-700 text-white rounded px-2 py-1 w-full"
-            value={activeIndustry}
+            value={activeIndustry === 'mortgage' ? 'mortgage' : 'real_estate'}
             onChange={(e) => handleIndustryChange(e.target.value)}
           >
             <option value="real_estate">Real Estate</option>
@@ -153,7 +159,7 @@ const Sidebar = ({ className }: SidebarProps) => {
             onClick={handleLogout}
             className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-800 transition-colors w-full justify-start"
           >
-            <Home className="h-4 w-4 mr-2" />
+            <LogOut className="h-4 w-4 mr-2" />
             <span>Logout</span>
           </button>
         </div>
