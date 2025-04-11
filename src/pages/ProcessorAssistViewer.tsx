@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -231,16 +232,16 @@ const ProcessorAssistViewer = () => {
       <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
 
       <div className="flex-1 p-6">
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-2xl font-bold text-blue-800 mb-2">
+        <div className="bg-sidebar-primary rounded-lg shadow-sm p-6 mb-6">
+          <h1 className="text-2xl font-bold text-white mb-2">
             Processor Tasks: {loanApplication.loanId}
           </h1>
-          <div className="flex items-center mt-2 text-sm text-gray-600">
+          <div className="flex items-center mt-2 text-sm text-white/80">
             <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium mr-2">
               {loanApplication.loanStatus}
             </span>
-            <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
-            <span className="ml-4 font-medium">{formatCurrency(loanApplication.loanAmount)}</span>
+            <span className="text-white">{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
+            <span className="ml-4 font-medium text-white">{formatCurrency(loanApplication.loanAmount)}</span>
           </div>
         </div>
 
@@ -250,44 +251,44 @@ const ProcessorAssistViewer = () => {
           </h2>
           
           <div className="grid grid-cols-1 gap-6">
-            <Card className="bg-sidebar-primary rounded-lg">
-              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
+            <Card className="bg-sidebar-accent rounded-lg">
+              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">Master Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
                 <div className="text-sm text-white/70 italic">
                   No master conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-sidebar-primary rounded-lg">
-              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
+            <Card className="bg-sidebar-accent rounded-lg">
+              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">General Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
                 <div className="text-sm text-white/70 italic">
                   No general conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-sidebar-primary rounded-lg">
-              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
+            <Card className="bg-sidebar-accent rounded-lg">
+              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">Prior to Final Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
                 <div className="text-sm text-white/70 italic">
                   No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
-            <Card className="bg-sidebar-primary rounded-lg">
-              <CardHeader className="bg-sidebar-primary pb-2 rounded-t-lg">
+            <Card className="bg-sidebar-accent rounded-lg">
+              <CardHeader className="bg-sidebar-accent pb-2 rounded-t-lg">
                 <CardTitle className="text-lg font-medium text-white">Compliance Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-sidebar-primary rounded-b-lg">
+              <CardContent className="pt-4 bg-sidebar-accent rounded-b-lg">
                 <div className="text-sm text-white/70 italic">
                   No compliance conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
