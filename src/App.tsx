@@ -1,8 +1,9 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import TwilioScript from "./components/TwilioScript";
 import { useEffect, useState } from "react";
 import { audioProcessing } from "./services/audioProcessing";
@@ -33,7 +34,6 @@ import AIRealtor from "./pages/AIRealtor";
 import ListingPresentation from "./pages/ListingPresentation";
 import LeadProfile from "./pages/LeadProfile";
 import LoanApplicationViewer from "./pages/LoanApplicationViewer";
-import PitchDeckLandingPage from "./pages/PitchDeckLandingPage";
 
 const queryClient = new QueryClient();
 
@@ -231,7 +231,7 @@ function App() {
             <div className="fixed top-16 right-4 z-50">
               <GlobalAudioSettings />
             </div>
-            <Router>
+            <BrowserRouter>
               <Routes>
                 <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
@@ -252,14 +252,15 @@ function App() {
                 
                 <Route path="/amortization" element={<ProtectedRoute><AmortizationCalculator /></ProtectedRoute>} />
                 <Route path="/pitch-deck" element={<ProtectedRoute><PitchDeckPro /></ProtectedRoute>} />
-                <Route path="/pitch-deck/builder/:id?" element={<PitchDeckBuilder />} />
-                <Route path="/pitch/:slug" element={<PitchDeckLandingPage />} />
+                <Route path="/pitch-deck/builder/:id" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
+                <Route path="/pitch-deck/builder" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
+                <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
                 
                 <Route path="/" element={<Navigate to="/landing" replace />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </Router>
+            </BrowserRouter>
           </IndustryProvider>
         </AuthProvider>
       </TooltipProvider>

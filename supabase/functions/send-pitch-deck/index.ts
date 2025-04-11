@@ -64,37 +64,49 @@ Deno.serve(async (req) => {
       console.error('Pitch deck fetch error:', pitchDeckError);
       throw new Error(`Failed to fetch pitch deck: ${pitchDeckError?.message || 'Not found'}`);
     }
-
-    // Make sure we have a slug
-    if (!pitchDeck.slug) {
-      console.log("Pitch deck has no slug, generating one...");
-      
-      // Generate a slug based on the title
-      let slug = pitchDeck.title
-        .toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-')
-        + '-home-solution';
-      
-      // Update the pitch deck with the slug
-      const { error: updateError } = await supabase
-        .from('pitch_decks')
-        .update({ slug })
-        .eq('id', pitchDeckId);
-        
-      if (updateError) {
-        console.error('Error updating pitch deck slug:', updateError);
-        throw new Error(`Failed to generate landing page URL: ${updateError.message}`);
-      }
-      
-      pitchDeck.slug = slug;
+    
+    // First, generate the PDF directly in this function
+    console.log("Generating PDF for pitch deck...");
+    
+    let pdfResponse;
+    try {
+      pdfResponse = await supabase.functions.invoke('save-pitch-deck', {
+        body: {
+          action: 'get-pdf',
+          pitchDeckId,
+          token: authToken // Pass the auth token
+        }
+      });
+    } catch (pdfError) {
+      console.error('Error calling save-pitch-deck function:', pdfError);
+      throw new Error(`PDF generation failed: ${pdfError.message || 'Unknown error'}`);
     }
     
-    // Generate the landing page URL
-    const landingPageUrl = `${supabaseUrl.replace('supabase', 'app')}/pitch/${pitchDeck.slug}`;
+    // Better error handling for PDF generation
+    if (pdfResponse.error) {
+      console.error('PDF generation error from function:', pdfResponse.error);
+      throw new Error(`Failed to generate PDF: ${JSON.stringify(pdfResponse.error)}`);
+    }
     
-    console.log("Landing page URL:", landingPageUrl);
+    if (!pdfResponse.data || !pdfResponse.data.pdfData) {
+      console.error('Invalid PDF response format:', pdfResponse);
+      throw new Error('Failed to generate PDF: Missing PDF data in response');
+    }
+    
+    console.log("PDF successfully generated, preparing to send email...");
+    
+    // Extract the base64 PDF data
+    const pdfData = pdfResponse.data.pdfData;
+    const pdfBase64 = pdfData.split(',')[1]; // Remove data:application/pdf;base64, prefix
+    
+    if (!pdfBase64) {
+      throw new Error('Failed to extract PDF data: Invalid format');
+    }
+    
+    // Set email subject and body
+    const emailSubject = subject || `Mortgage Proposal: ${pitchDeck.title}`;
+    const emailBody = message || 
+      `Dear Client,\n\nI'm excited to share this mortgage proposal with you.\n\n${pitchDeck.description || ''}\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${user.email}`;
     
     // Check if email connection exists
     const { data: connections, error: connectionsError } = await supabase
@@ -108,11 +120,6 @@ Deno.serve(async (req) => {
       throw new Error("No email connection found for your account. Please connect your Gmail account in the Settings page.");
     }
     
-    // Set email subject and body
-    const emailSubject = subject || `Mortgage Proposal: ${pitchDeck.title}`;
-    const emailBody = message || 
-      `Dear Client,\n\nI'm excited to share this mortgage proposal with you.\n\n${pitchDeck.description || ''}\n\nPlease review your personalized mortgage proposal at the link below:\n\n${landingPageUrl}\n\nBest regards,\n${user.email}`;
-    
     // Send email using our Gmail connector with improved error handling
     console.log("Calling send-gmail function...");
     let emailResponse;
@@ -123,7 +130,14 @@ Deno.serve(async (req) => {
           subject: emailSubject,
           body: emailBody,
           userId: user.id, // Pass the user ID to ensure we use the correct connection
-          // No attachments now, we're sending a link to the landing page instead
+          attachments: [
+            {
+              filename: `${pitchDeck.title.replace(/\s+/g, '_')}_Proposal.pdf`,
+              content: pdfBase64,
+              encoding: 'base64',
+              mimeType: 'application/pdf'
+            }
+          ]
         }
       });
       
@@ -168,7 +182,7 @@ Deno.serve(async (req) => {
       .eq('id', pitchDeckId);
     
     return new Response(
-      JSON.stringify({ success: true, message: `Pitch deck sent to ${recipientEmail}`, landingPageUrl }),
+      JSON.stringify({ success: true, message: `Pitch deck sent to ${recipientEmail}` }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

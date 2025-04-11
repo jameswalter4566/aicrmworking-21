@@ -212,7 +212,6 @@ export type Database = {
           id: string
           lead_id: string | null
           mortgage_data: Json | null
-          slug: string | null
           template_type: string | null
           title: string
           updated_at: string | null
@@ -224,7 +223,6 @@ export type Database = {
           id?: string
           lead_id?: string | null
           mortgage_data?: Json | null
-          slug?: string | null
           template_type?: string | null
           title: string
           updated_at?: string | null
@@ -236,7 +234,6 @@ export type Database = {
           id?: string
           lead_id?: string | null
           mortgage_data?: Json | null
-          slug?: string | null
           template_type?: string | null
           title?: string
           updated_at?: string | null

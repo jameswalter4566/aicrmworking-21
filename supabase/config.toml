@@ -1,52 +1,17 @@
 
 project_id = "imrmboyczebjlbnkgjns"
 
-[api]
-# Port to run the API proxy on. Defaults to 54321.
-port = 54321
-# should be false for Lovable preview
-enabled = false
-
-[db]
-# Port to run the DB on. Defaults to 54322.
-port = 54322
-# The database password. It's required by default for security.
-password = "postgres"
-# should be false for Lovable preview
-enabled = false
-
-[studio]
-# Port to run Studio on. Defaults to 54323.
-port = 54323
-# should be false for Lovable preview
-enabled = false
-
-[inbucket]
-# Port to run the SMTP server on. Defaults to 54324.
-port = 54324
-# should be false for Lovable preview
-enabled = false
-
-[auth]
-# should be false for Lovable preview
-enabled = false
-
-[storage]
-# should be false for Lovable preview
-enabled = false
-
-[realtime]
-# should be false for Lovable preview
-enabled = false
-
-[functions.create-pitch-deck]
-verify_jwt = true
-
-[functions.send-pitch-deck]
-verify_jwt = true
-
 [functions.save-pitch-deck]
-verify_jwt = true
+verify_jwt = false
 
 [functions.retrieve-pitch-deck]
-verify_jwt = true
+verify_jwt = false
+
+[functions.send-pitch-deck]
+verify_jwt = false
+
+[functions.send-gmail]
+verify_jwt = false
+
+[functions.twilio-token]
+verify_jwt = false
