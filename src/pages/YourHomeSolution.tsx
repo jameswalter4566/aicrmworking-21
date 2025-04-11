@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -107,6 +106,7 @@ const YourHomeSolution = () => {
         }
         
         console.log("Fetching pitch deck by ID:", pitchDeckId);
+        
         const { data, error } = await supabase
           .from('pitch_decks')
           .select('*')
@@ -114,6 +114,7 @@ const YourHomeSolution = () => {
           .single();
         
         if (error) {
+          console.error("Error fetching pitch deck with ID:", error);
           throw new Error(error.message);
         }
         
@@ -124,7 +125,6 @@ const YourHomeSolution = () => {
             ? JSON.parse(data.mortgage_data) 
             : (data.mortgage_data as MortgageData) || {};
           
-          // Handle client_info and loan_officer_info which might be missing from the database type
           const clientInfo = data.client_info ? 
             (typeof data.client_info === 'string' ? JSON.parse(data.client_info) : data.client_info) as ClientInfo : 
             {} as ClientInfo;
@@ -162,6 +162,8 @@ const YourHomeSolution = () => {
           };
           
           setPitchDeck(enhancedData);
+        } else {
+          throw new Error("Pitch deck not found");
         }
       } catch (error: any) {
         console.error("Error fetching pitch deck:", error);
