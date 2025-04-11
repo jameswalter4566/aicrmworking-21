@@ -122,79 +122,42 @@ const YourHomeSolution = () => {
         
         console.log("Fetching pitch deck by ID:", pitchDeckId);
         
-        let query = supabase
-          .from('pitch_decks')
-          .select('*')
-          .eq('id', pitchDeckId);
+        try {
+          console.log("Trying to get pitch deck through edge function");
+          const { data: publicData, error: publicError } = await supabase.functions.invoke("retrieve-pitch-deck", {
+            body: { pitchDeckId }
+          });
           
-        let { data, error } = await query.single();
-        
-        if (error) {
-          console.error("Error fetching pitch deck with ID:", error);
-          try {
-            const { data: publicData, error: publicError } = await supabase.functions.invoke("retrieve-pitch-deck", {
-              body: { pitchDeckId }
-            });
+          if (publicError || !publicData || !publicData.data) {
+            throw new Error(publicError?.message || "Failed to retrieve public pitch deck");
+          }
+          
+          const data = publicData.data;
+          console.log("Pitch deck found via public edge function:", data);
+          
+          if (data) {
+            processAndSetPitchDeck(data as PitchDeckRaw);
+          } else {
+            throw new Error("Pitch deck not found");
+          }
+        } catch (funcError) {
+          console.error("Error fetching through edge function:", funcError);
+          
+          console.log("Trying direct query as fallback");
+          let query = supabase
+            .from('pitch_decks')
+            .select('*')
+            .eq('id', pitchDeckId);
             
-            if (publicError || !publicData || !publicData.data) {
-              throw new Error(publicError?.message || "Failed to retrieve public pitch deck");
-            }
-            
-            data = publicData.data;
-          } catch (funcError) {
-            console.error("Error fetching public pitch deck:", funcError);
+          let { data, error } = await query.single();
+          
+          if (error || !data) {
+            console.error("Error fetching pitch deck with direct query:", error);
             throw new Error("Pitch deck not found or access denied");
           }
-        }
-        
-        if (data) {
-          console.log("Pitch deck found:", data);
           
-          const rawData = data as PitchDeckRaw;
-          
-          const mortgageData: MortgageData = typeof rawData.mortgage_data === 'string' 
-            ? JSON.parse(rawData.mortgage_data) 
-            : (rawData.mortgage_data as MortgageData) || {};
-          
-          const clientInfo = rawData.client_info ? 
-            (typeof rawData.client_info === 'string' ? JSON.parse(rawData.client_info) : rawData.client_info) as ClientInfo : 
-            undefined; 
-          
-          const loanOfficerInfo = rawData.loan_officer_info ?
-            (typeof rawData.loan_officer_info === 'string' ? JSON.parse(rawData.loan_officer_info) : rawData.loan_officer_info) as LoanOfficerInfo :
-            undefined;
-          
-          const enhancedData: PitchDeck = {
-            ...rawData,
-            mortgage_data: {
-              propertyValue: mortgageData.propertyValue || (mortgageData.currentLoan?.balance ? mortgageData.currentLoan.balance * 1.25 : 500000),
-              currentLoan: mortgageData.currentLoan ? {
-                ...mortgageData.currentLoan,
-                paymentBreakdown: mortgageData.currentLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
-                  mortgageData.currentLoan.payment,
-                  mortgageData.currentLoan.balance,
-                  mortgageData.currentLoan.rate,
-                  mortgageData.currentLoan.term
-                )
-              } : undefined,
-              proposedLoan: mortgageData.proposedLoan ? {
-                ...mortgageData.proposedLoan,
-                paymentBreakdown: mortgageData.proposedLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
-                  mortgageData.proposedLoan.payment,
-                  mortgageData.proposedLoan.amount,
-                  mortgageData.proposedLoan.rate,
-                  mortgageData.proposedLoan.term
-                )
-              } : undefined,
-              savings: mortgageData.savings
-            },
-            client_info: clientInfo,
-            loan_officer_info: loanOfficerInfo
-          };
-          
-          setPitchDeck(enhancedData);
-        } else {
-          throw new Error("Pitch deck not found");
+          console.log("Pitch deck found via direct query:", data);
+          processAndSetPitchDeck(data as PitchDeckRaw);
         }
       } catch (error: any) {
         console.error("Error fetching pitch deck:", error);
@@ -202,6 +165,50 @@ const YourHomeSolution = () => {
       } finally {
         setLoading(false);
       }
+    };
+    
+    const processAndSetPitchDeck = (rawData: PitchDeckRaw) => {
+      const mortgageData: MortgageData = typeof rawData.mortgage_data === 'string' 
+        ? JSON.parse(rawData.mortgage_data) 
+        : (rawData.mortgage_data as MortgageData) || {};
+      
+      const clientInfo = rawData.client_info ? 
+        (typeof rawData.client_info === 'string' ? JSON.parse(rawData.client_info) : rawData.client_info) as ClientInfo : 
+        undefined; 
+      
+      const loanOfficerInfo = rawData.loan_officer_info ?
+        (typeof rawData.loan_officer_info === 'string' ? JSON.parse(rawData.loan_officer_info) : rawData.loan_officer_info) as LoanOfficerInfo :
+        undefined;
+      
+      const enhancedData: PitchDeck = {
+        ...rawData,
+        mortgage_data: {
+          propertyValue: mortgageData.propertyValue || (mortgageData.currentLoan?.balance ? mortgageData.currentLoan.balance * 1.25 : 500000),
+          currentLoan: mortgageData.currentLoan ? {
+            ...mortgageData.currentLoan,
+            paymentBreakdown: mortgageData.currentLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
+              mortgageData.currentLoan.payment,
+              mortgageData.currentLoan.balance,
+              mortgageData.currentLoan.rate,
+              mortgageData.currentLoan.term
+            )
+          } : undefined,
+          proposedLoan: mortgageData.proposedLoan ? {
+            ...mortgageData.proposedLoan,
+            paymentBreakdown: mortgageData.proposedLoan.paymentBreakdown || calculateDefaultPaymentBreakdown(
+              mortgageData.proposedLoan.payment,
+              mortgageData.proposedLoan.amount,
+              mortgageData.proposedLoan.rate,
+              mortgageData.proposedLoan.term
+            )
+          } : undefined,
+          savings: mortgageData.savings
+        },
+        client_info: clientInfo,
+        loan_officer_info: loanOfficerInfo
+      };
+      
+      setPitchDeck(enhancedData);
     };
     
     fetchPitchDeck();

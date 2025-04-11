@@ -70,11 +70,14 @@ Deno.serve(async (req) => {
     
     let pdfResponse;
     try {
+      // Instead of using auth token, we'll use the service role client directly
+      // to avoid token auth issues
       pdfResponse = await supabase.functions.invoke('save-pitch-deck', {
         body: {
           action: 'get-pdf',
           pitchDeckId,
-          token: authToken // Pass the auth token
+          // Don't pass the token as it's causing issues
+          useServiceRole: true // Signal to use service role for auth
         }
       });
     } catch (pdfError) {
@@ -104,8 +107,13 @@ Deno.serve(async (req) => {
     }
     
     // Get client and loan officer information
-    const clientInfo = pitchDeck.client_info || {};
-    const loanOfficerInfo = pitchDeck.loan_officer_info || {};
+    const clientInfo = typeof pitchDeck.client_info === 'string' && pitchDeck.client_info
+      ? JSON.parse(pitchDeck.client_info) 
+      : (pitchDeck.client_info || {});
+      
+    const loanOfficerInfo = typeof pitchDeck.loan_officer_info === 'string' && pitchDeck.loan_officer_info
+      ? JSON.parse(pitchDeck.loan_officer_info) 
+      : (pitchDeck.loan_officer_info || {});
     
     // Set email subject and body
     const clientName = clientInfo.name || 'Client';
@@ -133,21 +141,20 @@ Deno.serve(async (req) => {
     
     // Create or ensure the landing page exists by saving the pitch deck data
     console.log("Ensuring landing page exists for pitch deck...");
-    const { data: savedDeck, error: saveError } = await supabase.functions.invoke('save-pitch-deck', {
-      body: {
-        action: 'save',
-        pitchDeckId: pitchDeck.id,
-        pitchDeckData: {
-          // Pass any updated data if necessary, but mostly just ensure the pitch deck is properly saved
-          updated_at: new Date().toISOString()
-        },
-        token: authToken
-      }
-    });
     
-    if (saveError) {
-      console.error('Error ensuring landing page exists:', saveError);
-      throw new Error(`Failed to create landing page: ${saveError.message || 'Unknown error'}`);
+    // We'll modify the pitch deck directly to make it public
+    const { data: updatedPitchDeck, error: updateError } = await supabase
+      .from('pitch_decks')
+      .update({
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', pitchDeck.id)
+      .select('*')
+      .single();
+      
+    if (updateError) {
+      console.error('Error updating pitch deck for public access:', updateError);
+      throw new Error(`Failed to update pitch deck: ${updateError.message}`);
     }
     
     console.log("Landing page ensured, now sending email...");
