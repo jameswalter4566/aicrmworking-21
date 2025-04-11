@@ -35,6 +35,19 @@ const defaultPitchDeck = {
       monthly: 115,
       lifetime: 41400
     }
+  },
+  client_info: {
+    name: "",
+    email: "",
+    phone: "",
+    address: ""
+  },
+  loan_officer_info: {
+    name: "",
+    nmls_id: "",
+    company: "",
+    phone: "",
+    email: ""
   }
 };
 
@@ -69,6 +82,16 @@ const PitchDeckBuilder = () => {
         if (data && data.success && data.data) {
           // Ensure mortgage_data structure is complete
           const fetchedDeck = data.data;
+          
+          // Initialize client_info and loan_officer_info if they don't exist
+          if (!fetchedDeck.client_info) {
+            fetchedDeck.client_info = defaultPitchDeck.client_info;
+          }
+          
+          if (!fetchedDeck.loan_officer_info) {
+            fetchedDeck.loan_officer_info = defaultPitchDeck.loan_officer_info;
+          }
+          
           if (!fetchedDeck.mortgage_data) {
             fetchedDeck.mortgage_data = defaultPitchDeck.mortgage_data;
           } else {
@@ -147,16 +170,23 @@ const PitchDeckBuilder = () => {
       const monthlySavings = Math.round(currentLoan.payment - proposedLoan.payment);
       const lifetimeSavings = Math.round(monthlySavings * proposedLoan.term * 12);
       
-      setPitchDeck(prev => ({
-        ...prev,
-        mortgage_data: {
-          ...prev.mortgage_data,
+      setPitchDeck(prev => {
+        // Fix the TypeScript error by ensuring we're spreading an object
+        const updatedDeck = {...prev};
+        if (!updatedDeck.mortgage_data) {
+          updatedDeck.mortgage_data = {};
+        }
+        
+        updatedDeck.mortgage_data = {
+          ...updatedDeck.mortgage_data,
           savings: {
             monthly: monthlySavings,
             lifetime: lifetimeSavings
           }
-        }
-      }));
+        };
+        
+        return updatedDeck;
+      });
     }
   }, [
     pitchDeck?.mortgage_data?.currentLoan?.balance,
@@ -259,13 +289,17 @@ const PitchDeckBuilder = () => {
   const handleChange = (field: string, value: any) => {
     if (field.includes(".")) {
       const [section, subField] = field.split(".");
-      setPitchDeck(prev => ({
-        ...prev,
-        [section]: {
-          ...(prev[section as keyof typeof prev] as object || {}), // Fix: Cast to object and provide default empty object
-          [subField]: value
+      setPitchDeck(prev => {
+        const updatedDeck = {...prev};
+        if (!updatedDeck[section as keyof typeof updatedDeck]) {
+          updatedDeck[section as keyof typeof updatedDeck] = {} as any;
         }
-      }));
+        
+        const sectionObj = updatedDeck[section as keyof typeof updatedDeck] as Record<string, any>;
+        sectionObj[subField] = value;
+        
+        return updatedDeck;
+      });
     } else {
       setPitchDeck(prev => ({
         ...prev,
@@ -274,18 +308,38 @@ const PitchDeckBuilder = () => {
     }
   };
   
+  // Handle nested client/loan officer info field changes
+  const handleInfoChange = (section: string, field: string, value: any) => {
+    setPitchDeck(prev => {
+      const updatedDeck = {...prev};
+      if (!updatedDeck[section as keyof typeof updatedDeck]) {
+        updatedDeck[section as keyof typeof updatedDeck] = {} as any;
+      }
+      
+      const sectionObj = updatedDeck[section as keyof typeof updatedDeck] as Record<string, any>;
+      sectionObj[field] = value;
+      
+      return updatedDeck;
+    });
+  };
+  
   // Handle nested field changes for mortgage data
   const handleMortgageDataChange = (section: string, field: string, value: any) => {
-    setPitchDeck(prev => ({
-      ...prev,
-      mortgage_data: {
-        ...prev.mortgage_data,
-        [section]: {
-          ...(prev.mortgage_data?.[section as keyof typeof prev.mortgage_data] || {}), // Fix: Provide default empty object
-          [field]: parseFloat(value) || 0
-        }
+    setPitchDeck(prev => {
+      const updatedDeck = {...prev};
+      if (!updatedDeck.mortgage_data) {
+        updatedDeck.mortgage_data = {};
       }
-    }));
+      
+      if (!updatedDeck.mortgage_data[section as keyof typeof updatedDeck.mortgage_data]) {
+        updatedDeck.mortgage_data[section as keyof typeof updatedDeck.mortgage_data] = {} as any;
+      }
+      
+      const sectionObj = updatedDeck.mortgage_data[section as keyof typeof updatedDeck.mortgage_data] as Record<string, any>;
+      sectionObj[field] = parseFloat(value) || 0;
+      
+      return updatedDeck;
+    });
   };
 
   // Go back to pitch deck listing
@@ -369,8 +423,9 @@ const PitchDeckBuilder = () => {
           
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid grid-cols-3 mb-6">
+              <TabsList className="grid grid-cols-4 mb-6">
                 <TabsTrigger value="info">Loan Info</TabsTrigger>
+                <TabsTrigger value="client">Client Info</TabsTrigger>
                 <TabsTrigger value="comparison">Loan Comparison</TabsTrigger>
                 <TabsTrigger value="preview">Preview</TabsTrigger>
               </TabsList>
@@ -499,6 +554,102 @@ const PitchDeckBuilder = () => {
                     </CardContent>
                   </Card>
                 </div>
+                
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Loan Officer Information</CardTitle>
+                    <CardDescription>Enter your information to personalize the proposal</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Your Name</label>
+                        <Input
+                          value={pitchDeck.loan_officer_info?.name || ''}
+                          onChange={(e) => handleInfoChange('loan_officer_info', 'name', e.target.value)}
+                          placeholder="John Doe"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">NMLS ID</label>
+                        <Input
+                          value={pitchDeck.loan_officer_info?.nmls_id || ''}
+                          onChange={(e) => handleInfoChange('loan_officer_info', 'nmls_id', e.target.value)}
+                          placeholder="12345678"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Company</label>
+                        <Input
+                          value={pitchDeck.loan_officer_info?.company || ''}
+                          onChange={(e) => handleInfoChange('loan_officer_info', 'company', e.target.value)}
+                          placeholder="Mortgage Company Name"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Phone</label>
+                        <Input
+                          value={pitchDeck.loan_officer_info?.phone || ''}
+                          onChange={(e) => handleInfoChange('loan_officer_info', 'phone', e.target.value)}
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1">Email</label>
+                        <Input
+                          value={pitchDeck.loan_officer_info?.email || ''}
+                          onChange={(e) => handleInfoChange('loan_officer_info', 'email', e.target.value)}
+                          placeholder="john.doe@example.com"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="client" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Client Information</CardTitle>
+                    <CardDescription>Enter client details to personalize the proposal</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Client Name</label>
+                        <Input
+                          value={pitchDeck.client_info?.name || ''}
+                          onChange={(e) => handleInfoChange('client_info', 'name', e.target.value)}
+                          placeholder="Jane Smith"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Email</label>
+                        <Input
+                          value={pitchDeck.client_info?.email || ''}
+                          onChange={(e) => handleInfoChange('client_info', 'email', e.target.value)}
+                          placeholder="jane.smith@example.com"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Phone</label>
+                        <Input
+                          value={pitchDeck.client_info?.phone || ''}
+                          onChange={(e) => handleInfoChange('client_info', 'phone', e.target.value)}
+                          placeholder="(555) 987-6543"
+                        />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium mb-1">Address</label>
+                        <Input
+                          value={pitchDeck.client_info?.address || ''}
+                          onChange={(e) => handleInfoChange('client_info', 'address', e.target.value)}
+                          placeholder="123 Main St, Anytown, USA"
+                        />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </TabsContent>
               
               <TabsContent value="comparison" className="space-y-6">
@@ -623,6 +774,20 @@ const PitchDeckBuilder = () => {
                         {pitchDeck.description && (
                           <p className="text-gray-600 mt-2">{pitchDeck.description}</p>
                         )}
+                        {pitchDeck.client_info?.name && (
+                          <p className="text-gray-700 mt-4">Prepared for: {pitchDeck.client_info.name}</p>
+                        )}
+                        {pitchDeck.loan_officer_info?.name && (
+                          <div className="mt-4 text-sm text-gray-600">
+                            <p>Prepared by: {pitchDeck.loan_officer_info.name}</p>
+                            {pitchDeck.loan_officer_info.nmls_id && (
+                              <p>NMLS# {pitchDeck.loan_officer_info.nmls_id}</p>
+                            )}
+                            {pitchDeck.loan_officer_info.company && (
+                              <p>{pitchDeck.loan_officer_info.company}</p>
+                            )}
+                          </div>
+                        )}
                       </div>
                       
                       <div className="mb-8">
@@ -681,6 +846,36 @@ const PitchDeckBuilder = () => {
                           </div>
                         </div>
                       </div>
+                      
+                      {pitchDeck.client_info?.name && (
+                        <div className="mb-8">
+                          <h3 className="text-xl font-semibold mb-4">Client Information</h3>
+                          <div className="space-y-1">
+                            <p className="text-sm flex justify-between">
+                              <span className="text-gray-600">Name:</span>
+                              <span>{pitchDeck.client_info.name}</span>
+                            </p>
+                            {pitchDeck.client_info.address && (
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Address:</span>
+                                <span>{pitchDeck.client_info.address}</span>
+                              </p>
+                            )}
+                            {pitchDeck.client_info.phone && (
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Phone:</span>
+                                <span>{pitchDeck.client_info.phone}</span>
+                              </p>
+                            )}
+                            {pitchDeck.client_info.email && (
+                              <p className="text-sm flex justify-between">
+                                <span className="text-gray-600">Email:</span>
+                                <span>{pitchDeck.client_info.email}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="mb-8">
                         <h3 className="text-xl font-semibold mb-4">Savings</h3>
@@ -751,6 +946,31 @@ const PitchDeckBuilder = () => {
                           </tbody>
                         </table>
                       </div>
+                      
+                      {pitchDeck.loan_officer_info?.name && (
+                        <div className="mt-8 border-t pt-6">
+                          <h3 className="text-xl font-semibold mb-4">Contact Your Loan Officer</h3>
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                            <div>
+                              <p className="font-medium">{pitchDeck.loan_officer_info.name}</p>
+                              {pitchDeck.loan_officer_info.nmls_id && (
+                                <p className="text-sm text-gray-600">NMLS# {pitchDeck.loan_officer_info.nmls_id}</p>
+                              )}
+                              {pitchDeck.loan_officer_info.company && (
+                                <p className="text-sm text-gray-600">{pitchDeck.loan_officer_info.company}</p>
+                              )}
+                            </div>
+                            <div className="mt-4 md:mt-0 text-sm">
+                              {pitchDeck.loan_officer_info.phone && (
+                                <p>{pitchDeck.loan_officer_info.phone}</p>
+                              )}
+                              {pitchDeck.loan_officer_info.email && (
+                                <p>{pitchDeck.loan_officer_info.email}</p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                   <CardFooter>
@@ -770,7 +990,9 @@ const PitchDeckBuilder = () => {
         pitchDeck={id ? { 
           id, 
           title: pitchDeck.title, 
-          description: pitchDeck.description 
+          description: pitchDeck.description,
+          client_info: pitchDeck.client_info,
+          loan_officer_info: pitchDeck.loan_officer_info
         } : null}
       />
     </MainLayout>

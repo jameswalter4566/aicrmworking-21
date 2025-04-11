@@ -7,8 +7,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Copy, Check, Loader2 } from 'lucide-react';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
-import { useForm } from 'react-hook-form';
+
+interface ClientInfo {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
+interface LoanOfficerInfo {
+  name: string;
+  nmls_id: string;
+  company: string;
+  phone: string;
+  email: string;
+}
 
 interface MortgageData {
   propertyValue?: number;
@@ -51,6 +64,8 @@ interface SendPitchDeckModalProps {
     id: string;
     title: string;
     description?: string;
+    client_info?: ClientInfo;
+    loan_officer_info?: LoanOfficerInfo;
     mortgage_data?: MortgageData;
   } | null;
 }
@@ -67,12 +82,29 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   
   React.useEffect(() => {
     if (isOpen) {
-      setSubject(pitchDeck?.title ? `Mortgage Proposal: ${pitchDeck.title}` : '');
+      // Use client name in the subject if available
+      const clientName = pitchDeck?.client_info?.name || 'Client';
+      setSubject(pitchDeck?.title ? `Mortgage Proposal for ${clientName}: ${pitchDeck.title}` : '');
+      
+      // Create personalized message with client and loan officer info
+      const officerName = pitchDeck?.loan_officer_info?.name || 'Your Mortgage Professional';
+      const officerCompany = pitchDeck?.loan_officer_info?.company || '';
+      const officerSignature = officerCompany ? `${officerName}\n${officerCompany}` : officerName;
+      
+      const clientGreeting = pitchDeck?.client_info?.name ? `Dear ${pitchDeck.client_info.name},` : 'Dear Client,';
+      
       setMessage(
-        `Dear Client,\n\nI'm excited to share this mortgage proposal with you.${
+        `${clientGreeting}\n\nI'm excited to share this mortgage proposal with you.${
           pitchDeck?.description ? `\n\n${pitchDeck.description}` : ''
-        }\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\nYour Mortgage Professional`
+        }\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${officerSignature}`
       );
+      
+      // Pre-populate recipient email if available
+      if (pitchDeck?.client_info?.email) {
+        setRecipientEmail(pitchDeck.client_info.email);
+      } else {
+        setRecipientEmail('');
+      }
       
       // Set property value from pitch deck or default
       if (pitchDeck?.mortgage_data?.propertyValue) {
@@ -88,7 +120,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         }
       }
       
-      setRecipientEmail('');
       setIsSending(false);
       setIsCreatingLandingPage(false);
       setLandingPageUrl(null);

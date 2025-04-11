@@ -103,10 +103,21 @@ Deno.serve(async (req) => {
       throw new Error('Failed to extract PDF data: Invalid format');
     }
     
+    // Get client and loan officer information
+    const clientInfo = pitchDeck.client_info || {};
+    const loanOfficerInfo = pitchDeck.loan_officer_info || {};
+    
     // Set email subject and body
-    const emailSubject = subject || `Mortgage Proposal: ${pitchDeck.title}`;
+    const clientName = clientInfo.name || 'Client';
+    const emailSubject = subject || `Mortgage Proposal for ${clientName}: ${pitchDeck.title}`;
+    
+    const officerName = loanOfficerInfo.name || user.email?.split('@')[0] || 'Your Mortgage Professional';
+    const officerCompany = loanOfficerInfo.company || '';
+    const officerSignature = officerCompany ? `${officerName}\n${officerCompany}` : officerName;
+    const clientGreeting = clientInfo.name ? `Dear ${clientInfo.name},` : 'Dear Client,';
+    
     const emailBody = message || 
-      `Dear Client,\n\nI'm excited to share this mortgage proposal with you.\n\n${pitchDeck.description || ''}\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${user.email}`;
+      `${clientGreeting}\n\nI'm excited to share this mortgage proposal with you.\n\n${pitchDeck.description || ''}\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${officerSignature}`;
     
     // Check if email connection exists
     const { data: connections, error: connectionsError } = await supabase
@@ -158,8 +169,16 @@ Deno.serve(async (req) => {
       fullLandingPageUrl = `${req.headers.get('origin') || ''}${landingPageUrl}`;
     }
     
-    // Add landing page URL to the email body
-    const emailWithLink = `${emailBody}\n\nYou can also view this proposal online at: ${fullLandingPageUrl}`;
+    // Add landing page URL to the email body with personalized details
+    let emailWithLink = `${emailBody}\n\nYou can also view this proposal online at: ${fullLandingPageUrl}`;
+    
+    // Add loan officer contact info if available
+    if (loanOfficerInfo?.phone || loanOfficerInfo?.email || loanOfficerInfo?.nmls_id) {
+      emailWithLink += "\n\nContact Information:";
+      if (loanOfficerInfo.phone) emailWithLink += `\nPhone: ${loanOfficerInfo.phone}`;
+      if (loanOfficerInfo.email) emailWithLink += `\nEmail: ${loanOfficerInfo.email}`;
+      if (loanOfficerInfo.nmls_id) emailWithLink += `\nNMLS#: ${loanOfficerInfo.nmls_id}`;
+    }
     
     // Send email using our Gmail connector with improved error handling
     console.log("Calling send-gmail function...");

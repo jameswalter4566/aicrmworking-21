@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -42,12 +43,29 @@ interface MortgageData {
   };
 }
 
+interface ClientInfo {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
+interface LoanOfficerInfo {
+  name: string;
+  nmls_id: string;
+  company: string;
+  phone: string;
+  email: string;
+}
+
 interface PitchDeck {
   id: string;
   title: string;
   description?: string;
   slug?: string;
   mortgage_data: MortgageData;
+  client_info?: ClientInfo;
+  loan_officer_info?: LoanOfficerInfo;
   created_at: string;
   updated_at: string;
 }
@@ -126,7 +144,9 @@ const YourHomeSolution = () => {
                 )
               } : undefined,
               savings: mortgageData.savings
-            }
+            },
+            client_info: data.client_info || undefined,
+            loan_officer_info: data.loan_officer_info || undefined
           };
           
           setPitchDeck(enhancedData);
@@ -228,6 +248,8 @@ const YourHomeSolution = () => {
   const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
   const savings = pitchDeck.mortgage_data.savings;
   const propertyValue = pitchDeck.mortgage_data.propertyValue || (currentLoan ? currentLoan.balance * 1.25 : 0);
+  const clientInfo = pitchDeck.client_info;
+  const loanOfficerInfo = pitchDeck.loan_officer_info;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -241,13 +263,18 @@ const YourHomeSolution = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold">{pitchDeck?.title}</h1>
+        <div className="mb-8 flex flex-col md:flex-row md:justify-between md:items-center">
+          <div>
+            <h1 className="text-3xl font-bold">{pitchDeck?.title}</h1>
+            {clientInfo?.name && (
+              <p className="text-lg text-gray-600 mt-1">Prepared for: {clientInfo.name}</p>
+            )}
+          </div>
           <Button
             variant="outline"
             onClick={handleDownloadPDF}
             disabled={downloading}
-            className="gap-2"
+            className="gap-2 mt-4 md:mt-0"
           >
             <Download className="h-4 w-4" />
             {downloading ? "Downloading..." : "Download PDF"}
@@ -256,6 +283,69 @@ const YourHomeSolution = () => {
         
         {pitchDeck?.description && (
           <p className="text-gray-600 mb-8">{pitchDeck.description}</p>
+        )}
+        
+        {loanOfficerInfo && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Your Mortgage Professional</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col md:flex-row md:justify-between">
+                <div>
+                  <p className="font-semibold text-lg">{loanOfficerInfo.name}</p>
+                  {loanOfficerInfo.company && (
+                    <p className="text-gray-600">{loanOfficerInfo.company}</p>
+                  )}
+                  {loanOfficerInfo.nmls_id && (
+                    <p className="text-gray-600">NMLS# {loanOfficerInfo.nmls_id}</p>
+                  )}
+                </div>
+                <div className="mt-4 md:mt-0 text-right">
+                  {loanOfficerInfo.phone && (
+                    <p className="text-gray-700">{loanOfficerInfo.phone}</p>
+                  )}
+                  {loanOfficerInfo.email && (
+                    <p className="text-gray-700">{loanOfficerInfo.email}</p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {clientInfo && (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>Client Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Name</p>
+                  <p>{clientInfo.name}</p>
+                </div>
+                {clientInfo.email && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Email</p>
+                    <p>{clientInfo.email}</p>
+                  </div>
+                )}
+                {clientInfo.phone && (
+                  <div>
+                    <p className="text-sm font-medium text-gray-500">Phone</p>
+                    <p>{clientInfo.phone}</p>
+                  </div>
+                )}
+                {clientInfo.address && (
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-medium text-gray-500">Address</p>
+                    <p>{clientInfo.address}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
         
         {currentLoan && currentLoan.paymentBreakdown && (
@@ -470,6 +560,15 @@ const YourHomeSolution = () => {
           <p className="text-sm text-gray-500">
             This mortgage comparison was generated on {new Date(pitchDeck.created_at).toLocaleDateString()}
           </p>
+          {loanOfficerInfo && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="font-medium">Contact Your Loan Officer</p>
+              <p>{loanOfficerInfo.name}</p>
+              {loanOfficerInfo.phone && <p>{loanOfficerInfo.phone}</p>}
+              {loanOfficerInfo.email && <p>{loanOfficerInfo.email}</p>}
+              {loanOfficerInfo.nmls_id && <p>NMLS# {loanOfficerInfo.nmls_id}</p>}
+            </div>
+          )}
         </div>
       </div>
     </div>
