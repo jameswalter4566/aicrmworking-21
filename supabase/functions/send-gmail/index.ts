@@ -33,7 +33,11 @@ serve(async (req) => {
     if (!to || !subject || !body) {
       console.error("Missing required email fields");
       return new Response(
-        JSON.stringify({ error: 'Missing required email fields' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing required email fields',
+          code: 'MISSING_FIELDS'
+        }),
         { 
           status: 400, 
           headers: corsHeaders 
@@ -55,7 +59,9 @@ serve(async (req) => {
       console.error('No Google email connection found:', connectionError);
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'No Google email connection found',
+          code: 'NO_EMAIL_CONNECTION',
           details: 'Please connect your Google account in the Settings page'
         }),
         { 
@@ -115,6 +121,7 @@ serve(async (req) => {
       console.error("No refresh token available");
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Email connection refresh token not available',
           code: 'REFRESH_TOKEN_MISSING',
           message: 'Please reconnect your Gmail account in the Settings page with the proper scopes'
@@ -150,6 +157,7 @@ serve(async (req) => {
         
         return new Response(
           JSON.stringify({ 
+            success: false,
             error: 'Failed to refresh access token', 
             details: refreshError,
             code: 'TOKEN_REFRESH_FAILED',
@@ -208,6 +216,7 @@ serve(async (req) => {
         if (errorText.includes("insufficient") || errorText.includes("permission")) {
           return new Response(
             JSON.stringify({ 
+              success: false,
               error: 'Gmail API permission error',
               details: errorText,
               code: 'INSUFFICIENT_PERMISSIONS',
@@ -222,8 +231,10 @@ serve(async (req) => {
         
         return new Response(
           JSON.stringify({ 
+            success: false,
             error: `Gmail API error (${emailResponse.status})`, 
-            details: errorText 
+            details: errorText,
+            code: 'GMAIL_API_ERROR'
           }),
           { 
             status: 502, 
@@ -248,6 +259,7 @@ serve(async (req) => {
       console.error('Error during token refresh or email sending:', refreshError);
       return new Response(
         JSON.stringify({ 
+          success: false,
           error: 'Failed during token refresh or email sending', 
           details: refreshError.message,
           code: 'EMAIL_SEND_ERROR',
@@ -263,8 +275,10 @@ serve(async (req) => {
     console.error('Error in send-gmail function:', error);
     return new Response(
       JSON.stringify({ 
+        success: false,
         error: 'Failed to send email', 
-        details: error.message 
+        details: error.message,
+        code: 'UNEXPECTED_ERROR'
       }),
       { 
         status: 500, 

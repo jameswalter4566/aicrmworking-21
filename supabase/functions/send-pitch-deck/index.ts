@@ -67,18 +67,25 @@ Deno.serve(async (req) => {
     
     // First, generate the PDF directly in this function
     console.log("Generating PDF for pitch deck...");
-    const pdfResponse = await supabase.functions.invoke('save-pitch-deck', {
-      body: {
-        action: 'get-pdf',
-        pitchDeckId,
-        token: authToken // Pass the auth token
-      }
-    });
+    
+    let pdfResponse;
+    try {
+      pdfResponse = await supabase.functions.invoke('save-pitch-deck', {
+        body: {
+          action: 'get-pdf',
+          pitchDeckId,
+          token: authToken // Pass the auth token
+        }
+      });
+    } catch (pdfError) {
+      console.error('Error calling save-pitch-deck function:', pdfError);
+      throw new Error(`PDF generation failed: ${pdfError.message || 'Unknown error'}`);
+    }
     
     // Better error handling for PDF generation
     if (pdfResponse.error) {
       console.error('PDF generation error from function:', pdfResponse.error);
-      throw new Error(`Failed to generate PDF: ${pdfResponse.error}`);
+      throw new Error(`Failed to generate PDF: ${JSON.stringify(pdfResponse.error)}`);
     }
     
     if (!pdfResponse.data || !pdfResponse.data.pdfData) {
@@ -112,45 +119,53 @@ Deno.serve(async (req) => {
       throw new Error("No email connection found. Please connect your Gmail account in the Settings page.");
     }
     
-    // Send email using our Gmail connector
+    // Send email using our Gmail connector with improved error handling
     console.log("Calling send-gmail function...");
-    const emailResponse = await supabase.functions.invoke('send-gmail', {
-      body: {
-        to: recipientEmail,
-        subject: emailSubject,
-        body: emailBody,
-        attachments: [
-          {
-            filename: `${pitchDeck.title.replace(/\s+/g, '_')}_Proposal.pdf`,
-            content: pdfBase64,
-            encoding: 'base64',
-            mimeType: 'application/pdf'
-          }
-        ]
-      }
-    });
-    
-    // Enhanced error handling for email sending
-    if (emailResponse.error) {
-      console.error('Email sending error:', emailResponse.error);
-      throw new Error(`Failed to send email: ${emailResponse.error}`);
-    }
-    
-    // Check for specific error codes in the response
-    if (emailResponse.data && !emailResponse.data.success) {
-      console.error('Email API error:', emailResponse.data);
+    let emailResponse;
+    try {
+      emailResponse = await supabase.functions.invoke('send-gmail', {
+        body: {
+          to: recipientEmail,
+          subject: emailSubject,
+          body: emailBody,
+          attachments: [
+            {
+              filename: `${pitchDeck.title.replace(/\s+/g, '_')}_Proposal.pdf`,
+              content: pdfBase64,
+              encoding: 'base64',
+              mimeType: 'application/pdf'
+            }
+          ]
+        }
+      });
       
-      // Check for permissions issue
-      if (emailResponse.data.code === 'INSUFFICIENT_PERMISSIONS') {
-        throw new Error("Gmail needs additional permissions. Please go to Settings and reconnect your Gmail account with full access.");
+      console.log("Raw email response:", JSON.stringify(emailResponse));
+      
+      // Enhanced error handling for email sending
+      if (emailResponse.error) {
+        console.error('Email sending error:', emailResponse.error);
+        throw new Error(`Failed to send email: ${JSON.stringify(emailResponse.error)}`);
       }
       
-      // Check for refresh token issue
-      if (emailResponse.data.code === 'REFRESH_TOKEN_MISSING' || emailResponse.data.code === 'TOKEN_REFRESH_FAILED') {
-        throw new Error("Gmail account needs to be reconnected. Please go to Settings and reconnect your Gmail account.");
+      // Check for specific error codes in the response
+      if (emailResponse.data && !emailResponse.data.success) {
+        console.error('Email API error details:', JSON.stringify(emailResponse.data));
+        
+        // Check for permissions issue
+        if (emailResponse.data.code === 'INSUFFICIENT_PERMISSIONS') {
+          throw new Error("Gmail needs additional permissions. Please go to Settings and reconnect your Gmail account with full access.");
+        }
+        
+        // Check for refresh token issue
+        if (emailResponse.data.code === 'REFRESH_TOKEN_MISSING' || emailResponse.data.code === 'TOKEN_REFRESH_FAILED') {
+          throw new Error("Gmail account needs to be reconnected. Please go to Settings and reconnect your Gmail account.");
+        }
+        
+        throw new Error(emailResponse.data.message || `Failed to send email: ${JSON.stringify(emailResponse.data)}`);
       }
-      
-      throw new Error(emailResponse.data.message || `Failed to send email: ${emailResponse.data.error}`);
+    } catch (err) {
+      console.error('Exception during email send:', err);
+      throw new Error(`Failed to send email. Error: ${err.message}`);
     }
     
     console.log("Email sent successfully to:", recipientEmail);

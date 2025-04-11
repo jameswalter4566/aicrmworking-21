@@ -26,6 +26,15 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stepStatus, setStepStatus] = useState<{
+    checkingEmail: boolean;
+    generatingPdf: boolean;
+    sendingEmail: boolean;
+  }>({
+    checkingEmail: false,
+    generatingPdf: false,
+    sendingEmail: false
+  });
 
   // Reset form when modal opens
   React.useEffect(() => {
@@ -37,6 +46,11 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         }\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n[Your Name]`
       );
       setError(null);
+      setStepStatus({
+        checkingEmail: false,
+        generatingPdf: false,
+        sendingEmail: false
+      });
     }
   }, [isOpen, pitchDeck]);
 
@@ -48,7 +62,8 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     setError(null);
     
     try {
-      // Check if email is connected before sending
+      // Step 1: Check if email is connected
+      setStepStatus({ ...stepStatus, checkingEmail: true });
       const { data: connections, error: connectionsError } = await supabase
         .from("user_email_connections")
         .select("*")
@@ -66,6 +81,10 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         return;
       }
 
+      // Step 2: Generate PDF and send email
+      setStepStatus({ ...stepStatus, checkingEmail: false, generatingPdf: true });
+      toast.info("Generating PDF and preparing email...");
+
       console.log("Sending pitch deck:", { 
         pitchDeckId: pitchDeck.id, 
         recipientEmail, 
@@ -78,8 +97,9 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         throw new Error("You must be logged in to send pitch decks");
       }
 
-      toast.info("Generating PDF and preparing email...");
-
+      // Step 3: Send the email
+      setStepStatus({ ...stepStatus, generatingPdf: false, sendingEmail: true });
+      
       // Send the pitch deck with the session token
       const { data, error } = await supabase.functions.invoke("send-pitch-deck", {
         body: {
@@ -132,6 +152,11 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       }
     } finally {
       setLoading(false);
+      setStepStatus({
+        checkingEmail: false,
+        generatingPdf: false,
+        sendingEmail: false
+      });
     }
   };
 
@@ -170,6 +195,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
               onChange={(e) => setRecipientEmail(e.target.value)}
               placeholder="client@example.com"
               required
+              disabled={loading}
             />
           </div>
 
@@ -180,6 +206,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Mortgage Proposal"
+              disabled={loading}
             />
           </div>
 
@@ -190,8 +217,32 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={5}
+              disabled={loading}
             />
           </div>
+
+          {loading && (
+            <div className="text-sm text-gray-500 flex flex-col gap-1">
+              <div className="flex items-center">
+                <div className={`w-4 h-4 mr-2 ${stepStatus.checkingEmail ? 'text-blue-500' : 'text-gray-400'}`}>
+                  {stepStatus.checkingEmail ? <Loader2 className="animate-spin" size={16} /> : '✓'}
+                </div>
+                <span>Verifying email connection...</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-4 h-4 mr-2 ${stepStatus.generatingPdf ? 'text-blue-500' : stepStatus.checkingEmail ? 'text-gray-400' : 'text-gray-400'}`}>
+                  {stepStatus.generatingPdf ? <Loader2 className="animate-spin" size={16} /> : stepStatus.checkingEmail ? '-' : '✓'}
+                </div>
+                <span>Generating PDF document...</span>
+              </div>
+              <div className="flex items-center">
+                <div className={`w-4 h-4 mr-2 ${stepStatus.sendingEmail ? 'text-blue-500' : stepStatus.generatingPdf || stepStatus.checkingEmail ? 'text-gray-400' : 'text-gray-400'}`}>
+                  {stepStatus.sendingEmail ? <Loader2 className="animate-spin" size={16} /> : stepStatus.generatingPdf || stepStatus.checkingEmail ? '-' : '✓'}
+                </div>
+                <span>Sending email...</span>
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="sm:justify-end">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
