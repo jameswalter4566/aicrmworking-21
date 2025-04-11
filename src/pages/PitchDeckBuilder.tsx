@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { useNavigate, useParams } from "react-router-dom";
@@ -11,7 +10,6 @@ import { toast } from "sonner";
 import { Calculator, Save, Download, ArrowLeft, Send } from "lucide-react";
 import SendPitchDeckModal from "@/components/pitch-deck/SendPitchDeckModal";
 
-// Default empty pitch deck structure with all required properties
 const defaultPitchDeck = {
   title: "New Mortgage Proposal",
   description: "",
@@ -62,7 +60,6 @@ const PitchDeckBuilder = () => {
   const [activeTab, setActiveTab] = useState("info");
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
   
-  // Fetch pitch deck data if editing an existing one
   useEffect(() => {
     const fetchPitchDeck = async () => {
       if (!id) {
@@ -80,10 +77,8 @@ const PitchDeckBuilder = () => {
         }
         
         if (data && data.success && data.data) {
-          // Ensure mortgage_data structure is complete
           const fetchedDeck = data.data;
           
-          // Initialize client_info and loan_officer_info if they don't exist
           if (!fetchedDeck.client_info) {
             fetchedDeck.client_info = defaultPitchDeck.client_info;
           }
@@ -95,7 +90,6 @@ const PitchDeckBuilder = () => {
           if (!fetchedDeck.mortgage_data) {
             fetchedDeck.mortgage_data = defaultPitchDeck.mortgage_data;
           } else {
-            // Ensure all required nested objects exist
             if (!fetchedDeck.mortgage_data.currentLoan) {
               fetchedDeck.mortgage_data.currentLoan = defaultPitchDeck.mortgage_data.currentLoan;
             }
@@ -119,18 +113,15 @@ const PitchDeckBuilder = () => {
     fetchPitchDeck();
   }, [id]);
   
-  // Calculate mortgage payments whenever loan values change
   useEffect(() => {
     if (!pitchDeck?.mortgage_data) return;
     
-    // Calculate current loan payment if not already set
-    const currentLoan = pitchDeck.mortgage_data.currentLoan;
-    if (currentLoan && currentLoan.balance && currentLoan.rate && currentLoan.term) {
-      const monthlyRate = currentLoan.rate / 100 / 12;
-      const numPayments = currentLoan.term * 12;
-      const payment = (currentLoan.balance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -numPayments));
+    if (pitchDeck.mortgage_data.currentLoan && pitchDeck.mortgage_data.currentLoan.balance && pitchDeck.mortgage_data.currentLoan.rate && pitchDeck.mortgage_data.currentLoan.term) {
+      const monthlyRate = pitchDeck.mortgage_data.currentLoan.rate / 100 / 12;
+      const numPayments = pitchDeck.mortgage_data.currentLoan.term * 12;
+      const payment = (pitchDeck.mortgage_data.currentLoan.balance * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -numPayments));
       
-      if (Math.abs(payment - currentLoan.payment) > 1) {
+      if (Math.abs(payment - pitchDeck.mortgage_data.currentLoan.payment) > 1) {
         setPitchDeck(prev => ({
           ...prev,
           mortgage_data: {
@@ -144,14 +135,12 @@ const PitchDeckBuilder = () => {
       }
     }
     
-    // Calculate proposed loan payment if not already set
-    const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
-    if (proposedLoan && proposedLoan.amount && proposedLoan.rate && proposedLoan.term) {
-      const monthlyRate = proposedLoan.rate / 100 / 12;
-      const numPayments = proposedLoan.term * 12;
-      const payment = (proposedLoan.amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -numPayments));
+    if (pitchDeck.mortgage_data.proposedLoan && pitchDeck.mortgage_data.proposedLoan.amount && pitchDeck.mortgage_data.proposedLoan.rate && pitchDeck.mortgage_data.proposedLoan.term) {
+      const monthlyRate = pitchDeck.mortgage_data.proposedLoan.rate / 100 / 12;
+      const numPayments = pitchDeck.mortgage_data.proposedLoan.term * 12;
+      const payment = (pitchDeck.mortgage_data.proposedLoan.amount * monthlyRate) / (1 - Math.pow(1 + monthlyRate, -numPayments));
       
-      if (Math.abs(payment - proposedLoan.payment) > 1) {
+      if (Math.abs(payment - pitchDeck.mortgage_data.proposedLoan.payment) > 1) {
         setPitchDeck(prev => ({
           ...prev,
           mortgage_data: {
@@ -165,13 +154,11 @@ const PitchDeckBuilder = () => {
       }
     }
     
-    // Calculate savings
-    if (currentLoan && proposedLoan) {
-      const monthlySavings = Math.round(currentLoan.payment - proposedLoan.payment);
-      const lifetimeSavings = Math.round(monthlySavings * proposedLoan.term * 12);
+    if (pitchDeck.mortgage_data.currentLoan && pitchDeck.mortgage_data.proposedLoan) {
+      const monthlySavings = Math.round(pitchDeck.mortgage_data.currentLoan.payment - pitchDeck.mortgage_data.proposedLoan.payment);
+      const lifetimeSavings = Math.round(monthlySavings * pitchDeck.mortgage_data.proposedLoan.term * 12);
       
       setPitchDeck(prev => {
-        // Fix the TypeScript error by ensuring we're spreading an object
         const updatedDeck = {...prev};
         if (!updatedDeck.mortgage_data) {
           updatedDeck.mortgage_data = {
@@ -201,7 +188,6 @@ const PitchDeckBuilder = () => {
     pitchDeck?.mortgage_data?.proposedLoan?.term
   ]);
   
-  // Handle saving the pitch deck
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -220,7 +206,6 @@ const PitchDeckBuilder = () => {
       
       if (data && data.success) {
         toast.success("Pitch deck saved successfully");
-        // If this is a new pitch deck, redirect to the edit page with the new ID
         if (!id && data.data?.id) {
           navigate(`/pitch-deck/builder/${data.data.id}`, { replace: true });
         }
@@ -233,11 +218,9 @@ const PitchDeckBuilder = () => {
     }
   };
   
-  // Handle downloading the PDF
   const handleDownloadPDF = async () => {
     setDownloading(true);
     try {
-      // Save first to ensure all data is up to date
       const saveResponse = await supabase.functions.invoke("save-pitch-deck", {
         body: {
           action: "save",
@@ -250,7 +233,6 @@ const PitchDeckBuilder = () => {
         throw new Error(saveResponse.error.message);
       }
       
-      // Generate PDF
       const { data, error } = await supabase.functions.invoke("save-pitch-deck", {
         body: {
           action: "get-pdf",
@@ -263,7 +245,6 @@ const PitchDeckBuilder = () => {
       }
       
       if (data && data.pdfData) {
-        // Create a download link for the PDF
         const link = document.createElement("a");
         link.href = data.pdfData;
         link.download = `${pitchDeck.title.replace(/\s+/g, "_")}.pdf`;
@@ -281,15 +262,12 @@ const PitchDeckBuilder = () => {
     }
   };
   
-  // Open send email modal
   const handleOpenSendModal = () => {
-    // First save the pitch deck to ensure all changes are saved
     handleSave().then(() => {
       setIsSendModalOpen(true);
     });
   };
 
-  // Handle field changes
   const handleChange = (field: string, value: any) => {
     if (field.includes(".")) {
       const [section, subField] = field.split(".");
@@ -312,7 +290,6 @@ const PitchDeckBuilder = () => {
     }
   };
   
-  // Handle nested client/loan officer info field changes
   const handleInfoChange = (section: string, field: string, value: any) => {
     setPitchDeck(prev => {
       const updatedDeck = {...prev};
@@ -327,7 +304,6 @@ const PitchDeckBuilder = () => {
     });
   };
   
-  // Handle nested field changes for mortgage data
   const handleMortgageDataChange = (section: string, field: string, value: any) => {
     setPitchDeck(prev => {
       const updatedDeck = {...prev};
@@ -356,7 +332,6 @@ const PitchDeckBuilder = () => {
     });
   };
 
-  // Go back to pitch deck listing
   const handleBack = () => {
     navigate("/pitch-deck");
   };
@@ -911,9 +886,16 @@ const PitchDeckBuilder = () => {
       
       {isSendModalOpen && (
         <SendPitchDeckModal
-          pitchDeckId={id!}
-          clientInfo={pitchDeck.client_info}
+          isOpen={isSendModalOpen}
           onClose={() => setIsSendModalOpen(false)}
+          pitchDeck={id ? { 
+            id, 
+            title: pitchDeck.title,
+            description: pitchDeck.description,
+            client_info: pitchDeck.client_info,
+            loan_officer_info: pitchDeck.loan_officer_info,
+            mortgage_data: pitchDeck.mortgage_data
+          } : null}
         />
       )}
     </MainLayout>

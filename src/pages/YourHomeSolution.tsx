@@ -120,8 +120,8 @@ const YourHomeSolution = () => {
             ? JSON.parse(data.mortgage_data) 
             : (data.mortgage_data as MortgageData) || {};
           
-          const clientInfo = data.client_info || {};
-          const loanOfficerInfo = data.loan_officer_info || {};
+          const clientInfo = typeof data.client_info === 'object' ? data.client_info as ClientInfo : {} as ClientInfo;
+          const loanOfficerInfo = typeof data.loan_officer_info === 'object' ? data.loan_officer_info as LoanOfficerInfo : {} as LoanOfficerInfo;
           
           const enhancedData: PitchDeck = {
             ...data,
@@ -147,8 +147,8 @@ const YourHomeSolution = () => {
               } : undefined,
               savings: mortgageData.savings
             },
-            client_info: clientInfo as ClientInfo,
-            loan_officer_info: loanOfficerInfo as LoanOfficerInfo
+            client_info: clientInfo,
+            loan_officer_info: loanOfficerInfo
           };
           
           setPitchDeck(enhancedData);
