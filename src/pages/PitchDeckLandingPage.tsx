@@ -70,15 +70,14 @@ const PitchDeckLandingPage = () => {
         if (!deckData) {
           throw new Error('Pitch deck not found');
         }
-        
-        // Cast to correct type with all required properties
+
+        // Check if slug exists and handle type conversion properly
         if (!deckData.slug) {
           throw new Error('Pitch deck slug is missing');
         }
-
-        // Cast to the proper PitchDeckData type
-        const completePitchDeck = deckData as unknown as PitchDeckData;
-        setPitchDeck(completePitchDeck);
+        
+        // Cast to the proper PitchDeckData type - use type assertion after ensuring slug exists
+        setPitchDeck(deckData as unknown as PitchDeckData);
         
         // Fetch the agent profile
         if (deckData.created_by) {
