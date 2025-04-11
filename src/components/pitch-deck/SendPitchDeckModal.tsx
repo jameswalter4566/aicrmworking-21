@@ -7,42 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Copy, Check, Loader2 } from 'lucide-react';
-import { Form, FormControl, FormField, FormItem, FormLabel } from '@/components/ui/form';
-import { useForm } from 'react-hook-form';
-
-interface MortgageData {
-  propertyValue?: number;
-  currentLoan?: {
-    balance: number;
-    rate: number;
-    payment: number;
-    term: number;
-    type: string;
-    paymentBreakdown?: {
-      principal: number;
-      interest: number;
-      taxes: number;
-      insurance: number;
-    };
-  };
-  proposedLoan?: {
-    amount: number;
-    rate: number;
-    payment: number;
-    term: number;
-    type: string;
-    paymentBreakdown?: {
-      principal: number;
-      interest: number;
-      taxes: number;
-      insurance: number;
-    };
-  };
-  savings?: {
-    monthly: number;
-    lifetime: number;
-  };
-}
+import { MortgageDetailedData } from './LoanInfoForm';
 
 interface SendPitchDeckModalProps {
   isOpen: boolean;
@@ -51,7 +16,7 @@ interface SendPitchDeckModalProps {
     id: string;
     title: string;
     description?: string;
-    mortgage_data?: MortgageData;
+    mortgage_data?: MortgageDetailedData | any;
   } | null;
 }
 
@@ -75,18 +40,24 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       );
       
       // Set property value from pitch deck or default
-      if (pitchDeck?.mortgage_data?.propertyValue) {
-        setPropertyValue(pitchDeck.mortgage_data.propertyValue.toString());
+      let propValue: number | undefined;
+      
+      // Check for the property value in the correct location based on the structure
+      if (pitchDeck?.mortgage_data?.basicInfo?.propertyValue) {
+        propValue = pitchDeck.mortgage_data.basicInfo.propertyValue;
+      } else if (pitchDeck?.mortgage_data?.propertyValue) {
+        // Legacy format support
+        propValue = pitchDeck.mortgage_data.propertyValue;
       } else {
         // Try to estimate from mortgage data if available
-        const currentLoan = pitchDeck?.mortgage_data?.currentLoan;
+        const currentLoan = pitchDeck?.mortgage_data?.basicInfo?.currentLoan || pitchDeck?.mortgage_data?.currentLoan;
         if (currentLoan?.balance) {
           // Default estimate: loan balance × 1.25 (assuming 80% LTV)
-          setPropertyValue((currentLoan.balance * 1.25).toString());
-        } else {
-          setPropertyValue('');
+          propValue = currentLoan.balance * 1.25;
         }
       }
+      
+      setPropertyValue(propValue ? propValue.toString() : '');
       
       setRecipientEmail('');
       setIsSending(false);
@@ -111,20 +82,36 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     setIsCreatingLandingPage(true);
 
     try {
-      // Update pitch deck with property value if provided
+      // Create a properly structured mortgage_data object
+      let updatedMortgageData = { ...pitchDeck.mortgage_data };
+      
+      // Update property value if provided
       if (propertyValue && !isNaN(Number(propertyValue))) {
         const propertyValueNumber = Number(propertyValue);
         
-        await supabase
-          .from('pitch_decks')
-          .update({
-            mortgage_data: {
-              ...pitchDeck.mortgage_data,
-              propertyValue: propertyValueNumber
+        // Handle both new and legacy formats
+        if (updatedMortgageData.basicInfo) {
+          updatedMortgageData.basicInfo.propertyValue = propertyValueNumber;
+        } else if (updatedMortgageData.currentLoan) {
+          // Legacy format
+          updatedMortgageData.propertyValue = propertyValueNumber;
+        } else {
+          // Create with new format if neither exists
+          updatedMortgageData = {
+            basicInfo: {
+              propertyValue: propertyValueNumber,
+              ...updatedMortgageData
             }
-          })
-          .eq('id', pitchDeck.id);
+          };
+        }
       }
+      
+      await supabase
+        .from('pitch_decks')
+        .update({
+          mortgage_data: updatedMortgageData
+        })
+        .eq('id', pitchDeck.id);
 
       toast.info('Creating landing page and generating PDF...');
       
