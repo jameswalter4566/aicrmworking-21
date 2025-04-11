@@ -197,20 +197,20 @@ const ProcessorAssistViewer = () => {
     return (
       <div className="space-y-4">
         {categoryTasks.map(task => (
-          <div key={task.id} className="bg-white rounded-md border border-gray-200 p-4">
+          <div key={task.id} className="bg-blue-800 text-white rounded-md border border-blue-700 p-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="bg-mortgage-lightPurple p-2 rounded-full">
+                <div className="bg-blue-700 p-2 rounded-full">
                   {task.icon}
                 </div>
                 <div>
-                  <h3 className="font-medium text-gray-900">{task.name}</h3>
-                  <p className="text-sm text-gray-500">{task.description}</p>
+                  <h3 className="font-medium">{task.name}</h3>
+                  <p className="text-sm text-blue-200">{task.description}</p>
                 </div>
               </div>
               <Button 
                 onClick={() => handleTaskAction(task.id)}
-                className="bg-mortgage-purple hover:bg-mortgage-darkPurple text-white"
+                className="bg-blue-600 hover:bg-blue-500 text-white"
               >
                 Initiate
               </Button>
@@ -224,7 +224,7 @@ const ProcessorAssistViewer = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -263,11 +263,11 @@ const ProcessorAssistViewer = () => {
       {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-2xl font-bold text-orange-700 mb-2">
+          <h1 className="text-2xl font-bold text-blue-800 mb-2">
             Processor Tasks: {loanApplication.loanId}
           </h1>
           <div className="flex items-center mt-2 text-sm text-gray-600">
-            <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium mr-2">
+            <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium mr-2">
               {loanApplication.loanStatus}
             </span>
             <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
@@ -276,55 +276,55 @@ const ProcessorAssistViewer = () => {
         </div>
 
         {/* Borrower's Remaining Conditions Section */}
-        <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-orange-800 mb-4">
+        <div className="bg-blue-900 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-white mb-4">
             Borrower's Remaining Conditions
           </h2>
           
           <div className="grid grid-cols-1 gap-6">
             {/* Master Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-800 pb-2">
+                <CardTitle className="text-lg font-medium text-white">Master Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
+              <CardContent className="pt-4 bg-blue-800">
+                <div className="text-sm text-blue-200 italic">
                   No master conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
             {/* General Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-800 pb-2">
+                <CardTitle className="text-lg font-medium text-white">General Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
+              <CardContent className="pt-4 bg-blue-800">
+                <div className="text-sm text-blue-200 italic">
                   No general conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
             {/* Prior to Final Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-800 pb-2">
+                <CardTitle className="text-lg font-medium text-white">Prior to Final Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
+              <CardContent className="pt-4 bg-blue-800">
+                <div className="text-sm text-blue-200 italic">
                   No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
             </Card>
             
             {/* Compliance Conditions */}
-            <Card className="bg-orange-100">
-              <CardHeader className="bg-orange-200 pb-2">
-                <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
+            <Card className="bg-blue-800">
+              <CardHeader className="bg-blue-800 pb-2">
+                <CardTitle className="text-lg font-medium text-white">Compliance Conditions</CardTitle>
               </CardHeader>
-              <CardContent className="pt-4 bg-orange-100">
-                <div className="text-sm text-orange-800 italic">
+              <CardContent className="pt-4 bg-blue-800">
+                <div className="text-sm text-blue-200 italic">
                   No compliance conditions found. Conditions will appear here when the approval letter is parsed.
                 </div>
               </CardContent>
@@ -333,50 +333,50 @@ const ProcessorAssistViewer = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-4 bg-orange-50">
+          <TabsList className="grid grid-cols-4 mb-4 bg-blue-900">
             <TabsTrigger 
               value="employment" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Employment Verification
             </TabsTrigger>
             <TabsTrigger 
               value="title" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Title Order
             </TabsTrigger>
             <TabsTrigger 
               value="appraisal" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Appraisal Order
             </TabsTrigger>
             <TabsTrigger 
               value="documents" 
-              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+              className="data-[state=active]:bg-blue-700 data-[state=active]:text-white"
             >
               Document Handler
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="employment" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Employment Verification Tasks</h2>
+          <TabsContent value="employment" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Employment Verification Tasks</h2>
             {renderTaskSection("employment")}
           </TabsContent>
           
-          <TabsContent value="title" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Title Order Tasks</h2>
+          <TabsContent value="title" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Title Order Tasks</h2>
             {renderTaskSection("title")}
           </TabsContent>
           
-          <TabsContent value="appraisal" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Appraisal Order Tasks</h2>
+          <TabsContent value="appraisal" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Appraisal Order Tasks</h2>
             {renderTaskSection("appraisal")}
           </TabsContent>
           
-          <TabsContent value="documents" className="bg-orange-50 rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-semibold mb-4 text-orange-800">Document Handler Tasks</h2>
+          <TabsContent value="documents" className="bg-blue-900 rounded-lg shadow-sm p-6">
+            <h2 className="text-xl font-semibold mb-4 text-white">Document Handler Tasks</h2>
             {renderTaskSection("documents")}
           </TabsContent>
         </Tabs>

@@ -111,7 +111,7 @@ const ProcessorAssist = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Processor Assist</h1>
         <Button 
-          className="bg-mortgage-purple hover:bg-mortgage-darkPurple text-white"
+          className="bg-blue-700 hover:bg-blue-600 text-white"
           onClick={() => navigate('/loan-application/new')}
         >
           Process New Application
@@ -127,7 +127,7 @@ const ProcessorAssist = () => {
         </div>
         {loading ? (
           <div className="flex justify-center items-center py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           </div>
         ) : deals.length === 0 ? (
           <div className="py-10 text-center text-gray-500">
@@ -169,7 +169,7 @@ const ProcessorAssist = () => {
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                     onClick={() => handleDealClick(deal)}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-mortgage-purple">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-700">
                       {deal.client}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -182,7 +182,7 @@ const ProcessorAssist = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-mortgage-lightPurple text-mortgage-darkPurple">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                         {deal.stage}
                       </span>
                     </td>
@@ -190,7 +190,7 @@ const ProcessorAssist = () => {
                       {deal.listedDate}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-mortgage-lightPurple text-mortgage-darkPurple">
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
                         {deal.loanStatus}
                       </span>
                     </td>
