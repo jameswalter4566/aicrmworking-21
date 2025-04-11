@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -259,9 +258,9 @@ function App() {
                 {/* Original pitch deck landing page route */}
                 <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
                 
-                {/* New simplified routes for client sharing */}
-                <Route path="/yourhomesolution:id" element={<PitchDeckLandingPage />} />
+                {/* New simplified routes for client sharing - both formats should work */}
                 <Route path="/yourhomesolution/:id" element={<PitchDeckLandingPage />} />
+                <Route path="/yourhomesolution*" element={<PitchDeckLandingPage />} />
                 
                 <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
                 

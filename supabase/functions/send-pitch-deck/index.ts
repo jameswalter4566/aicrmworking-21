@@ -120,6 +120,33 @@ Deno.serve(async (req) => {
       throw new Error("No email connection found for your account. Please connect your Gmail account in the Settings page.");
     }
     
+    // Create or ensure the landing page exists by saving the pitch deck data
+    console.log("Ensuring landing page exists for pitch deck...");
+    const { data: savedDeck, error: saveError } = await supabase.functions.invoke('save-pitch-deck', {
+      body: {
+        action: 'save',
+        pitchDeckId: pitchDeck.id,
+        pitchDeckData: {
+          // Pass any updated data if necessary, but mostly just ensure the pitch deck is properly saved
+          updated_at: new Date().toISOString()
+        },
+        token: authToken
+      }
+    });
+    
+    if (saveError) {
+      console.error('Error ensuring landing page exists:', saveError);
+      throw new Error(`Failed to create landing page: ${saveError.message || 'Unknown error'}`);
+    }
+    
+    console.log("Landing page ensured, now sending email...");
+    
+    // Generate landing page URL based on environment
+    const landingPageUrl = `/yourhomesolution${pitchDeck.id}`;
+    
+    // Add landing page URL to the email body
+    const emailWithLink = `${emailBody}\n\nYou can also view this proposal online at: ${landingPageUrl}`;
+    
     // Send email using our Gmail connector with improved error handling
     console.log("Calling send-gmail function...");
     let emailResponse;
@@ -128,7 +155,7 @@ Deno.serve(async (req) => {
         body: {
           to: recipientEmail,
           subject: emailSubject,
-          body: emailBody,
+          body: emailWithLink,
           userId: user.id, // Pass the user ID to ensure we use the correct connection
           attachments: [
             {
@@ -181,8 +208,13 @@ Deno.serve(async (req) => {
       })
       .eq('id', pitchDeckId);
     
+    // Return consistent landing page URL format
     return new Response(
-      JSON.stringify({ success: true, message: `Pitch deck sent to ${recipientEmail}` }),
+      JSON.stringify({ 
+        success: true, 
+        message: `Pitch deck sent to ${recipientEmail}`,
+        landingPageUrl: landingPageUrl 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

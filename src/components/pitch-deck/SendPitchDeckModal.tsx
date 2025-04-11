@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Send, Copy, Check } from 'lucide-react';
+import { Send, Copy, Check, Loader2 } from 'lucide-react';
 
 interface SendPitchDeckModalProps {
   isOpen: boolean;
@@ -23,6 +23,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [isCreatingLandingPage, setIsCreatingLandingPage] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [landingPageUrl, setLandingPageUrl] = useState<string | null>(null);
   
@@ -37,6 +38,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       );
       setRecipientEmail('');
       setIsSending(false);
+      setIsCreatingLandingPage(false);
       setLandingPageUrl(null);
       setIsCopied(false);
     }
@@ -54,8 +56,12 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     }
 
     setIsSending(true);
+    setIsCreatingLandingPage(true);
 
     try {
+      // Ensure the landing page exists before sending the email
+      toast.info('Creating landing page and generating PDF...');
+      
       const { data, error } = await supabase.functions.invoke('send-pitch-deck', {
         body: {
           pitchDeckId: pitchDeck.id,
@@ -72,24 +78,31 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       if (data.success) {
         toast.success(`Pitch deck sent to ${recipientEmail}`);
         
-        // Generate and save the landing page URL for sharing
-        // During testing, we'll use the preview URL with the format /yourhomesolutionID
-        const isProduction = window.location.hostname === 'app.co' || window.location.hostname.includes('.app.co');
-        
-        let shareBaseUrl = '';
-        if (isProduction) {
-          // Production URL
-          if (data.landingPageUrl) {
-            shareBaseUrl = data.landingPageUrl;
+        // Get the landing page URL from the response
+        let shareUrl = '';
+        if (data.landingPageUrl) {
+          // Check if the URL is relative or absolute
+          if (data.landingPageUrl.startsWith('/')) {
+            // It's a relative URL, build the full URL
+            const isProduction = window.location.hostname === 'app.co' || window.location.hostname.includes('.app.co');
+            
+            if (isProduction) {
+              // Production URL
+              shareUrl = `${window.location.origin}${data.landingPageUrl}`;
+            } else {
+              // Preview URL for testing
+              shareUrl = `${window.location.origin}${data.landingPageUrl}`;
+            }
           } else {
-            shareBaseUrl = `${window.location.origin}/yourhomesolution/${pitchDeck.id}`;
+            // It's an absolute URL
+            shareUrl = data.landingPageUrl;
           }
         } else {
-          // Preview URL for testing
-          shareBaseUrl = `${window.location.origin}/yourhomesolution${pitchDeck.id}`;
+          // Fallback to constructing the URL ourselves
+          shareUrl = `${window.location.origin}/yourhomesolution${pitchDeck.id}`;
         }
         
-        setLandingPageUrl(shareBaseUrl);
+        setLandingPageUrl(shareUrl);
       } else {
         throw new Error(data.message || 'Failed to send email');
       }
@@ -98,6 +111,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       toast.error(`Failed to send email: ${error.message}`);
     } finally {
       setIsSending(false);
+      setIsCreatingLandingPage(false);
     }
   };
 
@@ -126,7 +140,17 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
           </DialogDescription>
         </DialogHeader>
         
-        {landingPageUrl ? (
+        {isCreatingLandingPage ? (
+          <div className="py-8 text-center">
+            <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+            <p className="mt-4 text-sm text-gray-600">
+              Creating landing page and preparing your email...
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              This may take a moment
+            </p>
+          </div>
+        ) : landingPageUrl ? (
           <div className="space-y-4">
             <div className="bg-green-50 p-4 rounded-md">
               <h4 className="font-medium mb-1 text-green-700">Email sent successfully!</h4>
@@ -204,7 +228,10 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
                 className="gap-2"
               >
                 {isSending ? (
-                  "Sending..."
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
                 ) : (
                   <>
                     <Send size={16} />

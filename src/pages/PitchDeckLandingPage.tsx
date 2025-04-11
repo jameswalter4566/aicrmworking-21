@@ -1,11 +1,11 @@
 
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Download, ArrowLeft } from "lucide-react";
+import { Download, Loader2 } from "lucide-react";
 
 // Define the PitchDeck type including the slug property
 interface PitchDeck {
@@ -39,28 +39,45 @@ interface PitchDeck {
 
 const PitchDeckLandingPage = () => {
   const { slug, id } = useParams<{ slug?: string; id?: string }>();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [pitchDeck, setPitchDeck] = useState<PitchDeck | null>(null);
   
+  // Extract ID from the URL if it's in the format /yourhomesolutionID
   useEffect(() => {
     const fetchPitchDeck = async () => {
       setLoading(true);
       
       try {
+        let pitchDeckId = id;
         let query;
         
-        // Check if we're using the new format with ID or the old format with slug
-        if (id) {
-          // New format: /yourhomesolution/ID or /yourhomesolutionID
-          console.log("Fetching pitch deck by ID:", id);
+        // Check for different URL patterns
+        if (window.location.pathname.includes('/yourhomesolution')) {
+          // For URLs like /yourhomesolutionID1234 or /yourhomesolution/ID1234
+          const pathParts = window.location.pathname.split('/');
+          const lastPart = pathParts[pathParts.length - 1];
+          
+          if (lastPart.startsWith('yourhomesolution') && !id) {
+            // Format: /yourhomesolutionID1234
+            pitchDeckId = lastPart.replace('yourhomesolution', '');
+            console.log("Extracted ID from path:", pitchDeckId);
+          } else if (id) {
+            // Format: /yourhomesolution/ID1234
+            pitchDeckId = id;
+            console.log("Using ID from params:", pitchDeckId);
+          }
+        }
+        
+        if (pitchDeckId) {
+          // New format with ID
+          console.log("Fetching pitch deck by ID:", pitchDeckId);
           query = supabase
             .from('pitch_decks')
             .select('*')
-            .eq('id', id);
+            .eq('id', pitchDeckId);
         } else if (slug) {
-          // Old format: /pitch-deck/view/SLUG
+          // Old format with slug
           console.log("Fetching pitch deck by slug:", slug);
           query = supabase
             .from('pitch_decks')
@@ -77,10 +94,8 @@ const PitchDeckLandingPage = () => {
         }
         
         if (data) {
-          // Make sure we're handling the type correctly
           console.log("Pitch deck found:", data);
-          const pitchDeckData = data as unknown as PitchDeck;
-          setPitchDeck(pitchDeckData);
+          setPitchDeck(data as PitchDeck);
         }
       } catch (error: any) {
         console.error("Error fetching pitch deck:", error);
@@ -91,7 +106,7 @@ const PitchDeckLandingPage = () => {
     };
     
     fetchPitchDeck();
-  }, [slug, id]);
+  }, [slug, id, window.location.pathname]);
   
   const handleDownloadPDF = async () => {
     if (!pitchDeck) return;
@@ -132,6 +147,7 @@ const PitchDeckLandingPage = () => {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin mx-auto mb-4 text-primary" />
           <p>Loading pitch deck...</p>
         </div>
       </div>
