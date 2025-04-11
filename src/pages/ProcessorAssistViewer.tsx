@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -263,11 +262,11 @@ const ProcessorAssistViewer = () => {
       {/* Main Content */}
       <div className="flex-1 p-6">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-2xl font-bold text-mortgage-darkPurple mb-2">
+          <h1 className="text-2xl font-bold text-orange-700 mb-2">
             Processor Tasks: {loanApplication.loanId}
           </h1>
           <div className="flex items-center mt-2 text-sm text-gray-600">
-            <span className="px-2 py-1 rounded-full bg-mortgage-lightPurple text-mortgage-darkPurple text-xs font-medium mr-2">
+            <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium mr-2">
               {loanApplication.loanStatus}
             </span>
             <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
@@ -277,15 +276,15 @@ const ProcessorAssistViewer = () => {
 
         {/* Borrower's Remaining Conditions Section */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-mortgage-darkPurple mb-4">
+          <h2 className="text-xl font-bold text-orange-700 mb-4">
             Borrower's Remaining Conditions
           </h2>
           
           <div className="grid grid-cols-1 gap-6">
             {/* Master Conditions */}
             <Card>
-              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
-                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Master Conditions</CardTitle>
+              <CardHeader className="bg-orange-100/20 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-800">Master Conditions</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="text-sm text-gray-500 italic">
@@ -296,8 +295,8 @@ const ProcessorAssistViewer = () => {
             
             {/* General Conditions */}
             <Card>
-              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
-                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">General Conditions</CardTitle>
+              <CardHeader className="bg-orange-100/20 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-800">General Conditions</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="text-sm text-gray-500 italic">
@@ -308,8 +307,8 @@ const ProcessorAssistViewer = () => {
             
             {/* Prior to Final Conditions */}
             <Card>
-              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
-                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Prior to Final Conditions</CardTitle>
+              <CardHeader className="bg-orange-100/20 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-800">Prior to Final Conditions</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="text-sm text-gray-500 italic">
@@ -320,8 +319,8 @@ const ProcessorAssistViewer = () => {
             
             {/* Compliance Conditions */}
             <Card>
-              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
-                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Compliance Conditions</CardTitle>
+              <CardHeader className="bg-orange-100/20 pb-2">
+                <CardTitle className="text-lg font-medium text-orange-800">Compliance Conditions</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
                 <div className="text-sm text-gray-500 italic">
@@ -333,11 +332,31 @@ const ProcessorAssistViewer = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-4 mb-4">
-            <TabsTrigger value="employment">Employment Verification</TabsTrigger>
-            <TabsTrigger value="title">Title Order</TabsTrigger>
-            <TabsTrigger value="appraisal">Appraisal Order</TabsTrigger>
-            <TabsTrigger value="documents">Document Handler</TabsTrigger>
+          <TabsList className="grid grid-cols-4 mb-4 bg-orange-50">
+            <TabsTrigger 
+              value="employment" 
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            >
+              Employment Verification
+            </TabsTrigger>
+            <TabsTrigger 
+              value="title" 
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            >
+              Title Order
+            </TabsTrigger>
+            <TabsTrigger 
+              value="appraisal" 
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            >
+              Appraisal Order
+            </TabsTrigger>
+            <TabsTrigger 
+              value="documents" 
+              className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            >
+              Document Handler
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="employment" className="bg-white rounded-lg shadow-sm p-6">
