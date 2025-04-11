@@ -12,13 +12,6 @@ import { useForm } from 'react-hook-form';
 
 interface MortgageData {
   propertyValue?: number;
-  clientName?: string;
-  clientAddress?: string;
-  loanOfficer?: {
-    name: string;
-    nmlsId: string;
-    companyName: string;
-  };
   currentLoan?: {
     balance: number;
     rate: number;
@@ -71,11 +64,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   const [isCopied, setIsCopied] = useState(false);
   const [landingPageUrl, setLandingPageUrl] = useState<string | null>(null);
   const [propertyValue, setPropertyValue] = useState<string>('');
-  const [clientName, setClientName] = useState<string>('');
-  const [clientAddress, setClientAddress] = useState<string>('');
-  const [loanOfficerName, setLoanOfficerName] = useState<string>('');
-  const [loanOfficerNmlsId, setLoanOfficerNmlsId] = useState<string>('');
-  const [mortgageCompanyName, setMortgageCompanyName] = useState<string>('');
   
   React.useEffect(() => {
     if (isOpen) {
@@ -100,16 +88,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         }
       }
       
-      // Set client information if available
-      setClientName(pitchDeck?.mortgage_data?.clientName || '');
-      setClientAddress(pitchDeck?.mortgage_data?.clientAddress || '');
-      
-      // Set loan officer information if available
-      const loanOfficerData = pitchDeck?.mortgage_data?.loanOfficer;
-      setLoanOfficerName(loanOfficerData?.name || '');
-      setLoanOfficerNmlsId(loanOfficerData?.nmlsId || '');
-      setMortgageCompanyName(loanOfficerData?.companyName || '');
-      
       setRecipientEmail('');
       setIsSending(false);
       setIsCreatingLandingPage(false);
@@ -133,25 +111,20 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     setIsCreatingLandingPage(true);
 
     try {
-      // Update pitch deck with property value and other fields if provided
-      const updatedMortgageData = {
-        ...(pitchDeck.mortgage_data || {}),
-        propertyValue: propertyValue && !isNaN(Number(propertyValue)) ? Number(propertyValue) : undefined,
-        clientName: clientName || undefined,
-        clientAddress: clientAddress || undefined,
-        loanOfficer: {
-          name: loanOfficerName || '',
-          nmlsId: loanOfficerNmlsId || '',
-          companyName: mortgageCompanyName || ''
-        }
-      };
-      
-      await supabase
-        .from('pitch_decks')
-        .update({
-          mortgage_data: updatedMortgageData as any
-        })
-        .eq('id', pitchDeck.id);
+      // Update pitch deck with property value if provided
+      if (propertyValue && !isNaN(Number(propertyValue))) {
+        const propertyValueNumber = Number(propertyValue);
+        
+        await supabase
+          .from('pitch_decks')
+          .update({
+            mortgage_data: {
+              ...pitchDeck.mortgage_data,
+              propertyValue: propertyValueNumber
+            }
+          })
+          .eq('id', pitchDeck.id);
+      }
 
       toast.info('Creating landing page and generating PDF...');
       
@@ -308,104 +281,37 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
               </p>
             </div>
             
-            <div className="space-y-4 pt-2 border-t">
-              <h3 className="text-sm font-medium">Client Information</h3>
-              
-              <div>
-                <label htmlFor="clientName" className="block text-sm font-medium mb-1">Client Name</label>
-                <Input
-                  id="clientName"
-                  type="text"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  placeholder="John Smith"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="clientAddress" className="block text-sm font-medium mb-1">Client Address</label>
-                <Input
-                  id="clientAddress"
-                  type="text"
-                  value={clientAddress}
-                  onChange={(e) => setClientAddress(e.target.value)}
-                  placeholder="123 Main St, Anytown, CA 90210"
-                />
-              </div>
+            <div>
+              <label htmlFor="email" className="block text-sm font-medium mb-1">Recipient Email</label>
+              <Input
+                id="email"
+                type="email"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                placeholder="client@example.com"
+              />
             </div>
             
-            <div className="space-y-4 pt-2 border-t">
-              <h3 className="text-sm font-medium">Loan Officer Details</h3>
-              
-              <div>
-                <label htmlFor="loanOfficerName" className="block text-sm font-medium mb-1">Loan Officer Name</label>
-                <Input
-                  id="loanOfficerName"
-                  type="text"
-                  value={loanOfficerName}
-                  onChange={(e) => setLoanOfficerName(e.target.value)}
-                  placeholder="Jane Wilson"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="loanOfficerNmlsId" className="block text-sm font-medium mb-1">NMLS ID</label>
-                <Input
-                  id="loanOfficerNmlsId"
-                  type="text"
-                  value={loanOfficerNmlsId}
-                  onChange={(e) => setLoanOfficerNmlsId(e.target.value)}
-                  placeholder="123456"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="mortgageCompanyName" className="block text-sm font-medium mb-1">Company Name</label>
-                <Input
-                  id="mortgageCompanyName"
-                  type="text"
-                  value={mortgageCompanyName}
-                  onChange={(e) => setMortgageCompanyName(e.target.value)}
-                  placeholder="Superior Mortgage Group"
-                />
-              </div>
+            <div>
+              <label htmlFor="subject" className="block text-sm font-medium mb-1">Subject</label>
+              <Input
+                id="subject"
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="Mortgage Proposal"
+              />
             </div>
             
-            <div className="space-y-4 pt-2 border-t">
-              <h3 className="text-sm font-medium">Email Details</h3>
-              
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium mb-1">Recipient Email</label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                  placeholder="client@example.com"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="subject" className="block text-sm font-medium mb-1">Subject</label>
-                <Input
-                  id="subject"
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  placeholder="Mortgage Proposal"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="message" className="block text-sm font-medium mb-1">Message</label>
-                <Textarea
-                  id="message"
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Your message to the client..."
-                  rows={5}
-                />
-              </div>
+            <div>
+              <label htmlFor="message" className="block text-sm font-medium mb-1">Message</label>
+              <Textarea
+                id="message"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Your message to the client..."
+                rows={5}
+              />
             </div>
             
             <DialogFooter className="flex items-center justify-end space-x-2">

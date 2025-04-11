@@ -17,14 +17,6 @@ const defaultPitchDeck = {
   description: "",
   template_type: "purchase",
   mortgage_data: {
-    propertyValue: 500000,
-    clientName: "",
-    clientAddress: "",
-    loanOfficer: {
-      name: "",
-      nmlsId: "",
-      companyName: ""
-    },
     currentLoan: {
       balance: 200000,
       rate: 4.5,
@@ -270,7 +262,7 @@ const PitchDeckBuilder = () => {
       setPitchDeck(prev => ({
         ...prev,
         [section]: {
-          ...Object.assign({}, prev[section as keyof typeof prev] || {}),
+          ...(prev[section as keyof typeof prev] as object || {}), // Fix: Cast to object and provide default empty object
           [subField]: value
         }
       }));
@@ -283,34 +275,17 @@ const PitchDeckBuilder = () => {
   };
   
   // Handle nested field changes for mortgage data
-  const handleMortgageDataChange = (section: string, field: string | object, value?: any) => {
-    // For nested objects like loanOfficer
-    if (typeof field === 'string' && value !== undefined) {
-      // This is for nested properties like currentLoan.balance or loanOfficer.name
-      setPitchDeck(prev => ({
-        ...prev,
-        mortgage_data: {
-          ...prev.mortgage_data,
-          [section]: {
-            ...(prev.mortgage_data?.[section as keyof typeof prev.mortgage_data] || {}),
-            [field]: typeof value === 'string' && !isNaN(Number(value)) && field !== 'type' && field !== 'name' && field !== 'nmlsId' && field !== 'companyName' 
-              ? parseFloat(value) 
-              : value
-          }
+  const handleMortgageDataChange = (section: string, field: string, value: any) => {
+    setPitchDeck(prev => ({
+      ...prev,
+      mortgage_data: {
+        ...prev.mortgage_data,
+        [section]: {
+          ...(prev.mortgage_data?.[section as keyof typeof prev.mortgage_data] || {}), // Fix: Provide default empty object
+          [field]: parseFloat(value) || 0
         }
-      }));
-    } else {
-      // This is for direct properties like propertyValue, clientName
-      setPitchDeck(prev => ({
-        ...prev,
-        mortgage_data: {
-          ...prev.mortgage_data,
-          [section]: typeof field === 'string' && !isNaN(Number(field)) && section !== 'clientName' && section !== 'clientAddress' 
-            ? parseFloat(field) 
-            : field
-        }
-      }));
-    }
+      }
+    }));
   };
 
   // Go back to pitch deck listing
@@ -401,215 +376,128 @@ const PitchDeckBuilder = () => {
               </TabsList>
               
               <TabsContent value="info" className="space-y-6">
-                <div className="grid grid-cols-1 gap-6">
-                  {/* Client Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Client Information</CardTitle>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
+                        Current Loan
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Client Name</label>
-                        <Input
-                          value={pitchDeck.mortgage_data?.clientName || ''}
-                          onChange={(e) => handleMortgageDataChange('clientName', e.target.value)}
-                          placeholder="John Smith"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Client Address</label>
-                        <Input
-                          value={pitchDeck.mortgage_data?.clientAddress || ''}
-                          onChange={(e) => handleMortgageDataChange('clientAddress', e.target.value)}
-                          placeholder="123 Main St, Anytown, CA 90210"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Property Value</label>
+                        <label className="block text-sm font-medium mb-1">Loan Balance</label>
                         <div className="relative">
                           <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
                           <Input
                             type="number"
-                            value={pitchDeck.mortgage_data?.propertyValue || ''}
-                            onChange={(e) => handleMortgageDataChange('propertyValue', e.target.value)}
-                            placeholder="500000"
+                            value={pitchDeck.mortgage_data?.currentLoan?.balance || ''}
+                            onChange={(e) => handleMortgageDataChange('currentLoan', 'balance', e.target.value)}
                             className="pl-7"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Interest Rate (%)</label>
+                        <Input
+                          type="number"
+                          step="0.125"
+                          value={pitchDeck.mortgage_data?.currentLoan?.rate || ''}
+                          onChange={(e) => handleMortgageDataChange('currentLoan', 'rate', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Term (Years)</label>
+                        <Input
+                          type="number"
+                          value={pitchDeck.mortgage_data?.currentLoan?.term || ''}
+                          onChange={(e) => handleMortgageDataChange('currentLoan', 'term', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Loan Type</label>
+                        <Input
+                          type="text"
+                          value={pitchDeck.mortgage_data?.currentLoan?.type || ''}
+                          onChange={(e) => handleMortgageDataChange('currentLoan', 'type', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Monthly Payment</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                          <Input
+                            type="number"
+                            value={pitchDeck.mortgage_data?.currentLoan?.payment || ''}
+                            onChange={(e) => handleMortgageDataChange('currentLoan', 'payment', e.target.value)}
+                            className="pl-7"
+                            disabled
                           />
                         </div>
                       </div>
                     </CardContent>
                   </Card>
                   
-                  {/* Loan Officer Information */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="text-lg">Loan Officer Information</CardTitle>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                        Proposed Loan
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Loan Officer Name</label>
+                        <label className="block text-sm font-medium mb-1">Loan Amount</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                          <Input
+                            type="number"
+                            value={pitchDeck.mortgage_data?.proposedLoan?.amount || ''}
+                            onChange={(e) => handleMortgageDataChange('proposedLoan', 'amount', e.target.value)}
+                            className="pl-7"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Interest Rate (%)</label>
                         <Input
-                          value={pitchDeck.mortgage_data?.loanOfficer?.name || ''}
-                          onChange={(e) => handleMortgageDataChange('loanOfficer', 'name', e.target.value)}
-                          placeholder="Jane Wilson"
+                          type="number"
+                          step="0.125"
+                          value={pitchDeck.mortgage_data?.proposedLoan?.rate || ''}
+                          onChange={(e) => handleMortgageDataChange('proposedLoan', 'rate', e.target.value)}
                         />
                       </div>
-                      
                       <div>
-                        <label className="block text-sm font-medium mb-1">NMLS ID</label>
+                        <label className="block text-sm font-medium mb-1">Term (Years)</label>
                         <Input
-                          value={pitchDeck.mortgage_data?.loanOfficer?.nmlsId || ''}
-                          onChange={(e) => handleMortgageDataChange('loanOfficer', 'nmlsId', e.target.value)}
-                          placeholder="123456"
+                          type="number"
+                          value={pitchDeck.mortgage_data?.proposedLoan?.term || ''}
+                          onChange={(e) => handleMortgageDataChange('proposedLoan', 'term', e.target.value)}
                         />
                       </div>
-                      
                       <div>
-                        <label className="block text-sm font-medium mb-1">Mortgage Company Name</label>
+                        <label className="block text-sm font-medium mb-1">Loan Type</label>
                         <Input
-                          value={pitchDeck.mortgage_data?.loanOfficer?.companyName || ''}
-                          onChange={(e) => handleMortgageDataChange('loanOfficer', 'companyName', e.target.value)}
-                          placeholder="Superior Mortgage Group"
+                          type="text"
+                          value={pitchDeck.mortgage_data?.proposedLoan?.type || ''}
+                          onChange={(e) => handleMortgageDataChange('proposedLoan', 'type', e.target.value)}
                         />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Monthly Payment</label>
+                        <div className="relative">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
+                          <Input
+                            type="number"
+                            value={pitchDeck.mortgage_data?.proposedLoan?.payment || ''}
+                            onChange={(e) => handleMortgageDataChange('proposedLoan', 'payment', e.target.value)}
+                            className="pl-7"
+                            disabled
+                          />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <span className="w-3 h-3 bg-blue-500 rounded-full"></span>
-                          Current Loan
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Loan Balance</label>
-                          <div className="relative">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                            <Input
-                              type="number"
-                              value={pitchDeck.mortgage_data?.currentLoan?.balance || ''}
-                              onChange={(e) => handleMortgageDataChange('currentLoan', 'balance', e.target.value)}
-                              className="pl-7"
-                              placeholder="200000"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Interest Rate (%)</label>
-                          <Input
-                            type="number"
-                            step="0.125"
-                            value={pitchDeck.mortgage_data?.currentLoan?.rate || ''}
-                            onChange={(e) => handleMortgageDataChange('currentLoan', 'rate', e.target.value)}
-                            placeholder="4.5"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Term (Years)</label>
-                          <Input
-                            type="number"
-                            value={pitchDeck.mortgage_data?.currentLoan?.term || ''}
-                            onChange={(e) => handleMortgageDataChange('currentLoan', 'term', e.target.value)}
-                            placeholder="30"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Loan Type</label>
-                          <Input
-                            type="text"
-                            value={pitchDeck.mortgage_data?.currentLoan?.type || ''}
-                            onChange={(e) => handleMortgageDataChange('currentLoan', 'type', e.target.value)}
-                            placeholder="Conventional"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Monthly Payment</label>
-                          <div className="relative">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                            <Input
-                              type="number"
-                              value={pitchDeck.mortgage_data?.currentLoan?.payment || ''}
-                              onChange={(e) => handleMortgageDataChange('currentLoan', 'payment', e.target.value)}
-                              className="pl-7"
-                              placeholder="1013"
-                              disabled
-                            />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-lg flex items-center gap-2">
-                          <span className="w-3 h-3 bg-green-500 rounded-full"></span>
-                          Proposed Loan
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Loan Amount</label>
-                          <div className="relative">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                            <Input
-                              type="number"
-                              value={pitchDeck.mortgage_data?.proposedLoan?.amount || ''}
-                              onChange={(e) => handleMortgageDataChange('proposedLoan', 'amount', e.target.value)}
-                              className="pl-7"
-                              placeholder="200000"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Interest Rate (%)</label>
-                          <Input
-                            type="number"
-                            step="0.125"
-                            value={pitchDeck.mortgage_data?.proposedLoan?.rate || ''}
-                            onChange={(e) => handleMortgageDataChange('proposedLoan', 'rate', e.target.value)}
-                            placeholder="3.5"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Term (Years)</label>
-                          <Input
-                            type="number"
-                            value={pitchDeck.mortgage_data?.proposedLoan?.term || ''}
-                            onChange={(e) => handleMortgageDataChange('proposedLoan', 'term', e.target.value)}
-                            placeholder="30"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Loan Type</label>
-                          <Input
-                            type="text"
-                            value={pitchDeck.mortgage_data?.proposedLoan?.type || ''}
-                            onChange={(e) => handleMortgageDataChange('proposedLoan', 'type', e.target.value)}
-                            placeholder="Conventional"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Monthly Payment</label>
-                          <div className="relative">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-500">$</span>
-                            <Input
-                              type="number"
-                              value={pitchDeck.mortgage_data?.proposedLoan?.payment || ''}
-                              onChange={(e) => handleMortgageDataChange('proposedLoan', 'payment', e.target.value)}
-                              className="pl-7"
-                              placeholder="898"
-                              disabled
-                            />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
                 </div>
               </TabsContent>
               
@@ -811,27 +699,80 @@ const PitchDeckBuilder = () => {
                           </div>
                         </div>
                       </div>
+                      
+                      <div>
+                        <h3 className="text-xl font-semibold mb-4">Loan Comparison</h3>
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr className="bg-gray-100">
+                              <th className="border px-4 py-2 text-left">Feature</th>
+                              <th className="border px-4 py-2 text-right">Current Loan</th>
+                              <th className="border px-4 py-2 text-right">Proposed Loan</th>
+                              <th className="border px-4 py-2 text-right">Difference</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td className="border px-4 py-2 font-medium">Principal</td>
+                              <td className="border px-4 py-2 text-right">${(pitchDeck.mortgage_data?.currentLoan?.balance || 0).toLocaleString()}</td>
+                              <td className="border px-4 py-2 text-right">${(pitchDeck.mortgage_data?.proposedLoan?.amount || 0).toLocaleString()}</td>
+                              <td className="border px-4 py-2 text-right">${(
+                                (pitchDeck.mortgage_data?.proposedLoan?.amount || 0) - 
+                                (pitchDeck.mortgage_data?.currentLoan?.balance || 0)
+                              ).toLocaleString()}</td>
+                            </tr>
+                            <tr>
+                              <td className="border px-4 py-2 font-medium">Interest Rate</td>
+                              <td className="border px-4 py-2 text-right">{(pitchDeck.mortgage_data?.currentLoan?.rate || 0).toFixed(3)}%</td>
+                              <td className="border px-4 py-2 text-right">{(pitchDeck.mortgage_data?.proposedLoan?.rate || 0).toFixed(3)}%</td>
+                              <td className="border px-4 py-2 text-right">{(
+                                (pitchDeck.mortgage_data?.proposedLoan?.rate || 0) - 
+                                (pitchDeck.mortgage_data?.currentLoan?.rate || 0)
+                              ).toFixed(3)}%</td>
+                            </tr>
+                            <tr>
+                              <td className="border px-4 py-2 font-medium">Monthly Payment</td>
+                              <td className="border px-4 py-2 text-right">${(pitchDeck.mortgage_data?.currentLoan?.payment || 0).toLocaleString()}</td>
+                              <td className="border px-4 py-2 text-right">${(pitchDeck.mortgage_data?.proposedLoan?.payment || 0).toLocaleString()}</td>
+                              <td className="border px-4 py-2 text-right">${(
+                                (pitchDeck.mortgage_data?.proposedLoan?.payment || 0) - 
+                                (pitchDeck.mortgage_data?.currentLoan?.payment || 0)
+                              ).toLocaleString()}</td>
+                            </tr>
+                            <tr>
+                              <td className="border px-4 py-2 font-medium">Term (years)</td>
+                              <td className="border px-4 py-2 text-right">{pitchDeck.mortgage_data?.currentLoan?.term || 0}</td>
+                              <td className="border px-4 py-2 text-right">{pitchDeck.mortgage_data?.proposedLoan?.term || 0}</td>
+                              <td className="border px-4 py-2 text-right">{
+                                (pitchDeck.mortgage_data?.proposedLoan?.term || 0) - 
+                                (pitchDeck.mortgage_data?.currentLoan?.term || 0)
+                              }</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </CardContent>
+                  <CardFooter>
+                    <p className="text-xs text-gray-500">The PDF download will include this content formatted professionally.</p>
+                  </CardFooter>
                 </Card>
               </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
       </div>
-      
-      {isSendModalOpen && (
-        <SendPitchDeckModal 
-          isOpen={isSendModalOpen}
-          onClose={() => setIsSendModalOpen(false)}
-          pitchDeck={id ? {
-            id: id,
-            title: pitchDeck.title,
-            description: pitchDeck.description,
-            mortgage_data: pitchDeck.mortgage_data
-          } : null}
-        />
-      )}
+
+      {/* Send to client modal */}
+      <SendPitchDeckModal 
+        isOpen={isSendModalOpen} 
+        onClose={() => setIsSendModalOpen(false)}
+        pitchDeck={id ? { 
+          id, 
+          title: pitchDeck.title, 
+          description: pitchDeck.description 
+        } : null}
+      />
     </MainLayout>
   );
 };

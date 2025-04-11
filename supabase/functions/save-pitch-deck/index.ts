@@ -36,115 +36,69 @@ async function generatePDF(pitchDeck: any) {
     doc.setFontSize(20);
     doc.text(pitchDeck.title, 105, 20, { align: 'center' });
     
-    // Add client information if available
-    let yPos = 35;
-    
-    if (pitchDeck.mortgage_data?.clientName) {
-      doc.setFontSize(14);
-      doc.text(`Prepared for: ${pitchDeck.mortgage_data.clientName}`, 20, yPos);
-      yPos += 10;
-      
-      if (pitchDeck.mortgage_data?.clientAddress) {
-        doc.setFontSize(12);
-        doc.text(`Property Address: ${pitchDeck.mortgage_data.clientAddress}`, 20, yPos);
-        yPos += 10;
-      }
-    }
-    
-    // Add loan officer information if available
-    if (pitchDeck.mortgage_data?.loanOfficer?.name) {
-      doc.setFontSize(12);
-      doc.text(`Prepared by: ${pitchDeck.mortgage_data.loanOfficer.name}`, 20, yPos);
-      yPos += 7;
-      
-      if (pitchDeck.mortgage_data?.loanOfficer?.nmlsId) {
-        doc.setFontSize(10);
-        doc.text(`NMLS ID: ${pitchDeck.mortgage_data.loanOfficer.nmlsId}`, 20, yPos);
-        yPos += 7;
-      }
-      
-      if (pitchDeck.mortgage_data?.loanOfficer?.companyName) {
-        doc.setFontSize(10);
-        doc.text(`${pitchDeck.mortgage_data.loanOfficer.companyName}`, 20, yPos);
-        yPos += 7;
-      }
-    }
-    
     // Add description if available
     if (pitchDeck.description) {
       doc.setFontSize(12);
-      doc.text(`Description: ${pitchDeck.description}`, 20, yPos);
-      yPos += 10;
+      doc.text(`Description: ${pitchDeck.description}`, 20, 35);
     }
     
     // Add a divider
     doc.setDrawColor(200);
-    doc.line(20, yPos, 190, yPos);
-    yPos += 10;
+    doc.line(20, 40, 190, 40);
     
-    // Add property value if available
-    if (pitchDeck.mortgage_data?.propertyValue) {
-      doc.setFontSize(14);
-      doc.text(`Property Value: ${formatCurrency(pitchDeck.mortgage_data.propertyValue)}`, 20, yPos);
-      yPos += 15;
-    }
+    // Client information if available
+    doc.setFontSize(16);
+    doc.text("Loan Details", 20, 50);
     
     // Current loan data
-    doc.setFontSize(16);
-    doc.text("Loan Details", 20, yPos);
-    yPos += 10;
-    
     if (pitchDeck.mortgage_data?.currentLoan) {
       doc.setFontSize(14);
-      doc.text("Current Loan", 20, yPos);
-      yPos += 10;
+      doc.text("Current Loan", 20, 60);
       
       const currentLoan = pitchDeck.mortgage_data.currentLoan;
       doc.setFontSize(10);
-      doc.text(`Loan Balance: ${formatCurrency(currentLoan.balance || 0)}`, 25, yPos); yPos += 7;
-      doc.text(`Interest Rate: ${(currentLoan.rate || 0).toFixed(3)}%`, 25, yPos); yPos += 7;
-      doc.text(`Monthly Payment: ${formatCurrency(currentLoan.payment || 0)}`, 25, yPos); yPos += 7;
-      doc.text(`Term: ${currentLoan.term || 30} years`, 25, yPos); yPos += 7;
-      doc.text(`Type: ${currentLoan.type || 'Conventional'}`, 25, yPos); yPos += 7;
+      doc.text(`Loan Balance: ${formatCurrency(currentLoan.balance || 0)}`, 25, 70);
+      doc.text(`Interest Rate: ${(currentLoan.rate || 0).toFixed(3)}%`, 25, 77);
+      doc.text(`Monthly Payment: ${formatCurrency(currentLoan.payment || 0)}`, 25, 84);
+      doc.text(`Term: ${currentLoan.term || 30} years`, 25, 91);
+      doc.text(`Type: ${currentLoan.type || 'Conventional'}`, 25, 98);
     }
     
     // Proposed loan data
     if (pitchDeck.mortgage_data?.proposedLoan) {
       doc.setFontSize(14);
-      doc.text("Proposed Loan", 20, yPos);
-      yPos += 10;
+      doc.text("Proposed Loan", 110, 60);
       
       const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
       doc.setFontSize(10);
-      doc.text(`Loan Amount: ${formatCurrency(proposedLoan.amount || 0)}`, 25, yPos); yPos += 7;
-      doc.text(`Interest Rate: ${(proposedLoan.rate || 0).toFixed(3)}%`, 25, yPos); yPos += 7;
-      doc.text(`Monthly Payment: ${formatCurrency(proposedLoan.payment || 0)}`, 25, yPos); yPos += 7;
-      doc.text(`Term: ${proposedLoan.term || 30} years`, 25, yPos); yPos += 7;
-      doc.text(`Type: ${proposedLoan.type || 'Conventional'}`, 25, yPos); yPos += 7;
+      doc.text(`Loan Amount: ${formatCurrency(proposedLoan.amount || 0)}`, 115, 70);
+      doc.text(`Interest Rate: ${(proposedLoan.rate || 0).toFixed(3)}%`, 115, 77);
+      doc.text(`Monthly Payment: ${formatCurrency(proposedLoan.payment || 0)}`, 115, 84);
+      doc.text(`Term: ${proposedLoan.term || 30} years`, 115, 91);
+      doc.text(`Type: ${proposedLoan.type || 'Conventional'}`, 115, 98);
     }
     
     // Savings information
     if (pitchDeck.mortgage_data?.savings) {
       doc.setFontSize(16);
-      doc.text("Savings", 20, yPos);
-      yPos += 10;
+      doc.text("Savings", 20, 115);
       
       const savings = pitchDeck.mortgage_data.savings;
       doc.setFontSize(10);
-      doc.text(`Monthly Savings: ${formatCurrency(savings.monthly || 0)}`, 25, yPos); yPos += 7;
-      doc.text(`Lifetime Savings: ${formatCurrency(savings.lifetime || 0)}`, 25, yPos); yPos += 12;
+      doc.text(`Monthly Savings: ${formatCurrency(savings.monthly || 0)}`, 25, 125);
+      doc.text(`Lifetime Savings: ${formatCurrency(savings.lifetime || 0)}`, 25, 132);
     }
     
     // Create comparison table
     if (pitchDeck.mortgage_data?.currentLoan && pitchDeck.mortgage_data?.proposedLoan) {
       doc.setFontSize(16);
-      doc.text("Loan Comparison", 20, yPos);
+      doc.text("Loan Comparison", 20, 150);
       
       const currentLoan = pitchDeck.mortgage_data.currentLoan;
       const proposedLoan = pitchDeck.mortgage_data.proposedLoan;
       
       autoTable(doc, {
-        startY: yPos + 5,
+        startY: 155,
         head: [['Feature', 'Current Loan', 'Proposed Loan', 'Difference']],
         body: [
           [
@@ -175,19 +129,10 @@ async function generatePDF(pitchDeck: any) {
       });
     }
     
-    // Add date and loan officer details at the bottom
+    // Add date at the bottom
     const dateStr = new Date().toLocaleDateString();
     doc.setFontSize(8);
     doc.text(`Generated on: ${dateStr}`, 20, 285);
-    
-    // Add loan officer contact at the bottom if available
-    if (pitchDeck.mortgage_data?.loanOfficer?.name) {
-      let contactInfo = `Contact: ${pitchDeck.mortgage_data.loanOfficer.name}`;
-      if (pitchDeck.mortgage_data?.loanOfficer?.nmlsId) {
-        contactInfo += ` (NMLS ID: ${pitchDeck.mortgage_data.loanOfficer.nmlsId})`;
-      }
-      doc.text(contactInfo, 105, 285, { align: 'center' });
-    }
     
     console.log("PDF generation completed successfully");
     
