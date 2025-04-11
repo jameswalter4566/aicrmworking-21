@@ -1,110 +1,105 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { v4 as uuidv4 } from "https://deno.land/std@0.177.0/uuid/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import twilio from "https://esm.sh/twilio@4.20.0";
 
-// CORS headers for cross-origin requests
+// Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-  'Content-Type': 'application/json'
 };
 
-console.log("Twilio token function loaded");
+// Create Supabase client with service role key to bypass RLS
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Using ESM imports from Twilio
-import twilio from "npm:twilio@4.23.0";
+// Get environment variables for Twilio
+const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
+const TWILIO_API_KEY = Deno.env.get('TWILIO_API_KEY') || '';
+const TWILIO_API_SECRET = Deno.env.get('TWILIO_API_SECRET') || '';
+const TWILIO_TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID') || '';
 
+// Main function to handle requests
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders
-    });
+    return new Response(null, { headers: corsHeaders });
   }
-
+  
   try {
-    // Get Twilio credentials from environment variables
-    const ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-    const AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
-    const API_KEY = Deno.env.get('TWILIO_API_KEY');
-    const API_SECRET = Deno.env.get('TWILIO_API_SECRET');
-    const TWIML_APP_SID = Deno.env.get('TWILIO_TWIML_APP_SID');
-    const PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
-
-    if (!ACCOUNT_SID || !API_KEY || !API_SECRET || !TWIML_APP_SID) {
-      console.error("Missing required environment variables");
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: "Server configuration error. Missing required Twilio credentials."
-        }),
-        {
-          status: 500,
-          headers: corsHeaders
-        }
-      );
+    // Get auth token from request headers
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
     }
-
-    // Generate a timestamp-based identity for better uniqueness
-    const timestamp = Date.now();
-    const identity = `browser-refresh-${timestamp}`;
-    console.log(`Generated identity: ${identity}`);
-
-    // Create access token with the twilio helper library
-    const { jwt } = twilio;
-    const AccessToken = jwt.AccessToken;
+    
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Verify the user's token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    if (userError || !user) {
+      console.error('Auth error:', userError);
+      throw new Error('Unauthorized: Invalid user token');
+    }
+    
+    // Check if we have all the necessary Twilio credentials
+    if (!TWILIO_ACCOUNT_SID || !TWILIO_API_KEY || !TWILIO_API_SECRET || !TWILIO_TWIML_APP_SID) {
+      throw new Error('Missing required Twilio configuration');
+    }
+    
+    console.log(`Generating Twilio token for user: ${user.id}`);
+    
+    // Generate a unique identity for the user based on their Supabase ID
+    const identity = `user-${user.id}`;
+    
+    // Create an Access Token
+    const AccessToken = twilio.jwt.AccessToken;
     const VoiceGrant = AccessToken.VoiceGrant;
-
-    // Create an access token with 24-hour TTL
-    const token = new AccessToken(
-      ACCOUNT_SID,
-      API_KEY,
-      API_SECRET,
-      { identity, ttl: 86400 }
-    );
-
-    // Create Voice grant and add it to the access token
+    
+    // Create a Voice grant for this token
     const voiceGrant = new VoiceGrant({
-      outgoingApplicationSid: TWIML_APP_SID,
+      outgoingApplicationSid: TWILIO_TWIML_APP_SID,
       incomingAllow: true,
     });
-    token.addGrant(voiceGrant);
-
+    
+    // Create an access token which we will sign and return to the client
+    const accessToken = new AccessToken(
+      TWILIO_ACCOUNT_SID,
+      TWILIO_API_KEY,
+      TWILIO_API_SECRET,
+      { identity }
+    );
+    
+    // Add the voice grant to our token
+    accessToken.addGrant(voiceGrant);
+    
     // Generate the token
-    const tokenString = token.toJwt();
-    console.log(`Token generated successfully with 24-hour TTL (Identity: ${identity})`);
-
-    // Return the token as JSON
+    const twilioToken = accessToken.toJwt();
+    
+    console.log(`Successfully generated token for user: ${user.id}`);
+    
     return new Response(
-      JSON.stringify({
-        token: tokenString,
-        identity,
-        twilioAppSid: TWIML_APP_SID,
-        twilioPhoneNumber: PHONE_NUMBER,
-        accountSid: ACCOUNT_SID,
-        success: true,
-        ttl: 86400,
-        timestamp: new Date().toISOString(),
-        refreshRequest: false
+      JSON.stringify({ 
+        success: true, 
+        token: twilioToken
       }),
       {
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
       }
     );
   } catch (error) {
-    console.error("Error generating token:", error);
-
+    console.error(`Error generating Twilio token: ${error.message}`);
+    
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || "Failed to generate token"
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
       }),
       {
-        status: 500,
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
       }
     );
   }

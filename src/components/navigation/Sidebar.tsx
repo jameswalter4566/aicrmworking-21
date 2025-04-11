@@ -1,272 +1,210 @@
+import React from "react"
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { ModeToggle } from "@/components/ModeToggle"
+import { useAuth } from "@/context/AuthContext"
+import { useLocation, useNavigate } from "react-router-dom"
+import {
+  Home,
+  LayoutDashboard,
+  Menu,
+  Plus,
+  Settings,
+  User,
+  HelpCircle,
+  LogOut,
+  Phone
+} from "lucide-react"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
+import { Link } from "react-router-dom"
+import { Button } from "@/components/ui/button"
 
-import React, { useState } from "react";
-import { 
-  Users, Inbox, ListTodo, Calendar, 
-  BarChart2, Settings, Home, DollarSign, 
-  PhoneOutgoing, Menu, Bot, MessageSquare,
-  FileText, Calculator, Briefcase, Brain,
-  Presentation, Phone, Building
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Link, useLocation } from "react-router-dom";
-import { useIndustry } from "@/context/IndustryContext";
+const ListItem = React.forwardRef<
+  React.ElementRef<"a">,
+  React.ComponentPropsWithoutRef<"a">
+>(({ className, title, children, ...props }, ref) => {
+  return (
+    <li>
+      <NavigationMenuLink asChild>
+        <a
+          ref={ref}
+          className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
+          {...props}
+        >
+          <div className="text-sm font-medium leading-none">{title}</div>
+          <p className="line-clamp-2 text-sm leading-snug text-muted-foreground">
+            {children}
+          </p>
+        </a>
+      </NavigationMenuLink>
+    </li>
+  )
+})
+ListItem.displayName = "ListItem"
 
-// Define a type for navigation items
 interface NavItem {
-  name: string;
-  icon: React.ElementType;
-  path: string;
-  badge?: number;
+  label: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  href: string;
 }
 
-const itemColors = [
-  "bg-blue-600", // Dashboard
-  "bg-purple-600", // Leads
-  "bg-green-600", // Power Dialer
-  "bg-yellow-600", // Inbox
-  "bg-pink-600", // Tasks
-  "bg-orange-600", // Calendar
-  "bg-teal-600", // Pipeline/Deals
-  "bg-indigo-600", // Reporting
-  "bg-gray-600", // Settings
-  "bg-violet-600", // AI Dialer
-  "bg-emerald-600", // SMS Campaign
-  "bg-rose-600", // Start an Application
-  "bg-amber-600", // Quick Pricer
-  "bg-cyan-600", // Predictive Dialer
+const navigationItems: NavItem[] = [
+  {
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/",
+  },
+  {
+    label: "Contacts",
+    icon: User,
+    href: "/contacts",
+  },
+  {
+    label: "Deals",
+    icon: Home,
+    href: "/deals",
+  },
+  {
+    label: "Pitch Decks",
+    icon: Plus,
+    href: "/pitch-decks",
+  },
+  {
+    label: "Settings",
+    icon: Settings,
+    href: "/settings",
+  },
+  {
+    label: "Help",
+    icon: HelpCircle,
+    href: "/help",
+  },
+  {
+    label: "Phone",
+    icon: Phone,
+    href: "/phone",
+  },
 ];
 
-const Sidebar = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const isMobile = useIsMobile();
+export function Sidebar() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const location = useLocation();
-  const { activeIndustry } = useIndustry();
-  
-  // Base navigation items that appear for all industries
-  const baseNavItems: NavItem[] = [
-    { name: "Dashboard", icon: Home, path: "/" },
-    { name: "Leads", icon: Users, path: "/people" },
-    { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
-    { name: "Predictive Dialer", icon: Phone, path: "/predictive-dialer" },
-    { name: "AI Dialer", icon: Bot, path: "/ai-dialer" },
-    { name: "SMS Campaign", icon: MessageSquare, path: "/sms-campaign" },
-    { name: "Inbox", icon: Inbox, badge: 5, path: "#" },
-    { name: "Tasks", icon: ListTodo, path: "#" },
-    { name: "Calendar", icon: Calendar, path: "#" },
-  ];
 
-  // Conditional navigation items based on industry
-  const getIndustrySpecificItems = (): NavItem[] => {
-    if (activeIndustry === "mortgage") {
-      return [
-        { name: "Pipeline", icon: DollarSign, path: "/deals" },
-        { name: "Start an Application", icon: FileText, path: "/application" },
-        { name: "Quick Pricer", icon: Calculator, path: "/pricer" },
-        { name: "Amortization Calculator", icon: Calculator, path: "/amortization" },
-        { name: "Pitch Deck Pro", icon: Presentation, path: "/pitch-deck" },
-        { name: "Processor Assist", icon: Briefcase, path: "/processor" },
-        { name: "AI Loan Officer", icon: Brain, path: "/ai-loan-officer" },
-      ];
-    } else if (activeIndustry === "realEstate") {
-      return [
-        { name: "Pipeline", icon: Building, path: "/pipeline" },
-        { name: "AI Realtor", icon: Brain, path: "/ai-realtor" },
-        { name: "Listing Presentation Builder", icon: Presentation, path: "/listing-presentation" }
-      ];
-    } else {
-      return [
-        { name: "Deals", icon: DollarSign, path: "/deals" },
-      ];
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/login");
+      toast.success("Logged out successfully!");
+    } catch (error) {
+      console.error("Logout failed:", error);
+      toast.error("Failed to log out.");
     }
   };
-
-  // Final navigation items
-  const finalNavItems: NavItem[] = [
-    ...baseNavItems,
-    ...getIndustrySpecificItems(),
-    { name: "Reporting", icon: BarChart2, path: "#" },
-    { name: "Settings", icon: Settings, path: "/settings" },
-  ];
-  
-  const getIndustryDisplayName = () => {
-    switch (activeIndustry) {
-      case "mortgage":
-        return "Mortgage";
-      case "realEstate":
-        return "Real Estate";
-      case "debtSettlement":
-        return "Debt";
-      default:
-        return "";
-    }
-  };
-
-  const getIndustryColor = () => {
-    switch (activeIndustry) {
-      case "mortgage":
-        return "bg-blue-600";
-      case "realEstate":
-        return "bg-green-600";
-      case "debtSettlement":
-        return "bg-purple-600";
-      default:
-        return "bg-crm-blue";
-    }
-  };
-  
-  const getIndustryTextColor = () => {
-    return "text-white";
-  };
-
-  const isActive = (path: string) => {
-    if (path === "/") {
-      return location.pathname === path;
-    }
-    return location.pathname === path || 
-           (path !== "#" && location.pathname.startsWith(path));
-  };
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(prev => !prev);
-  };
-
-  if (isMobile) {
-    return (
-      <div className={`w-full ${getIndustryColor()}`}>
-        <div className="flex items-center justify-between px-4 py-2">
-          <div className="flex items-center">
-            <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold text-sm">CRM</span>
-            </div>
-            <span className="ml-2 text-lg font-semibold text-white">
-              {getIndustryDisplayName()} SalesPro
-            </span>
-          </div>
-          <button 
-            onClick={toggleMobileMenu}
-            className="text-white p-2"
-          >
-            <Menu size={24} />
-          </button>
-        </div>
-
-        {mobileMenuOpen && (
-          <div className="px-2 pb-3 pt-1">
-            <div className="grid grid-cols-3 gap-2">
-              {finalNavItems.map((item, index) => {
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.path}
-                    className={cn(
-                      "flex flex-col items-center px-3 py-3 text-sm font-medium rounded-md",
-                      active 
-                        ? "bg-white text-crm-blue"
-                        : "text-white hover:bg-white/90 hover:text-crm-blue"
-                    )}
-                  >
-                    <item.icon
-                      className={cn(
-                        "h-6 w-6 mb-2",
-                        active ? "text-crm-blue" : "text-white group-hover:text-crm-blue"
-                      )}
-                    />
-                    <span className={cn("truncate text-base", active ? "text-crm-blue" : "text-white")}>
-                      {item.name}
-                    </span>
-                    {item.badge && (
-                      <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full absolute top-0 right-0">
-                        {item.badge}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
-    <div 
-      className={cn(
-        "hidden md:block h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl",
-        getIndustryColor(),
-        expanded ? "w-72" : "w-20"
-      )}
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
-    >
-      <div className="py-6">
-        <div className={cn("px-4 py-3 mb-6", expanded ? "" : "flex justify-center")}>
-          <div className="flex items-center">
-            <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold text-sm">CRM</span>
-            </div>
-            {expanded && (
-              <span className="ml-2 text-lg font-semibold text-white">
-                {getIndustryDisplayName()} SalesPro
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="space-y-2">
-          {finalNavItems.map((item, index) => {
-            const active = isActive(item.path);
-            return (
+    <div className="border-r h-full">
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="ghost" size="sm" className="p-0 px-2">
+            <Menu className="h-4 w-4" />
+          </Button>
+        </SheetTrigger>
+        <SheetContent className="w-full sm:w-64">
+          <SheetHeader>
+            <SheetTitle>Menu</SheetTitle>
+            <SheetDescription>
+              Navigate through the application.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex flex-col gap-4 mt-4">
+            {navigationItems.map((item) => (
               <Link
-                key={item.name}
-                to={item.path}
-                className={cn(
-                  "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
-                  active 
-                    ? itemColors[index % itemColors.length]
-                    : "text-white hover:text-white",
-                  expanded ? "px-5" : "px-0 justify-center"
-                )}
+                key={item.label}
+                to={item.href}
+                className={`flex items-center space-x-2 rounded-md p-2 hover:bg-secondary ${location.pathname === item.href ? 'bg-secondary' : ''}`}
               >
-                <div 
-                  className={cn(
-                    "absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-md", 
-                    !active && itemColors[index % itemColors.length]
-                  )}
-                />
-                <item.icon
-                  className={cn(
-                    "h-6 w-6 flex-shrink-0",
-                    active ? "text-white" : "text-white group-hover:text-white",
-                    expanded ? "mr-4" : "mr-0",
-                    "relative z-10"
-                  )}
-                />
-                {expanded && (
-                  <span className={cn(
-                    "relative z-10", 
-                    active ? "text-white" : "text-white"
-                  )}>
-                    {item.name}
-                  </span>
-                )}
-                {item.badge && (
-                  <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full relative z-10">
-                    {item.badge}
-                  </span>
-                )}
-                {!expanded && item.badge && (
-                  <span className="absolute top-0 right-0 bg-crm-red w-2.5 h-2.5 rounded-full relative z-10"></span>
-                )}
+                <item.icon className="h-4 w-4" />
+                <span>{item.label}</span>
               </Link>
-            );
-          })}
+            ))}
+          </div>
+          <SheetFooter>
+            <Button onClick={handleLogout} variant="destructive" className="w-full mt-4">
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+      <div className="flex flex-col h-full">
+        <div className="px-4 py-6">
+          <NavigationMenu>
+            <NavigationMenuList>
+              {navigationItems.map((item) => (
+                <NavigationMenuItem key={item.label}>
+                  <NavigationMenuLink className={navigationMenuTriggerStyle()}>
+                    <Link
+                      to={item.href}
+                      className={`flex items-center space-x-2 rounded-md p-2 hover:bg-secondary ${location.pathname === item.href ? 'bg-secondary' : ''}`}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.label}</span>
+                    </Link>
+                  </NavigationMenuLink>
+                </NavigationMenuItem>
+              ))}
+            </NavigationMenuList>
+          </NavigationMenu>
+        </div>
+        <div className="mt-auto px-4 py-6">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="w-full justify-start gap-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={user?.user_metadata?.avatar_url} />
+                  <AvatarFallback>{user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col text-left">
+                  <span className="font-semibold">{user?.user_metadata?.full_name || user?.email}</span>
+                  <span className="text-sm text-muted-foreground">{user?.email}</span>
+                </div>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-80" align="end">
+              <DropdownMenuItem>
+                <Link to="/settings" className="w-full">
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout}>Logout</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <ModeToggle />
         </div>
       </div>
     </div>
-  );
-};
+  )
+}
 
-export default Sidebar;
+interface SheetFooterProps extends React.HTMLAttributes<HTMLDivElement> {}
+
+const SheetFooter = React.forwardRef<HTMLDivElement, SheetFooterProps>(
+  ({ className, children, ...props }, ref) => (
+    <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2" ref={ref} {...props}>
+      {children}
+    </div>
+  )
+)
+SheetFooter.displayName = "SheetFooter"
