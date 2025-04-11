@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -27,7 +26,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   const [isCopied, setIsCopied] = useState(false);
   const [landingPageUrl, setLandingPageUrl] = useState<string | null>(null);
   
-  // Reset form when modal opens or closes
   React.useEffect(() => {
     if (isOpen) {
       setSubject(pitchDeck?.title ? `Mortgage Proposal: ${pitchDeck.title}` : '');
@@ -59,7 +57,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     setIsCreatingLandingPage(true);
 
     try {
-      // Ensure the landing page exists before sending the email
       toast.info('Creating landing page and generating PDF...');
       
       const { data, error } = await supabase.functions.invoke('send-pitch-deck', {
@@ -78,31 +75,20 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       if (data.success) {
         toast.success(`Pitch deck sent to ${recipientEmail}`);
         
-        // Get the landing page URL from the response
-        let shareUrl = '';
         if (data.landingPageUrl) {
-          // Check if the URL is relative or absolute
-          if (data.landingPageUrl.startsWith('/')) {
-            // It's a relative URL, build the full URL
-            const isProduction = window.location.hostname === 'app.co' || window.location.hostname.includes('.app.co');
-            
-            if (isProduction) {
-              // Production URL
-              shareUrl = `${window.location.origin}${data.landingPageUrl}`;
-            } else {
-              // Preview URL for testing
-              shareUrl = `${window.location.origin}${data.landingPageUrl}`;
-            }
-          } else {
-            // It's an absolute URL
-            shareUrl = data.landingPageUrl;
-          }
+          setLandingPageUrl(data.landingPageUrl);
         } else {
-          // Fallback to constructing the URL ourselves
-          shareUrl = `${window.location.origin}/yourhomesolution${pitchDeck.id}`;
+          const isPreview = window.location.hostname.includes('preview--');
+          let shareUrl;
+          
+          if (isPreview) {
+            shareUrl = `https://preview--aicrmworking.lovable.app/your-home-solution/${pitchDeck.id}`;
+          } else {
+            shareUrl = `${window.location.origin}/your-home-solution/${pitchDeck.id}`;
+          }
+          
+          setLandingPageUrl(shareUrl);
         }
-        
-        setLandingPageUrl(shareUrl);
       } else {
         throw new Error(data.message || 'Failed to send email');
       }

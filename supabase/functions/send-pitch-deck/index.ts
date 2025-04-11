@@ -141,11 +141,25 @@ Deno.serve(async (req) => {
     
     console.log("Landing page ensured, now sending email...");
     
-    // Generate landing page URL based on environment
-    const landingPageUrl = `/yourhomesolution${pitchDeck.id}`;
+    // Generate correct landing page URL based on environment 
+    const landingPageUrl = `/your-home-solution/${pitchDeck.id}`;
+    
+    // Prepare the URL for the email - determine if we're in preview or production
+    const isProduction = req.headers.get('host') === 'app.co' || req.headers.get('host')?.includes('.app.co');
+    const isPreview = req.headers.get('host')?.includes('preview--');
+    
+    let fullLandingPageUrl;
+    if (isPreview) {
+      fullLandingPageUrl = `https://preview--aicrmworking.lovable.app/your-home-solution/${pitchDeck.id}`;
+    } else if (isProduction) {
+      fullLandingPageUrl = `https://app.co${landingPageUrl}`;
+    } else {
+      // Fallback for development 
+      fullLandingPageUrl = `${req.headers.get('origin') || ''}${landingPageUrl}`;
+    }
     
     // Add landing page URL to the email body
-    const emailWithLink = `${emailBody}\n\nYou can also view this proposal online at: ${landingPageUrl}`;
+    const emailWithLink = `${emailBody}\n\nYou can also view this proposal online at: ${fullLandingPageUrl}`;
     
     // Send email using our Gmail connector with improved error handling
     console.log("Calling send-gmail function...");
@@ -213,7 +227,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: `Pitch deck sent to ${recipientEmail}`,
-        landingPageUrl: landingPageUrl 
+        landingPageUrl: fullLandingPageUrl
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

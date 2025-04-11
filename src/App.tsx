@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,6 +30,7 @@ import AmortizationCalculator from "./pages/AmortizationCalculator";
 import PitchDeckPro from "./pages/PitchDeckPro";
 import PitchDeckBuilder from "./pages/PitchDeckBuilder";
 import PitchDeckLandingPage from "./pages/PitchDeckLandingPage";
+import YourHomeSolution from "./pages/YourHomeSolution";
 import PredictiveDialer from "./pages/PredictiveDialer";
 import AIRealtor from "./pages/AIRealtor";
 import ListingPresentation from "./pages/ListingPresentation";
@@ -258,9 +260,12 @@ function App() {
                 {/* Original pitch deck landing page route */}
                 <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
                 
-                {/* New simplified routes for client sharing - both formats should work */}
-                <Route path="/yourhomesolution/:id" element={<PitchDeckLandingPage />} />
-                <Route path="/yourhomesolution*" element={<PitchDeckLandingPage />} />
+                {/* New consolidated and scalable solution */}
+                <Route path="/your-home-solution/:id" element={<YourHomeSolution />} />
+                
+                {/* Legacy URL formats that will be redirected to the new format */}
+                <Route path="/yourhomesolution/:id" element={<YourHomeSolution />} />
+                <Route path="/yourhomesolution*" element={<YourHomeSolution />} />
                 
                 <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
                 
