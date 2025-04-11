@@ -7,6 +7,7 @@ import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Briefcase, FileText, HomeIcon, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 interface LoanApplication {
   id: string;
@@ -26,6 +27,12 @@ interface ProcessorTask {
   description: string;
   status: "pending" | "in_progress" | "completed" | "cancelled";
   icon: React.ReactNode;
+}
+
+interface LoanCondition {
+  id: string;
+  description: string;
+  status: "pending" | "cleared" | "waived";
 }
 
 const ProcessorAssistViewer = () => {
@@ -265,6 +272,63 @@ const ProcessorAssistViewer = () => {
             </span>
             <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
             <span className="ml-4 font-medium">{formatCurrency(loanApplication.loanAmount)}</span>
+          </div>
+        </div>
+
+        {/* Borrower's Remaining Conditions Section */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-mortgage-darkPurple mb-4">
+            Borrower's Remaining Conditions
+          </h2>
+          
+          <div className="grid grid-cols-1 gap-6">
+            {/* Master Conditions */}
+            <Card>
+              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
+                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Master Conditions</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="text-sm text-gray-500 italic">
+                  No master conditions found. Conditions will appear here when the approval letter is parsed.
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* General Conditions */}
+            <Card>
+              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
+                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">General Conditions</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="text-sm text-gray-500 italic">
+                  No general conditions found. Conditions will appear here when the approval letter is parsed.
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Prior to Final Conditions */}
+            <Card>
+              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
+                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Prior to Final Conditions</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="text-sm text-gray-500 italic">
+                  No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
+                </div>
+              </CardContent>
+            </Card>
+            
+            {/* Compliance Conditions */}
+            <Card>
+              <CardHeader className="bg-mortgage-lightPurple/20 pb-2">
+                <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Compliance Conditions</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <div className="text-sm text-gray-500 italic">
+                  No compliance conditions found. Conditions will appear here when the approval letter is parsed.
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
