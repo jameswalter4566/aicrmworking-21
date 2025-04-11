@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,9 @@ interface PitchDeck {
   loan_officer_info?: LoanOfficerInfo;
   created_at: string;
   updated_at: string;
+  created_by?: string;
+  lead_id?: string;
+  template_type?: string;
 }
 
 const YourHomeSolution = () => {
@@ -120,8 +124,14 @@ const YourHomeSolution = () => {
             ? JSON.parse(data.mortgage_data) 
             : (data.mortgage_data as MortgageData) || {};
           
-          const clientInfo = typeof data.client_info === 'object' ? data.client_info as ClientInfo : {} as ClientInfo;
-          const loanOfficerInfo = typeof data.loan_officer_info === 'object' ? data.loan_officer_info as LoanOfficerInfo : {} as LoanOfficerInfo;
+          // Handle client_info and loan_officer_info which might be missing from the database type
+          const clientInfo = data.client_info ? 
+            (typeof data.client_info === 'string' ? JSON.parse(data.client_info) : data.client_info) as ClientInfo : 
+            {} as ClientInfo;
+          
+          const loanOfficerInfo = data.loan_officer_info ?
+            (typeof data.loan_officer_info === 'string' ? JSON.parse(data.loan_officer_info) : data.loan_officer_info) as LoanOfficerInfo :
+            {} as LoanOfficerInfo;
           
           const enhancedData: PitchDeck = {
             ...data,
