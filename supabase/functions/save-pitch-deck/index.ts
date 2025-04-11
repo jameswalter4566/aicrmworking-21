@@ -1,567 +1,32 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
-import { jsPDF } from 'https://esm.sh/jspdf@2.5.1'
-import autoTable from 'https://esm.sh/jspdf-autotable@3.8.2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { PDFDocument, rgb, StandardFonts, PageSizes } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
 
 // Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+};
 
 // Create Supabase client with service role key to bypass RLS
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Format currency for PDF generation
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-};
-
-// Format percentage for PDF generation
-const formatPercentage = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'percent',
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3
-  }).format(value / 100);
-};
-
-// Generate PDF from pitch deck data
-async function generatePDF(pitchDeck: any) {
-  try {
-    console.log("Starting enhanced PDF generation for pitch deck:", pitchDeck.id);
-    
-    // Create new PDF document
-    const doc = new jsPDF();
-    const primaryColor = [0, 174, 239]; // Light blue color (#00AEEF)
-    const secondaryColor = [255, 242, 0]; // Yellow color (#FFF200)
-    
-    // Helper function to add a colored header
-    const addHeader = (text: string, y: number) => {
-      doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.rect(20, y, 170, 10, 'F');
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text(text, 105, y + 7, { align: 'center' });
-      doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-    };
-
-    // Add company logo or title
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.text(pitchDeck.title, 105, 20, { align: 'center' });
-    
-    const currentDate = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    });
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Date: ${currentDate}`, 20, 30);
-    
-    // PAGE 1: CURRENT SITUATION ANALYSIS
-    addHeader("Current Situation Analysis", 40);
-    
-    // Current situation text
-    doc.setFontSize(10);
-    doc.text(
-      "Often times when a homeowner does a mortgage analysis, they only review the " +
-      "mortgage numbers. However, to get a clearer overall financial picture, we provide " +
-      "clients with a general overview of the expenses associated with living in their specific " +
-      "state. This analysis is designed to give you an idea as to how much cash flow is " +
-      "remaining at the end of every month - once all your expenses are accounted for.", 
-      20, 60, { maxWidth: 170, align: 'left' }
-    );
-    
-    // Monthly Income Analysis Table
-    const incomeData = [
-      ['Your Gross Monthly Income', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.income || 0)],
-      ['Taxes', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.taxes || 0)],
-      ['Current Mortgage*', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.payment || 0)],
-      ['Installment Loans*', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.installmentLoans || 0)],
-      ['Credit Cards*', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.creditCards || 0)],
-      ['Utilities*', '#N/A'],
-      ['Auto Insurance**', '#N/A'],
-      ['Healthcare & Insurance**', '#N/A'],
-      ['Gasoline**', '#N/A'],
-      ['Cell Phone**', formatCurrency(-130)],
-      ['Food**', formatCurrency(-240)],
-      ['Emergency Fund', ''],
-      ['Entertainment', ''],
-    ];
-    
-    autoTable(doc, {
-      startY: 85,
-      head: [],
-      body: incomeData,
-      theme: 'grid',
-      styles: { fontSize: 10 },
-      columnStyles: {
-        0: { cellWidth: 100 },
-        1: { cellWidth: 70, halign: 'right' }
-      }
-    });
-    
-    // Add discretionary income row with special coloring
-    const lastY = (doc as any).lastAutoTable.finalY;
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(20, lastY, 100, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.text("Discretionary Income", 25, lastY + 7);
-    doc.setTextColor(0, 0, 0);
-    
-    doc.setFillColor(255, 200, 200);  // Light red
-    doc.rect(120, lastY, 70, 10, 'F');
-    doc.text("#N/A", 180, lastY + 7, { align: 'right' });
-    
-    // Add notes
-    doc.setFontSize(8);
-    doc.text("*Based on your credit report.", 20, lastY + 20);
-    doc.text("**Based on an average household of your size.", 20, lastY + 25);
-    
-    // Add goal statement
-    doc.setFontSize(10);
-    doc.text(
-      "Our goal is to make sure that we put our borrowers in a better financial position and " +
-      "increase their overall enjoyment of life. We accomplish this by finding hidden areas in your " +
-      "mortgage and expenses that can be reallocated to your entertainment, family, future, and " +
-      "financial freedom.",
-      20, lastY + 40, { maxWidth: 170 }
-    );
-    
-    // Add Refinance Goals
-    addHeader("Refinance Goals", lastY + 55);
-    
-    // Add bullet points for goals
-    const goals = pitchDeck.mortgage_data?.goals || [];
-    const goalStrings = goals.length > 0 ? goals : ["Lower monthly payment", "Reduce interest rate", "Consolidate debt"];
-    
-    let goalY = lastY + 70;
-    goalStrings.forEach(goal => {
-      doc.text(`• ${goal}`, 30, goalY);
-      goalY += 7;
-    });
-    
-    // Add contact footer
-    let footerY = 250;
-    doc.setFontSize(9);
-    doc.text(
-      "Always feel free to contact me directly\nwith any questions. My goal is to assist\nyou with your financing. Let me know\nhow I can help you!",
-      20, footerY
-    );
-    
-    const contactInfo = pitchDeck.mortgage_data?.contactInfo || {
-      address: "250 Commerce, Suite 220, Irvine, CA 92614",
-      office: "",
-      fax: "",
-      website: "www.example.com"
-    };
-    
-    doc.text(contactInfo.address, 130, footerY);
-    doc.text(`Office: ${contactInfo.office}`, 130, footerY + 7);
-    doc.text(`Fax: ${contactInfo.fax || ""}`, 130, footerY + 14);
-    doc.setTextColor(0, 0, 255);
-    doc.text(contactInfo.website || "", 130, footerY + 21);
-    doc.setTextColor(0, 0, 0);
-    
-    // PAGE 2: LOAN SOLUTIONS
-    doc.addPage();
-    
-    // Add header
-    const loanConsultant = pitchDeck.mortgage_data?.loanConsultant || "Mortgage Advisor";
-    doc.text(`DATE: ${currentDate}`, 150, 15, { align: 'right' });
-    doc.text(`Loan Consultant: ${loanConsultant}`, 150, 22, { align: 'right' });
-    
-    // Add title
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(20, 30, 170, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text("LOAN SOLUTIONS", 105, 37, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    
-    // Add introduction text
-    doc.text(
-      "Thank you for taking the time to and for choosing us for the refinancing of your mortgage. " +
-      "This decision is a very important one, and I want to make sure you have all the available information necessary to make an educated decision, " +
-      "one that you will be happy with years after we close your loan.",
-      20, 50, { maxWidth: 170 }
-    );
-    
-    // Add instruction text in blue
-    doc.setTextColor(0, 0, 255);
-    doc.text(
-      "Please review the pre-approved options below, select which option looks best to you, and send back with the rest of the required loan disclosures per our request.",
-      20, 70, { maxWidth: 170 }
-    );
-    doc.setTextColor(0, 0, 0);
-    
-    // Option 1: Lowest Rate
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(20, 85, 170, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.text("Lowest Rate", 105, 92, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    
-    // Option 1 details
-    const option1Data = [
-      ['Interest Rate:', (pitchDeck.mortgage_data?.proposedLoan?.rate || 0).toFixed(3) + '%'],
-      ['Prepaid Interest:', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.prepaidInterest || 0)],
-      ['New Loan Balance:', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.amount || 0)],
-      ['Term:', `${pitchDeck.mortgage_data?.proposedLoan?.term || 30} years`],
-      ['Principal and Interest:', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.payment || 0)]
-    ];
-    
-    autoTable(doc, {
-      startY: 95,
-      head: [],
-      body: option1Data,
-      theme: 'plain',
-      styles: { fontSize: 10 },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: 40, halign: 'right' }
-      }
-    });
-    
-    // Add yellow box with total
-    doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.rect(120, 130, 70, 25, 'F');
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text("SOLUTION 1", 125, 140);
-    doc.text("TOTAL PAYMENTS", 125, 148);
-    doc.setFontSize(18);
-    doc.text(formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.payment || 0), 155, 148, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    
-    // Add benefits text
-    doc.setFontSize(10);
-    doc.text(
-      `By refinancing your loan you will receive ${formatCurrency(pitchDeck.mortgage_data?.savings?.cashOut || 0)} Cash back. ` +
-      "The interest on your mortgage may be tax deductible, so please consult an accountant.",
-      200, 110, { maxWidth: 70, align: 'left' }
-    );
-    
-    // Option 2: Low Cost
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(20, 165, 170, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.text("Low Cost", 105, 172, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    
-    // Option 2 details - slightly different rate
-    const option2Rate = ((pitchDeck.mortgage_data?.proposedLoan?.rate || 0) + 0.125);
-    const option2Data = [
-      ['Interest Rate:', option2Rate.toFixed(3) + '%'],
-      ['Prepaid Interest:', formatCurrency((pitchDeck.mortgage_data?.proposedLoan?.prepaidInterest || 0) * 0.5)],
-      ['New Loan Balance:', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.amount || 0)],
-      ['Term:', `${pitchDeck.mortgage_data?.proposedLoan?.term || 30} years`],
-      ['Principal and Interest:', formatCurrency((pitchDeck.mortgage_data?.proposedLoan?.payment || 0) * 1.05)]
-    ];
-    
-    autoTable(doc, {
-      startY: 175,
-      head: [],
-      body: option2Data,
-      theme: 'plain',
-      styles: { fontSize: 10 },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: 40, halign: 'right' }
-      }
-    });
-    
-    // Add yellow box with total
-    doc.setFillColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.rect(120, 210, 70, 25, 'F');
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text("SOLUTION 2", 125, 220);
-    doc.text("TOTAL PAYMENTS", 125, 228);
-    doc.setFontSize(18);
-    doc.text(formatCurrency((pitchDeck.mortgage_data?.proposedLoan?.payment || 0) * 1.05), 155, 228, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    
-    // Add benefits text
-    doc.setFontSize(10);
-    doc.text(
-      `Option 1 has ${formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.prepaidInterest || 0)} of prepaid interest for a lower rate. ` +
-      `Option 2 has less prepaid interest. The hard cost for both loans in your state of ${pitchDeck.mortgage_data?.state || "CA"} is ${formatCurrency(2690)}.`,
-      200, 190, { maxWidth: 70, align: 'left' }
-    );
-    
-    // Current Situation (Option 3)
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(20, 245, 170, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(14);
-    doc.text("Current Situation", 105, 252, { align: 'center' });
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    
-    // Current situation details
-    const option3Data = [
-      ['Interest Rate:', (pitchDeck.mortgage_data?.currentLoan?.rate || 0).toFixed(3) + '%'],
-      ['Lender Credit:', formatCurrency(0)],
-      ['Current Loan Balance:', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.balance || 0)],
-      ['Term:', `${pitchDeck.mortgage_data?.currentLoan?.term || 30} years`],
-      ['Principal and Interest (Plus mortgage insurance):', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.payment || 0)]
-    ];
-    
-    autoTable(doc, {
-      startY: 255,
-      head: [],
-      body: option3Data,
-      theme: 'plain',
-      styles: { fontSize: 10 },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: 40, halign: 'right' }
-      }
-    });
-    
-    // Add red box with total
-    doc.setFillColor(255, 0, 0);
-    doc.rect(120, 290, 70, 25, 'F');
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text("SOLUTION 3", 125, 300);
-    doc.text("TOTAL PAYMENTS", 125, 308);
-    doc.setFontSize(18);
-    doc.text("#VALUE!", 155, 308, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0, 0, 0);
-    
-    // Add footer with contact info again
-    footerY = 330;
-    doc.setFontSize(9);
-    doc.text(
-      "Always feel free to contact me directly\nwith any questions. My goal is to assist\nyou with your financing. Let me know\nhow I can help you!",
-      20, footerY
-    );
-    
-    doc.text(contactInfo.address, 130, footerY);
-    doc.text(`Office: ${contactInfo.office}`, 130, footerY + 7);
-    doc.text(`Fax: ${contactInfo.fax || ""}`, 130, footerY + 14);
-    doc.setTextColor(0, 0, 255);
-    doc.text(contactInfo.website || "", 130, footerY + 21);
-    doc.setTextColor(0, 0, 0);
-    
-    // PAGE 3: DETAILED LOAN COMPARISON
-    doc.addPage();
-    
-    // Create three column comparison table
-    const colWidth = 170 / 3;
-    
-    // Create headers for the three sections
-    // Loan Payoffs section
-    doc.setFillColor(0, 0, 0);
-    doc.rect(20, 20, colWidth, 10, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12);
-    doc.text("💰Loan Payoffs", 25, 27);
-    
-    // Current Loan Information section
-    doc.setFillColor(150, 150, 150);
-    doc.rect(20 + colWidth, 20, colWidth, 10, 'F');
-    doc.text("🏠Current Loan Information", 25 + colWidth, 27);
-    
-    // New Loan Information section
-    doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.rect(20 + 2 * colWidth, 20, colWidth, 10, 'F');
-    doc.text("🏠New Loan Information", 25 + 2 * colWidth, 27);
-    doc.setTextColor(0, 0, 0);
-    
-    // Loan Payoffs content
-    doc.setFontSize(10);
-    const payoffData = [
-      ['Current Loan Balance', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.balance || 0)],
-      ['Remaining Monthly Payments', pitchDeck.mortgage_data?.currentLoan?.remainingPayments || 0],
-      ['Payment (P.I.M.I)', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.payment || 0)],
-      ['Revolving Debt', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.revolvingDebt || 0)],
-      ['Minimum Payment', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.minPayment || 0)],
-      ['Installment Debt', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.installmentDebt || 0)],
-      ['Payment', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.installmentPayment || 0)],
-    ];
-    
-    autoTable(doc, {
-      startY: 35,
-      head: [],
-      body: payoffData,
-      theme: 'plain',
-      styles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: colWidth - 85, halign: 'right' }
-      },
-      margin: { left: 20 }
-    });
-    
-    // Loan Benefits
-    const lastY1 = (doc as any).lastAutoTable.finalY;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text("Loan Benefits", 25, lastY1 + 10);
-    doc.setFont('helvetica', 'normal');
-    
-    const benefitsData = [
-      ['Cash to You!', formatCurrency(pitchDeck.mortgage_data?.savings?.cashOut || 0)],
-      ['#VALUE!', '#VALUE!'],
-      ['#VALUE!', '#VALUE!'],
-    ];
-    
-    autoTable(doc, {
-      startY: lastY1 + 15,
-      head: [],
-      body: benefitsData,
-      theme: 'plain',
-      styles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: colWidth - 85, halign: 'right' }
-      },
-      margin: { left: 20 }
-    });
-    
-    const benefitsY = (doc as any).lastAutoTable.finalY;
-    doc.text("#VALUE!", 25, benefitsY + 10);
-    
-    // Current Loan Information content
-    doc.setFontSize(10);
-    doc.text(`Interest Rate: ${(pitchDeck.mortgage_data?.currentLoan?.rate || 0).toFixed(3)}%`, 25 + colWidth, 40);
-    
-    // Current Loan Details
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text("Current Loan Details", 25 + colWidth, 60);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    
-    const currentLoanData = [
-      ['Aggregate Payments', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.aggregatePayments || 0)],
-      ['Current Mortgage Balance', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.balance || 0)],
-      ['Remaining Term', `${Math.floor((pitchDeck.mortgage_data?.currentLoan?.remainingPayments || 0) / 12)} Years, ${(pitchDeck.mortgage_data?.currentLoan?.remainingPayments || 0) % 12} Months`],
-      ['Total Interest', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.totalInterest || 0)],
-      ['Total Payments', formatCurrency(pitchDeck.mortgage_data?.currentLoan?.totalPayments || 0)],
-    ];
-    
-    autoTable(doc, {
-      startY: 65,
-      head: [],
-      body: currentLoanData,
-      theme: 'plain',
-      styles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: colWidth - 85, halign: 'right' }
-      },
-      margin: { left: 20 + colWidth }
-    });
-    
-    // Total Cost of Loan
-    const currentLoanY = (doc as any).lastAutoTable.finalY;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text("Total Cost of Loan", 25 + colWidth, currentLoanY + 10);
-    doc.setFont('helvetica', 'normal');
-    
-    doc.setFontSize(18);
-    doc.text(formatCurrency(pitchDeck.mortgage_data?.currentLoan?.totalCost || 0), 25 + colWidth + colWidth/2, currentLoanY + 30, { align: 'center' });
-    
-    // New Loan Information content
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text("New Loan Details", 25 + 2 * colWidth, 40);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    
-    const newLoanData = [
-      ['Monthly Payment (+ MIP if applicable)', '#VALUE!'],
-      ['Monthly Payment + Escrows', 'No Escrow'],
-      ['New Loan Amount', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.amount || 0)],
-      ['Term in Years', pitchDeck.mortgage_data?.proposedLoan?.term || 30],
-      ['Total Loan Interest', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.totalInterest || 0)],
-      ['Total Payments', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.totalPayments || 0)],
-      ['Interest Rate', (pitchDeck.mortgage_data?.proposedLoan?.rate || 0).toFixed(3) + '%'],
-      ['Titan Lender Fees', formatCurrency(2690)],
-      ['3rd party fees', formatCurrency(0)],
-      ['Prepaid Interest to Secure Below Market Interest Rate', formatCurrency(pitchDeck.mortgage_data?.proposedLoan?.prepaidInterest || 0)],
-      ['Upfront Mortgage Insurance/Funding Fee', '#DIV/0!'],
-      ['Monthly MIP', formatCurrency(0)],
-      ['Escrow Impounds/Prepaids', formatCurrency(0)],
-      ['Monthly Escrow Contribution', formatCurrency(0)],
-      ['APR', '#VALUE!'],
-    ];
-    
-    autoTable(doc, {
-      startY: 45,
-      head: [],
-      body: newLoanData,
-      theme: 'plain',
-      styles: { fontSize: 9 },
-      columnStyles: {
-        0: { cellWidth: 80 },
-        1: { cellWidth: colWidth - 85, halign: 'right' }
-      },
-      margin: { left: 20 + 2 * colWidth }
-    });
-    
-    // Value highlights
-    const newLoanY = (doc as any).lastAutoTable.finalY;
-    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text("#VALUE!", 25 + 2 * colWidth + colWidth/2, newLoanY + 10, { align: 'center' });
-    
-    doc.setFontSize(18);
-    doc.text("#VALUE!", 25 + 2 * colWidth + colWidth/2, newLoanY + 25, { align: 'center' });
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(0, 0, 0);
-    
-    // Disclaimer text
-    doc.setFontSize(7);
-    doc.text(
-      "**This is not a commitment to lend or an approval of a loan, your application will be subject to underwriting approval and possibly an acceptable property appraisal. " + 
-      "This is only an estimate based on the preliminary terms discussed. These terms may not be accurate and the actual terms of a new loan may be different based on your individual circumstances " +
-      "including the interest rate, loan amount and term of the loan. All terms are subject to change based on your individual circumstances at approval. Please review your loan disclosures upon receipt, including the Loan Estimate for actual terms, fees and conditions.",
-      20, 280, { maxWidth: 170 }
-    );
-    
-    doc.text(
-      "**\"Total Savings\" is the difference between your current loan and the estimates of a new loan including interest, over the life of the loan. " +
-      "\"Payoff Accelerator Option\" is applicable only if the difference between your current loan payment and the estimated new loan payment is applied to the outstanding principal balance of the estimated new loan on a monthly basis.**",
-      20, 295, { maxWidth: 170 }
-    );
-
-    console.log("Enhanced PDF generation completed successfully");
-    
-    // Return the PDF as a base64 string
-    return doc.output('datauristring');
-  } catch (err) {
-    console.error("Error generating enhanced PDF:", err);
-    throw new Error(`PDF generation failed: ${err.message}`);
-  }
+// Helper function to generate a URL slug
+function generateSlug(title: string, lastName: string = '') {
+  // Create base from last name if available
+  let slug = lastName ? `${lastName.toLowerCase()}-` : '';
+  
+  // Add title to slug, sanitized
+  slug += title
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')  // Remove special chars
+    .replace(/\s+/g, '-')      // Replace spaces with hyphens
+    .replace(/-+/g, '-')       // Remove consecutive hyphens
+    + '-home-solution';
+    
+  return slug;
 }
 
 // Main function to handle requests
@@ -572,95 +37,84 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get auth token from request headers
+    const authHeader = req.headers.get('Authorization');
+    
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+    
+    // Extract JWT token
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Get user from token
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      console.error('Auth error:', userError);
+      throw new Error('Unauthorized: Invalid user token');
+    }
+    
     // Parse request body
-    const requestBody = await req.json();
-    console.log("Received request with action:", requestBody.action);
+    const { action, pitchDeckData, pitchDeckId, generatePdf = true } = await req.json();
     
-    const { action, pitchDeckData, pitchDeckId, generatePdf, token } = requestBody;
-    
-    // Check for token - either from headers or from the request body (for function-to-function calls)
-    let authToken = req.headers.get('Authorization');
-    if (authToken) {
-      authToken = authToken.replace('Bearer ', '');
-    } else if (token) {
-      authToken = token;
-      console.log("Using token from request body");
-    }
-    
-    let userId = null;
-    
-    // Get user from token if provided
-    if (authToken) {
-      try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser(authToken);
-        
-        if (!userError && user) {
-          userId = user.id;
-          console.log(`Authenticated as user: ${userId}`);
-        } else {
-          console.log('Token provided but user not found or error occurred');
-          // Continue without user ID for public access endpoints
-        }
-      } catch (error) {
-        console.log('Error verifying token:', error.message);
-        // Continue without user ID for public access endpoints
-      }
-    }
+    console.log(`Action: ${action}, User ID: ${user.id}`);
     
     let responseData;
-    let pdfData = null;
-    
-    console.log(`Action: ${action}, User ID: ${userId || 'Not authenticated'}`);
     
     switch (action) {
       case 'save':
-        // Check if this is an update or create
-        if (pitchDeckId) {
-          // Update existing pitch deck
-          console.log(`Updating pitch deck ${pitchDeckId}`);
-          
-          // If userId is available, check ownership
-          const query = supabase
-            .from('pitch_decks')
-            .update({ 
-              ...pitchDeckData, 
-              updated_at: new Date().toISOString() 
-            })
-            .eq('id', pitchDeckId);
-          
-          // Add user check if userId is available
-          if (userId) {
-            query.eq('created_by', userId);
+        // Process pitch deck data before saving
+        let dataToSave = { ...pitchDeckData };
+        
+        // Generate a unique slug for the pitch deck if not already present
+        if (!dataToSave.slug) {
+          // Try to get lead details if lead_id is available
+          let lastName = '';
+          if (dataToSave.lead_id) {
+            const { data: leadData } = await supabase
+              .from('leads')
+              .select('last_name')
+              .eq('id', dataToSave.lead_id)
+              .single();
+              
+            if (leadData && leadData.last_name) {
+              lastName = leadData.last_name;
+            }
           }
-            
-          const { data: updatedDeck, error: updateError } = await query.select('*').single();
+          
+          dataToSave.slug = generateSlug(dataToSave.title, lastName);
+        }
+        
+        console.log('Saving pitch deck with data:', dataToSave);
+        
+        // If we have an existing pitch deck, update it
+        if (pitchDeckId) {
+          const { data: updateData, error: updateError } = await supabase
+            .from('pitch_decks')
+            .update({
+              ...dataToSave,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', pitchDeckId)
+            .eq('created_by', user.id)
+            .select('*')
+            .single();
             
           if (updateError) {
             console.error('Update error details:', updateError);
             throw new Error(`Failed to update pitch deck: ${updateError.message}`);
           }
           
-          console.log('Successfully updated pitch deck');
-          responseData = { success: true, data: updatedDeck };
-          
-          // Generate PDF if requested
-          if (generatePdf && updatedDeck) {
-            try {
-              pdfData = await generatePDF(updatedDeck);
-            } catch (pdfError) {
-              console.error('PDF generation error:', pdfError);
-              // Continue without throwing to return the updated deck data
-            }
-          }
-        } else if (userId) {
-          // Create new pitch deck - requires authentication
-          console.log('Creating new pitch deck');
-          
-          const { data: newDeck, error: createError } = await supabase
+          console.log('Successfully updated pitch deck:', updateData);
+          responseData = { success: true, data: updateData };
+        } else {
+          // Create new pitch deck
+          const { data: newDeckData, error: createError } = await supabase
             .from('pitch_decks')
             .insert({
-              ...pitchDeckData,
-              created_by: userId,
+              ...dataToSave,
+              created_by: user.id,
             })
             .select('*')
             .single();
@@ -670,71 +124,409 @@ Deno.serve(async (req) => {
             throw new Error(`Failed to create pitch deck: ${createError.message}`);
           }
           
-          console.log('Successfully created pitch deck:', newDeck);
-          responseData = { success: true, data: newDeck };
-          
-          // Generate PDF if requested
-          if (generatePdf && newDeck) {
-            try {
-              pdfData = await generatePDF(newDeck);
-            } catch (pdfError) {
-              console.error('PDF generation error:', pdfError);
-              // Continue without throwing to return the created deck data
-            }
-          }
-        } else {
-          throw new Error('Authentication required to create a pitch deck');
+          console.log('Successfully created pitch deck:', newDeckData);
+          responseData = { success: true, data: newDeckData };
         }
         break;
         
       case 'get-pdf':
-        // Get pitch deck and generate PDF
-        console.log(`Generating PDF for pitch deck ${pitchDeckId}`);
-        
         if (!pitchDeckId) {
-          throw new Error('Missing required parameter: pitchDeckId');
+          throw new Error('Pitch deck ID is required');
         }
         
-        const deckQuery = supabase
+        // Get the pitch deck data
+        const { data: deckData, error: getDeckError } = await supabase
           .from('pitch_decks')
           .select('*')
-          .eq('id', pitchDeckId);
-        
-        // Add user check if userId is available  
-        if (userId) {
-          deckQuery.eq('created_by', userId);
-        }
-        
-        const { data: deckData, error: getError } = await deckQuery.single();
+          .eq('id', pitchDeckId)
+          .eq('created_by', user.id)
+          .single();
           
-        if (getError) {
-          console.error('Error fetching pitch deck:', getError);
-          throw new Error(`Failed to get pitch deck: ${getError.message}`);
+        if (getDeckError || !deckData) {
+          console.error('Get deck error:', getDeckError);
+          throw new Error(`Failed to get pitch deck: ${getDeckError?.message || 'Not found'}`);
         }
         
-        if (!deckData) {
-          throw new Error(`Pitch deck not found with ID: ${pitchDeckId}`);
-        }
+        // Generate PDF
+        console.log('Generating PDF for pitch deck:', deckData.title);
         
-        console.log("Pitch deck found, generating PDF...");
+        const pdfDoc = await PDFDocument.create();
+        const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
         
-        try {
-          pdfData = await generatePDF(deckData);
-          console.log("PDF generated successfully, length:", pdfData.length);
-          responseData = { success: true, data: { id: pitchDeckId } };
-        } catch (pdfError) {
-          console.error('PDF generation error:', pdfError);
-          throw new Error(`Failed to generate PDF: ${pdfError.message}`);
-        }
+        // Create first page - Current Situation Analysis
+        const page1 = pdfDoc.addPage(PageSizes.LETTER);
+        const { width, height } = page1.getSize();
+        const margin = 50;
+        
+        // Title
+        page1.drawText(`${deckData.title}`, {
+          x: margin,
+          y: height - margin,
+          size: 24,
+          font: helveticaBold,
+          color: rgb(0.1, 0.1, 0.4)
+        });
+        
+        // Current situation heading
+        page1.drawText(`Current Situation Analysis`, {
+          x: margin,
+          y: height - margin - 50,
+          size: 18,
+          font: helveticaBold,
+          color: rgb(0.2, 0.2, 0.5)
+        });
+        
+        // Current loan details
+        const currentLoan = deckData.mortgage_data?.currentLoan || {};
+        page1.drawText(`Current Mortgage Overview`, {
+          x: margin,
+          y: height - margin - 100,
+          size: 14,
+          font: helveticaBold,
+        });
+        
+        page1.drawText(`Loan Balance: $${Number(currentLoan.balance || 0).toLocaleString()}`, {
+          x: margin,
+          y: height - margin - 130,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page1.drawText(`Interest Rate: ${Number(currentLoan.rate || 0).toFixed(3)}%`, {
+          x: margin,
+          y: height - margin - 150,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page1.drawText(`Monthly Payment: $${Number(currentLoan.payment || 0).toLocaleString()}`, {
+          x: margin,
+          y: height - margin - 170,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page1.drawText(`Loan Term: ${Number(currentLoan.term || 0)} years`, {
+          x: margin,
+          y: height - margin - 190,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page1.drawText(`Loan Type: ${currentLoan.type || 'N/A'}`, {
+          x: margin,
+          y: height - margin - 210,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        // Financial impact section
+        page1.drawText(`Financial Impact Assessment`, {
+          x: margin,
+          y: height - margin - 250,
+          size: 14,
+          font: helveticaBold,
+        });
+        
+        const totalInterest = currentLoan.balance * (currentLoan.rate / 100) * currentLoan.term;
+        page1.drawText(`Estimated Total Interest Over Life of Loan: $${Math.round(totalInterest).toLocaleString()}`, {
+          x: margin,
+          y: height - margin - 280,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        // Create second page - Loan Solutions
+        const page2 = pdfDoc.addPage(PageSizes.LETTER);
+        
+        // Title
+        page2.drawText(`Loan Solutions & Recommendations`, {
+          x: margin,
+          y: height - margin,
+          size: 20,
+          font: helveticaBold,
+          color: rgb(0.1, 0.1, 0.4)
+        });
+        
+        // Proposed loan details
+        const proposedLoan = deckData.mortgage_data?.proposedLoan || {};
+        page2.drawText(`Proposed Mortgage Solution`, {
+          x: margin,
+          y: height - margin - 50,
+          size: 16,
+          font: helveticaBold,
+          color: rgb(0.2, 0.5, 0.2)
+        });
+        
+        page2.drawText(`Loan Amount: $${Number(proposedLoan.amount || 0).toLocaleString()}`, {
+          x: margin,
+          y: height - margin - 80,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page2.drawText(`Interest Rate: ${Number(proposedLoan.rate || 0).toFixed(3)}%`, {
+          x: margin,
+          y: height - margin - 100,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page2.drawText(`Monthly Payment: $${Number(proposedLoan.payment || 0).toLocaleString()}`, {
+          x: margin,
+          y: height - margin - 120,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page2.drawText(`Loan Term: ${Number(proposedLoan.term || 0)} years`, {
+          x: margin,
+          y: height - margin - 140,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page2.drawText(`Loan Type: ${proposedLoan.type || 'N/A'}`, {
+          x: margin,
+          y: height - margin - 160,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        // Benefits section
+        page2.drawText(`Benefits of This Solution`, {
+          x: margin,
+          y: height - margin - 200,
+          size: 16,
+          font: helveticaBold,
+        });
+        
+        const savings = deckData.mortgage_data?.savings || {};
+        page2.drawText(`Monthly Savings: $${Number(savings.monthly || 0).toLocaleString()}`, {
+          x: margin,
+          y: height - margin - 230,
+          size: 14,
+          font: helveticaBold,
+          color: rgb(0.2, 0.6, 0.2)
+        });
+        
+        page2.drawText(`Lifetime Savings: $${Number(savings.lifetime || 0).toLocaleString()}`, {
+          x: margin,
+          y: height - margin - 250,
+          size: 14,
+          font: helveticaBold,
+          color: rgb(0.2, 0.6, 0.2)
+        });
+        
+        // Create third page - Detailed Comparison
+        const page3 = pdfDoc.addPage(PageSizes.LETTER);
+        
+        // Title
+        page3.drawText(`Detailed Loan Comparison`, {
+          x: margin,
+          y: height - margin,
+          size: 20,
+          font: helveticaBold,
+          color: rgb(0.1, 0.1, 0.4)
+        });
+        
+        // Column headers
+        const col1 = margin;
+        const col2 = margin + 150;
+        const col3 = margin + 300;
+        const col4 = margin + 450;
+        
+        page3.drawText(`Feature`, {
+          x: col1,
+          y: height - margin - 50,
+          size: 12,
+          font: helveticaBold,
+        });
+        
+        page3.drawText(`Current Loan`, {
+          x: col2,
+          y: height - margin - 50,
+          size: 12,
+          font: helveticaBold,
+        });
+        
+        page3.drawText(`Proposed Loan`, {
+          x: col3,
+          y: height - margin - 50,
+          size: 12,
+          font: helveticaBold,
+        });
+        
+        page3.drawText(`Difference`, {
+          x: col4,
+          y: height - margin - 50,
+          size: 12,
+          font: helveticaBold,
+        });
+        
+        // Draw line under headers
+        page3.drawLine({
+          start: { x: col1, y: height - margin - 60 },
+          end: { x: col4 + 80, y: height - margin - 60 },
+          thickness: 1,
+          color: rgb(0.7, 0.7, 0.7),
+        });
+        
+        // Row 1 - Principal
+        const row1Y = height - margin - 80;
+        page3.drawText(`Principal`, {
+          x: col1,
+          y: row1Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`$${Number(currentLoan.balance || 0).toLocaleString()}`, {
+          x: col2,
+          y: row1Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`$${Number(proposedLoan.amount || 0).toLocaleString()}`, {
+          x: col3,
+          y: row1Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        const principalDiff = (proposedLoan.amount || 0) - (currentLoan.balance || 0);
+        page3.drawText(`$${Number(principalDiff).toLocaleString()}`, {
+          x: col4,
+          y: row1Y,
+          size: 12,
+          font: helveticaFont,
+          color: principalDiff < 0 ? rgb(0.2, 0.6, 0.2) : rgb(0.8, 0.2, 0.2)
+        });
+        
+        // Row 2 - Interest Rate
+        const row2Y = height - margin - 100;
+        page3.drawText(`Interest Rate`, {
+          x: col1,
+          y: row2Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`${Number(currentLoan.rate || 0).toFixed(3)}%`, {
+          x: col2,
+          y: row2Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`${Number(proposedLoan.rate || 0).toFixed(3)}%`, {
+          x: col3,
+          y: row2Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        const rateDiff = (proposedLoan.rate || 0) - (currentLoan.rate || 0);
+        page3.drawText(`${rateDiff.toFixed(3)}%`, {
+          x: col4,
+          y: row2Y,
+          size: 12,
+          font: helveticaFont,
+          color: rateDiff < 0 ? rgb(0.2, 0.6, 0.2) : rgb(0.8, 0.2, 0.2)
+        });
+        
+        // Row 3 - Monthly Payment
+        const row3Y = height - margin - 120;
+        page3.drawText(`Monthly Payment`, {
+          x: col1,
+          y: row3Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`$${Number(currentLoan.payment || 0).toLocaleString()}`, {
+          x: col2,
+          y: row3Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`$${Number(proposedLoan.payment || 0).toLocaleString()}`, {
+          x: col3,
+          y: row3Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        const paymentDiff = (proposedLoan.payment || 0) - (currentLoan.payment || 0);
+        page3.drawText(`$${Number(paymentDiff).toLocaleString()}`, {
+          x: col4,
+          y: row3Y,
+          size: 12,
+          font: helveticaFont,
+          color: paymentDiff < 0 ? rgb(0.2, 0.6, 0.2) : rgb(0.8, 0.2, 0.2)
+        });
+        
+        // Row 4 - Term
+        const row4Y = height - margin - 140;
+        page3.drawText(`Term (years)`, {
+          x: col1,
+          y: row4Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`${Number(currentLoan.term || 0)}`, {
+          x: col2,
+          y: row4Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        page3.drawText(`${Number(proposedLoan.term || 0)}`, {
+          x: col3,
+          y: row4Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        const termDiff = (proposedLoan.term || 0) - (currentLoan.term || 0);
+        page3.drawText(`${termDiff}`, {
+          x: col4,
+          y: row4Y,
+          size: 12,
+          font: helveticaFont,
+        });
+        
+        // Footer with disclaimer
+        const footerY = 50;
+        page3.drawText('Disclaimer: This proposal is for informational purposes only. The actual loan terms and conditions', {
+          x: margin,
+          y: footerY,
+          size: 8,
+          font: helveticaFont,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+        
+        page3.drawText('may vary based on final underwriting approval. Interest rates subject to change without notice.', {
+          x: margin,
+          y: footerY - 12,
+          size: 8,
+          font: helveticaFont,
+          color: rgb(0.5, 0.5, 0.5),
+        });
+        
+        // Serialize the PDF to a base64 data URI
+        const pdfBytes = await pdfDoc.save();
+        const pdfBase64 = `data:application/pdf;base64,${btoa(String.fromCharCode(...pdfBytes))}`;
+        
+        responseData = { success: true, pdfData: pdfBase64, landingPageUrl: `${supabaseUrl.replace('supabase', 'app')}/pitch/${deckData.slug}` };
         break;
         
       default:
         throw new Error(`Invalid action: ${action}`);
-    }
-    
-    // Add PDF data to response if generated
-    if (pdfData) {
-      responseData.pdfData = pdfData;
     }
 
     return new Response(
@@ -751,7 +543,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ success: false, error: error.message }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 400,
       }
     );
   }

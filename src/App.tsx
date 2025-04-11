@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,6 +33,7 @@ import AIRealtor from "./pages/AIRealtor";
 import ListingPresentation from "./pages/ListingPresentation";
 import LeadProfile from "./pages/LeadProfile";
 import LoanApplicationViewer from "./pages/LoanApplicationViewer";
+import PitchDeckLandingPage from "./pages/PitchDeckLandingPage";
 
 const queryClient = new QueryClient();
 
@@ -253,8 +253,7 @@ function App() {
                 <Route path="/amortization" element={<ProtectedRoute><AmortizationCalculator /></ProtectedRoute>} />
                 <Route path="/pitch-deck" element={<ProtectedRoute><PitchDeckPro /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder/:id" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
-                <Route path="/pitch-deck/builder" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
-                <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
+                <Route path="/pitch/:slug" element={<PitchDeckLandingPage />} />
                 
                 <Route path="/" element={<Navigate to="/landing" replace />} />
                 
