@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -148,7 +149,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
       await supabase
         .from('pitch_decks')
         .update({
-          mortgage_data: updatedMortgageData
+          mortgage_data: updatedMortgageData as any
         })
         .eq('id', pitchDeck.id);
 

@@ -270,7 +270,7 @@ const PitchDeckBuilder = () => {
       setPitchDeck(prev => ({
         ...prev,
         [section]: {
-          ...(prev[section as keyof typeof prev] as object || {}), // Fix: Cast to object and provide default empty object
+          ...((prev[section as keyof typeof prev] || {}) as object),
           [subField]: value
         }
       }));
@@ -822,9 +822,14 @@ const PitchDeckBuilder = () => {
       
       {isSendModalOpen && (
         <SendPitchDeckModal 
-          pitchDeckId={id!}
           isOpen={isSendModalOpen}
           onClose={() => setIsSendModalOpen(false)}
+          pitchDeck={id ? {
+            id: id,
+            title: pitchDeck.title,
+            description: pitchDeck.description,
+            mortgage_data: pitchDeck.mortgage_data
+          } : null}
         />
       )}
     </MainLayout>
