@@ -255,7 +255,14 @@ function App() {
                 <Route path="/pitch-deck" element={<ProtectedRoute><PitchDeckPro /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder/:id" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
+                
+                {/* Original pitch deck landing page route */}
                 <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
+                
+                {/* New simplified routes for client sharing */}
+                <Route path="/yourhomesolution:id" element={<PitchDeckLandingPage />} />
+                <Route path="/yourhomesolution/:id" element={<PitchDeckLandingPage />} />
+                
                 <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
                 
                 <Route path="*" element={<NotFound />} />

@@ -38,7 +38,7 @@ interface PitchDeck {
 }
 
 const PitchDeckLandingPage = () => {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, id } = useParams<{ slug?: string; id?: string }>();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(false);
@@ -46,17 +46,31 @@ const PitchDeckLandingPage = () => {
   
   useEffect(() => {
     const fetchPitchDeck = async () => {
-      if (!slug) {
-        setLoading(false);
-        return;
-      }
+      setLoading(true);
       
       try {
-        const { data, error } = await supabase
-          .from('pitch_decks')
-          .select('*')
-          .eq('slug', slug)
-          .single();
+        let query;
+        
+        // Check if we're using the new format with ID or the old format with slug
+        if (id) {
+          // New format: /yourhomesolution/ID or /yourhomesolutionID
+          console.log("Fetching pitch deck by ID:", id);
+          query = supabase
+            .from('pitch_decks')
+            .select('*')
+            .eq('id', id);
+        } else if (slug) {
+          // Old format: /pitch-deck/view/SLUG
+          console.log("Fetching pitch deck by slug:", slug);
+          query = supabase
+            .from('pitch_decks')
+            .select('*')
+            .eq('slug', slug);
+        } else {
+          throw new Error("No identifier provided for the pitch deck");
+        }
+        
+        const { data, error } = await query.single();
         
         if (error) {
           throw new Error(error.message);
@@ -64,6 +78,7 @@ const PitchDeckLandingPage = () => {
         
         if (data) {
           // Make sure we're handling the type correctly
+          console.log("Pitch deck found:", data);
           const pitchDeckData = data as unknown as PitchDeck;
           setPitchDeck(pitchDeckData);
         }
@@ -76,7 +91,7 @@ const PitchDeckLandingPage = () => {
     };
     
     fetchPitchDeck();
-  }, [slug]);
+  }, [slug, id]);
   
   const handleDownloadPDF = async () => {
     if (!pitchDeck) return;
@@ -149,7 +164,7 @@ const PitchDeckLandingPage = () => {
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
         <div className="mb-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold">{pitchDeck.title}</h1>
+          <h1 className="text-3xl font-bold">{pitchDeck?.title}</h1>
           <Button
             variant="outline"
             onClick={handleDownloadPDF}
@@ -161,7 +176,7 @@ const PitchDeckLandingPage = () => {
           </Button>
         </div>
         
-        {pitchDeck.description && (
+        {pitchDeck?.description && (
           <p className="text-gray-600 mb-8">{pitchDeck.description}</p>
         )}
         
