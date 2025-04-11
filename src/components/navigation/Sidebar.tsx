@@ -1,271 +1,164 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { 
-  Users, Inbox, ListTodo, Calendar, 
-  BarChart2, Settings, Home, DollarSign, 
-  PhoneOutgoing, Menu, Bot, MessageSquare,
-  FileText, Calculator, Briefcase, Brain,
-  Presentation, Phone, Building
+  BarChart, 
+  Home, 
+  Settings, 
+  Users,
+  FileText,
+  Phone,
+  LineChart,
+  Calculator,
+  Brain
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Link, useLocation } from "react-router-dom";
 import { useIndustry } from "@/context/IndustryContext";
+import { 
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
-// Define a type for navigation items
-interface NavItem {
-  name: string;
-  icon: React.ElementType;
-  path: string;
-  badge?: number;
+interface SidebarProps {
+  className?: string;
 }
 
-const itemColors = [
-  "bg-blue-600", // Dashboard
-  "bg-purple-600", // Leads
-  "bg-green-600", // Power Dialer
-  "bg-yellow-600", // Inbox
-  "bg-pink-600", // Tasks
-  "bg-orange-600", // Calendar
-  "bg-teal-600", // Pipeline/Deals
-  "bg-indigo-600", // Reporting
-  "bg-gray-600", // Settings
-  "bg-violet-600", // AI Dialer
-  "bg-emerald-600", // SMS Campaign
-  "bg-rose-600", // Start an Application
-  "bg-amber-600", // Quick Pricer
-  "bg-cyan-600", // Predictive Dialer
-];
-
-const Sidebar = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const [expanded, setExpanded] = useState(false);
-  const isMobile = useIsMobile();
+const Sidebar = ({ className }: SidebarProps) => {
   const location = useLocation();
-  const { activeIndustry } = useIndustry();
-  
-  // Base navigation items that appear for all industries
-  const baseNavItems: NavItem[] = [
-    { name: "Dashboard", icon: Home, path: "/" },
-    { name: "Leads", icon: Users, path: "/people" },
-    { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
-    { name: "Predictive Dialer", icon: Phone, path: "/predictive-dialer" },
-    { name: "AI Dialer", icon: Bot, path: "/ai-dialer" },
-    { name: "SMS Campaign", icon: MessageSquare, path: "/sms-campaign" },
-    { name: "Inbox", icon: Inbox, badge: 5, path: "#" },
-    { name: "Tasks", icon: ListTodo, path: "#" },
-    { name: "Calendar", icon: Calendar, path: "#" },
+  const navigate = useNavigate();
+  const { logout } = useAuth();
+  const { activeIndustry, setActiveIndustry } = useIndustry();
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsExpanded(window.innerWidth >= 768);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  const mortgageItems = [
+    { label: "Dashboard", icon: <Home className="h-4 w-4 mr-2" />, href: "/" },
+    { label: "Leads", icon: <Users className="h-4 w-4 mr-2" />, href: "/people" },
+    { label: "Pipeline", icon: <LineChart className="h-4 w-4 mr-2" />, href: "/pipeline" },
+    { label: "Processor", icon: <Brain className="h-4 w-4 mr-2" />, href: "/processor" },
+    { label: "AI Dialer", icon: <Phone className="h-4 w-4 mr-2" />, href: "/ai-dialer" },
+    { label: "AI Marketer", icon: <BarChart className="h-4 w-4 mr-2" />, href: "/sms-campaign" },
+    { label: "Pitch Deck", icon: <FileText className="h-4 w-4 mr-2" />, href: "/pitch-deck-pro" },
+    { label: "Home Solution", icon: <Home className="h-4 w-4 mr-2" />, href: "/your-home-solution" },
+    { label: "Amortization", icon: <Calculator className="h-4 w-4 mr-2" />, href: "/amortization-calculator" },
   ];
 
-  // Conditional navigation items based on industry
-  const getIndustrySpecificItems = (): NavItem[] => {
-    if (activeIndustry === "mortgage") {
-      return [
-        { name: "Pipeline", icon: DollarSign, path: "/deals" },
-        { name: "Start an Application", icon: FileText, path: "/application" },
-        { name: "Quick Pricer", icon: Calculator, path: "/pricer" },
-        { name: "Amortization Calculator", icon: Calculator, path: "/amortization" },
-        { name: "Pitch Deck Pro", icon: Presentation, path: "/pitch-deck" },
-        { name: "Processor Assist", icon: Briefcase, path: "/processor" },
-        { name: "AI Loan Officer", icon: Brain, path: "/ai-loan-officer" },
-      ];
-    } else if (activeIndustry === "realEstate") {
-      return [
-        { name: "Pipeline", icon: Building, path: "/pipeline" },
-        { name: "AI Realtor", icon: Brain, path: "/ai-realtor" },
-        { name: "Listing Presentation Builder", icon: Presentation, path: "/listing-presentation" }
-      ];
-    } else {
-      return [
-        { name: "Deals", icon: DollarSign, path: "/deals" },
-      ];
-    }
-  };
-
-  // Final navigation items
-  const finalNavItems: NavItem[] = [
-    ...baseNavItems,
-    ...getIndustrySpecificItems(),
-    { name: "Reporting", icon: BarChart2, path: "#" },
-    { name: "Settings", icon: Settings, path: "/settings" },
+  const realEstateItems = [
+    { label: "Dashboard", icon: <Home className="h-4 w-4 mr-2" />, href: "/" },
+    { label: "Leads", icon: <Users className="h-4 w-4 mr-2" />, href: "/people" },
+    { label: "Deals", icon: <LineChart className="h-4 w-4 mr-2" />, href: "/deals" },
+    { label: "AI Dialer", icon: <Phone className="h-4 w-4 mr-2" />, href: "/ai-dialer" },
+    { label: "AI Marketer", icon: <BarChart className="h-4 w-4 mr-2" />, href: "/sms-campaign" },
+    { label: "Listing Presentation", icon: <FileText className="h-4 w-4 mr-2" />, href: "/listing-presentation" },
   ];
-  
-  const getIndustryDisplayName = () => {
-    switch (activeIndustry) {
-      case "mortgage":
-        return "Mortgage";
-      case "realEstate":
-        return "Real Estate";
-      case "debtSettlement":
-        return "Debt";
-      default:
-        return "";
-    }
+
+  const handleIndustryChange = (industry: string) => {
+    setActiveIndustry(industry);
+    localStorage.setItem('activeIndustry', industry);
+    navigate('/');
   };
 
-  const getIndustryColor = () => {
-    switch (activeIndustry) {
-      case "mortgage":
-        return "bg-blue-600";
-      case "realEstate":
-        return "bg-green-600";
-      case "debtSettlement":
-        return "bg-purple-600";
-      default:
-        return "bg-crm-blue";
-    }
-  };
-  
-  const getIndustryTextColor = () => {
-    return "text-white";
+  const handleLogout = async () => {
+    await logout();
+    navigate('/auth');
   };
 
-  const isActive = (path: string) => {
-    if (path === "/") {
-      return location.pathname === path;
-    }
-    return location.pathname === path || 
-           (path !== "#" && location.pathname.startsWith(path));
-  };
+  const items = activeIndustry === 'mortgage' ? mortgageItems : realEstateItems;
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(prev => !prev);
-  };
-
-  if (isMobile) {
-    return (
-      <div className={`w-full ${getIndustryColor()}`}>
-        <div className="flex items-center justify-between px-4 py-2">
-          <div className="flex items-center">
-            <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold text-sm">CRM</span>
-            </div>
-            <span className="ml-2 text-lg font-semibold text-white">
-              {getIndustryDisplayName()} SalesPro
-            </span>
-          </div>
-          <button 
-            onClick={toggleMobileMenu}
-            className="text-white p-2"
-          >
-            <Menu size={24} />
+  return (
+    <TooltipProvider>
+      <div
+        className={cn(
+          "flex flex-col bg-gray-900 text-white w-64 py-4 px-3 space-y-4 border-r border-gray-700 transition-transform duration-300",
+          isExpanded ? "translate-x-0" : "-translate-x-64",
+          className
+        )}
+      >
+        <div className="flex items-center justify-between">
+          <span className="font-bold text-xl">CRM</span>
+          <button onClick={() => setIsExpanded(!isExpanded)} className="focus:outline-none">
+            {isExpanded ? '<<' : '>>'}
           </button>
         </div>
 
-        {mobileMenuOpen && (
-          <div className="px-2 pb-3 pt-1">
-            <div className="grid grid-cols-3 gap-2">
-              {finalNavItems.map((item, index) => {
-                const active = isActive(item.path);
-                return (
-                  <Link
-                    key={item.name}
-                    to={item.path}
-                    className={cn(
-                      "flex flex-col items-center px-3 py-3 text-sm font-medium rounded-md",
-                      active 
-                        ? "bg-white text-crm-blue"
-                        : "text-white hover:bg-white/90 hover:text-crm-blue"
-                    )}
-                  >
-                    <item.icon
-                      className={cn(
-                        "h-6 w-6 mb-2",
-                        active ? "text-crm-blue" : "text-white group-hover:text-crm-blue"
-                      )}
-                    />
-                    <span className={cn("truncate text-base", active ? "text-crm-blue" : "text-white")}>
-                      {item.name}
-                    </span>
-                    {item.badge && (
-                      <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full absolute top-0 right-0">
-                        {item.badge}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div 
-      className={cn(
-        "hidden md:block h-screen transition-all duration-300 rounded-tr-2xl rounded-br-2xl",
-        getIndustryColor(),
-        expanded ? "w-72" : "w-20"
-      )}
-      onMouseEnter={() => setExpanded(true)}
-      onMouseLeave={() => setExpanded(false)}
-    >
-      <div className="py-6">
-        <div className={cn("px-4 py-3 mb-6", expanded ? "" : "flex justify-center")}>
-          <div className="flex items-center">
-            <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded">
-              <span className="font-bold text-sm">CRM</span>
-            </div>
-            {expanded && (
-              <span className="ml-2 text-lg font-semibold text-white">
-                {getIndustryDisplayName()} SalesPro
-              </span>
-            )}
-          </div>
+        <div className="space-y-1">
+          <h3 className="font-medium text-sm text-gray-400">Industry</h3>
+          <select
+            className="bg-gray-700 text-white rounded px-2 py-1 w-full"
+            value={activeIndustry}
+            onChange={(e) => handleIndustryChange(e.target.value)}
+          >
+            <option value="real_estate">Real Estate</option>
+            <option value="mortgage">Mortgage</option>
+          </select>
         </div>
-        <div className="space-y-2">
-          {finalNavItems.map((item, index) => {
-            const active = isActive(item.path);
-            return (
-              <Link
-                key={item.name}
-                to={item.path}
+
+        <div className="space-y-1">
+          <h3 className="font-medium text-sm text-gray-400">Navigation</h3>
+          {items.map((item) => (
+            <Tooltip key={item.label} delayDuration={200}>
+              <TooltipTrigger asChild>
+                <a
+                  href={item.href}
+                  className={cn(
+                    "flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-800 transition-colors",
+                    location.pathname === item.href ? "bg-gray-800" : "transparent"
+                  )}
+                >
+                  {item.icon}
+                  <span>{item.label}</span>
+                </a>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center">
+                {item.label}
+              </TooltipContent>
+            </Tooltip>
+          ))}
+        </div>
+
+        <div className="mt-auto">
+          <h3 className="font-medium text-sm text-gray-400">Settings</h3>
+          <Tooltip delayDuration={200}>
+            <TooltipTrigger asChild>
+              <a
+                href="/settings"
                 className={cn(
-                  "flex items-center py-3 text-base font-medium rounded-md mx-2 group relative transition-all",
-                  active 
-                    ? itemColors[index % itemColors.length]
-                    : "text-white hover:text-white",
-                  expanded ? "px-5" : "px-0 justify-center"
+                  "flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-800 transition-colors",
+                  location.pathname === "/settings" ? "bg-gray-800" : "transparent"
                 )}
               >
-                <div 
-                  className={cn(
-                    "absolute inset-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-md", 
-                    !active && itemColors[index % itemColors.length]
-                  )}
-                />
-                <item.icon
-                  className={cn(
-                    "h-6 w-6 flex-shrink-0",
-                    active ? "text-white" : "text-white group-hover:text-white",
-                    expanded ? "mr-4" : "mr-0",
-                    "relative z-10"
-                  )}
-                />
-                {expanded && (
-                  <span className={cn(
-                    "relative z-10", 
-                    active ? "text-white" : "text-white"
-                  )}>
-                    {item.name}
-                  </span>
-                )}
-                {item.badge && (
-                  <span className="ml-auto bg-crm-red text-white text-sm px-2 py-0.5 rounded-full relative z-10">
-                    {item.badge}
-                  </span>
-                )}
-                {!expanded && item.badge && (
-                  <span className="absolute top-0 right-0 bg-crm-red w-2.5 h-2.5 rounded-full relative z-10"></span>
-                )}
-              </Link>
-            );
-          })}
+                <Settings className="h-4 w-4 mr-2" />
+                <span>Settings</span>
+              </a>
+            </TooltipTrigger>
+            <TooltipContent side="right" align="center">
+              Settings
+            </TooltipContent>
+          </Tooltip>
+          <button
+            onClick={handleLogout}
+            className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-gray-800 transition-colors w-full justify-start"
+          >
+            <Home className="h-4 w-4 mr-2" />
+            <span>Logout</span>
+          </button>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 
