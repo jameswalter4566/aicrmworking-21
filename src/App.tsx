@@ -36,6 +36,7 @@ import ListingPresentation from "./pages/ListingPresentation";
 import LeadProfile from "./pages/LeadProfile";
 import LoanApplicationViewer from "./pages/LoanApplicationViewer";
 import ProcessorAssist from "./pages/ProcessorAssist";
+import ProcessorAssistViewer from "./pages/ProcessorAssistViewer";
 
 const queryClient = new QueryClient();
 
@@ -257,14 +258,12 @@ function App() {
                 <Route path="/pitch-deck/builder/:id" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
                 <Route path="/processor" element={<ProtectedRoute><ProcessorAssist /></ProtectedRoute>} />
+                <Route path="/processor-assist/:id" element={<ProtectedRoute><ProcessorAssistViewer /></ProtectedRoute>} />
                 
-                {/* Original pitch deck landing page route */}
                 <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
                 
-                {/* New consolidated and scalable solution */}
                 <Route path="/your-home-solution/:id" element={<YourHomeSolution />} />
                 
-                {/* Legacy URL formats that will be redirected to the new format */}
                 <Route path="/yourhomesolution/:id" element={<YourHomeSolution />} />
                 <Route path="/yourhomesolution*" element={<YourHomeSolution />} />
                 

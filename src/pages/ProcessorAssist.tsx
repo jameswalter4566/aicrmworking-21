@@ -102,7 +102,8 @@ const ProcessorAssist = () => {
   };
 
   const handleDealClick = (deal: MortgageDeal) => {
-    navigate(`/loan-application/${deal.id}`);
+    // Navigate to the ProcessorAssistViewer instead of LoanApplicationViewer
+    navigate(`/processor-assist/${deal.id}`);
   };
 
   return (
