@@ -103,10 +103,43 @@ Deno.serve(async (req) => {
       throw new Error('Failed to extract PDF data: Invalid format');
     }
     
-    // Set email subject and body
+    // Get client name and loan officer details from mortgage data
+    const mortgageData = pitchDeck.mortgage_data || {};
+    const clientName = mortgageData.clientName || 'Client';
+    const loanOfficerName = mortgageData.loanOfficer?.name || user.email?.split('@')[0] || 'Mortgage Professional';
+    const loanOfficerNmlsId = mortgageData.loanOfficer?.nmlsId || '';
+    const companyName = mortgageData.loanOfficer?.companyName || '';
+    
+    // Set email subject and body with personalization
     const emailSubject = subject || `Mortgage Proposal: ${pitchDeck.title}`;
-    const emailBody = message || 
-      `Dear Client,\n\nI'm excited to share this mortgage proposal with you.\n\n${pitchDeck.description || ''}\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${user.email}`;
+    
+    // Create personalized email body with client name
+    let emailBody = message || '';
+    
+    // If there is no custom message, create a default one with personalization
+    if (!message) {
+      emailBody = `Dear ${clientName},\n\nI'm excited to share this mortgage proposal with you.`;
+      
+      if (pitchDeck.description) {
+        emailBody += `\n\n${pitchDeck.description}`;
+      }
+      
+      emailBody += `\n\nPlease review the attached document and let me know if you have any questions.`;
+    }
+    
+    // Add professional signature
+    const signature = `\n\nBest regards,`;
+    if (loanOfficerName && loanOfficerName !== 'Mortgage Professional') {
+      emailBody += signature + `\n${loanOfficerName}`;
+      if (loanOfficerNmlsId) {
+        emailBody += `\nNMLS ID: ${loanOfficerNmlsId}`;
+      }
+      if (companyName) {
+        emailBody += `\n${companyName}`;
+      }
+    } else {
+      emailBody += signature + `\n${user.email}`;
+    }
     
     // Check if email connection exists
     const { data: connections, error: connectionsError } = await supabase
