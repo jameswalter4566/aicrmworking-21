@@ -29,6 +29,7 @@ import NotFound from "./pages/NotFound";
 import AmortizationCalculator from "./pages/AmortizationCalculator";
 import PitchDeckPro from "./pages/PitchDeckPro";
 import PitchDeckBuilder from "./pages/PitchDeckBuilder";
+import PitchDeckLandingPage from "./pages/PitchDeckLandingPage";
 import PredictiveDialer from "./pages/PredictiveDialer";
 import AIRealtor from "./pages/AIRealtor";
 import ListingPresentation from "./pages/ListingPresentation";
@@ -254,9 +255,8 @@ function App() {
                 <Route path="/pitch-deck" element={<ProtectedRoute><PitchDeckPro /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder/:id" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
+                <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
                 <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
-                
-                <Route path="/" element={<Navigate to="/landing" replace />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
