@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { useNavigate, useParams } from "react-router-dom";
@@ -609,7 +610,8 @@ const PitchDeckBuilder = () => {
                       </CardContent>
                     </Card>
                   </div>
-                </TabsContent>
+                </div>
+              </TabsContent>
               
               <TabsContent value="comparison" className="space-y-6">
                 <Card>
@@ -805,4 +807,28 @@ const PitchDeckBuilder = () => {
                             <p className="text-sm text-gray-600">Lifetime Savings</p>
                             <p className="text-2xl font-bold text-green-600">
                               ${(pitchDeck.mortgage_data?.savings?.lifetime || 0).toLocaleString()}
-                            </p
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {isSendModalOpen && (
+        <SendPitchDeckModal 
+          pitchDeckId={id!}
+          isOpen={isSendModalOpen}
+          onClose={() => setIsSendModalOpen(false)}
+        />
+      )}
+    </MainLayout>
+  );
+};
+
+export default PitchDeckBuilder;
