@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -134,27 +133,16 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
 
     try {
       // Update pitch deck with property value and other fields if provided
-      const updatedMortgageData: MortgageData = {
-        ...pitchDeck.mortgage_data
-      };
-      
-      if (propertyValue && !isNaN(Number(propertyValue))) {
-        updatedMortgageData.propertyValue = Number(propertyValue);
-      }
-      
-      if (clientName) {
-        updatedMortgageData.clientName = clientName;
-      }
-      
-      if (clientAddress) {
-        updatedMortgageData.clientAddress = clientAddress;
-      }
-      
-      // Update loan officer information
-      updatedMortgageData.loanOfficer = {
-        name: loanOfficerName,
-        nmlsId: loanOfficerNmlsId,
-        companyName: mortgageCompanyName
+      const updatedMortgageData = {
+        ...(pitchDeck.mortgage_data || {}),
+        propertyValue: propertyValue && !isNaN(Number(propertyValue)) ? Number(propertyValue) : undefined,
+        clientName: clientName || undefined,
+        clientAddress: clientAddress || undefined,
+        loanOfficer: {
+          name: loanOfficerName || '',
+          nmlsId: loanOfficerNmlsId || '',
+          companyName: mortgageCompanyName || ''
+        }
       };
       
       await supabase
