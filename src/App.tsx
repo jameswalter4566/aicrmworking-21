@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -36,6 +35,7 @@ import AIRealtor from "./pages/AIRealtor";
 import ListingPresentation from "./pages/ListingPresentation";
 import LeadProfile from "./pages/LeadProfile";
 import LoanApplicationViewer from "./pages/LoanApplicationViewer";
+import ProcessorAssist from "./pages/ProcessorAssist";
 
 const queryClient = new QueryClient();
 
@@ -256,6 +256,7 @@ function App() {
                 <Route path="/pitch-deck" element={<ProtectedRoute><PitchDeckPro /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder/:id" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />
+                <Route path="/processor" element={<ProtectedRoute><ProcessorAssist /></ProtectedRoute>} />
                 
                 {/* Original pitch deck landing page route */}
                 <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
