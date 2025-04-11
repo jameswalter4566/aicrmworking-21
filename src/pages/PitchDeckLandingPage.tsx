@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,7 @@ interface PitchDeckData {
   id: string;
   title: string;
   description?: string;
-  slug: string;
+  slug: string;  // Added this field to match the database schema
   created_at: string;
   updated_at: string;
   created_by: string;
