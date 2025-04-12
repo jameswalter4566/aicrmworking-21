@@ -2,9 +2,10 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Search, FileText, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, Search, FileText, CheckCircle2, XCircle, AlertCircle, Info } from 'lucide-react';
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 interface LoanCondition {
   description: string;
@@ -35,6 +36,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
   const [conditions, setConditions] = useState<ParsedConditions | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string | null>(null);
+  const [lastError, setLastError] = useState<{code: string, message: string, details?: any} | null>(null);
 
   const searchEmails = async () => {
     setIsSearching(true);
@@ -42,8 +45,11 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     setSelectedEmailId(null);
     setSelectedAttachmentId(null);
     setConditions(null);
+    setLastError(null);
+    setSearchQuery(null);
     
     try {
+      console.log('Searching for approval emails with:', { clientLastName, loanNumber });
       const { data, error } = await supabase.functions.invoke('search-approval-emails', {
         body: { 
           clientLastName,
@@ -54,7 +60,17 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       if (error) {
         console.error("Error searching emails:", error);
         toast.error("Failed to search emails");
+        setLastError({
+          code: 'FUNCTION_ERROR',
+          message: "Failed to invoke search-approval-emails function",
+          details: error
+        });
         return;
+      }
+
+      // Save the search query for reference
+      if (data.query) {
+        setSearchQuery(data.query);
       }
 
       if (data.success && data.emails) {
@@ -62,15 +78,29 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         
         if (data.emails.length === 0) {
           toast.info("No approval emails found matching the search criteria");
+          console.log("Search completed - no approval emails found");
         } else {
           toast.success(`Found ${data.emails.length} potential approval emails`);
+          console.log(`Search completed - found ${data.emails.length} emails with PDF attachments`);
         }
       } else {
-        toast.error(data.error || "Failed to search emails");
+        const errorMessage = data.error || "Failed to search emails";
+        toast.error(errorMessage);
+        setLastError({
+          code: data.code || 'UNKNOWN_ERROR',
+          message: errorMessage,
+          details: data.details || {}
+        });
+        console.error("Search failed:", data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error in searchEmails:", err);
       toast.error("An unexpected error occurred");
+      setLastError({
+        code: 'UNEXPECTED_ERROR',
+        message: err.message || "An unexpected error occurred",
+        details: err
+      });
     } finally {
       setIsSearching(false);
     }
@@ -81,8 +111,10 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     setSelectedAttachmentId(attachmentId);
     setIsParsing(true);
     setConditions(null);
+    setLastError(null);
     
     try {
+      console.log(`Parsing document from email ${emailId}, attachment ${attachmentId}`);
       const { data, error } = await supabase.functions.invoke('parse-approval-document', {
         body: { 
           emailId,
@@ -93,6 +125,11 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       if (error) {
         console.error("Error parsing document:", error);
         toast.error("Failed to parse document");
+        setLastError({
+          code: 'FUNCTION_ERROR',
+          message: "Failed to invoke parse-approval-document function",
+          details: error
+        });
         return;
       }
 
@@ -104,12 +141,25 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         }
         
         toast.success("Successfully extracted conditions from document");
+        console.log("Document parsed successfully:", data.conditions);
       } else {
-        toast.error(data.error || "Failed to parse conditions from document");
+        const errorMessage = data.error || "Failed to parse conditions from document";
+        toast.error(errorMessage);
+        setLastError({
+          code: data.code || 'UNKNOWN_ERROR',
+          message: errorMessage,
+          details: data.details || {}
+        });
+        console.error("Parsing failed:", data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error in parseDocument:", err);
       toast.error("An unexpected error occurred");
+      setLastError({
+        code: 'UNEXPECTED_ERROR',
+        message: err.message || "An unexpected error occurred",
+        details: err
+      });
     } finally {
       setIsParsing(false);
     }
@@ -140,6 +190,46 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </Button>
       </div>
       
+      {/* Search parameters display */}
+      <div className="bg-orange-50 p-4 rounded-md text-sm text-orange-800">
+        <h3 className="font-medium mb-2 flex items-center">
+          <Info className="h-4 w-4 mr-1" /> Search Parameters
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <span className="font-medium">Client Last Name:</span> {clientLastName || <span className="italic text-orange-500">Not provided</span>}
+          </div>
+          <div>
+            <span className="font-medium">Loan Number:</span> {loanNumber || <span className="italic text-orange-500">Not provided</span>}
+          </div>
+        </div>
+        {searchQuery && (
+          <div className="mt-2 pt-2 border-t border-orange-200">
+            <span className="font-medium">Gmail Search Query:</span> 
+            <code className="ml-2 p-1 bg-orange-100 rounded text-orange-700">{searchQuery}</code>
+          </div>
+        )}
+      </div>
+      
+      {/* Error display */}
+      {lastError && (
+        <Alert variant="destructive" className="text-red-800 bg-red-50 border-red-200">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle className="text-red-800">Error: {lastError.code}</AlertTitle>
+          <AlertDescription>
+            <p>{lastError.message}</p>
+            {lastError.details && (
+              <details className="mt-2 text-xs">
+                <summary className="cursor-pointer font-medium">Technical Details</summary>
+                <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto max-h-40">
+                  {JSON.stringify(lastError.details, null, 2)}
+                </pre>
+              </details>
+            )}
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {foundEmails.length > 0 && (
         <Card className="bg-orange-100">
           <CardHeader className="bg-orange-200 pb-2">
@@ -152,13 +242,13 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
               {foundEmails.map((email) => (
                 <div key={email.id} className="bg-white rounded-lg p-3 shadow-sm">
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-medium text-orange-900">{email.subject}</h4>
                       <p className="text-sm text-orange-700">From: {email.from}</p>
                       <p className="text-xs text-orange-600">Date: {formatDate(email.date)}</p>
                       <p className="text-sm mt-2 text-orange-800">{email.snippet}...</p>
                     </div>
-                    <div className="ml-4">
+                    <div className="ml-4 flex flex-col gap-2">
                       {email.attachments.map((attachment: any) => (
                         <Button 
                           key={attachment.id}
@@ -171,10 +261,13 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                           {isParsing && selectedEmailId === email.id && selectedAttachmentId === attachment.id ? (
                             <><Loader2 className="h-3 w-3 animate-spin" /> <span>Parsing...</span></>
                           ) : (
-                            <><FileText className="h-3 w-3" /> <span>Parse {attachment.filename}</span></>
+                            <><FileText className="h-3 w-3" /> <span>{attachment.filename}</span></>
                           )}
                         </Button>
                       ))}
+                      <p className="text-xs text-orange-600 mt-1">
+                        {email.attachments.length} PDF attachment(s)
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -25,10 +25,19 @@ serve(async (req) => {
   }
 
   try {
+    console.log('---------------------------------------------');
+    console.log('🔍 STARTED: search-approval-emails function');
     // Parse the request body
     const { clientLastName, loanNumber, userId } = await req.json();
     
+    console.log(`📝 Search parameters received:`, {
+      clientLastName,
+      loanNumber,
+      userId
+    });
+    
     if (!clientLastName && !loanNumber) {
+      console.log('❌ ERROR: Missing search parameters');
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -42,7 +51,7 @@ serve(async (req) => {
       );
     }
     
-    console.log(`Searching emails for approval documents related to: ${clientLastName}, loan #${loanNumber}`);
+    console.log(`🔍 Searching emails for approval documents related to: ${clientLastName || '[no lastname]'}, loan #${loanNumber || '[no loan number]'}`);
 
     // Get the user's Google email connection
     let connectionQuery = supabaseAdmin
@@ -51,14 +60,33 @@ serve(async (req) => {
       .eq('provider', 'google');
       
     if (userId) {
-      console.log(`Looking for email connection for user ${userId}`);
+      console.log(`👤 Looking for email connection for user ${userId}`);
       connectionQuery = connectionQuery.eq('user_id', userId);
+    } else {
+      console.log('⚠️ WARNING: No userId provided, using first available Google connection');
     }
     
     const { data: connection, error: connectionError } = await connectionQuery.limit(1).single();
 
-    if (connectionError || !connection) {
-      console.error('No Google email connection found:', connectionError);
+    if (connectionError) {
+      console.error('❌ No Google email connection found:', connectionError);
+      return new Response(
+        JSON.stringify({ 
+          success: false,
+          error: 'No Google email connection found',
+          code: 'NO_EMAIL_CONNECTION',
+          details: 'Please connect your Google account in the Settings page',
+          supabaseError: connectionError
+        }),
+        { 
+          status: 404, 
+          headers: corsHeaders 
+        }
+      );
+    }
+
+    if (!connection) {
+      console.error('❌ No Google email connection found (connection is null)');
       return new Response(
         JSON.stringify({ 
           success: false,
@@ -73,11 +101,11 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Using email connection for: ${connection.email}`);
+    console.log(`✅ Using email connection for: ${connection.email}`);
 
     // Refresh the token
     if (!connection.refresh_token) {
-      console.error("No refresh token available");
+      console.error("❌ No refresh token available for email connection");
       return new Response(
         JSON.stringify({ 
           success: false,
@@ -91,6 +119,8 @@ serve(async (req) => {
         }
       );
     }
+    
+    console.log("🔄 Refreshing Google access token...");
     
     // Refresh the token
     const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
@@ -111,7 +141,7 @@ serve(async (req) => {
     
     if (!refreshResponse.ok) {
       refreshError = await refreshResponse.text();
-      console.error('Token refresh error:', refreshResponse.status, refreshError);
+      console.error(`❌ Token refresh error (${refreshResponse.status}):`, refreshError);
       
       return new Response(
         JSON.stringify({ 
@@ -128,19 +158,26 @@ serve(async (req) => {
       );
     } else {
       refreshData = await refreshResponse.json();
-      console.log("Access token refreshed successfully");
+      console.log("✅ Access token refreshed successfully");
     }
     
     const accessToken = refreshData.access_token;
     
     // Update the stored token
-    await supabaseAdmin
+    console.log("💾 Updating stored token in database...");
+    const updateResult = await supabaseAdmin
       .from('user_email_connections')
       .update({ 
         access_token: accessToken,
         expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
       })
       .eq('id', connection.id);
+      
+    if (updateResult.error) {
+      console.warn("⚠️ Failed to update stored token, but continuing with search:", updateResult.error);
+    } else {
+      console.log("✅ Token updated in database");
+    }
 
     // Build search query for Gmail API
     // Search for emails with PDF attachments that contain approval keywords and client information
@@ -158,10 +195,13 @@ serve(async (req) => {
       searchQuery += ` "${loanNumber}"`;
     }
     
-    console.log(`Searching Gmail with query: ${searchQuery}`);
+    console.log(`🔎 Searching Gmail with query: "${searchQuery}"`);
     
     // Search for matching emails
-    const emailSearchResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=5`, {
+    const emailSearchUrl = `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=5`;
+    console.log(`🌐 Sending request to: ${emailSearchUrl}`);
+    
+    const emailSearchResponse = await fetch(emailSearchUrl, {
       headers: {
         'Authorization': `Bearer ${accessToken}`
       }
@@ -169,14 +209,15 @@ serve(async (req) => {
     
     if (!emailSearchResponse.ok) {
       const errorText = await emailSearchResponse.text();
-      console.error('Gmail API search error:', emailSearchResponse.status, errorText);
+      console.error(`❌ Gmail API search error (${emailSearchResponse.status}):`, errorText);
       
       return new Response(
         JSON.stringify({ 
           success: false,
           error: `Gmail API search error (${emailSearchResponse.status})`, 
           details: errorText,
-          code: 'GMAIL_API_ERROR'
+          code: 'GMAIL_API_ERROR',
+          requestUrl: emailSearchUrl
         }),
         { 
           status: 502, 
@@ -186,21 +227,27 @@ serve(async (req) => {
     }
     
     const searchResults = await emailSearchResponse.json();
+    console.log(`📨 Gmail search results:`, searchResults);
     
     // If no emails found, return empty result
     if (!searchResults.messages || searchResults.messages.length === 0) {
+      console.log('ℹ️ No matching approval emails found');
       return new Response(
         JSON.stringify({ 
           success: true,
           emails: [],
-          message: 'No matching approval emails found'
+          message: 'No matching approval emails found',
+          queryUsed: searchQuery
         }),
         { headers: corsHeaders }
       );
     }
     
+    console.log(`✅ Found ${searchResults.messages.length} potential emails matching search criteria`);
+    
     // Get details for each email
     const emailPromises = searchResults.messages.slice(0, 5).map(async (message: any) => {
+      console.log(`📩 Fetching details for email ID: ${message.id}`);
       const emailDetailResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=full`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
@@ -208,7 +255,7 @@ serve(async (req) => {
       });
       
       if (!emailDetailResponse.ok) {
-        console.error(`Error fetching email ${message.id}:`, emailDetailResponse.status);
+        console.error(`❌ Error fetching email ${message.id}: ${emailDetailResponse.status}`);
         return null;
       }
       
@@ -219,12 +266,15 @@ serve(async (req) => {
       const from = emailDetail.payload.headers.find((h: any) => h.name.toLowerCase() === 'from')?.value || '';
       const date = emailDetail.payload.headers.find((h: any) => h.name.toLowerCase() === 'date')?.value || '';
       
+      console.log(`📧 Found email - Subject: "${subject}", From: ${from}, Date: ${date}`);
+      
       // Find PDF attachments
       const attachments = [];
       
       // Helper function to find attachments in message parts recursively
       const findAttachments = (part: any) => {
         if (part.mimeType === 'application/pdf' && part.body.attachmentId) {
+          console.log(`📎 Found PDF attachment: ${part.filename} (${part.body.size} bytes)`);
           attachments.push({
             id: part.body.attachmentId,
             filename: part.filename,
@@ -239,6 +289,8 @@ serve(async (req) => {
       // Process parts if they exist
       if (emailDetail.payload.parts) {
         emailDetail.payload.parts.forEach(findAttachments);
+      } else {
+        console.log(`⚠️ Email ${message.id} has no parts structure`);
       }
       
       return {
@@ -255,23 +307,26 @@ serve(async (req) => {
     // Wait for all email detail fetches to complete
     const emails = (await Promise.all(emailPromises)).filter(email => email !== null && email.attachments.length > 0);
     
-    console.log(`Found ${emails.length} emails with PDF attachments that match criteria`);
+    console.log(`✅ Found ${emails.length} emails with PDF attachments that match criteria`);
     
     return new Response(
       JSON.stringify({ 
         success: true,
         emails,
-        query: searchQuery
+        query: searchQuery,
+        totalFound: searchResults.messages.length,
+        totalWithPdfAttachments: emails.length
       }),
       { headers: corsHeaders }
     );
   } catch (error) {
-    console.error('Error in search-approval-emails function:', error);
+    console.error('❌ Error in search-approval-emails function:', error);
     return new Response(
       JSON.stringify({ 
         success: false,
         error: 'Failed to search emails', 
         details: error.message,
+        stack: error.stack,
         code: 'UNEXPECTED_ERROR'
       }),
       { 
