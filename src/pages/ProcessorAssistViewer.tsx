@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -90,7 +91,10 @@ const ProcessorAssistViewer = () => {
 
       console.log(`Retrieved ${data.data.length} leads for ID ${leadId}:`, data);
       
+      // Get the first lead from the results
       const lead = data.data[0];
+      
+      // Verify that the lead ID matches the requested ID
       if (lead.id.toString() !== leadId.toString()) {
         console.error(`Lead ID mismatch! Requested ${leadId} but got ${lead.id}`);
         setLoadError(`Data error: Received incorrect lead (${lead.id}) instead of requested lead (${leadId})`);

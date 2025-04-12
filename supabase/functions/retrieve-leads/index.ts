@@ -1,3 +1,4 @@
+
 // Follow the REST architecture for edge functions
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -187,6 +188,8 @@ async function fetchLeadById(leadId) {
       console.log(`Found lead with ID ${leadId}:`, JSON.stringify(data[0].id, null, 2));
     } else {
       console.log(`No lead found with ID: ${leadId}`);
+      // Return empty array if no lead found with this ID
+      return [];
     }
     
     // Transform the data to match the expected format
