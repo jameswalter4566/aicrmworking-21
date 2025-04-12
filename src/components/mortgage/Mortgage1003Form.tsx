@@ -17,7 +17,7 @@ import { LiabilityInformationForm } from "./1003/LiabilityInformationForm";
 import { RealEstateOwnedForm } from "./1003/RealEstateOwnedForm";
 import { LoanInformationForm } from "./1003/LoanInformationForm";
 import { HousingExpensesForm } from "./1003/HousingExpensesForm";
-import { IntelligentFileUpload } from "@/components/IntelligentFileUpload";
+import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { leadProfileService } from "@/services/leadProfile";
 
 interface Mortgage1003FormProps {
@@ -138,6 +138,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             successMessage="Document analyzed successfully"
             analyzeText="Analyze Document"
             uploadText="Upload & Analyze Document"
+            onImportComplete={() => {}}
           />
         </div>
         
@@ -177,7 +178,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             <PersonalInfoForm 
               leadId={lead?.id}
               mortgageData={mortgageData}
-              onSave={handleSaveSection}
+              onSave={(data) => handleSaveSection("borrower", data)}
               isEditable={isEditable}
             />
           </TabsContent>
@@ -186,7 +187,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             <EmploymentIncomeForm 
               leadId={lead?.id} 
               mortgageData={mortgageData}
-              onSave={handleSaveSection}
+              onSave={(data) => handleSaveSection("employment", data)}
               isEditable={isEditable}
             />
           </TabsContent>
@@ -195,7 +196,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             <AssetInformationForm
               leadId={lead?.id}
               mortgageData={mortgageData}
-              onSave={handleSaveSection}
+              onSave={(data) => handleSaveSection("assets", data)}
               isEditable={isEditable}
             />
           </TabsContent>
@@ -204,7 +205,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             <LiabilityInformationForm
               leadId={lead?.id}
               mortgageData={mortgageData}
-              onSave={handleSaveSection}
+              onSave={(data) => handleSaveSection("liabilities", data)}
               isEditable={isEditable}
             />
           </TabsContent>
@@ -213,7 +214,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             <RealEstateOwnedForm
               leadId={lead?.id}
               mortgageData={mortgageData}
-              onSave={handleSaveSection}
+              onSave={(data) => handleSaveSection("realestate", data)}
               isEditable={isEditable}
             />
           </TabsContent>
@@ -222,7 +223,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             <HousingExpensesForm
               leadId={lead?.id}
               mortgageData={mortgageData}
-              onSave={handleSaveSection}
+              onSave={(data) => handleSaveSection("housing", data)}
               isEditable={isEditable}
             />
           </TabsContent>
@@ -231,7 +232,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
             <LoanInformationForm
               leadId={lead?.id}
               mortgageData={mortgageData}
-              onSave={handleSaveSection}
+              onSave={(data) => handleSaveSection("loan", data)}
               isEditable={isEditable}
             />
           </TabsContent>
