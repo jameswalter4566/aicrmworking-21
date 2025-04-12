@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -151,7 +150,7 @@ export const LoanInformationForm = ({
 
   return (
     <Card className="mb-6">
-      <CardHeader className="bg-blue-600 text-white">
+      <CardHeader>
         <CardTitle className="text-xl flex items-center">
           <DollarSign className="h-5 w-5 mr-2" />
           LOAN INFORMATION
