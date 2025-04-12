@@ -341,5 +341,35 @@ export const leadProfileService = {
       console.error(`Error updating mortgage ${section} data:`, error);
       throw error;
     }
+  },
+
+  /**
+   * Consolidate mortgage document data for a lead
+   * @param leadId The ID of the lead
+   */
+  async consolidateMortgageData(leadId: number | string): Promise<any> {
+    try {
+      console.log('Consolidating mortgage data for lead ID:', leadId);
+      
+      const { data, error } = await supabase.functions.invoke('consolidate-mortgage-data', {
+        body: { leadId }
+      });
+
+      if (error) {
+        console.error('Error consolidating mortgage data:', error);
+        throw error;
+      }
+
+      if (!data.success) {
+        console.error('Error in response:', data.error);
+        throw new Error(data.error || 'Failed to consolidate mortgage data');
+      }
+
+      console.log('Successfully consolidated mortgage data');
+      return data;
+    } catch (error) {
+      console.error('Error in consolidateMortgageData:', error);
+      throw error;
+    }
   }
 };
