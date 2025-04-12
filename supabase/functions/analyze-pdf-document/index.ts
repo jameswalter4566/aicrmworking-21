@@ -278,8 +278,9 @@ You are acting as a trusted document processing agent in a mortgage underwriting
 });
 
 // Helper function to intelligently merge document data into mortgage_data structure
-function mergeDocumentData(existingData: any, extractedData: any) {
-  const result = { ...existingData };
+function mergeDocumentData(existingData, extractedData) {
+  // Create a deep copy to avoid modifying the original object
+  const result = JSON.parse(JSON.stringify(existingData));
   
   // Initialize sections if they don't exist
   if (!result.borrower) result.borrower = {};
@@ -381,7 +382,7 @@ function mergeDocumentData(existingData: any, extractedData: any) {
       // See if we have an employer with the same name
       const employerName = currentEmployment.employerName || currentEmployment["Employer Name"];
       const existingEmployerIndex = employerName ? result.employment.employers.findIndex(
-        (e: any) => e.name === employerName
+        (e) => e.name === employerName
       ) : -1;
       
       if (existingEmployerIndex >= 0) {
@@ -421,7 +422,7 @@ function mergeDocumentData(existingData: any, extractedData: any) {
       
       const employerName = previousEmployment.employerName || previousEmployment["Employer Name"];
       const existingEmployerIndex = employerName ? result.employment.previousEmployers.findIndex(
-        (e: any) => e.name === employerName
+        (e) => e.name === employerName
       ) : -1;
       
       if (existingEmployerIndex >= 0) {
