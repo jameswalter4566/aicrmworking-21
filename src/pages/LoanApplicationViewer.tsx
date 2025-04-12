@@ -147,7 +147,7 @@ const LoanApplicationViewer = () => {
     navigate(-1);
   };
 
-  const handlePdfDrop = async (file: File) => {
+  const handleFileAccepted = async (file: File) => {
     if (!id || !file) return;
     
     try {
@@ -187,7 +187,7 @@ const LoanApplicationViewer = () => {
       
       toast.success('Document successfully analyzed and data extracted!');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error processing document:', error);
       toast.error(`Failed to process document: ${error.message || 'Unknown error'}`);
     }
@@ -464,7 +464,7 @@ const LoanApplicationViewer = () => {
       
       <div className="bg-white px-8 py-4 border-b">
         <PDFDropZone 
-          onFileAccepted={handlePdfDrop} 
+          onFileAccepted={handleFileAccepted} 
           className="max-w-3xl mx-auto"
         />
       </div>
