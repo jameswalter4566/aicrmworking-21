@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,7 +52,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       console.log(`Fetching existing conditions for lead ID: ${leadId}`);
       const { data, error } = await supabase.functions.invoke('retrieve-conditions', {
         body: {},
-        queryParams: { leadId }
+        query: { leadId }
       });
       
       if (error) {
