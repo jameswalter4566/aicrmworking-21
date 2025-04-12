@@ -77,7 +77,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         setFoundEmails(data.emails);
         
         if (data.emails.length === 0) {
-          toast.info("No approval emails found matching the search criteria");
+          toast.info("No approval emails found matching the search criteria. Try broadening your search terms.");
           console.log("Search completed - no approval emails found");
         } else {
           toast.success(`Found ${data.emails.length} potential approval emails`);

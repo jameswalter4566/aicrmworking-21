@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -180,25 +179,34 @@ serve(async (req) => {
     }
 
     // Build search query for Gmail API
-    // Search for emails with PDF attachments that contain approval keywords and client information
+    // Search for emails with PDF attachments that might be related to loan approvals
+    // Using a more flexible search approach for better results
     let searchQuery = 'has:attachment filename:pdf';
     
-    // Add keywords for approval-related emails
-    searchQuery += ' (subject:"approval" OR subject:"conditional approval" OR subject:"loan approval")';
+    // Add keywords for approval-related emails - now using a broader set of keywords
+    searchQuery += ' (subject:"approval" OR subject:"conditional" OR subject:"loan" OR subject:"mortgage")';
     
-    // Add client-specific information if available
+    // Add client-specific information if available - use partial matching instead of exact matches
     if (clientLastName) {
-      searchQuery += ` "${clientLastName}"`;
+      // Remove quotes to allow for partial matching of the last name
+      searchQuery += ` ${clientLastName}`;
     }
     
     if (loanNumber) {
+      // For loan numbers, we'll keep exact matching as these should be precise
       searchQuery += ` "${loanNumber}"`;
+      
+      // Also try without dashes or with only partial numbers
+      const loanNumberWithoutPrefix = loanNumber.replace(/^(ML-|ML)/i, '');
+      if (loanNumberWithoutPrefix !== loanNumber) {
+        searchQuery += ` OR ${loanNumberWithoutPrefix}`;
+      }
     }
     
     console.log(`🔎 Searching Gmail with query: "${searchQuery}"`);
     
-    // Search for matching emails
-    const emailSearchUrl = `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=5`;
+    // Search for matching emails - increased maxResults for better chances of finding matches
+    const emailSearchUrl = `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=10`;
     console.log(`🌐 Sending request to: ${emailSearchUrl}`);
     
     const emailSearchResponse = await fetch(emailSearchUrl, {
@@ -246,7 +254,7 @@ serve(async (req) => {
     console.log(`✅ Found ${searchResults.messages.length} potential emails matching search criteria`);
     
     // Get details for each email
-    const emailPromises = searchResults.messages.slice(0, 5).map(async (message: any) => {
+    const emailPromises = searchResults.messages.slice(0, 10).map(async (message: any) => {
       console.log(`📩 Fetching details for email ID: ${message.id}`);
       const emailDetailResponse = await fetch(`https://www.googleapis.com/gmail/v1/users/me/messages/${message.id}?format=full`, {
         headers: {
@@ -293,21 +301,50 @@ serve(async (req) => {
         console.log(`⚠️ Email ${message.id} has no parts structure`);
       }
       
-      return {
-        id: message.id,
-        threadId: message.threadId,
-        subject,
-        from,
-        date,
-        snippet: emailDetail.snippet,
-        attachments
-      };
+      // Score the relevance of this email based on keywords
+      let relevanceScore = 0;
+      
+      // Check subject for approval keywords
+      const approvalKeywords = ['approval', 'approved', 'conditional', 'conditions', 'loan', 'mortgage'];
+      const subjectLower = subject.toLowerCase();
+      approvalKeywords.forEach(keyword => {
+        if (subjectLower.includes(keyword)) relevanceScore += 5;
+      });
+      
+      // Check for client name match
+      if (clientLastName && subjectLower.includes(clientLastName.toLowerCase())) {
+        relevanceScore += 10;
+      }
+      
+      // Check for loan number match
+      if (loanNumber && subjectLower.includes(loanNumber.toLowerCase())) {
+        relevanceScore += 15;
+      }
+      
+      // Only return emails with PDF attachments and minimum relevance
+      if (attachments.length > 0 && relevanceScore > 0) {
+        return {
+          id: message.id,
+          threadId: message.threadId,
+          subject,
+          from,
+          date,
+          snippet: emailDetail.snippet,
+          attachments,
+          relevanceScore
+        };
+      }
+      
+      return null;
     });
     
     // Wait for all email detail fetches to complete
-    const emails = (await Promise.all(emailPromises)).filter(email => email !== null && email.attachments.length > 0);
+    let emails = (await Promise.all(emailPromises)).filter(email => email !== null);
     
-    console.log(`✅ Found ${emails.length} emails with PDF attachments that match criteria`);
+    // Sort emails by relevance score (highest first)
+    emails = emails.sort((a, b) => b.relevanceScore - a.relevanceScore);
+    
+    console.log(`✅ Found ${emails.length} relevant emails with PDF attachments that match criteria`);
     
     return new Response(
       JSON.stringify({ 
