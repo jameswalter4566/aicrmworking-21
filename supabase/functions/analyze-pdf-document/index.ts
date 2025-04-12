@@ -283,315 +283,322 @@ You are acting as a trusted document processing agent in a mortgage underwriting
 });
 
 // Helper function to intelligently merge document data into mortgage_data structure
+// COMPLETELY REWRITTEN to avoid maximum call stack exceeded errors
 function mergeDocumentData(existingData, extractedData) {
   // Safety check for null/undefined inputs
-  if (!existingData) existingData = {};
-  if (!extractedData) extractedData = {};
+  const existing = existingData || {};
+  const extracted = extractedData || {};
   
-  // Create a new result object instead of trying to deep copy with JSON.parse(JSON.stringify())
-  // This avoids maximum call stack errors with large nested objects
-  const result = {};
+  // Create a very simple base object without deep copying
+  let result = {};
   
-  // Copy top-level properties from existing data without using deep copy
-  // which can cause stack overflow on large objects
-  Object.keys(existingData).forEach(key => {
-    if (typeof existingData[key] === 'object' && existingData[key] !== null) {
-      // For objects, create a shallow copy
-      result[key] = Array.isArray(existingData[key]) ? [...existingData[key]] : {...existingData[key]};
-    } else {
-      // For primitive values, just copy the value
-      result[key] = existingData[key];
-    }
-  });
+  // Initialize core sections - avoid complex nesting
+  result.borrower = {};
+  result.property = {};
+  result.employment = { employers: [], previousEmployers: [] };
+  result.income = {};
+  result.assets = {};
+  result.liabilities = {};
+  result.declarations = {};
+  result.housing = {};
+  result.loan = {};
+  result.governmentMonitoring = {};
   
-  // Initialize sections if they don't exist
-  if (!result.borrower) result.borrower = {};
-  if (!result.property) result.property = {};
-  if (!result.employment) result.employment = {};
-  if (!result.income) result.income = {};
-  if (!result.assets) result.assets = {};
-  if (!result.liabilities) result.liabilities = {};
-  if (!result.declarations) result.declarations = {};
-  if (!result.housing) result.housing = {};
-  if (!result.loan) result.loan = {};
-  
-  // Merge borrower section data
-  if (extractedData.borrower || extractedData["SECTION I"]) {
-    const borrowerData = extractedData.borrower || extractedData["SECTION I"] || {};
-    result.borrower = {
-      ...result.borrower,
-      firstName: borrowerData.firstName || borrowerData["Borrower First Name"] || result.borrower.firstName,
-      middleName: borrowerData.middleName || borrowerData["Borrower Middle Name"] || result.borrower.middleName,
-      lastName: borrowerData.lastName || borrowerData["Borrower Last Name"] || result.borrower.lastName,
-      suffix: borrowerData.suffix || borrowerData["Suffix"] || result.borrower.suffix,
-      ssn: borrowerData.ssn || borrowerData["Social Security Number"] || result.borrower.ssn,
-      dateOfBirth: borrowerData.dateOfBirth || borrowerData["Date of Birth"] || result.borrower.dateOfBirth,
-      maritalStatus: borrowerData.maritalStatus || borrowerData["Marital Status"] || result.borrower.maritalStatus,
-      citizenship: borrowerData.citizenship || borrowerData["Citizenship Status"] || result.borrower.citizenship,
-      dependents: borrowerData.dependents || borrowerData["Number of Dependents"] || result.borrower.dependents,
-      dependentAges: borrowerData.dependentAges || borrowerData["Dependent Ages"] || result.borrower.dependentAges,
-      email: borrowerData.email || borrowerData["Email Address"] || result.borrower.email,
-      homePhone: borrowerData.homePhone || borrowerData["Home Phone"] || result.borrower.homePhone,
-      mobilePhone: borrowerData.mobilePhone || borrowerData["Mobile Phone"] || result.borrower.mobilePhone,
-      currentAddress: borrowerData.currentAddress || borrowerData["Current Address"] || result.borrower.currentAddress,
-      timeAtCurrentAddress: borrowerData.timeAtCurrentAddress || borrowerData["Time at Current Address"] || result.borrower.timeAtCurrentAddress,
-      isPrimaryResidence: borrowerData.isPrimaryResidence || borrowerData["Is this your Primary Residence"] || result.borrower.isPrimaryResidence
-    };
+  // Extremely simplified merging approach
+  // 1. First, copy basic values from existing data
+  if (existing.borrower) {
+    Object.assign(result.borrower, existing.borrower);
   }
-
-  // Merge assets and liabilities
-  if (extractedData.assets || extractedData["SECTION II"] || extractedData["Financial Information"]) {
-    const financialData = extractedData.assets || extractedData["SECTION II"] || extractedData["Financial Information"] || {};
-    
-    // Handle assets
-    const assetsData = financialData.assets || financialData["Assets"] || {};
-    if (Object.keys(assetsData).length > 0) {
-      result.assets = {
-        ...result.assets,
-        checkingAccounts: assetsData.checkingAccounts || assetsData["Checking Account Balances"] || result.assets.checkingAccounts,
-        savingsAccounts: assetsData.savingsAccounts || assetsData["Savings Account Balances"] || result.assets.savingsAccounts,
-        retirementAccounts: assetsData.retirementAccounts || assetsData["Retirement Accounts"] || result.assets.retirementAccounts,
-        stocksAndBonds: assetsData.stocksAndBonds || assetsData["Stocks and Bonds"] || result.assets.stocksAndBonds,
-        cashOnHand: assetsData.cashOnHand || assetsData["Cash on Hand"] || result.assets.cashOnHand,
-        realEstateOwned: assetsData.realEstateOwned || assetsData["Real Estate Owned"] || result.assets.realEstateOwned
-      };
-    }
-
-    // Handle liabilities
-    const liabilitiesData = financialData.liabilities || financialData["Liabilities"] || {};
-    if (Object.keys(liabilitiesData).length > 0) {
-      result.liabilities = {
-        ...result.liabilities,
-        creditCardDebts: liabilitiesData.creditCardDebts || liabilitiesData["Credit Card Debts"] || result.liabilities.creditCardDebts,
-        autoLoans: liabilitiesData.autoLoans || liabilitiesData["Auto Loans"] || result.liabilities.autoLoans,
-        studentLoans: liabilitiesData.studentLoans || liabilitiesData["Student Loans"] || result.liabilities.studentLoans,
-        mortgageBalances: liabilitiesData.mortgageBalances || liabilitiesData["Mortgage Balances on Other Properties"] || result.liabilities.mortgageBalances,
-        monthlyPayments: liabilitiesData.monthlyPayments || liabilitiesData["Monthly Payment Obligations"] || result.liabilities.monthlyPayments,
-        coSignedLiabilities: liabilitiesData.coSignedLiabilities || liabilitiesData["Co-Signed Liabilities"] || result.liabilities.coSignedLiabilities
-      };
+  
+  if (existing.property) {
+    Object.assign(result.property, existing.property);
+  }
+  
+  if (existing.income) {
+    Object.assign(result.income, existing.income);
+  }
+  
+  if (existing.assets) {
+    Object.assign(result.assets, existing.assets);
+  }
+  
+  if (existing.liabilities) {
+    Object.assign(result.liabilities, existing.liabilities);
+  }
+  
+  if (existing.declarations) {
+    Object.assign(result.declarations, existing.declarations);
+  }
+  
+  if (existing.housing) {
+    Object.assign(result.housing, existing.housing);
+  }
+  
+  if (existing.loan) {
+    Object.assign(result.loan, existing.loan);
+  }
+  
+  if (existing.governmentMonitoring) {
+    Object.assign(result.governmentMonitoring, existing.governmentMonitoring);
+  }
+  
+  // Special handling for employers to avoid deep nesting issues
+  if (existing.employment && Array.isArray(existing.employment.employers)) {
+    // Shallow copy of employers
+    for (let i = 0; i < existing.employment.employers.length; i++) {
+      if (existing.employment.employers[i]) {
+        result.employment.employers.push({...existing.employment.employers[i]});
+      }
     }
   }
-
-  // Merge real estate information
-  if (extractedData.property || extractedData["SECTION III"] || extractedData["Real Estate"]) {
-    const propertyData = extractedData.property || extractedData["SECTION III"] || extractedData["Real Estate"] || {};
+  
+  if (existing.employment && Array.isArray(existing.employment.previousEmployers)) {
+    // Shallow copy of previous employers
+    for (let i = 0; i < existing.employment.previousEmployers.length; i++) {
+      if (existing.employment.previousEmployers[i]) {
+        result.employment.previousEmployers.push({...existing.employment.previousEmployers[i]});
+      }
+    }
+  }
+  
+  // 2. Then, merge data from extracted information
+  // Borrower info
+  const borrowerData = extracted.borrower || extracted["SECTION I"] || {};
+  if (Object.keys(borrowerData).length > 0) {
+    // Direct key mapping to avoid complex lookups
+    result.borrower.firstName = borrowerData.firstName || borrowerData["Borrower First Name"] || result.borrower.firstName;
+    result.borrower.middleName = borrowerData.middleName || borrowerData["Borrower Middle Name"] || result.borrower.middleName;
+    result.borrower.lastName = borrowerData.lastName || borrowerData["Borrower Last Name"] || result.borrower.lastName;
+    result.borrower.suffix = borrowerData.suffix || borrowerData["Suffix"] || result.borrower.suffix;
+    result.borrower.ssn = borrowerData.ssn || borrowerData["Social Security Number"] || result.borrower.ssn;
+    result.borrower.dateOfBirth = borrowerData.dateOfBirth || borrowerData["Date of Birth"] || result.borrower.dateOfBirth;
+    result.borrower.maritalStatus = borrowerData.maritalStatus || borrowerData["Marital Status"] || result.borrower.maritalStatus;
+    result.borrower.citizenship = borrowerData.citizenship || borrowerData["Citizenship Status"] || result.borrower.citizenship;
+    result.borrower.dependents = borrowerData.dependents || borrowerData["Number of Dependents"] || result.borrower.dependents;
+    result.borrower.dependentAges = borrowerData.dependentAges || borrowerData["Dependent Ages"] || result.borrower.dependentAges;
+    result.borrower.email = borrowerData.email || borrowerData["Email Address"] || result.borrower.email;
+    result.borrower.homePhone = borrowerData.homePhone || borrowerData["Home Phone"] || result.borrower.homePhone;
+    result.borrower.mobilePhone = borrowerData.mobilePhone || borrowerData["Mobile Phone"] || result.borrower.mobilePhone;
+    result.borrower.currentAddress = borrowerData.currentAddress || borrowerData["Current Address"] || result.borrower.currentAddress;
+    result.borrower.timeAtCurrentAddress = borrowerData.timeAtCurrentAddress || borrowerData["Time at Current Address"] || result.borrower.timeAtCurrentAddress;
+    result.borrower.isPrimaryResidence = borrowerData.isPrimaryResidence || borrowerData["Is this your Primary Residence"] || result.borrower.isPrimaryResidence;
+  }
+  
+  // Assets data - simplified approach with direct field assignment
+  const financialData = extracted.assets || extracted["SECTION II"] || extracted["Financial Information"] || {};
+  const assetsData = financialData.assets || financialData["Assets"] || {};
+  
+  if (Object.keys(assetsData).length > 0) {
+    result.assets.checkingAccounts = assetsData.checkingAccounts || assetsData["Checking Account Balances"] || result.assets.checkingAccounts;
+    result.assets.savingsAccounts = assetsData.savingsAccounts || assetsData["Savings Account Balances"] || result.assets.savingsAccounts;
+    result.assets.retirementAccounts = assetsData.retirementAccounts || assetsData["Retirement Accounts"] || result.assets.retirementAccounts;
+    result.assets.stocksAndBonds = assetsData.stocksAndBonds || assetsData["Stocks and Bonds"] || result.assets.stocksAndBonds;
+    result.assets.cashOnHand = assetsData.cashOnHand || assetsData["Cash on Hand"] || result.assets.cashOnHand;
+    result.assets.realEstateOwned = assetsData.realEstateOwned || assetsData["Real Estate Owned"] || result.assets.realEstateOwned;
+  }
+  
+  // Liabilities data
+  const liabilitiesData = financialData.liabilities || financialData["Liabilities"] || {};
+  
+  if (Object.keys(liabilitiesData).length > 0) {
+    result.liabilities.creditCardDebts = liabilitiesData.creditCardDebts || liabilitiesData["Credit Card Debts"] || result.liabilities.creditCardDebts;
+    result.liabilities.autoLoans = liabilitiesData.autoLoans || liabilitiesData["Auto Loans"] || result.liabilities.autoLoans;
+    result.liabilities.studentLoans = liabilitiesData.studentLoans || liabilitiesData["Student Loans"] || result.liabilities.studentLoans;
+    result.liabilities.mortgageBalances = liabilitiesData.mortgageBalances || liabilitiesData["Mortgage Balances on Other Properties"] || result.liabilities.mortgageBalances;
+    result.liabilities.monthlyPayments = liabilitiesData.monthlyPayments || liabilitiesData["Monthly Payment Obligations"] || result.liabilities.monthlyPayments;
+    result.liabilities.coSignedLiabilities = liabilitiesData.coSignedLiabilities || liabilitiesData["Co-Signed Liabilities"] || result.liabilities.coSignedLiabilities;
+  }
+  
+  // Real estate information
+  const propertyData = extracted.property || extracted["SECTION III"] || extracted["Real Estate"] || {};
+  
+  if (Object.keys(propertyData).length > 0) {
+    // Property fields
+    result.property.address = propertyData.address || propertyData["Property Address"] || result.property.address;
+    result.property.propertyType = propertyData.propertyType || result.property.propertyType;
+    result.property.occupancy = propertyData.occupancy || propertyData["Intended Occupancy"] || result.property.occupancy;
+    result.property.value = propertyData.value || propertyData["Purchase Price"] || result.property.value;
+    result.property.loanAmount = propertyData.loanAmount || propertyData["Loan Amount"] || result.property.loanAmount;
     
-    if (Object.keys(propertyData).length > 0) {
-      result.property = {
-        ...result.property,
-        address: propertyData.address || propertyData["Property Address"] || result.property.address,
-        propertyType: propertyData.propertyType || result.property.propertyType,
-        occupancy: propertyData.occupancy || propertyData["Intended Occupancy"] || result.property.occupancy,
-        value: propertyData.value || propertyData["Purchase Price"] || result.property.value,
-        loanAmount: propertyData.loanAmount || propertyData["Loan Amount"] || result.property.loanAmount
+    // Housing fields
+    result.housing.monthlyPayment = propertyData.monthlyPayment || propertyData["Monthly Mortgage Payment"] || result.housing.monthlyPayment;
+    result.housing.propertyTaxes = propertyData.propertyTaxes || propertyData["Property Taxes"] || result.housing.propertyTaxes;
+    result.housing.insurance = propertyData.insurance || propertyData["Insurance"] || result.housing.insurance;
+    result.housing.hoaFees = propertyData.hoaFees || propertyData["HOA Fees"] || result.housing.hoaFees;
+    result.housing.rentalIncome = propertyData.rentalIncome || propertyData["Rental Income"] || result.housing.rentalIncome;
+  }
+  
+  // Employment data - completely rewritten for simplicity
+  const employmentData = extracted.employment || extracted["SECTION IV"] || {};
+  
+  // Current employment
+  const currentEmployment = employmentData.currentEmployment || employmentData["Current Employment"] || {};
+  
+  if (Object.keys(currentEmployment).length > 0) {
+    const employerName = currentEmployment.employerName || currentEmployment["Employer Name"];
+    
+    if (employerName) {
+      // Create employer object
+      const newEmployer = {
+        name: employerName,
+        position: currentEmployment.position || currentEmployment["Position/Title"],
+        address: currentEmployment.address || currentEmployment["Street Address"],
+        phone: currentEmployment.phone || currentEmployment["Phone Number"],
+        isSelfEmployed: currentEmployment.isSelfEmployed || currentEmployment["Self-Employed"],
+        startDate: currentEmployment.startDate || currentEmployment["Date of Employment Start"]
       };
       
-      result.housing = {
-        ...result.housing,
-        monthlyPayment: propertyData.monthlyPayment || propertyData["Monthly Mortgage Payment"] || result.housing.monthlyPayment,
-        propertyTaxes: propertyData.propertyTaxes || propertyData["Property Taxes"] || result.housing.propertyTaxes,
-        insurance: propertyData.insurance || propertyData["Insurance"] || result.housing.insurance,
-        hoaFees: propertyData.hoaFees || propertyData["HOA Fees"] || result.housing.hoaFees,
-        rentalIncome: propertyData.rentalIncome || propertyData["Rental Income"] || result.housing.rentalIncome
-      };
-    }
-  }
-
-  // Handle employment information - completely redesigned to avoid recursion issues
-  if (extractedData.employment || extractedData["SECTION IV"]) {
-    const employmentData = extractedData.employment || extractedData["SECTION IV"] || {};
-    
-    // Initialize employers array if it doesn't exist
-    if (!result.employment.employers) {
-      result.employment.employers = [];
-    }
-    
-    // Handle current employment
-    const currentEmployment = employmentData.currentEmployment || employmentData["Current Employment"] || {};
-    if (Object.keys(currentEmployment).length > 0) {
-      const employerName = currentEmployment.employerName || currentEmployment["Employer Name"];
-      
-      if (employerName) {
-        // Check if this employer already exists
-        let found = false;
-        let employerIndex = -1;
-        
-        // Using for loop instead of higher-order functions to reduce stack usage
-        for (let i = 0; i < result.employment.employers.length; i++) {
-          const employer = result.employment.employers[i];
-          if (employer && employer.name === employerName) {
-            found = true;
-            employerIndex = i;
-            break;
-          }
-        }
-        
-        // Extract address components safely
-        let city = null;
-        let state = null;
-        let zip = null;
-        
-        if (currentEmployment["City, State, ZIP"]) {
+      // Add location data if available
+      if (currentEmployment["City, State, ZIP"]) {
+        try {
           const parts = currentEmployment["City, State, ZIP"].split(',');
-          if (parts.length > 0) city = parts[0].trim();
+          if (parts.length > 0) newEmployer.city = parts[0].trim();
           
-          if (parts.length > 1 && parts[1]) {
+          if (parts.length > 1) {
             const stateZip = parts[1].trim().split(' ');
-            if (stateZip.length > 0) state = stateZip[0];
-            if (stateZip.length > 1) zip = stateZip[1];
+            if (stateZip.length > 0) newEmployer.state = stateZip[0];
+            if (stateZip.length > 1) newEmployer.zip = stateZip[1];
           }
-        }
-        
-        // Build the employer object
-        const employer = {
-          name: employerName,
-          position: currentEmployment.position || currentEmployment["Position/Title"] || null,
-          address: currentEmployment.address || currentEmployment["Street Address"] || null,
-          city: currentEmployment.city || city,
-          state: currentEmployment.state || state,
-          zip: currentEmployment.zip || zip,
-          phone: currentEmployment.phone || currentEmployment["Phone Number"] || null,
-          isSelfEmployed: currentEmployment.isSelfEmployed || currentEmployment["Self-Employed"] || null,
-          startDate: currentEmployment.startDate || currentEmployment["Date of Employment Start"] || null
-        };
-        
-        if (found) {
-          // Update existing employer
-          result.employment.employers[employerIndex] = employer;
-        } else {
-          // Add new employer
-          result.employment.employers.push(employer);
+        } catch (e) {
+          // Ignore parsing errors
         }
       }
-    }
-    
-    // Handle previous employment
-    if (!result.employment.previousEmployers) {
-      result.employment.previousEmployers = [];
-    }
-    
-    const previousEmployment = employmentData.previousEmployment || employmentData["Previous Employment"] || {};
-    if (Object.keys(previousEmployment).length > 0) {
-      const employerName = previousEmployment.employerName || previousEmployment["Employer Name"];
       
-      if (employerName) {
-        // Check if this previous employer already exists
-        let found = false;
-        let employerIndex = -1;
-        
-        for (let i = 0; i < result.employment.previousEmployers.length; i++) {
-          const employer = result.employment.previousEmployers[i];
-          if (employer && employer.name === employerName) {
-            found = true;
-            employerIndex = i;
-            break;
-          }
-        }
-        
-        // Extract address components safely
-        let city = null;
-        let state = null;
-        let zip = null;
-        
-        if (previousEmployment["City, State, ZIP"]) {
-          const parts = previousEmployment["City, State, ZIP"].split(',');
-          if (parts.length > 0) city = parts[0].trim();
-          
-          if (parts.length > 1 && parts[1]) {
-            const stateZip = parts[1].trim().split(' ');
-            if (stateZip.length > 0) state = stateZip[0];
-            if (stateZip.length > 1) zip = stateZip[1];
-          }
-        }
-        
-        // Build the employer object
-        const employer = {
-          name: employerName,
-          position: previousEmployment.position || previousEmployment["Position/Title"] || null,
-          address: previousEmployment.address || previousEmployment["Street Address"] || null,
-          city: previousEmployment.city || city,
-          state: previousEmployment.state || state,
-          zip: previousEmployment.zip || zip,
-          phone: previousEmployment.phone || previousEmployment["Phone Number"] || null,
-          isSelfEmployed: previousEmployment.isSelfEmployed || previousEmployment["Self-Employed"] || null,
-          startDate: previousEmployment.startDate || previousEmployment["Date of Employment Start"] || null,
-          endDate: previousEmployment.endDate || null
-        };
-        
-        if (found) {
+      // Check if employer already exists
+      let found = false;
+      
+      for (let i = 0; i < result.employment.employers.length; i++) {
+        if (result.employment.employers[i].name === employerName) {
           // Update existing employer
-          result.employment.previousEmployers[employerIndex] = employer;
-        } else {
-          // Add new employer
-          result.employment.previousEmployers.push(employer);
+          result.employment.employers[i] = { ...result.employment.employers[i], ...newEmployer };
+          found = true;
+          break;
         }
+      }
+      
+      // Add new employer if not found
+      if (!found) {
+        result.employment.employers.push(newEmployer);
       }
     }
   }
-
-  // Merge income information
-  if (extractedData.income || extractedData["SECTION V"]) {
-    const incomeData = extractedData.income || extractedData["SECTION V"] || {};
+  
+  // Previous employment - similar approach
+  const previousEmployment = employmentData.previousEmployment || employmentData["Previous Employment"] || {};
+  
+  if (Object.keys(previousEmployment).length > 0) {
+    const employerName = previousEmployment.employerName || previousEmployment["Employer Name"];
     
-    result.income = {
-      ...result.income,
-      monthlyBase: incomeData.monthlyBase || incomeData["Total Monthly Base Income"] || incomeData.base || incomeData["Base"] || result.income.monthlyBase,
-      monthlyOvertime: incomeData.monthlyOvertime || incomeData["Overtime"] || result.income.monthlyOvertime,
-      monthlyBonus: incomeData.monthlyBonus || incomeData["Bonuses"] || result.income.monthlyBonus,
-      monthlyCommission: incomeData.monthlyCommission || incomeData["Commissions"] || result.income.monthlyCommission,
-      monthlyMilitary: incomeData.monthlyMilitary || incomeData["Military"] || result.income.monthlyMilitary,
-      monthlyOther: incomeData.monthlyOther || incomeData["Other Income"] || result.income.monthlyOther,
-      totalMonthlyIncome: incomeData.totalMonthlyIncome || result.income.totalMonthlyIncome,
-      annualIncome: incomeData.annualIncome || result.income.annualIncome
-    };
+    if (employerName) {
+      // Create employer object
+      const newEmployer = {
+        name: employerName,
+        position: previousEmployment.position || previousEmployment["Position/Title"],
+        address: previousEmployment.address || previousEmployment["Street Address"],
+        phone: previousEmployment.phone || previousEmployment["Phone Number"],
+        isSelfEmployed: previousEmployment.isSelfEmployed || previousEmployment["Self-Employed"],
+        startDate: previousEmployment.startDate || previousEmployment["Date of Employment Start"],
+        endDate: previousEmployment.endDate
+      };
+      
+      // Add location data if available
+      if (previousEmployment["City, State, ZIP"]) {
+        try {
+          const parts = previousEmployment["City, State, ZIP"].split(',');
+          if (parts.length > 0) newEmployer.city = parts[0].trim();
+          
+          if (parts.length > 1) {
+            const stateZip = parts[1].trim().split(' ');
+            if (stateZip.length > 0) newEmployer.state = stateZip[0];
+            if (stateZip.length > 1) newEmployer.zip = stateZip[1];
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+      
+      // Check if employer already exists
+      let found = false;
+      
+      for (let i = 0; i < result.employment.previousEmployers.length; i++) {
+        if (result.employment.previousEmployers[i].name === employerName) {
+          // Update existing employer
+          result.employment.previousEmployers[i] = { ...result.employment.previousEmployers[i], ...newEmployer };
+          found = true;
+          break;
+        }
+      }
+      
+      // Add new employer if not found
+      if (!found) {
+        result.employment.previousEmployers.push(newEmployer);
+      }
+    }
   }
-
-  // Merge declarations
-  if (extractedData.declarations || extractedData["SECTION VIII"]) {
-    const declarationsData = extractedData.declarations || extractedData["SECTION VIII"] || {};
-    
-    result.declarations = {
-      ...result.declarations,
-      alimonyChildSupport: declarationsData.alimonyChildSupport || declarationsData["Are you obligated to pay alimony or child support"] || result.declarations.alimonyChildSupport,
-      bankruptcy: declarationsData.bankruptcy || declarationsData["Have you declared bankruptcy in the last 7 years"] || result.declarations.bankruptcy,
-      lawsuit: declarationsData.lawsuit || declarationsData["Are you party to a lawsuit"] || result.declarations.lawsuit,
-      otherProperties: declarationsData.otherProperties || declarationsData["Do you own any other properties"] || result.declarations.otherProperties
-    };
+  
+  // Income information - direct field assignment
+  const incomeData = extracted.income || extracted["SECTION V"] || {};
+  
+  if (Object.keys(incomeData).length > 0) {
+    result.income.monthlyBase = incomeData.monthlyBase || incomeData["Total Monthly Base Income"] || incomeData.base || incomeData["Base"] || result.income.monthlyBase;
+    result.income.monthlyOvertime = incomeData.monthlyOvertime || incomeData["Overtime"] || result.income.monthlyOvertime;
+    result.income.monthlyBonus = incomeData.monthlyBonus || incomeData["Bonuses"] || result.income.monthlyBonus;
+    result.income.monthlyCommission = incomeData.monthlyCommission || incomeData["Commissions"] || result.income.monthlyCommission;
+    result.income.monthlyMilitary = incomeData.monthlyMilitary || incomeData["Military"] || result.income.monthlyMilitary;
+    result.income.monthlyOther = incomeData.monthlyOther || incomeData["Other Income"] || result.income.monthlyOther;
+    result.income.totalMonthlyIncome = incomeData.totalMonthlyIncome || result.income.totalMonthlyIncome;
+    result.income.annualIncome = incomeData.annualIncome || result.income.annualIncome;
   }
-
-  // Merge loan information (from section VI)
-  if (extractedData.loan || extractedData["SECTION VI"] || extractedData["Details of Transaction"]) {
-    const loanData = extractedData.loan || extractedData["SECTION VI"] || extractedData["Details of Transaction"] || {};
-    
-    result.loan = {
-      ...result.loan,
-      purchasePrice: loanData.purchasePrice || loanData["Purchase Price"] || result.loan.purchasePrice,
-      loanAmount: loanData.loanAmount || loanData["Loan Amount"] || result.loan.loanAmount,
-      estimatedClosingCosts: loanData.estimatedClosingCosts || loanData["Estimated Closing Costs"] || result.loan.estimatedClosingCosts,
-      downPayment: loanData.downPayment || loanData["Down Payment"] || result.loan.downPayment,
-      sellerCredits: loanData.sellerCredits || loanData["Seller Credits"] || result.loan.sellerCredits,
-      otherCosts: loanData.otherCosts || loanData["Other Costs"] || result.loan.otherCosts
-    };
+  
+  // Declarations
+  const declarationsData = extracted.declarations || extracted["SECTION VIII"] || {};
+  
+  if (Object.keys(declarationsData).length > 0) {
+    result.declarations.alimonyChildSupport = declarationsData.alimonyChildSupport || declarationsData["Are you obligated to pay alimony or child support"] || result.declarations.alimonyChildSupport;
+    result.declarations.bankruptcy = declarationsData.bankruptcy || declarationsData["Have you declared bankruptcy in the last 7 years"] || result.declarations.bankruptcy;
+    result.declarations.lawsuit = declarationsData.lawsuit || declarationsData["Are you party to a lawsuit"] || result.declarations.lawsuit;
+    result.declarations.otherProperties = declarationsData.otherProperties || declarationsData["Do you own any other properties"] || result.declarations.otherProperties;
   }
-
-  // Merge government monitoring information
-  if (extractedData.governmentMonitoring || extractedData["SECTION X"] || extractedData["Information for Government Monitoring"]) {
-    const monitoringData = extractedData.governmentMonitoring || extractedData["SECTION X"] || extractedData["Information for Government Monitoring"] || {};
-    
-    if (!result.governmentMonitoring) result.governmentMonitoring = {};
-    result.governmentMonitoring = {
-      ...result.governmentMonitoring,
-      gender: monitoringData.gender || monitoringData["Gender"] || result.governmentMonitoring.gender,
-      ethnicity: monitoringData.ethnicity || monitoringData["Ethnicity"] || result.governmentMonitoring.ethnicity,
-      race: monitoringData.race || monitoringData["Race"] || result.governmentMonitoring.race,
-      noProvide: monitoringData.noProvide || monitoringData["Chosen Not to Provide"] || result.governmentMonitoring.noProvide
-    };
+  
+  // Loan information
+  const loanData = extracted.loan || extracted["SECTION VI"] || extracted["Details of Transaction"] || {};
+  
+  if (Object.keys(loanData).length > 0) {
+    result.loan.purchasePrice = loanData.purchasePrice || loanData["Purchase Price"] || result.loan.purchasePrice;
+    result.loan.loanAmount = loanData.loanAmount || loanData["Loan Amount"] || result.loan.loanAmount;
+    result.loan.estimatedClosingCosts = loanData.estimatedClosingCosts || loanData["Estimated Closing Costs"] || result.loan.estimatedClosingCosts;
+    result.loan.downPayment = loanData.downPayment || loanData["Down Payment"] || result.loan.downPayment;
+    result.loan.sellerCredits = loanData.sellerCredits || loanData["Seller Credits"] || result.loan.sellerCredits;
+    result.loan.otherCosts = loanData.otherCosts || loanData["Other Costs"] || result.loan.otherCosts;
   }
-
+  
+  // Government monitoring information
+  const monitoringData = extracted.governmentMonitoring || extracted["SECTION X"] || extracted["Information for Government Monitoring"] || {};
+  
+  if (Object.keys(monitoringData).length > 0) {
+    result.governmentMonitoring.gender = monitoringData.gender || monitoringData["Gender"] || result.governmentMonitoring.gender;
+    result.governmentMonitoring.ethnicity = monitoringData.ethnicity || monitoringData["Ethnicity"] || result.governmentMonitoring.ethnicity;
+    result.governmentMonitoring.race = monitoringData.race || monitoringData["Race"] || result.governmentMonitoring.race;
+    result.governmentMonitoring.noProvide = monitoringData.noProvide || monitoringData["Chosen Not to Provide"] || result.governmentMonitoring.noProvide;
+  }
+  
   // Document type
-  if (extractedData.documentType) {
-    result.documentType = extractedData.documentType;
+  if (extracted.documentType) {
+    result.documentType = extracted.documentType;
   }
+  
+  // Clean up any undefined values to reduce object size
+  function removeUndefined(obj) {
+    Object.keys(obj).forEach(key => {
+      if (obj[key] === undefined) {
+        delete obj[key];
+      } else if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
+        removeUndefined(obj[key]);
+      }
+    });
+  }
+  
+  removeUndefined(result);
   
   return result;
 }
