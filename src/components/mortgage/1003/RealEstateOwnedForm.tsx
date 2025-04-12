@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,7 +97,7 @@ export const RealEstateOwnedForm = ({
   mortgageData = {},
   onSave,
   isEditable = true,
-}: RealEstateOwnedFormProps) => {
+}: RealEateOwnedFormProps) => {
   const [activeTab, setActiveTab] = useState<string>("details");
   const [properties, setProperties] = useState<any[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<any | null>(null);
@@ -186,12 +185,10 @@ export const RealEstateOwnedForm = ({
 
     let updatedProperties;
     if (selectedProperty) {
-      // Update existing property
       updatedProperties = properties.map((prop) =>
         prop.id === selectedProperty.id ? newProperty : prop
       );
     } else {
-      // Add new property
       updatedProperties = [...properties, newProperty];
     }
 
@@ -239,7 +236,6 @@ export const RealEstateOwnedForm = ({
     return !isNaN(numeric) ? `$${numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
   };
 
-  // Owners and Primary Residents - Placeholder names, would come from borrower data in a real app
   const people = [
     { id: "person1", name: "Rene Pastor" },
     { id: "person2", name: "Iohana Tapia Garcia" },
@@ -679,17 +675,29 @@ export const RealEstateOwnedForm = ({
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {/* This would typically be populated with actual liabilities from the borrower's profile */}
-                      <TableRow>
-                        <TableCell className="text-center">
-                          <Checkbox defaultChecked />
-                        </TableCell>
-                        <TableCell>M & T BANK</TableCell>
-                        <TableCell>$719,892.00</TableCell>
-                        <TableCell>$6,272.00</TableCell>
-                        <TableCell>123 Main St</TableCell>
-                        <TableCell>$0.00</TableCell>
-                      </TableRow>
+                      {form.watch('associatedLiabilities')?.map((liability, index) => (
+                        <TableRow key={liability.id}>
+                          <TableCell className="text-center">
+                            <FormField
+                              control={form.control}
+                              name={`associatedLiabilities.${index}.isAssociated`}
+                              render={({ field }) => (
+                                <Checkbox
+                                  checked={field.value}
+                                  onCheckedChange={(checked) => {
+                                    form.setValue(`associatedLiabilities.${index}.isAssociated`, checked);
+                                  }}
+                                />
+                              )}
+                            />
+                          </TableCell>
+                          <TableCell>{liability.creditor}</TableCell>
+                          <TableCell>{liability.balance}</TableCell>
+                          <TableCell>{liability.monthlyPayment}</TableCell>
+                          <TableCell>{liability.address}</TableCell>
+                          <TableCell>{liability.creditLimit}</TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
