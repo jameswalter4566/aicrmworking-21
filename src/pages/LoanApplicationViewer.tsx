@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -65,7 +64,6 @@ const LoanApplicationViewer = () => {
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
       
-      // Determine the current step based on loan status or other data
       let currentStep = "applicationCreated"; // Default to first step
       
       if (lead.mortgageData?.loan?.status) {
@@ -103,16 +101,13 @@ const LoanApplicationViewer = () => {
     try {
       const { section, data } = sectionData;
       
-      // Get the current mortgage data
       const { mortgageData = {} } = loanApplication || {};
       
-      // Merge the new data with existing mortgage data
       const updatedMortgageData = {
         ...mortgageData,
         ...data
       };
       
-      // Update the lead with new mortgage data
       const { data: responseData, error } = await supabase.functions.invoke('update-lead', {
         body: { 
           leadId: id,
@@ -124,7 +119,6 @@ const LoanApplicationViewer = () => {
         throw new Error(error || responseData?.error || "Failed to update loan application");
       }
       
-      // Update the local state with new data
       setLoanApplication(prev => {
         if (!prev) return null;
         return {
@@ -147,7 +141,6 @@ const LoanApplicationViewer = () => {
   };
 
   const renderContent = () => {
-    // First, determine the main tab
     const mainTab = activeTab.includes("-") ? activeTab.split("-")[0] : activeTab;
     const subSection = activeTab.includes("-") ? activeTab.split("-")[1] : null;
     
@@ -235,7 +228,6 @@ const LoanApplicationViewer = () => {
     }
   };
 
-  // Helper function to render the appropriate 1003 section
   const render1003Section = (section: string) => {
     const sectionTitles = {
       personal: "Personal Information",
@@ -256,7 +248,6 @@ const LoanApplicationViewer = () => {
       <div className="p-6">
         <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
         
-        {/* Render the appropriate form based on the selected section */}
         {section === "personal" && loanApplication && (
           <PersonalInfoForm 
             leadId={loanApplication.id} 
@@ -277,7 +268,6 @@ const LoanApplicationViewer = () => {
     );
   };
 
-  // Helper function to get descriptions for each section
   const getDescription = (section: string): string => {
     switch(section) {
       case "personal":
@@ -328,7 +318,6 @@ const LoanApplicationViewer = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
-      {/* Back Button Header */}
       <div className="bg-white shadow-sm p-4">
         <Button 
           onClick={goBack} 
@@ -341,10 +330,8 @@ const LoanApplicationViewer = () => {
         </Button>
       </div>
 
-      {/* Loan Progress Tracker */}
       <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
 
-      {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
         <LoanApplicationSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <div className="flex-1 overflow-auto bg-white border-l">

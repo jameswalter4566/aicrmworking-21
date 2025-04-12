@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -24,20 +25,19 @@ serve(async (req) => {
   try {
     console.log('---------------------------------------------');
     console.log('🔍 STARTED: search-approval-emails function');
-    const { clientLastName, loanNumber, userId } = await req.json();
+    const { clientLastName, userId } = await req.json();
     
     console.log(`📝 Search parameters received:`, {
       clientLastName,
-      loanNumber,
       userId
     });
     
-    if (!clientLastName && !loanNumber) {
+    if (!clientLastName) {
       console.log('❌ ERROR: Missing search parameters');
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Missing search parameters. Please provide clientLastName or loanNumber.',
+          error: 'Missing search parameter. Please provide clientLastName.',
           code: 'MISSING_PARAMS'
         }),
         { 
@@ -47,7 +47,7 @@ serve(async (req) => {
       );
     }
     
-    console.log(`🔍 Searching emails for approval documents related to: ${clientLastName || '[no lastname]'}, loan #${loanNumber || '[no loan number]'}`);
+    console.log(`🔍 Searching emails for approval documents related to: ${clientLastName || '[no lastname]'}`);
 
     let connectionQuery = supabaseAdmin
       .from('user_email_connections')
@@ -181,22 +181,6 @@ serve(async (req) => {
     
     if (clientLastName) {
       searchQuery += ` ${clientLastName}`;
-    }
-    
-    if (loanNumber) {
-      const cleanLoanNumber = loanNumber.replace(/^(ML-|ML)/i, '').trim();
-      searchQuery += ` "${cleanLoanNumber}"`;
-      
-      const numericOnly = cleanLoanNumber.replace(/\D/g, '');
-      if (numericOnly !== cleanLoanNumber) {
-        searchQuery += ` OR ${numericOnly}`;
-      }
-      
-      if (numericOnly.length > 5) {
-        const withDashes = numericOnly.replace(/(\d{4})(\d{4})(\d+)/, '$1-$2-$3');
-        const withSlashes = numericOnly.replace(/(\d{4})(\d{4})(\d+)/, '$1/$2/$3');
-        searchQuery += ` OR ${withDashes} OR ${withSlashes}`;
-      }
     }
     
     console.log(`🔎 Searching Gmail with enhanced query: "${searchQuery}"`);
