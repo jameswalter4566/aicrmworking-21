@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Search, FileText, Info, AlertCircle } from 'lucide-react';
+import { Loader2, Search, FileText, Info, AlertCircle, Save, RefreshCcw } from 'lucide-react';
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -17,22 +17,173 @@ interface ParsedConditions {
 interface EmailConditionsParserProps {
   clientLastName: string;
   loanNumber: string;
+  leadId?: string | number;
   onConditionsFound?: (conditions: ParsedConditions) => void;
 }
 
 const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   clientLastName,
   loanNumber,
+  leadId,
   onConditionsFound
 }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [foundEmails, setFoundEmails] = useState<any[]>([]);
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
   const [conditions, setConditions] = useState<ParsedConditions | null>(null);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [lastError, setLastError] = useState<{code: string, message: string, details?: any} | null>(null);
+
+  useEffect(() => {
+    if (leadId) {
+      fetchExistingConditions(leadId.toString());
+    }
+  }, [leadId]);
+
+  const fetchExistingConditions = async (leadId: string) => {
+    setIsLoading(true);
+    setLastError(null);
+    
+    try {
+      console.log(`Fetching existing conditions for lead ID: ${leadId}`);
+      const { data, error } = await supabase.functions.invoke('retrieve-conditions', {
+        body: {},
+        query: { leadId }
+      });
+      
+      if (error) {
+        console.error("Error retrieving conditions:", error);
+        toast.error("Failed to retrieve loan conditions");
+        setLastError({
+          code: 'FUNCTION_ERROR',
+          message: "Failed to invoke retrieve-conditions function",
+          details: error
+        });
+        return;
+      }
+
+      if (data.success && data.conditions) {
+        setConditions(data.conditions);
+        
+        if (onConditionsFound) {
+          onConditionsFound(data.conditions);
+        }
+        
+        toast.success("Successfully retrieved loan conditions");
+        console.log("Retrieved conditions:", data.conditions);
+      } else if (data.success && !data.conditions) {
+        console.log("No existing conditions found for lead ID:", leadId);
+      } else {
+        const errorMessage = data.error || "Failed to retrieve loan conditions";
+        toast.error(errorMessage);
+        setLastError({
+          code: data.code || 'UNKNOWN_ERROR',
+          message: errorMessage,
+          details: data.details || {}
+        });
+      }
+    } catch (err: any) {
+      console.error("Error in fetchExistingConditions:", err);
+      toast.error("An unexpected error occurred");
+      setLastError({
+        code: 'UNEXPECTED_ERROR',
+        message: err.message || "An unexpected error occurred",
+        details: err
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const saveConditions = async () => {
+    if (!conditions || !leadId) {
+      toast.error("No conditions to save or missing lead ID");
+      return;
+    }
+    
+    setIsSaving(true);
+    setLastError(null);
+    
+    try {
+      console.log(`Saving conditions for lead ID: ${leadId}`);
+      const { data, error } = await supabase.functions.invoke('update-conditions', {
+        body: { 
+          leadId,
+          conditions
+        }
+      });
+      
+      if (error) {
+        console.error("Error saving conditions:", error);
+        toast.error("Failed to save loan conditions");
+        setLastError({
+          code: 'FUNCTION_ERROR',
+          message: "Failed to invoke update-conditions function",
+          details: error
+        });
+        return;
+      }
+
+      if (data.success) {
+        toast.success("Successfully saved loan conditions");
+        console.log("Saved conditions:", data);
+      } else {
+        const errorMessage = data.error || "Failed to save loan conditions";
+        toast.error(errorMessage);
+        setLastError({
+          code: data.code || 'UNKNOWN_ERROR',
+          message: errorMessage,
+          details: data.details || {}
+        });
+      }
+    } catch (err: any) {
+      console.error("Error in saveConditions:", err);
+      toast.error("An unexpected error occurred");
+      setLastError({
+        code: 'UNEXPECTED_ERROR',
+        message: err.message || "An unexpected error occurred",
+        details: err
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleFileUpload = (conditionId: string | undefined, file: File) => {
+    if (!conditionId || !conditions) return;
+    
+    const updatedConditions = {...conditions};
+    
+    ["masterConditions", "generalConditions", "priorToFinalConditions", "complianceConditions"].forEach((category) => {
+      const categoryKey = category as keyof ParsedConditions;
+      updatedConditions[categoryKey] = updatedConditions[categoryKey].map(condition => {
+        if (condition.id === conditionId) {
+          return {
+            ...condition,
+            fileName: file.name,
+            fileUrl: URL.createObjectURL(file),
+            conditionStatus: "ready_for_download"
+          };
+        }
+        return condition;
+      });
+    });
+    
+    setConditions(updatedConditions);
+    if (onConditionsFound) {
+      onConditionsFound(updatedConditions);
+    }
+    
+    toast.success(`File "${file.name}" uploaded and ready for download`);
+  };
+
+  const handleDownloadFile = (conditionId: string | undefined, fileUrl: string) => {
+    window.open(fileUrl, '_blank');
+  };
 
   const searchEmails = async () => {
     setIsSearching(true);
@@ -169,8 +320,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   };
 
   const assignRandomStatuses = (conditions: LoanCondition[]): LoanCondition[] => {
-    const statuses: ("in_review" | "no_action" | "waiting_borrower" | "cleared" | "waived")[] = 
-      ["in_review", "no_action", "waiting_borrower", "cleared", "waived"];
+    const statuses: ConditionStatus[] = 
+      ["in_review", "no_action", "waiting_borrower", "cleared", "waived", "ready_for_download"];
     
     return conditions.map((condition) => {
       if (condition.status === "cleared") {
@@ -202,13 +353,18 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         case "waived":
           notes = "This condition was waived by the underwriter due to compensating factors.";
           break;
+        case "ready_for_download":
+          notes = "Documentation has been uploaded and is ready for download.";
+          break;
       }
       
       return {
         ...condition,
-        id: `condition-${Math.random().toString(36).substr(2, 9)}`,
+        id: condition.id || `condition-${Math.random().toString(36).substr(2, 9)}`,
         conditionStatus: randomStatus,
-        notes
+        notes,
+        fileName: randomStatus === "ready_for_download" ? "document.pdf" : undefined,
+        fileUrl: randomStatus === "ready_for_download" ? "#" : undefined
       };
     });
   };
@@ -289,17 +445,48 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-orange-800">Email Conditions Parser</h2>
-        <Button 
-          onClick={searchEmails} 
-          disabled={isSearching}
-          className="bg-orange-600 hover:bg-orange-700"
-        >
-          {isSearching ? (
-            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching Emails</>
-          ) : (
-            <><Search className="mr-2 h-4 w-4" /> Search Approval Emails</>
+        <div className="flex space-x-2">
+          {leadId && (
+            <>
+              <Button 
+                onClick={() => fetchExistingConditions(leadId.toString())} 
+                disabled={isLoading}
+                variant="outline"
+                className="bg-white hover:bg-gray-50 border-orange-400 text-orange-700"
+              >
+                {isLoading ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
+                ) : (
+                  <><RefreshCcw className="mr-2 h-4 w-4" /> Refresh Conditions</>
+                )}
+              </Button>
+              
+              <Button 
+                onClick={saveConditions} 
+                disabled={isSaving || !conditions}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {isSaving ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                ) : (
+                  <><Save className="mr-2 h-4 w-4" /> Save Conditions</>
+                )}
+              </Button>
+            </>
           )}
-        </Button>
+          
+          <Button 
+            onClick={searchEmails} 
+            disabled={isSearching}
+            className="bg-orange-600 hover:bg-orange-700"
+          >
+            {isSearching ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching Emails</>
+            ) : (
+              <><Search className="mr-2 h-4 w-4" /> Search Approval Emails</>
+            )}
+          </Button>
+        </div>
       </div>
       
       <div className="bg-orange-50 p-4 rounded-md text-sm text-orange-800">
@@ -400,6 +587,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                     <ConditionItem 
                       key={condition.id || `master-${index}`}
                       condition={condition}
+                      onUploadFile={handleFileUpload}
+                      onDownloadFile={handleDownloadFile}
                     />
                   ))}
                 </div>
@@ -422,6 +611,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                     <ConditionItem 
                       key={condition.id || `general-${index}`}
                       condition={condition}
+                      onUploadFile={handleFileUpload}
+                      onDownloadFile={handleDownloadFile}
                     />
                   ))}
                 </div>
@@ -444,6 +635,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                     <ConditionItem 
                       key={condition.id || `final-${index}`}
                       condition={condition}
+                      onUploadFile={handleFileUpload}
+                      onDownloadFile={handleDownloadFile}
                     />
                   ))}
                 </div>
@@ -466,6 +659,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                     <ConditionItem 
                       key={condition.id || `compliance-${index}`}
                       condition={condition}
+                      onUploadFile={handleFileUpload}
+                      onDownloadFile={handleDownloadFile}
                     />
                   ))}
                 </div>
@@ -479,7 +674,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </div>
       )}
       
-      {!isSearching && foundEmails.length === 0 && (
+      {!isSearching && foundEmails.length === 0 && !conditions && (
         <Card className="bg-orange-50">
           <CardContent className="p-6 text-center">
             <Search className="mx-auto h-12 w-12 text-orange-300 mb-3" />

@@ -461,6 +461,7 @@ const ProcessorAssistViewer = () => {
           <EmailConditionsParser 
             clientLastName={loanApplication.lastName} 
             loanNumber={loanApplication.loanId}
+            leadId={loanApplication.id}
             onConditionsFound={handleConditionsFound}
           />
         </div>

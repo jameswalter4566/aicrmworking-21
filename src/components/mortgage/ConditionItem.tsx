@@ -1,6 +1,6 @@
 
 import React, { useState } from "react";
-import { CheckCircle, Clock, HelpCircle, ChevronDown, ChevronUp, Info } from "lucide-react";
+import { CheckCircle, Clock, HelpCircle, ChevronDown, ChevronUp, Info, FileUp, Download } from "lucide-react";
 import { 
   Collapsible, 
   CollapsibleTrigger, 
@@ -12,8 +12,10 @@ import {
   HoverCardContent,
 } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
-export type ConditionStatus = "in_review" | "no_action" | "waiting_borrower" | "cleared" | "waived" | "pending";
+export type ConditionStatus = "in_review" | "no_action" | "waiting_borrower" | "cleared" | "waived" | "pending" | "ready_for_download";
 
 export interface LoanCondition {
   id?: string;
@@ -21,14 +23,23 @@ export interface LoanCondition {
   status: "pending" | "cleared" | "waived";
   conditionStatus?: ConditionStatus;
   notes?: string;
+  fileUrl?: string; // URL to the file if available
+  fileName?: string; // Name of the attached file
 }
 
 interface ConditionItemProps {
   condition: LoanCondition;
   className?: string;
+  onUploadFile?: (conditionId: string | undefined, file: File) => void;
+  onDownloadFile?: (conditionId: string | undefined, fileUrl: string) => void;
 }
 
-export const ConditionItem: React.FC<ConditionItemProps> = ({ condition, className }) => {
+export const ConditionItem: React.FC<ConditionItemProps> = ({ 
+  condition, 
+  className,
+  onUploadFile,
+  onDownloadFile
+}) => {
   const [isOpen, setIsOpen] = useState(false);
 
   // Set default condition status if not available
@@ -49,6 +60,8 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({ condition, classNa
         return "This condition has been cleared by underwriting.";
       case "waived":
         return "This condition has been waived and is no longer required.";
+      case "ready_for_download":
+        return "This condition's documentation is ready for download.";
       default:
         return "This condition is pending review.";
     }
@@ -56,6 +69,23 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({ condition, classNa
 
   // Use provided notes or default based on status
   const notes = condition.notes || defaultNotes();
+  
+  // Handle file upload
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0] && onUploadFile) {
+      const file = event.target.files[0];
+      onUploadFile(condition.id, file);
+      toast.success(`File "${file.name}" uploaded for condition`);
+    }
+  };
+
+  // Handle file download
+  const handleDownload = () => {
+    if (condition.fileUrl && onDownloadFile) {
+      onDownloadFile(condition.id, condition.fileUrl);
+      toast.success("Downloading document...");
+    }
+  };
   
   // Get status information
   const getStatusInfo = () => {
@@ -95,6 +125,13 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({ condition, classNa
           color: "text-purple-600 bg-purple-50",
           description: "This condition has been waived"
         };
+      case "ready_for_download":
+        return {
+          label: "Ready for Download",
+          icon: <Download className="h-4 w-4 text-green-600" />,
+          color: "text-green-600 bg-green-100",
+          description: "Documentation is ready for download"
+        };
       default:
         return {
           label: "Pending",
@@ -129,6 +166,18 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({ condition, classNa
               <p className="text-sm">{statusInfo.description}</p>
             </HoverCardContent>
           </HoverCard>
+          {conditionStatus === "ready_for_download" && condition.fileUrl && (
+            <button 
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                handleDownload(); 
+              }}
+              className="p-1 rounded-full hover:bg-gray-100"
+              title="Download document"
+            >
+              <Download className="h-4 w-4 text-green-600" />
+            </button>
+          )}
           {isOpen ? 
             <ChevronUp className="h-4 w-4" /> : 
             <ChevronDown className="h-4 w-4" />
@@ -138,7 +187,37 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({ condition, classNa
       <CollapsibleContent>
         <div className="p-3 border-t bg-gray-50">
           <h4 className="font-medium text-sm mb-1">Notes</h4>
-          <p className="text-sm text-gray-700">{notes}</p>
+          <p className="text-sm text-gray-700 mb-3">{notes}</p>
+          
+          {condition.fileName && (
+            <div className="mb-3 text-sm">
+              <span className="font-medium">Attached file: </span>
+              <span className="text-blue-600">{condition.fileName}</span>
+              {condition.fileUrl && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="ml-2 py-0 h-6"
+                  onClick={handleDownload}
+                >
+                  <Download className="h-3 w-3 mr-1" /> Download
+                </Button>
+              )}
+            </div>
+          )}
+          
+          <div className="flex items-center">
+            <label className="flex items-center cursor-pointer text-sm text-gray-700 hover:text-gray-900 py-1 px-2 rounded border border-dashed border-gray-300 hover:border-gray-400 bg-white">
+              <FileUp className="h-4 w-4 mr-1" />
+              <span>Upload document</span>
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </label>
+          </div>
         </div>
       </CollapsibleContent>
     </Collapsible>

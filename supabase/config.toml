@@ -1,23 +1,9 @@
 
 project_id = "imrmboyczebjlbnkgjns"
 
-[functions.save-pitch-deck]
-verify_jwt = false
-
-[functions.retrieve-pitch-deck]
-verify_jwt = false
-
-[functions.send-pitch-deck]
-verify_jwt = false
-
-[functions.send-gmail]
-verify_jwt = false
-
-[functions.twilio-token]
-verify_jwt = false
-
-[functions.search-approval-emails]
+[functions]
+[functions.update-conditions]
 verify_jwt = true
 
-[functions.parse-approval-document]
+[functions.retrieve-conditions]
 verify_jwt = true
