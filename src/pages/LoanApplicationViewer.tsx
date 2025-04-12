@@ -1,15 +1,20 @@
-
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { Loader2, ArrowLeft, Upload, FileText } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 import LoanApplicationSidebar from "@/components/mortgage/LoanApplicationSidebar";
+import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 import PDFDropZone from "@/components/mortgage/PDFDropZone";
+import { PersonalInfoForm } from "@/components/mortgage/1003/PersonalInfoForm";
+import { EmploymentIncomeForm } from "@/components/mortgage/1003/EmploymentIncomeForm";
+import { AssetInformationForm } from "@/components/mortgage/1003/AssetInformationForm";
+import { LiabilityInformationForm } from "@/components/mortgage/1003/LiabilityInformationForm";
+import { RealEstateOwnedForm } from "@/components/mortgage/1003/RealEstateOwnedForm";
+import { LoanInformationForm } from "@/components/mortgage/1003/LoanInformationForm";
+import { HousingExpensesForm } from "@/components/mortgage/1003/HousingExpensesForm";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
 
 interface LoanApplication {
   id: string;
@@ -23,13 +28,14 @@ interface LoanApplication {
   currentStep?: string;
 }
 
-const LoanApplicationViewer: React.FC = () => {
+const LoanApplicationViewer = () => {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const [loanApplication, setLoanApplication] = useState<LoanApplication | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("overview");
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("1003-personal");
+  const [isSaving, setIsSaving] = useState(false);
   
   useEffect(() => {
     if (id) {
@@ -39,21 +45,17 @@ const LoanApplicationViewer: React.FC = () => {
   
   const fetchLoanApplicationData = async (leadId: string) => {
     setLoading(true);
-    setLoadError(null);
-    
     try {
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { 
-          leadId: leadId,
-          industryFilter: 'mortgage',
-          exactMatch: true
+          leadId,
+          industryFilter: 'mortgage'
         }
       });
 
       if (error) {
         console.error("Error fetching loan application:", error);
         toast.error("Failed to load loan application details");
-        setLoadError(`API Error: ${error.message}`);
         setLoading(false);
         return;
       }
@@ -61,24 +63,15 @@ const LoanApplicationViewer: React.FC = () => {
       if (!data.success || !data.data || data.data.length === 0) {
         console.error("API returned error or no data:", data.error);
         toast.error(data.error || "Failed to load loan application details");
-        setLoadError(`No data returned for lead ID: ${leadId}`);
         setLoading(false);
         return;
       }
 
       const lead = data.data[0];
-      
-      if (lead.id.toString() !== leadId.toString()) {
-        console.error(`Lead ID mismatch! Requested ${leadId} but got ${lead.id}`);
-        setLoadError(`Data error: Received incorrect lead (${lead.id}) instead of requested lead (${leadId})`);
-        setLoading(false);
-        return;
-      }
-      
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
       
-      let currentStep = "applicationCreated";
+      let currentStep = "applicationCreated"; // Default to first step
       
       if (lead.mortgageData?.loan?.status) {
         const status = lead.mortgageData.loan.status.toLowerCase();
@@ -89,7 +82,7 @@ const LoanApplicationViewer: React.FC = () => {
         else if (status.includes("submitted")) currentStep = "submitted";
       }
       
-      const loanAppData = {
+      setLoanApplication({
         id: lead.id,
         firstName: lead.firstName || '',
         lastName: lead.lastName || '',
@@ -99,47 +92,86 @@ const LoanApplicationViewer: React.FC = () => {
         loanId: lead.mortgageData?.loan?.loanNumber || `ML-${lead.id}`,
         mortgageData: lead.mortgageData || {},
         currentStep: currentStep
-      };
-      
-      setLoanApplication(loanAppData);
-    } catch (error: any) {
+      });
+    } catch (error) {
       console.error("Error in fetchLoanApplicationData:", error);
       toast.error("An unexpected error occurred");
-      setLoadError(`Unexpected error: ${error.message}`);
     } finally {
       setLoading(false);
     }
+  };
+
+  const saveFormData = async (sectionData: any) => {
+    if (!id) return;
+
+    setIsSaving(true);
+    try {
+      const { section, data } = sectionData;
+      
+      const { mortgageData = {} } = loanApplication || {};
+      
+      const updatedMortgageData = {
+        ...mortgageData,
+        ...data
+      };
+      
+      const { data: responseData, error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId: id,
+          leadData: { mortgageData: updatedMortgageData }
+        }
+      });
+      
+      if (error || !responseData.success) {
+        throw new Error(error || responseData?.error || "Failed to update loan application");
+      }
+      
+      setLoanApplication(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          mortgageData: updatedMortgageData
+        };
+      });
+      
+      toast.success(`${section.charAt(0).toUpperCase() + section.slice(1)} information saved successfully`);
+    } catch (error) {
+      console.error("Error saving form data:", error);
+      toast.error("Failed to save information");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const goBack = () => {
+    navigate(-1);
   };
 
   const handlePdfDrop = async (file: File) => {
     if (!id || !file) return;
     
     try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
       const uniqueFileName = `${Date.now()}_${file.name}`;
       const fileType = guessDocumentType(file.name);
       
       toast.info(`Analyzing ${fileType || 'document'}: ${file.name}...`);
       
-      // Upload file to Supabase storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError, data } = await supabase.storage
         .from('borrower-documents')
-        .upload(`leads/${id}/${uniqueFileName}`, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
+        .upload(`leads/${id}/${uniqueFileName}`, file);
+        
       if (uploadError) {
-        console.error('Upload error:', uploadError);
         throw new Error(`Error uploading document: ${uploadError.message}`);
       }
       
-      // Get public URL for the uploaded file
       const { data: { publicUrl } } = supabase.storage
         .from('borrower-documents')
         .getPublicUrl(`leads/${id}/${uniqueFileName}`);
       
-      // Analyze PDF using edge function
-      const { data, error } = await supabase.functions.invoke('analyze-pdf-document', {
+      const { data: analysisData, error } = await supabase.functions.invoke('analyze-pdf-document', {
         body: { 
           fileUrl: publicUrl, 
           fileType: fileType,
@@ -148,71 +180,264 @@ const LoanApplicationViewer: React.FC = () => {
       });
       
       if (error) {
-        console.error('Analysis error:', error);
         throw new Error(`Error analyzing document: ${error.message}`);
       }
       
-      // Refresh loan application data after successful analysis
       await fetchLoanApplicationData(id);
       
-      // Display success toast with document type and details
-      toast.success(`Successfully analyzed ${fileType || 'document'}!`, {
-        description: `Extracted data from ${file.name}`
-      });
+      toast.success('Document successfully analyzed and data extracted!');
       
     } catch (error) {
-      console.error('Document processing error:', error);
-      toast.error(`Failed to process document: ${error instanceof Error ? error.message : 'Unknown error'}`, {
-        description: 'Please try uploading the document again'
-      });
+      console.error('Error processing document:', error);
+      toast.error(`Failed to process document: ${error.message || 'Unknown error'}`);
     }
   };
 
-  // Helper function to guess document type from filename
-  const guessDocumentType = (filename: string): string => {
-    const lowerFilename = filename.toLowerCase();
-    if (lowerFilename.includes('payslip') || lowerFilename.includes('pay')) return 'Pay Slip';
-    if (lowerFilename.includes('bank') || lowerFilename.includes('statement')) return 'Bank Statement';
-    if (lowerFilename.includes('tax') || lowerFilename.includes('return')) return 'Tax Return';
-    if (lowerFilename.includes('id') || lowerFilename.includes('license')) return 'ID Document';
-    if (lowerFilename.includes('w2') || lowerFilename.includes('w-2')) return 'W-2';
-    if (lowerFilename.includes('1099')) return '1099';
-    if (lowerFilename.includes('approval')) return 'Approval Letter';
-    return 'Document';
+  const guessDocumentType = (filename: string): string | undefined => {
+    const lowercaseFilename = filename.toLowerCase();
+    
+    if (lowercaseFilename.includes('1003') || lowercaseFilename.includes('application')) {
+      return '1003';
+    } else if (lowercaseFilename.includes('mortgage') || lowercaseFilename.includes('statement')) {
+      return 'mortgage_statement';
+    } else if (lowercaseFilename.includes('w2') || lowercaseFilename.includes('w-2')) {
+      return 'w2';
+    } else if (lowercaseFilename.includes('paystub') || lowercaseFilename.includes('pay stub') ||
+               lowercaseFilename.includes('payslip') || lowercaseFilename.includes('pay slip')) {
+      return 'paystub';
+    }
+    
+    return undefined; // Unknown document type
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0
-    }).format(amount);
+  const renderContent = () => {
+    const mainTab = activeTab.includes("-") ? activeTab.split("-")[0] : activeTab;
+    const subSection = activeTab.includes("-") ? activeTab.split("-")[1] : null;
+    
+    switch(mainTab) {
+      case "1003":
+        if (subSection) {
+          return render1003Section(subSection);
+        }
+        return render1003Section("personal"); // Default to personal info
+        
+      case "products":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Products and Pricing</h2>
+            <p className="text-gray-600">
+              View available loan products and pricing options.
+            </p>
+          </div>
+        );
+      case "processor":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Processor Assist</h2>
+            <p className="text-gray-600">
+              Get assistance with loan processing tasks.
+            </p>
+          </div>
+        );
+      case "pitchDeck":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Pitch Deck Pro</h2>
+            <p className="text-gray-600">
+              Create and manage presentation materials for this loan.
+            </p>
+          </div>
+        );
+      case "aiLoanOfficer":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">AI Loan Officer</h2>
+            <p className="text-gray-600">
+              Get AI assistance with loan officer tasks.
+            </p>
+          </div>
+        );
+      case "fees":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Fees</h2>
+            <p className="text-gray-600">
+              View and manage loan fees.
+            </p>
+          </div>
+        );
+      case "documents":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Document Manager</h2>
+            <p className="text-gray-600">
+              Manage loan documents and paperwork.
+            </p>
+          </div>
+        );
+      case "conditions":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Conditions</h2>
+            <p className="text-gray-600">
+              View and manage loan conditions.
+            </p>
+          </div>
+        );
+      case "withdraw":
+        return (
+          <div className="p-6">
+            <h2 className="text-2xl font-semibold mb-4">Withdraw / Cancel Loan</h2>
+            <p className="text-gray-600">
+              Options to withdraw or cancel this loan application.
+            </p>
+          </div>
+        );
+      default:
+        return <div className="p-6">Select an option from the sidebar</div>;
+    }
   };
 
-  const goBack = () => {
-    navigate('/pipeline');
+  const render1003Section = (section: string) => {
+    const sectionTitles = {
+      personal: "Personal Information",
+      employment: "Employment & Income",
+      assets: "Assets",
+      liabilities: "Liabilities",
+      realEstate: "Real Estate Owned",
+      loanInfo: "Loan Information",
+      housing: "Housing Expenses",
+      transaction: "Details of Transaction",
+      declarations: "Declarations",
+      government: "Government Monitoring"
+    };
+    
+    const title = sectionTitles[section as keyof typeof sectionTitles] || "Loan Application";
+    
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
+        
+        {section === "personal" && loanApplication && (
+          <PersonalInfoForm 
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section === "employment" && loanApplication && (
+          <EmploymentIncomeForm 
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section === "assets" && loanApplication && (
+          <AssetInformationForm 
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section === "liabilities" && loanApplication && (
+          <LiabilityInformationForm 
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section === "realEstate" && loanApplication && (
+          <RealEstateOwnedForm
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section === "loanInfo" && loanApplication && (
+          <LoanInformationForm
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section === "housing" && loanApplication && (
+          <HousingExpensesForm
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section !== "personal" && 
+         section !== "employment" && 
+         section !== "assets" && 
+         section !== "liabilities" && 
+         section !== "realEstate" &&
+         section !== "loanInfo" &&
+         section !== "housing" && (
+          <div className="mt-4 p-4 border rounded-md bg-gray-50">
+            <p className="text-gray-500 italic">
+              This section has not been implemented yet. It will contain fields for {title.toLowerCase()}.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const getDescription = (section: string): string => {
+    switch(section) {
+      case "personal":
+        return "Basic information about the borrower including name, address, and contact details.";
+      case "employment":
+        return "Information about current and previous employment, income sources, and verification.";
+      case "assets":
+        return "Details about financial assets including bank accounts, investments, and other holdings.";
+      case "liabilities":
+        return "Information about existing debts and financial obligations.";
+      case "realEstate":
+        return "Details about properties currently owned by the borrower.";
+      case "loanInfo":
+        return "Specific information about the loan being requested and property details.";
+      case "housing":
+        return "Current housing expenses and projected expenses after the loan.";
+      case "transaction":
+        return "Breakdown of the purchase transaction including costs and sources of funds.";
+      case "declarations":
+        return "Legal declarations required for mortgage applications.";
+      case "government":
+        return "Government-required monitoring information for fair lending purposes.";
+      default:
+        return "Complete the form to continue with your loan application.";
+    }
   };
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple mx-auto mb-4" />
-          <p className="text-gray-600">Loading loan application for ID: {id}...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
       </div>
     );
   }
 
-  if (loadError || !loanApplication) {
+  if (!loanApplication) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <h2 className="text-2xl font-bold text-gray-700">
-          {loadError ? "Error loading loan application" : "Loan application not found"}
-        </h2>
-        <p className="mt-2 text-gray-500">
-          {loadError || `The requested loan application (ID: ${id}) could not be found.`}
-        </p>
+        <h2 className="text-2xl font-bold text-gray-700">Loan application not found</h2>
+        <p className="mt-2 text-gray-500">The requested loan application could not be found.</p>
         <Button onClick={goBack} className="mt-4" variant="outline">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Go Back
@@ -231,101 +456,35 @@ const LoanApplicationViewer: React.FC = () => {
           className="rounded-full"
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Pipeline
+          Back
         </Button>
       </div>
 
       <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
+      
+      <div className="bg-white px-8 py-4 border-b">
+        <PDFDropZone 
+          onFileAccepted={handlePdfDrop} 
+          className="max-w-3xl mx-auto"
+        />
+      </div>
 
-      <div className="flex flex-1">
-        {/* Main content */}
-        <div className="flex-1 p-6">
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-            <h1 className="text-2xl font-bold text-mortgage-purple mb-2">
-              {loanApplication.loanId}: {loanApplication.firstName} {loanApplication.lastName}
+      <div className="flex flex-1 overflow-hidden">
+        <LoanApplicationSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <div className="flex-1 overflow-auto bg-white border-l">
+          <div className="p-6 border-b bg-gray-50">
+            <h1 className="text-2xl font-bold text-mortgage-darkPurple">
+              Loan Application: {loanApplication.loanId}
             </h1>
-            <div className="flex flex-wrap items-center mt-2 text-sm text-gray-600">
-              <span className="px-2 py-1 rounded-full bg-mortgage-lightPurple text-mortgage-purple text-xs font-medium mr-2 mb-1">
+            <div className="flex items-center mt-2 text-sm text-gray-600">
+              <span className="px-2 py-1 rounded-full bg-mortgage-lightPurple text-mortgage-darkPurple text-xs font-medium mr-2">
                 {loanApplication.loanStatus}
               </span>
-              <span className="mr-4 mb-1">{loanApplication.propertyAddress}</span>
-              <span className="font-medium mb-1">{formatCurrency(loanApplication.loanAmount)}</span>
+              <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
             </div>
           </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-5 mb-4">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="documents">Documents</TabsTrigger>
-              <TabsTrigger value="conditions">Conditions</TabsTrigger>
-              <TabsTrigger value="notes">Notes & History</TabsTrigger>
-              <TabsTrigger value="details">Loan Details</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview" className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-4 text-mortgage-darkPurple">Loan Overview</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card>
-                  <CardHeader className="bg-mortgage-lightPurple pb-2">
-                    <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Borrower Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <p><strong>Name:</strong> {loanApplication.firstName} {loanApplication.lastName}</p>
-                    <p><strong>Property:</strong> {loanApplication.propertyAddress}</p>
-                    <p><strong>Loan Amount:</strong> {formatCurrency(loanApplication.loanAmount)}</p>
-                    <p><strong>Loan ID:</strong> {loanApplication.loanId}</p>
-                  </CardContent>
-                </Card>
-                
-                <Card>
-                  <CardHeader className="bg-mortgage-lightPurple pb-2">
-                    <CardTitle className="text-lg font-medium text-mortgage-darkPurple">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button variant="outline" className="text-mortgage-purple border-mortgage-purple hover:bg-mortgage-lightPurple">
-                        <FileText className="h-4 w-4 mr-2" />
-                        View 1003
-                      </Button>
-                      <Button variant="outline" className="text-mortgage-purple border-mortgage-purple hover:bg-mortgage-lightPurple">
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Document
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="documents" className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-4 text-mortgage-darkPurple">Document Upload</h2>
-              <PDFDropZone onFileAccepted={handlePdfDrop} />
-            </TabsContent>
-            
-            <TabsContent value="conditions" className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-4 text-mortgage-darkPurple">Loan Conditions</h2>
-              <p className="text-gray-500">No conditions found for this loan.</p>
-            </TabsContent>
-            
-            <TabsContent value="notes" className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-4 text-mortgage-darkPurple">Notes & History</h2>
-              <p className="text-gray-500">No notes found for this loan.</p>
-            </TabsContent>
-            
-            <TabsContent value="details" className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-4 text-mortgage-darkPurple">Loan Details</h2>
-              <pre className="bg-gray-50 p-4 rounded-md overflow-auto max-h-[600px]">
-                {JSON.stringify(loanApplication.mortgageData, null, 2)}
-              </pre>
-            </TabsContent>
-          </Tabs>
+          {renderContent()}
         </div>
-        
-        {/* Sidebar */}
-        <LoanApplicationSidebar 
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
       </div>
     </div>
   );
