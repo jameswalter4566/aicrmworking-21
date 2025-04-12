@@ -226,31 +226,36 @@ You are acting as a trusted document processing agent in a mortgage underwriting
     
     // Update lead's mortgage data if leadId is provided
     if (leadId) {
-      // Get existing mortgage data
-      const { data: leadData, error: fetchError } = await supabase
-        .from('leads')
-        .select('mortgage_data')
-        .eq('id', leadId)
-        .single();
-        
-      if (fetchError) {
-        console.error("Error fetching lead data:", fetchError);
-      } else {
-        // Merge existing data with new extracted data
-        const existingMortgageData = leadData?.mortgage_data || {};
-        const updatedMortgageData = mergeDocumentData(existingMortgageData, extractedData);
-        
-        // Update the lead with new data
-        const { error: updateError } = await supabase
+      try {
+        // Get existing mortgage data
+        const { data: leadData, error: fetchError } = await supabase
           .from('leads')
-          .update({ mortgage_data: updatedMortgageData })
-          .eq('id', leadId);
+          .select('mortgage_data')
+          .eq('id', leadId)
+          .single();
           
-        if (updateError) {
-          console.error("Error updating lead data:", updateError);
+        if (fetchError) {
+          console.error("Error fetching lead data:", fetchError);
         } else {
-          console.log("Successfully updated lead mortgage data");
+          // Merge existing data with new extracted data
+          const existingMortgageData = leadData?.mortgage_data || {};
+          const updatedMortgageData = mergeDocumentData(existingMortgageData, extractedData);
+          
+          // Update the lead with new data
+          const { error: updateError } = await supabase
+            .from('leads')
+            .update({ mortgage_data: updatedMortgageData })
+            .eq('id', leadId);
+            
+          if (updateError) {
+            console.error("Error updating lead data:", updateError);
+          } else {
+            console.log("Successfully updated lead mortgage data");
+          }
         }
+      } catch (err) {
+        console.error("Error in data merging process:", err);
+        // Continue execution to return the extracted data even if merging fails
       }
     }
     
@@ -279,8 +284,18 @@ You are acting as a trusted document processing agent in a mortgage underwriting
 
 // Helper function to intelligently merge document data into mortgage_data structure
 function mergeDocumentData(existingData, extractedData) {
+  // Safety check for null/undefined inputs
+  if (!existingData) existingData = {};
+  if (!extractedData) extractedData = {};
+  
   // Create a deep copy to avoid modifying the original object
-  const result = JSON.parse(JSON.stringify(existingData));
+  let result = {};
+  try {
+    result = JSON.parse(JSON.stringify(existingData));
+  } catch (e) {
+    console.error("Error parsing existing data:", e);
+    result = {}; // Fallback to empty object if parsing fails
+  }
   
   // Initialize sections if they don't exist
   if (!result.borrower) result.borrower = {};
@@ -381,9 +396,13 @@ function mergeDocumentData(existingData, extractedData) {
       
       // See if we have an employer with the same name
       const employerName = currentEmployment.employerName || currentEmployment["Employer Name"];
-      const existingEmployerIndex = employerName ? result.employment.employers.findIndex(
-        (e) => e.name === employerName
-      ) : -1;
+      let existingEmployerIndex = -1;
+      
+      if (employerName && result.employment.employers && Array.isArray(result.employment.employers)) {
+        existingEmployerIndex = result.employment.employers.findIndex(
+          (e) => e && e.name === employerName
+        );
+      }
       
       if (existingEmployerIndex >= 0) {
         // Update existing employer
@@ -421,9 +440,13 @@ function mergeDocumentData(existingData, extractedData) {
       if (!result.employment.previousEmployers) result.employment.previousEmployers = [];
       
       const employerName = previousEmployment.employerName || previousEmployment["Employer Name"];
-      const existingEmployerIndex = employerName ? result.employment.previousEmployers.findIndex(
-        (e) => e.name === employerName
-      ) : -1;
+      let existingEmployerIndex = -1;
+      
+      if (employerName && result.employment.previousEmployers && Array.isArray(result.employment.previousEmployers)) {
+        existingEmployerIndex = result.employment.previousEmployers.findIndex(
+          (e) => e && e.name === employerName
+        );
+      }
       
       if (existingEmployerIndex >= 0) {
         // Update existing previous employer
