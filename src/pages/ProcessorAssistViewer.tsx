@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -67,8 +66,9 @@ const ProcessorAssistViewer = () => {
     try {
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { 
-          leadId,
-          industryFilter: 'mortgage'
+          leadId: leadId,
+          industryFilter: 'mortgage',
+          exactMatch: true
         }
       });
 
@@ -88,10 +88,18 @@ const ProcessorAssistViewer = () => {
         return;
       }
 
+      console.log(`Retrieved ${data.data.length} leads for ID ${leadId}:`, data);
+      
       const lead = data.data[0];
+      if (lead.id.toString() !== leadId.toString()) {
+        console.error(`Lead ID mismatch! Requested ${leadId} but got ${lead.id}`);
+        setLoadError(`Data error: Received incorrect lead (${lead.id}) instead of requested lead (${leadId})`);
+        setLoading(false);
+        return;
+      }
+      
       console.log("Retrieved lead data:", lead);
       
-      // Check if we have the basic borrower info
       if (!lead.firstName && !lead.lastName) {
         console.warn("Lead is missing first name and last name:", lead);
       }

@@ -64,6 +64,9 @@ const ProcessorAssist = () => {
         return;
       }
 
+      // Log the raw data for debugging
+      console.log("Raw mortgage leads data:", data.data);
+      
       const mortgageDeals = data.data
         .filter((lead: any) => lead.isMortgageLead)
         .map((lead: any) => {
@@ -106,7 +109,8 @@ const ProcessorAssist = () => {
   };
 
   const handleDealClick = (deal: MortgageDeal) => {
-    // Navigate to the ProcessorAssistViewer for this specific deal
+    // Ensure we're passing the correct lead ID
+    console.log(`Navigating to processor-assist view for lead ${deal.id} (${deal.firstName} ${deal.lastName})`);
     navigate(`/processor-assist/${deal.id}`);
   };
 

@@ -1,4 +1,3 @@
-
 // Follow the REST architecture for edge functions
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -58,7 +57,7 @@ Deno.serve(async (req) => {
     }
     
     // Extract request body parameters
-    let requestBody = { source: 'all', industryFilter: null };
+    let requestBody = { source: 'all', industryFilter: null, leadId: null, exactMatch: false };
     try {
       if (req.headers.get('content-type')?.includes('application/json')) {
         const body = await req.json().catch(() => ({}));
@@ -102,7 +101,17 @@ Deno.serve(async (req) => {
     // Fetch leads based on parameters and authentication status
     let leads = [];
     
-    if (isAuthenticated && userLeadCount === 0 && totalLeadCount > 0) {
+    // If specific leadId is provided, prioritize that
+    if (requestBody.leadId) {
+      console.log(`Fetching specific lead ID: ${requestBody.leadId}`);
+      leads = await fetchLeadById(requestBody.leadId);
+      
+      if (leads.length === 0) {
+        console.log(`Lead ID ${requestBody.leadId} not found, falling back to regular search`);
+      } else {
+        console.log(`Found lead with ID: ${requestBody.leadId}`);
+      }
+    } else if (isAuthenticated && userLeadCount === 0 && totalLeadCount > 0) {
       console.log("User has no leads but there are leads in the database. Fetching all leads for testing purposes.");
       leads = await fetchAllLeads(userId, requestBody.source, requestBody.industryFilter);
     } else {
@@ -123,6 +132,7 @@ Deno.serve(async (req) => {
           userLeadCount: userLeadCount || 0,
           source: requestBody.source,
           industryFilter: requestBody.industryFilter,
+          leadId: requestBody.leadId,
           retrievedCount: leads.length
         }
       }),
@@ -152,6 +162,66 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// New function to fetch a specific lead by ID
+async function fetchLeadById(leadId) {
+  try {
+    console.log(`Starting fetchLeadById for ID: ${leadId}`);
+    
+    // Initialize query to the leads table
+    let query = supabase.from('leads')
+      .select('*')
+      .eq('id', leadId);
+    
+    console.log('Executing Supabase query for specific lead ID...');
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error(`Query error: ${error.code} - ${error.message}`, error);
+      throw new Error(`Failed to fetch lead by ID from Supabase database: ${error.message}`);
+    }
+    
+    // Log raw data for debugging
+    console.log(`Raw query returned ${data?.length || 0} results for ID ${leadId}`);
+    if (data && data.length > 0) {
+      console.log(`Found lead with ID ${leadId}:`, JSON.stringify(data[0].id, null, 2));
+    } else {
+      console.log(`No lead found with ID: ${leadId}`);
+    }
+    
+    // Transform the data to match the expected format
+    const transformedLeads = (data || []).map(lead => ({
+      id: lead.id,
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      email: lead.email,
+      phone1: lead.phone1,
+      phone2: lead.phone2,
+      disposition: lead.disposition,
+      avatar: lead.avatar,
+      mailingAddress: lead.mailing_address,
+      propertyAddress: lead.property_address,
+      tags: lead.tags,
+      createdAt: lead.created_at,
+      updatedAt: lead.updated_at,
+      createdBy: lead.created_by,
+      isMortgageLead: lead.is_mortgage_lead || false,
+      addedToPipelineAt: lead.added_to_pipeline_at,
+      mortgageData: lead.mortgage_data
+    }));
+    
+    console.log(`Transformed ${transformedLeads.length} leads for ID ${leadId}`);
+    if (transformedLeads.length > 0) {
+      console.log(`Lead ${leadId} name: ${transformedLeads[0].firstName} ${transformedLeads[0].lastName}`);
+    }
+    
+    return transformedLeads;
+  } catch (error) {
+    console.error(`Error fetching lead by ID (${leadId}) from Supabase database: ${error.message}`);
+    console.error(`Stack trace: ${error.stack}`);
+    throw error;
+  }
+}
 
 // Function to fetch leads from Supabase with user filtering
 async function fetchLeadsFromSupabase(userId, source = 'all', industryFilter = null) {
