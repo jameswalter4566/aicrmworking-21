@@ -299,7 +299,7 @@ const LoanApplicationViewer: React.FC = () => {
             
             <TabsContent value="documents" className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold mb-4 text-mortgage-darkPurple">Document Upload</h2>
-              <PDFDropZone onPdfDrop={handlePdfDrop} />
+              <PDFDropZone onFileAccepted={handlePdfDrop} />
             </TabsContent>
             
             <TabsContent value="conditions" className="bg-white rounded-lg shadow-sm p-6">
