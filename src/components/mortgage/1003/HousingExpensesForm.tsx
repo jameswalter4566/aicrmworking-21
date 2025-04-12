@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,33 +21,33 @@ export const HousingExpensesForm = ({
   onSave,
   isEditable = true,
 }: HousingExpensesFormProps) => {
-  const [activeTab, setActiveTab] = useState<string>("present");
+  const [activeTab, setActiveTab] = useState<string>("comparison");
   const [isSaving, setIsSaving] = useState(false);
   
   // Initialize form data from mortgageData or with default values
   const [presentExpenses, setPresentExpenses] = useState({
-    monthlyRent: mortgageData?.housing?.present?.monthlyRent || "0.00",
-    mortgagePayment: mortgageData?.housing?.present?.mortgagePayment || "0.00",
-    otherFinancingPayment: mortgageData?.housing?.present?.otherFinancingPayment || "0.00",
-    hazardInsurance: mortgageData?.housing?.present?.hazardInsurance || "0.00",
-    monthlyTaxes: mortgageData?.housing?.present?.monthlyTaxes || "0.00",
-    monthlyMI: mortgageData?.housing?.present?.monthlyMI || "0.00",
-    monthlyHOADues: mortgageData?.housing?.present?.monthlyHOADues || "0.00",
-    floodInsurance: mortgageData?.housing?.present?.floodInsurance || "0.00",
-    monthlyOther: mortgageData?.housing?.present?.monthlyOther || "0.00",
+    monthlyRent: mortgageData?.housing?.present?.monthlyRent || "",
+    mortgagePayment: mortgageData?.housing?.present?.mortgagePayment || "",
+    otherFinancingPayment: mortgageData?.housing?.present?.otherFinancingPayment || "",
+    hazardInsurance: mortgageData?.housing?.present?.hazardInsurance || "",
+    monthlyTaxes: mortgageData?.housing?.present?.monthlyTaxes || "",
+    monthlyMI: mortgageData?.housing?.present?.monthlyMI || "",
+    monthlyHOADues: mortgageData?.housing?.present?.monthlyHOADues || "",
+    floodInsurance: mortgageData?.housing?.present?.floodInsurance || "",
+    monthlyOther: mortgageData?.housing?.present?.monthlyOther || "",
     totalAmount: mortgageData?.housing?.present?.totalAmount || "0.00",
   });
   
   const [proposedExpenses, setProposedExpenses] = useState({
-    monthlyRent: mortgageData?.housing?.proposed?.monthlyRent || "0.00",
-    mortgagePayment: mortgageData?.housing?.proposed?.mortgagePayment || "0.00",
-    otherFinancingPayment: mortgageData?.housing?.proposed?.otherFinancingPayment || "0.00",
-    hazardInsurance: mortgageData?.housing?.proposed?.hazardInsurance || "0.00",
-    monthlyTaxes: mortgageData?.housing?.proposed?.monthlyTaxes || "0.00",
-    monthlyMI: mortgageData?.housing?.proposed?.monthlyMI || "0.00",
-    monthlyHOADues: mortgageData?.housing?.proposed?.monthlyHOADues || "0.00",
-    floodInsurance: mortgageData?.housing?.proposed?.floodInsurance || "0.00",
-    monthlyOther: mortgageData?.housing?.proposed?.monthlyOther || "0.00",
+    monthlyRent: mortgageData?.housing?.proposed?.monthlyRent || "",
+    mortgagePayment: mortgageData?.housing?.proposed?.mortgagePayment || "",
+    otherFinancingPayment: mortgageData?.housing?.proposed?.otherFinancingPayment || "",
+    hazardInsurance: mortgageData?.housing?.proposed?.hazardInsurance || "",
+    monthlyTaxes: mortgageData?.housing?.proposed?.monthlyTaxes || "",
+    monthlyMI: mortgageData?.housing?.proposed?.monthlyMI || "",
+    monthlyHOADues: mortgageData?.housing?.proposed?.monthlyHOADues || "",
+    floodInsurance: mortgageData?.housing?.proposed?.floodInsurance || "",
+    monthlyOther: mortgageData?.housing?.proposed?.monthlyOther || "",
     totalAmount: mortgageData?.housing?.proposed?.totalAmount || "0.00",
   });
 
@@ -66,7 +67,8 @@ export const HousingExpensesForm = ({
       ];
       
       const total = fields.reduce((sum, field) => {
-        return sum + parseFloat(presentExpenses[field] || "0");
+        const value = presentExpenses[field] === "" ? "0" : presentExpenses[field];
+        return sum + parseFloat(value || "0");
       }, 0);
       
       setPresentExpenses(prev => ({
@@ -98,7 +100,8 @@ export const HousingExpensesForm = ({
       ];
       
       const total = fields.reduce((sum, field) => {
-        return sum + parseFloat(proposedExpenses[field] || "0");
+        const value = proposedExpenses[field] === "" ? "0" : proposedExpenses[field];
+        return sum + parseFloat(value || "0");
       }, 0);
       
       setProposedExpenses(prev => ({
@@ -156,32 +159,34 @@ export const HousingExpensesForm = ({
     value: string, 
     onChange: (value: string) => void,
     disabled: boolean = false,
-    readOnly: boolean = false
+    readOnly: boolean = false,
+    placeholder: string = "0.00"
   ) => {
     return (
       <div className="relative">
-        <span className="absolute left-3 top-3 text-gray-500">$</span>
+        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500">$</span>
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className={`pl-8 text-right ${readOnly ? 'bg-gray-100' : ''}`}
+          className={`pl-8 text-right bg-gray-100 ${readOnly ? 'bg-gray-200' : ''}`}
           disabled={disabled || isSaving}
           readOnly={readOnly}
+          placeholder={placeholder}
         />
       </div>
     );
   };
 
-  // Component for both tabs with a combined view
-  const renderCombinedView = () => {
+  // Component for comparison view (both present and proposed expenses)
+  const renderComparisonView = () => {
     return (
       <div className="p-6">
         <div className="grid grid-cols-3 gap-4 mb-2">
           <div className="col-span-1"></div>
-          <div className="col-span-1 text-center font-semibold text-blue-800">
+          <div className="col-span-1 text-center font-semibold text-orange-500">
             TOTAL PRESENT EXPENSE
           </div>
-          <div className="col-span-1 text-center font-semibold text-blue-800">
+          <div className="col-span-1 text-center font-semibold text-orange-500">
             PROPOSED EXPENSE
           </div>
         </div>
@@ -375,8 +380,7 @@ export const HousingExpensesForm = ({
           </div>
         </div>
         
-        {/* Separator */}
-        <Separator className="my-4" />
+        <Separator className="my-4 border-t border-orange-300" />
         
         {/* Total Amount */}
         <div className="grid grid-cols-3 gap-4 mb-4">
@@ -405,16 +409,17 @@ export const HousingExpensesForm = ({
           <Button
             onClick={handleSave}
             disabled={!isEditable || isSaving}
+            className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-2xl px-6"
           >
             {isSaving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-800 mr-2"></div>
                 Saving...
               </>
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Save Housing Expenses
+                SAVE
               </>
             )}
           </Button>
@@ -423,7 +428,7 @@ export const HousingExpensesForm = ({
     );
   };
 
-  // Render separate tabs for individual views
+  // Render present expenses tab
   const renderPresentExpensesTab = () => {
     return (
       <div className="p-6">
@@ -534,16 +539,17 @@ export const HousingExpensesForm = ({
           <Button
             onClick={handleSave}
             disabled={!isEditable || isSaving}
+            className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-2xl px-6"
           >
             {isSaving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-800 mr-2"></div>
                 Saving...
               </>
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Save Present Housing Expenses
+                SAVE
               </>
             )}
           </Button>
@@ -552,6 +558,7 @@ export const HousingExpensesForm = ({
     );
   };
 
+  // Render proposed expenses tab
   const renderProposedExpensesTab = () => {
     return (
       <div className="p-6">
@@ -662,16 +669,17 @@ export const HousingExpensesForm = ({
           <Button
             onClick={handleSave}
             disabled={!isEditable || isSaving}
+            className="bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-2xl px-6"
           >
             {isSaving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-gray-800 mr-2"></div>
                 Saving...
               </>
             ) : (
               <>
                 <Save className="h-4 w-4 mr-2" />
-                Save Proposed Housing Expenses
+                SAVE
               </>
             )}
           </Button>
@@ -682,28 +690,35 @@ export const HousingExpensesForm = ({
 
   return (
     <Card className="mb-6">
-      <CardHeader>
-        <CardTitle className="text-xl flex items-center">
-          <Home className="h-5 w-5 mr-2" />
-          HOUSING EXPENSES
-        </CardTitle>
+      <CardHeader className="bg-gray-100 border-b pb-2">
+        <div className="flex justify-between items-center">
+          <div className="w-32 text-center py-1 bg-blue-800 text-white font-semibold uppercase text-xs">
+            Summary
+          </div>
+          <div className="flex-grow text-center text-sm font-medium">
+            {mortgageData?.borrowers?.[0]?.firstName || ''} {mortgageData?.borrowers?.[0]?.lastName || ''}
+            {mortgageData?.borrowers?.[1] && 
+              ` & ${mortgageData?.borrowers?.[1]?.firstName || ''} ${mortgageData?.borrowers?.[1]?.lastName || ''}`}
+          </div>
+          <div className="w-32"></div>
+        </div>
       </CardHeader>
       <CardContent className="p-0">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full border-b">
+          <TabsList className="w-full border-b bg-gray-100">
             <TabsTrigger value="comparison" className="flex-1 uppercase font-semibold">
               Total vs. Proposed Expenses
             </TabsTrigger>
             <TabsTrigger value="present" className="flex-1 uppercase font-semibold">
-              Present Expenses
+              Present
             </TabsTrigger>
             <TabsTrigger value="proposed" className="flex-1 uppercase font-semibold">
-              Proposed Expenses
+              Proposed
             </TabsTrigger>
           </TabsList>
           
           <TabsContent value="comparison">
-            {renderCombinedView()}
+            {renderComparisonView()}
           </TabsContent>
           
           <TabsContent value="present">

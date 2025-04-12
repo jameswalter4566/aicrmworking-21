@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ import { AssetInformationForm } from "@/components/mortgage/1003/AssetInformatio
 import { LiabilityInformationForm } from "@/components/mortgage/1003/LiabilityInformationForm";
 import { RealEstateOwnedForm } from "@/components/mortgage/1003/RealEstateOwnedForm";
 import { LoanInformationForm } from "@/components/mortgage/1003/LoanInformationForm";
+import { HousingExpensesForm } from "@/components/mortgage/1003/HousingExpensesForm";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -312,12 +314,22 @@ const LoanApplicationViewer = () => {
           />
         )}
         
+        {section === "housing" && loanApplication && (
+          <HousingExpensesForm
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
         {section !== "personal" && 
          section !== "employment" && 
          section !== "assets" && 
          section !== "liabilities" && 
          section !== "realEstate" &&
-         section !== "loanInfo" && (
+         section !== "loanInfo" &&
+         section !== "housing" && (
           <div className="mt-4 p-4 border rounded-md bg-gray-50">
             <p className="text-gray-500 italic">
               This section has not been implemented yet. It will contain fields for {title.toLowerCase()}.
