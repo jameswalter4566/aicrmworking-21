@@ -115,7 +115,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
                 AI Loan Officer Assist
               </h3>
               <p className="text-gray-700 font-medium mb-1">
-                Drop your 1003 PDF file here
+                Drop your borrower documents here
               </p>
               <p className="text-gray-500 text-sm mb-4">
                 or click to browse
@@ -144,10 +144,10 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         
         <div className="mt-4 text-center text-sm text-gray-500">
           <p className="font-medium text-mortgage-darkPurple">
-            AI-Powered 1003 Form Completion
+            AI-Powered Document Analysis
           </p>
           <p className="text-gray-600">
-            Upload your 1003 PDF and let our AI automatically populate your application data
+            Upload mortgage statements, W-2s, paystubs, or any borrower document and our AI will automatically populate your 1003 application
           </p>
           <p className="text-xs mt-1 italic">
             Supported format: PDF up to 10MB

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -148,8 +147,67 @@ const LoanApplicationViewer = () => {
     navigate(-1);
   };
 
-  const handlePdfDrop = (file: File) => {
-    toast.info(`PDF received: ${file.name}. Auto-population functionality coming soon.`);
+  const handlePdfDrop = async (file: File) => {
+    if (!id || !file) return;
+    
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const uniqueFileName = `${Date.now()}_${file.name}`;
+      const fileType = guessDocumentType(file.name);
+      
+      toast.info(`Analyzing ${fileType || 'document'}: ${file.name}...`);
+      
+      const { error: uploadError, data } = await supabase.storage
+        .from('borrower-documents')
+        .upload(`leads/${id}/${uniqueFileName}`, file);
+        
+      if (uploadError) {
+        throw new Error(`Error uploading document: ${uploadError.message}`);
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('borrower-documents')
+        .getPublicUrl(`leads/${id}/${uniqueFileName}`);
+      
+      const { data: analysisData, error } = await supabase.functions.invoke('analyze-pdf-document', {
+        body: { 
+          fileUrl: publicUrl, 
+          fileType: fileType,
+          leadId: id
+        }
+      });
+      
+      if (error) {
+        throw new Error(`Error analyzing document: ${error.message}`);
+      }
+      
+      await fetchLoanApplicationData(id);
+      
+      toast.success('Document successfully analyzed and data extracted!');
+      
+    } catch (error) {
+      console.error('Error processing document:', error);
+      toast.error(`Failed to process document: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const guessDocumentType = (filename: string): string | undefined => {
+    const lowercaseFilename = filename.toLowerCase();
+    
+    if (lowercaseFilename.includes('1003') || lowercaseFilename.includes('application')) {
+      return '1003';
+    } else if (lowercaseFilename.includes('mortgage') || lowercaseFilename.includes('statement')) {
+      return 'mortgage_statement';
+    } else if (lowercaseFilename.includes('w2') || lowercaseFilename.includes('w-2')) {
+      return 'w2';
+    } else if (lowercaseFilename.includes('paystub') || lowercaseFilename.includes('pay stub') ||
+               lowercaseFilename.includes('payslip') || lowercaseFilename.includes('pay slip')) {
+      return 'paystub';
+    }
+    
+    return undefined; // Unknown document type
   };
 
   const renderContent = () => {
