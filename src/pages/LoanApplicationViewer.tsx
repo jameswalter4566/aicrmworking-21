@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LoanApplicationSidebar from "@/components/mortgage/LoanApplicationSidebar";
 import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
+import PDFDropZone from "@/components/mortgage/PDFDropZone";
 import { PersonalInfoForm } from "@/components/mortgage/1003/PersonalInfoForm";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
@@ -138,6 +139,10 @@ const LoanApplicationViewer = () => {
 
   const goBack = () => {
     navigate(-1);
+  };
+
+  const handlePdfDrop = (file: File) => {
+    toast.info(`PDF received: ${file.name}. Auto-population functionality coming soon.`);
   };
 
   const renderContent = () => {
@@ -331,6 +336,13 @@ const LoanApplicationViewer = () => {
       </div>
 
       <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
+      
+      <div className="bg-white px-8 py-4 border-b">
+        <PDFDropZone 
+          onFileAccepted={handlePdfDrop} 
+          className="max-w-3xl mx-auto"
+        />
+      </div>
 
       <div className="flex flex-1 overflow-hidden">
         <LoanApplicationSidebar activeTab={activeTab} onTabChange={setActiveTab} />
