@@ -629,7 +629,7 @@ export const DeclarationsForm: React.FC<DeclarationsFormProps> = ({
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                {renderRadioOptions('borrower', 'hasForeclosureExplanation', formData.borrower.hasForeclosureExplanation || '')}
+                {renderRadioOptions('borrower', 'foreclosureExplanation', formData.borrower.foreclosureExplanation)}
               </div>
               <div className="space-y-2">
                 <Select
@@ -649,7 +649,7 @@ export const DeclarationsForm: React.FC<DeclarationsFormProps> = ({
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                {renderRadioOptions('coBorrower', 'hasForeclosureExplanation', formData.coBorrower.hasForeclosureExplanation || '')}
+                {renderRadioOptions('coBorrower', 'foreclosureExplanation', formData.coBorrower.foreclosureExplanation)}
               </div>
             </div>
           </div>
@@ -675,7 +675,7 @@ export const DeclarationsForm: React.FC<DeclarationsFormProps> = ({
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                {renderRadioOptions('borrower', 'hasDelinquencyExplanation', formData.borrower.hasDelinquencyExplanation || '')}
+                {renderRadioOptions('borrower', 'delinquencyExplanation', formData.borrower.delinquencyExplanation)}
               </div>
               <div className="space-y-2">
                 <Select
@@ -695,7 +695,7 @@ export const DeclarationsForm: React.FC<DeclarationsFormProps> = ({
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                {renderRadioOptions('coBorrower', 'hasDelinquencyExplanation', formData.coBorrower.hasDelinquencyExplanation || '')}
+                {renderRadioOptions('coBorrower', 'delinquencyExplanation', formData.coBorrower.delinquencyExplanation)}
               </div>
             </div>
           </div>
@@ -722,7 +722,7 @@ export const DeclarationsForm: React.FC<DeclarationsFormProps> = ({
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                {renderRadioOptions('borrower', 'hasBankruptcyExplanation', formData.borrower.hasBankruptcyExplanation || '')}
+                {renderRadioOptions('borrower', 'bankruptcyExplanation', formData.borrower.bankruptcyExplanation)}
               </div>
               <div className="space-y-2">
                 <Select
@@ -743,7 +743,7 @@ export const DeclarationsForm: React.FC<DeclarationsFormProps> = ({
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>
-                {renderRadioOptions('coBorrower', 'hasBankruptcyExplanation', formData.coBorrower.hasBankruptcyExplanation || '')}
+                {renderRadioOptions('coBorrower', 'bankruptcyExplanation', formData.coBorrower.bankruptcyExplanation)}
               </div>
             </div>
           </div>
