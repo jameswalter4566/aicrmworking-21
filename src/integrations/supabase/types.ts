@@ -133,6 +133,30 @@ export type Database = {
         }
         Relationships: []
       }
+      loan_conditions: {
+        Row: {
+          conditions_data: Json
+          created_at: string
+          id: string
+          lead_id: string
+          updated_at: string
+        }
+        Insert: {
+          conditions_data: Json
+          created_at?: string
+          id?: string
+          lead_id: string
+          updated_at?: string
+        }
+        Update: {
+          conditions_data?: Json
+          created_at?: string
+          id?: string
+          lead_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       mortgage_deals: {
         Row: {
           closing_date: string | null

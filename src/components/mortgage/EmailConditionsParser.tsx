@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,7 @@ import { Loader2, Search, FileText, Info, AlertCircle, Save, RefreshCcw } from '
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { ConditionItem, LoanCondition } from './ConditionItem';
+import { ConditionItem, LoanCondition, ConditionStatus } from './ConditionItem';
 
 interface ParsedConditions {
   masterConditions: LoanCondition[];
@@ -52,7 +53,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       console.log(`Fetching existing conditions for lead ID: ${leadId}`);
       const { data, error } = await supabase.functions.invoke('retrieve-conditions', {
         body: {},
-        query: { leadId }
+        queryParams: { leadId }
       });
       
       if (error) {
@@ -327,7 +328,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       if (condition.status === "cleared") {
         return {
           ...condition,
-          conditionStatus: "cleared",
+          conditionStatus: "cleared" as ConditionStatus,
           notes: "This condition has been reviewed and cleared by the underwriter."
         };
       }
