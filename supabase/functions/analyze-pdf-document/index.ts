@@ -288,14 +288,21 @@ function mergeDocumentData(existingData, extractedData) {
   if (!existingData) existingData = {};
   if (!extractedData) extractedData = {};
   
-  // Create a deep copy to avoid modifying the original object
-  let result = {};
-  try {
-    result = JSON.parse(JSON.stringify(existingData));
-  } catch (e) {
-    console.error("Error parsing existing data:", e);
-    result = {}; // Fallback to empty object if parsing fails
-  }
+  // Create a new result object instead of trying to deep copy with JSON.parse(JSON.stringify())
+  // This avoids maximum call stack errors with large nested objects
+  const result = {};
+  
+  // Copy top-level properties from existing data without using deep copy
+  // which can cause stack overflow on large objects
+  Object.keys(existingData).forEach(key => {
+    if (typeof existingData[key] === 'object' && existingData[key] !== null) {
+      // For objects, create a shallow copy
+      result[key] = Array.isArray(existingData[key]) ? [...existingData[key]] : {...existingData[key]};
+    } else {
+      // For primitive values, just copy the value
+      result[key] = existingData[key];
+    }
+  });
   
   // Initialize sections if they don't exist
   if (!result.borrower) result.borrower = {};
@@ -306,6 +313,7 @@ function mergeDocumentData(existingData, extractedData) {
   if (!result.liabilities) result.liabilities = {};
   if (!result.declarations) result.declarations = {};
   if (!result.housing) result.housing = {};
+  if (!result.loan) result.loan = {};
   
   // Merge borrower section data
   if (extractedData.borrower || extractedData["SECTION I"]) {
@@ -334,9 +342,10 @@ function mergeDocumentData(existingData, extractedData) {
   // Merge assets and liabilities
   if (extractedData.assets || extractedData["SECTION II"] || extractedData["Financial Information"]) {
     const financialData = extractedData.assets || extractedData["SECTION II"] || extractedData["Financial Information"] || {};
-    const assetsData = financialData.assets || financialData["Assets"] || {};
     
-    if (assetsData) {
+    // Handle assets
+    const assetsData = financialData.assets || financialData["Assets"] || {};
+    if (Object.keys(assetsData).length > 0) {
       result.assets = {
         ...result.assets,
         checkingAccounts: assetsData.checkingAccounts || assetsData["Checking Account Balances"] || result.assets.checkingAccounts,
@@ -348,9 +357,9 @@ function mergeDocumentData(existingData, extractedData) {
       };
     }
 
+    // Handle liabilities
     const liabilitiesData = financialData.liabilities || financialData["Liabilities"] || {};
-    
-    if (liabilitiesData) {
+    if (Object.keys(liabilitiesData).length > 0) {
       result.liabilities = {
         ...result.liabilities,
         creditCardDebts: liabilitiesData.creditCardDebts || liabilitiesData["Credit Card Debts"] || result.liabilities.creditCardDebts,
@@ -367,116 +376,155 @@ function mergeDocumentData(existingData, extractedData) {
   if (extractedData.property || extractedData["SECTION III"] || extractedData["Real Estate"]) {
     const propertyData = extractedData.property || extractedData["SECTION III"] || extractedData["Real Estate"] || {};
     
-    result.property = {
-      ...result.property,
-      address: propertyData.address || propertyData["Property Address"] || result.property.address,
-      propertyType: propertyData.propertyType || result.property.propertyType,
-      occupancy: propertyData.occupancy || propertyData["Intended Occupancy"] || result.property.occupancy,
-      value: propertyData.value || propertyData["Purchase Price"] || result.property.value,
-      loanAmount: propertyData.loanAmount || propertyData["Loan Amount"] || result.property.loanAmount
-    };
-    
-    result.housing = {
-      ...result.housing,
-      monthlyPayment: propertyData.monthlyPayment || propertyData["Monthly Mortgage Payment"] || result.housing.monthlyPayment,
-      propertyTaxes: propertyData.propertyTaxes || propertyData["Property Taxes"] || result.housing.propertyTaxes,
-      insurance: propertyData.insurance || propertyData["Insurance"] || result.housing.insurance,
-      hoaFees: propertyData.hoaFees || propertyData["HOA Fees"] || result.housing.hoaFees,
-      rentalIncome: propertyData.rentalIncome || propertyData["Rental Income"] || result.housing.rentalIncome
-    };
+    if (Object.keys(propertyData).length > 0) {
+      result.property = {
+        ...result.property,
+        address: propertyData.address || propertyData["Property Address"] || result.property.address,
+        propertyType: propertyData.propertyType || result.property.propertyType,
+        occupancy: propertyData.occupancy || propertyData["Intended Occupancy"] || result.property.occupancy,
+        value: propertyData.value || propertyData["Purchase Price"] || result.property.value,
+        loanAmount: propertyData.loanAmount || propertyData["Loan Amount"] || result.property.loanAmount
+      };
+      
+      result.housing = {
+        ...result.housing,
+        monthlyPayment: propertyData.monthlyPayment || propertyData["Monthly Mortgage Payment"] || result.housing.monthlyPayment,
+        propertyTaxes: propertyData.propertyTaxes || propertyData["Property Taxes"] || result.housing.propertyTaxes,
+        insurance: propertyData.insurance || propertyData["Insurance"] || result.housing.insurance,
+        hoaFees: propertyData.hoaFees || propertyData["HOA Fees"] || result.housing.hoaFees,
+        rentalIncome: propertyData.rentalIncome || propertyData["Rental Income"] || result.housing.rentalIncome
+      };
+    }
   }
 
-  // Merge employment and income information
+  // Handle employment information - completely redesigned to avoid recursion issues
   if (extractedData.employment || extractedData["SECTION IV"]) {
     const employmentData = extractedData.employment || extractedData["SECTION IV"] || {};
-    const currentEmployment = employmentData.currentEmployment || employmentData["Current Employment"] || {};
     
-    if (currentEmployment && Object.keys(currentEmployment).length > 0) {
-      if (!result.employment.employers) result.employment.employers = [];
-      
-      // See if we have an employer with the same name
+    // Initialize employers array if it doesn't exist
+    if (!result.employment.employers) {
+      result.employment.employers = [];
+    }
+    
+    // Handle current employment
+    const currentEmployment = employmentData.currentEmployment || employmentData["Current Employment"] || {};
+    if (Object.keys(currentEmployment).length > 0) {
       const employerName = currentEmployment.employerName || currentEmployment["Employer Name"];
-      let existingEmployerIndex = -1;
       
-      if (employerName && result.employment.employers && Array.isArray(result.employment.employers)) {
-        existingEmployerIndex = result.employment.employers.findIndex(
-          (e) => e && e.name === employerName
-        );
-      }
-      
-      if (existingEmployerIndex >= 0) {
-        // Update existing employer
-        result.employment.employers[existingEmployerIndex] = {
-          ...result.employment.employers[existingEmployerIndex],
-          name: employerName || result.employment.employers[existingEmployerIndex].name,
-          position: currentEmployment.position || currentEmployment["Position/Title"] || result.employment.employers[existingEmployerIndex].position,
-          address: currentEmployment.address || currentEmployment["Street Address"] || result.employment.employers[existingEmployerIndex].address,
-          city: currentEmployment.city || (currentEmployment["City, State, ZIP"] ? currentEmployment["City, State, ZIP"].split(',')[0] : null) || result.employment.employers[existingEmployerIndex].city,
-          state: currentEmployment.state || (currentEmployment["City, State, ZIP"] ? currentEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[0] : null) || result.employment.employers[existingEmployerIndex].state,
-          zip: currentEmployment.zip || (currentEmployment["City, State, ZIP"] ? currentEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[1] : null) || result.employment.employers[existingEmployerIndex].zip,
-          phone: currentEmployment.phone || currentEmployment["Phone Number"] || result.employment.employers[existingEmployerIndex].phone,
-          isSelfEmployed: currentEmployment.isSelfEmployed || currentEmployment["Self-Employed"] || result.employment.employers[existingEmployerIndex].isSelfEmployed,
-          startDate: currentEmployment.startDate || currentEmployment["Date of Employment Start"] || result.employment.employers[existingEmployerIndex].startDate
-        };
-      } else if (employerName) {
-        // Add new employer
-        result.employment.employers.push({
+      if (employerName) {
+        // Check if this employer already exists
+        let found = false;
+        let employerIndex = -1;
+        
+        // Using for loop instead of higher-order functions to reduce stack usage
+        for (let i = 0; i < result.employment.employers.length; i++) {
+          const employer = result.employment.employers[i];
+          if (employer && employer.name === employerName) {
+            found = true;
+            employerIndex = i;
+            break;
+          }
+        }
+        
+        // Extract address components safely
+        let city = null;
+        let state = null;
+        let zip = null;
+        
+        if (currentEmployment["City, State, ZIP"]) {
+          const parts = currentEmployment["City, State, ZIP"].split(',');
+          if (parts.length > 0) city = parts[0].trim();
+          
+          if (parts.length > 1 && parts[1]) {
+            const stateZip = parts[1].trim().split(' ');
+            if (stateZip.length > 0) state = stateZip[0];
+            if (stateZip.length > 1) zip = stateZip[1];
+          }
+        }
+        
+        // Build the employer object
+        const employer = {
           name: employerName,
-          position: currentEmployment.position || currentEmployment["Position/Title"],
-          address: currentEmployment.address || currentEmployment["Street Address"],
-          city: currentEmployment.city || (currentEmployment["City, State, ZIP"] ? currentEmployment["City, State, ZIP"].split(',')[0] : null),
-          state: currentEmployment.state || (currentEmployment["City, State, ZIP"] ? currentEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[0] : null),
-          zip: currentEmployment.zip || (currentEmployment["City, State, ZIP"] ? currentEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[1] : null),
-          phone: currentEmployment.phone || currentEmployment["Phone Number"],
-          isSelfEmployed: currentEmployment.isSelfEmployed || currentEmployment["Self-Employed"],
-          startDate: currentEmployment.startDate || currentEmployment["Date of Employment Start"]
-        });
+          position: currentEmployment.position || currentEmployment["Position/Title"] || null,
+          address: currentEmployment.address || currentEmployment["Street Address"] || null,
+          city: currentEmployment.city || city,
+          state: currentEmployment.state || state,
+          zip: currentEmployment.zip || zip,
+          phone: currentEmployment.phone || currentEmployment["Phone Number"] || null,
+          isSelfEmployed: currentEmployment.isSelfEmployed || currentEmployment["Self-Employed"] || null,
+          startDate: currentEmployment.startDate || currentEmployment["Date of Employment Start"] || null
+        };
+        
+        if (found) {
+          // Update existing employer
+          result.employment.employers[employerIndex] = employer;
+        } else {
+          // Add new employer
+          result.employment.employers.push(employer);
+        }
       }
     }
     
-    // Handle previous employment if present
+    // Handle previous employment
+    if (!result.employment.previousEmployers) {
+      result.employment.previousEmployers = [];
+    }
+    
     const previousEmployment = employmentData.previousEmployment || employmentData["Previous Employment"] || {};
-    if (previousEmployment && Object.keys(previousEmployment).length > 0) {
-      if (!result.employment.previousEmployers) result.employment.previousEmployers = [];
-      
+    if (Object.keys(previousEmployment).length > 0) {
       const employerName = previousEmployment.employerName || previousEmployment["Employer Name"];
-      let existingEmployerIndex = -1;
       
-      if (employerName && result.employment.previousEmployers && Array.isArray(result.employment.previousEmployers)) {
-        existingEmployerIndex = result.employment.previousEmployers.findIndex(
-          (e) => e && e.name === employerName
-        );
-      }
-      
-      if (existingEmployerIndex >= 0) {
-        // Update existing previous employer
-        result.employment.previousEmployers[existingEmployerIndex] = {
-          ...result.employment.previousEmployers[existingEmployerIndex],
-          name: employerName || result.employment.previousEmployers[existingEmployerIndex].name,
-          position: previousEmployment.position || previousEmployment["Position/Title"] || result.employment.previousEmployers[existingEmployerIndex].position,
-          address: previousEmployment.address || previousEmployment["Street Address"] || result.employment.previousEmployers[existingEmployerIndex].address,
-          city: previousEmployment.city || (previousEmployment["City, State, ZIP"] ? previousEmployment["City, State, ZIP"].split(',')[0] : null) || result.employment.previousEmployers[existingEmployerIndex].city,
-          state: previousEmployment.state || (previousEmployment["City, State, ZIP"] ? previousEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[0] : null) || result.employment.previousEmployers[existingEmployerIndex].state,
-          zip: previousEmployment.zip || (previousEmployment["City, State, ZIP"] ? previousEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[1] : null) || result.employment.previousEmployers[existingEmployerIndex].zip,
-          phone: previousEmployment.phone || previousEmployment["Phone Number"] || result.employment.previousEmployers[existingEmployerIndex].phone,
-          isSelfEmployed: previousEmployment.isSelfEmployed || previousEmployment["Self-Employed"] || result.employment.previousEmployers[existingEmployerIndex].isSelfEmployed,
-          startDate: previousEmployment.startDate || previousEmployment["Date of Employment Start"] || result.employment.previousEmployers[existingEmployerIndex].startDate,
-          endDate: previousEmployment.endDate || result.employment.previousEmployers[existingEmployerIndex].endDate
-        };
-      } else if (employerName) {
-        // Add new previous employer
-        result.employment.previousEmployers.push({
+      if (employerName) {
+        // Check if this previous employer already exists
+        let found = false;
+        let employerIndex = -1;
+        
+        for (let i = 0; i < result.employment.previousEmployers.length; i++) {
+          const employer = result.employment.previousEmployers[i];
+          if (employer && employer.name === employerName) {
+            found = true;
+            employerIndex = i;
+            break;
+          }
+        }
+        
+        // Extract address components safely
+        let city = null;
+        let state = null;
+        let zip = null;
+        
+        if (previousEmployment["City, State, ZIP"]) {
+          const parts = previousEmployment["City, State, ZIP"].split(',');
+          if (parts.length > 0) city = parts[0].trim();
+          
+          if (parts.length > 1 && parts[1]) {
+            const stateZip = parts[1].trim().split(' ');
+            if (stateZip.length > 0) state = stateZip[0];
+            if (stateZip.length > 1) zip = stateZip[1];
+          }
+        }
+        
+        // Build the employer object
+        const employer = {
           name: employerName,
-          position: previousEmployment.position || previousEmployment["Position/Title"],
-          address: previousEmployment.address || previousEmployment["Street Address"],
-          city: previousEmployment.city || (previousEmployment["City, State, ZIP"] ? previousEmployment["City, State, ZIP"].split(',')[0] : null),
-          state: previousEmployment.state || (previousEmployment["City, State, ZIP"] ? previousEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[0] : null),
-          zip: previousEmployment.zip || (previousEmployment["City, State, ZIP"] ? previousEmployment["City, State, ZIP"].split(',')[1]?.trim()?.split(' ')[1] : null),
-          phone: previousEmployment.phone || previousEmployment["Phone Number"],
-          isSelfEmployed: previousEmployment.isSelfEmployed || previousEmployment["Self-Employed"],
-          startDate: previousEmployment.startDate || previousEmployment["Date of Employment Start"],
-          endDate: previousEmployment.endDate
-        });
+          position: previousEmployment.position || previousEmployment["Position/Title"] || null,
+          address: previousEmployment.address || previousEmployment["Street Address"] || null,
+          city: previousEmployment.city || city,
+          state: previousEmployment.state || state,
+          zip: previousEmployment.zip || zip,
+          phone: previousEmployment.phone || previousEmployment["Phone Number"] || null,
+          isSelfEmployed: previousEmployment.isSelfEmployed || previousEmployment["Self-Employed"] || null,
+          startDate: previousEmployment.startDate || previousEmployment["Date of Employment Start"] || null,
+          endDate: previousEmployment.endDate || null
+        };
+        
+        if (found) {
+          // Update existing employer
+          result.employment.previousEmployers[employerIndex] = employer;
+        } else {
+          // Add new employer
+          result.employment.previousEmployers.push(employer);
+        }
       }
     }
   }
@@ -515,7 +563,6 @@ function mergeDocumentData(existingData, extractedData) {
   if (extractedData.loan || extractedData["SECTION VI"] || extractedData["Details of Transaction"]) {
     const loanData = extractedData.loan || extractedData["SECTION VI"] || extractedData["Details of Transaction"] || {};
     
-    if (!result.loan) result.loan = {};
     result.loan = {
       ...result.loan,
       purchasePrice: loanData.purchasePrice || loanData["Purchase Price"] || result.loan.purchasePrice,
