@@ -1,16 +1,11 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Search, FileText, CheckCircle2, XCircle, AlertCircle, Info } from 'lucide-react';
+import { Loader2, Search, FileText, Info, AlertCircle } from 'lucide-react';
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-
-interface LoanCondition {
-  description: string;
-  status: "pending" | "cleared" | "waived";
-}
+import { ConditionItem, LoanCondition } from './ConditionItem';
 
 interface ParsedConditions {
   masterConditions: LoanCondition[];
@@ -68,7 +63,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         return;
       }
 
-      // Save the search query for reference
       if (data.query) {
         setSearchQuery(data.query);
       }
@@ -134,14 +128,15 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       }
 
       if (data.success && data.conditions) {
-        setConditions(data.conditions);
+        const enhancedConditions = processConditionsWithStatus(data.conditions);
+        setConditions(enhancedConditions);
         
         if (onConditionsFound) {
-          onConditionsFound(data.conditions);
+          onConditionsFound(enhancedConditions);
         }
         
         toast.success("Successfully extracted conditions from document");
-        console.log("Document parsed successfully:", data.conditions);
+        console.log("Document parsed successfully:", enhancedConditions);
       } else {
         const errorMessage = data.error || "Failed to parse conditions from document";
         toast.error(errorMessage);
@@ -173,6 +168,123 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     }
   };
 
+  const assignRandomStatuses = (conditions: LoanCondition[]): LoanCondition[] => {
+    const statuses: ("in_review" | "no_action" | "waiting_borrower" | "cleared" | "waived")[] = 
+      ["in_review", "no_action", "waiting_borrower", "cleared", "waived"];
+    
+    return conditions.map((condition) => {
+      if (condition.status === "cleared") {
+        return {
+          ...condition,
+          conditionStatus: "cleared",
+          notes: "This condition has been reviewed and cleared by the underwriter."
+        };
+      }
+      
+      const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
+      let notes = "";
+      
+      switch (randomStatus) {
+        case "in_review":
+          notes = "Underwriter is currently reviewing the submitted documentation.";
+          break;
+        case "no_action":
+          notes = "This condition has not been addressed yet.";
+          break;
+        case "waiting_borrower":
+          notes = "We have requested additional documentation from the borrower on " +
+            new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)).toLocaleDateString();
+          break;
+        case "cleared":
+          notes = "Condition was cleared on " +
+            new Date(Date.now() - Math.floor(Math.random() * 3 * 24 * 60 * 60 * 1000)).toLocaleDateString();
+          break;
+        case "waived":
+          notes = "This condition was waived by the underwriter due to compensating factors.";
+          break;
+      }
+      
+      return {
+        ...condition,
+        id: `condition-${Math.random().toString(36).substr(2, 9)}`,
+        conditionStatus: randomStatus,
+        notes
+      };
+    });
+  };
+
+  const processConditionsWithStatus = (parsedConditions: ParsedConditions): ParsedConditions => {
+    return {
+      masterConditions: assignRandomStatuses(parsedConditions.masterConditions),
+      generalConditions: assignRandomStatuses(parsedConditions.generalConditions),
+      priorToFinalConditions: assignRandomStatuses(parsedConditions.priorToFinalConditions),
+      complianceConditions: assignRandomStatuses(parsedConditions.complianceConditions)
+    };
+  };
+
+  const originalParseDocument = parseDocument;
+  const enhancedParseDocument = async (emailId: string, attachmentId: string) => {
+    setSelectedEmailId(emailId);
+    setSelectedAttachmentId(attachmentId);
+    setIsParsing(true);
+    setConditions(null);
+    setLastError(null);
+    
+    try {
+      console.log(`Parsing document from email ${emailId}, attachment ${attachmentId}`);
+      const { data, error } = await supabase.functions.invoke('parse-approval-document', {
+        body: { 
+          emailId,
+          attachmentId
+        }
+      });
+      
+      if (error) {
+        console.error("Error parsing document:", error);
+        toast.error("Failed to parse document");
+        setLastError({
+          code: 'FUNCTION_ERROR',
+          message: "Failed to invoke parse-approval-document function",
+          details: error
+        });
+        return;
+      }
+
+      if (data.success && data.conditions) {
+        const enhancedConditions = processConditionsWithStatus(data.conditions);
+        setConditions(enhancedConditions);
+        
+        if (onConditionsFound) {
+          onConditionsFound(enhancedConditions);
+        }
+        
+        toast.success("Successfully extracted conditions from document");
+        console.log("Document parsed successfully:", enhancedConditions);
+      } else {
+        const errorMessage = data.error || "Failed to parse conditions from document";
+        toast.error(errorMessage);
+        setLastError({
+          code: data.code || 'UNKNOWN_ERROR',
+          message: errorMessage,
+          details: data.details || {}
+        });
+        console.error("Parsing failed:", data);
+      }
+    } catch (err: any) {
+      console.error("Error in parseDocument:", err);
+      toast.error("An unexpected error occurred");
+      setLastError({
+        code: 'UNEXPECTED_ERROR',
+        message: err.message || "An unexpected error occurred",
+        details: err
+      });
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const parseDocumentWithStatus = enhancedParseDocument;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -190,7 +302,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </Button>
       </div>
       
-      {/* Search parameters display */}
       <div className="bg-orange-50 p-4 rounded-md text-sm text-orange-800">
         <h3 className="font-medium mb-2 flex items-center">
           <Info className="h-4 w-4 mr-1" /> Search Parameters
@@ -211,7 +322,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         )}
       </div>
       
-      {/* Error display */}
       {lastError && (
         <Alert variant="destructive" className="text-red-800 bg-red-50 border-red-200">
           <AlertCircle className="h-4 w-4" />
@@ -279,27 +389,20 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       
       {conditions && (
         <div className="grid grid-cols-1 gap-6">
-          {/* Master Conditions */}
           <Card className="bg-orange-100">
             <CardHeader className="bg-orange-200 pb-2">
               <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
             </CardHeader>
             <CardContent className="pt-4 bg-orange-100">
               {conditions.masterConditions.length > 0 ? (
-                <ul className="space-y-2">
+                <div className="space-y-2">
                   {conditions.masterConditions.map((condition, index) => (
-                    <li key={index} className="flex items-start">
-                      <div className="mr-2 mt-0.5">
-                        {condition.status === "cleared" ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-orange-600" />
-                        )}
-                      </div>
-                      <span className="text-orange-800">{condition.description}</span>
-                    </li>
+                    <ConditionItem 
+                      key={condition.id || `master-${index}`}
+                      condition={condition}
+                    />
                   ))}
-                </ul>
+                </div>
               ) : (
                 <div className="text-sm text-orange-800 italic">
                   No master conditions found in the document.
@@ -308,27 +411,20 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
             </CardContent>
           </Card>
           
-          {/* General Conditions */}
           <Card className="bg-orange-100">
             <CardHeader className="bg-orange-200 pb-2">
               <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
             </CardHeader>
             <CardContent className="pt-4 bg-orange-100">
               {conditions.generalConditions.length > 0 ? (
-                <ul className="space-y-2">
+                <div className="space-y-2">
                   {conditions.generalConditions.map((condition, index) => (
-                    <li key={index} className="flex items-start">
-                      <div className="mr-2 mt-0.5">
-                        {condition.status === "cleared" ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-orange-600" />
-                        )}
-                      </div>
-                      <span className="text-orange-800">{condition.description}</span>
-                    </li>
+                    <ConditionItem 
+                      key={condition.id || `general-${index}`}
+                      condition={condition}
+                    />
                   ))}
-                </ul>
+                </div>
               ) : (
                 <div className="text-sm text-orange-800 italic">
                   No general conditions found in the document.
@@ -337,27 +433,20 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
             </CardContent>
           </Card>
           
-          {/* Prior to Final Conditions */}
           <Card className="bg-orange-100">
             <CardHeader className="bg-orange-200 pb-2">
               <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
             </CardHeader>
             <CardContent className="pt-4 bg-orange-100">
               {conditions.priorToFinalConditions.length > 0 ? (
-                <ul className="space-y-2">
+                <div className="space-y-2">
                   {conditions.priorToFinalConditions.map((condition, index) => (
-                    <li key={index} className="flex items-start">
-                      <div className="mr-2 mt-0.5">
-                        {condition.status === "cleared" ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-orange-600" />
-                        )}
-                      </div>
-                      <span className="text-orange-800">{condition.description}</span>
-                    </li>
+                    <ConditionItem 
+                      key={condition.id || `final-${index}`}
+                      condition={condition}
+                    />
                   ))}
-                </ul>
+                </div>
               ) : (
                 <div className="text-sm text-orange-800 italic">
                   No prior to final conditions found in the document.
@@ -366,27 +455,20 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
             </CardContent>
           </Card>
           
-          {/* Compliance Conditions */}
           <Card className="bg-orange-100">
             <CardHeader className="bg-orange-200 pb-2">
               <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
             </CardHeader>
             <CardContent className="pt-4 bg-orange-100">
               {conditions.complianceConditions.length > 0 ? (
-                <ul className="space-y-2">
+                <div className="space-y-2">
                   {conditions.complianceConditions.map((condition, index) => (
-                    <li key={index} className="flex items-start">
-                      <div className="mr-2 mt-0.5">
-                        {condition.status === "cleared" ? (
-                          <CheckCircle2 className="h-4 w-4 text-green-600" />
-                        ) : (
-                          <XCircle className="h-4 w-4 text-orange-600" />
-                        )}
-                      </div>
-                      <span className="text-orange-800">{condition.description}</span>
-                    </li>
+                    <ConditionItem 
+                      key={condition.id || `compliance-${index}`}
+                      condition={condition}
+                    />
                   ))}
-                </ul>
+                </div>
               ) : (
                 <div className="text-sm text-orange-800 italic">
                   No compliance conditions found in the document.

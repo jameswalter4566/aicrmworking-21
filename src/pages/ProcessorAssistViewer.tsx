@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Loader2, ArrowLeft, Briefcase, FileText, HomeIcon, ClipboardCheck } fro
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import EmailConditionsParser from "@/components/mortgage/EmailConditionsParser";
+import { ConditionItem, LoanCondition } from "@/components/mortgage/ConditionItem";
 
 interface LoanApplication {
   id: string;
@@ -28,12 +28,6 @@ interface ProcessorTask {
   description: string;
   status: "pending" | "in_progress" | "completed" | "cancelled";
   icon: React.ReactNode;
-}
-
-interface LoanCondition {
-  id: string;
-  description: string;
-  status: "pending" | "cleared" | "waived";
 }
 
 interface ParsedConditions {
@@ -91,10 +85,8 @@ const ProcessorAssistViewer = () => {
 
       console.log(`Retrieved ${data.data.length} leads for ID ${leadId}:`, data);
       
-      // Get the first lead from the results
       const lead = data.data[0];
       
-      // Verify that the lead ID matches the requested ID
       if (lead.id.toString() !== leadId.toString()) {
         console.error(`Lead ID mismatch! Requested ${leadId} but got ${lead.id}`);
         setLoadError(`Data error: Received incorrect lead (${lead.id}) instead of requested lead (${leadId})`);
@@ -111,7 +103,7 @@ const ProcessorAssistViewer = () => {
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
       
-      let currentStep = "applicationCreated"; // Default to first step
+      let currentStep = "applicationCreated";
       
       if (lead.mortgageData?.loan?.status) {
         const status = lead.mortgageData.loan.status.toLowerCase();
@@ -155,7 +147,6 @@ const ProcessorAssistViewer = () => {
 
   const handleTaskAction = (taskId: string) => {
     toast.success(`Task ${taskId} initiated`);
-    // Here you would implement the actual task processing logic
   };
 
   const goBack = () => {
@@ -335,13 +326,14 @@ const ProcessorAssistViewer = () => {
                 </CardHeader>
                 <CardContent className="pt-4 bg-orange-100">
                   {parsedConditions.masterConditions?.length > 0 ? (
-                    <ul className="space-y-2">
+                    <div className="space-y-2">
                       {parsedConditions.masterConditions.map((condition, index) => (
-                        <li key={index} className="text-sm text-orange-800">
-                          • {condition.description}
-                        </li>
+                        <ConditionItem 
+                          key={condition.id || `master-${index}`}
+                          condition={condition}
+                        />
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <div className="text-sm text-orange-800 italic">
                       No master conditions found.
@@ -356,13 +348,14 @@ const ProcessorAssistViewer = () => {
                 </CardHeader>
                 <CardContent className="pt-4 bg-orange-100">
                   {parsedConditions.generalConditions?.length > 0 ? (
-                    <ul className="space-y-2">
+                    <div className="space-y-2">
                       {parsedConditions.generalConditions.map((condition, index) => (
-                        <li key={index} className="text-sm text-orange-800">
-                          • {condition.description}
-                        </li>
+                        <ConditionItem 
+                          key={condition.id || `general-${index}`}
+                          condition={condition}
+                        />
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <div className="text-sm text-orange-800 italic">
                       No general conditions found.
@@ -377,13 +370,14 @@ const ProcessorAssistViewer = () => {
                 </CardHeader>
                 <CardContent className="pt-4 bg-orange-100">
                   {parsedConditions.priorToFinalConditions?.length > 0 ? (
-                    <ul className="space-y-2">
+                    <div className="space-y-2">
                       {parsedConditions.priorToFinalConditions.map((condition, index) => (
-                        <li key={index} className="text-sm text-orange-800">
-                          • {condition.description}
-                        </li>
+                        <ConditionItem 
+                          key={condition.id || `final-${index}`}
+                          condition={condition}
+                        />
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <div className="text-sm text-orange-800 italic">
                       No prior to final conditions found.
@@ -398,13 +392,14 @@ const ProcessorAssistViewer = () => {
                 </CardHeader>
                 <CardContent className="pt-4 bg-orange-100">
                   {parsedConditions.complianceConditions?.length > 0 ? (
-                    <ul className="space-y-2">
+                    <div className="space-y-2">
                       {parsedConditions.complianceConditions.map((condition, index) => (
-                        <li key={index} className="text-sm text-orange-800">
-                          • {condition.description}
-                        </li>
+                        <ConditionItem 
+                          key={condition.id || `compliance-${index}`}
+                          condition={condition}
+                        />
                       ))}
-                    </ul>
+                    </div>
                   ) : (
                     <div className="text-sm text-orange-800 italic">
                       No compliance conditions found.
