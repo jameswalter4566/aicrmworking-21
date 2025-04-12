@@ -131,13 +131,6 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
         
         <div className="mb-6">
           <IntelligentFileUpload 
-            uploadType="pdf" 
-            endpoint="analyze-pdf-document" 
-            entityId={lead?.id?.toString()}
-            entityType="lead"
-            successMessage="Document analyzed successfully"
-            analyzeText="Analyze Document"
-            uploadText="Upload & Analyze Document"
             onImportComplete={() => {}}
           />
         </div>
