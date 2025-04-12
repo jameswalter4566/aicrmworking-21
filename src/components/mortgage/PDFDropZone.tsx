@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { FileUp, CheckCircle, AlertCircle } from "lucide-react";
+import { FileUp, CheckCircle, AlertCircle, Brain } from "lucide-react";
 
 interface PDFDropZoneProps {
   onFileAccepted?: (file: File) => void;
@@ -110,9 +110,16 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
             </div>
           ) : (
             <div className="flex flex-col items-center">
-              <FileUp className="h-10 w-10 text-gray-400 mb-2" />
-              <p className="text-gray-700 font-medium">Drop your 1003 PDF file here</p>
-              <p className="text-gray-500 text-sm mb-4">or click to browse</p>
+              <Brain className="h-12 w-12 text-mortgage-purple mb-3" />
+              <h3 className="text-xl font-bold text-mortgage-darkPurple mb-2">
+                AI Loan Officer Assist
+              </h3>
+              <p className="text-gray-700 font-medium mb-1">
+                Drop your 1003 PDF file here
+              </p>
+              <p className="text-gray-500 text-sm mb-4">
+                or click to browse
+              </p>
               
               <label className="cursor-pointer bg-mortgage-purple hover:bg-mortgage-darkPurple text-white px-4 py-2 rounded-md transition-colors">
                 Select PDF
@@ -136,8 +143,15 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         </div>
         
         <div className="mt-4 text-center text-sm text-gray-500">
-          <p>Upload your 1003 PDF file to automatically populate application data</p>
-          <p className="text-xs mt-1 italic">Supported format: PDF up to 10MB</p>
+          <p className="font-medium text-mortgage-darkPurple">
+            AI-Powered 1003 Form Completion
+          </p>
+          <p className="text-gray-600">
+            Upload your 1003 PDF and let our AI automatically populate your application data
+          </p>
+          <p className="text-xs mt-1 italic">
+            Supported format: PDF up to 10MB
+          </p>
         </div>
       </CardContent>
     </Card>
