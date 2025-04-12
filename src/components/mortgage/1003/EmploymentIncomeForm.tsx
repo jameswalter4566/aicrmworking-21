@@ -145,7 +145,7 @@ export const EmploymentIncomeForm: React.FC<EmploymentIncomeFormProps> = ({
       setCurrentEntry(prev => ({
         ...prev,
         [parentField]: {
-          ...prev[parentField as keyof typeof prev],
+          ...prev[parentField as keyof typeof prev] as Record<string, any>,
           [childField]: value
         }
       }));
