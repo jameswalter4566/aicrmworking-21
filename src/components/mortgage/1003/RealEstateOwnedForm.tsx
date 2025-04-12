@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -97,7 +98,7 @@ export const RealEstateOwnedForm = ({
   mortgageData = {},
   onSave,
   isEditable = true,
-}: RealEateOwnedFormProps) => {
+}: RealEstateOwnedFormProps) => {  // Fixed the typo in props type name
   const [activeTab, setActiveTab] = useState<string>("details");
   const [properties, setProperties] = useState<any[]>([]);
   const [selectedProperty, setSelectedProperty] = useState<any | null>(null);
@@ -683,9 +684,9 @@ export const RealEstateOwnedForm = ({
                               name={`associatedLiabilities.${index}.isAssociated`}
                               render={({ field }) => (
                                 <Checkbox
-                                  checked={field.value}
+                                  checked={!!field.value}  // Ensure boolean type with double negation
                                   onCheckedChange={(checked) => {
-                                    form.setValue(`associatedLiabilities.${index}.isAssociated`, checked);
+                                    form.setValue(`associatedLiabilities.${index}.isAssociated`, !!checked);
                                   }}
                                 />
                               )}
