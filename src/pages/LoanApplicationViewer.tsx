@@ -11,6 +11,8 @@ import { AssetInformationForm } from "@/components/mortgage/1003/AssetInformatio
 import { LiabilityInformationForm } from "@/components/mortgage/1003/LiabilityInformationForm";
 import { RealEstateOwnedForm } from "@/components/mortgage/1003/RealEstateOwnedForm";
 import { LoanInformationForm } from "@/components/mortgage/1003/LoanInformationForm";
+import { HousingExpensesForm } from "@/components/mortgage/1003/HousingExpensesForm";
+import { DeclarationsForm } from "@/components/mortgage/1003/DeclarationsForm";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -312,12 +314,32 @@ const LoanApplicationViewer = () => {
           />
         )}
         
+        {section === "housing" && loanApplication && (
+          <HousingExpensesForm
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section === "declarations" && loanApplication && (
+          <DeclarationsForm
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
         {section !== "personal" && 
          section !== "employment" && 
          section !== "assets" && 
          section !== "liabilities" && 
          section !== "realEstate" &&
-         section !== "loanInfo" && (
+         section !== "loanInfo" &&
+         section !== "housing" &&
+         section !== "declarations" && (
           <div className="mt-4 p-4 border rounded-md bg-gray-50">
             <p className="text-gray-500 italic">
               This section has not been implemented yet. It will contain fields for {title.toLowerCase()}.
@@ -347,7 +369,7 @@ const LoanApplicationViewer = () => {
       case "transaction":
         return "Breakdown of the purchase transaction including costs and sources of funds.";
       case "declarations":
-        return "Legal declarations required for mortgage applications.";
+        return "Legal declarations required for mortgage applications including bankruptcy, foreclosure, and other financial history.";
       case "government":
         return "Government-required monitoring information for fair lending purposes.";
       default:
