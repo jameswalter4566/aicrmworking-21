@@ -42,6 +42,7 @@ const ProcessorAssist = () => {
   const fetchMortgageDeals = async () => {
     setLoading(true);
     try {
+      console.log("Fetching mortgage deals for Processor Assist...");
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { 
           source: 'all',
@@ -69,6 +70,9 @@ const ProcessorAssist = () => {
           const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
           const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
 
+          // Log each lead to check if names are correct
+          console.log(`Processing lead ${lead.id} - Name: ${lead.firstName} ${lead.lastName}`);
+
           return {
             id: lead.id,
             firstName: lead.firstName || '',
@@ -83,7 +87,7 @@ const ProcessorAssist = () => {
           };
         });
 
-      console.log("Processed mortgage deals for processor:", mortgageDeals);
+      console.log(`Processed ${mortgageDeals.length} mortgage deals for processor assist view`);
       setDeals(mortgageDeals);
     } catch (error) {
       console.error("Error in fetchMortgageDeals:", error);
@@ -102,7 +106,7 @@ const ProcessorAssist = () => {
   };
 
   const handleDealClick = (deal: MortgageDeal) => {
-    // Navigate to the ProcessorAssistViewer instead of LoanApplicationViewer
+    // Navigate to the ProcessorAssistViewer for this specific deal
     navigate(`/processor-assist/${deal.id}`);
   };
 
@@ -170,7 +174,7 @@ const ProcessorAssist = () => {
                     onClick={() => handleDealClick(deal)}
                   >
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-mortgage-purple">
-                      {deal.client}
+                      {deal.client || "No Name Provided"}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {deal.propertyAddress}

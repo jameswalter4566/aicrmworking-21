@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ const ProcessorAssistViewer = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("employment");
   const [parsedConditions, setParsedConditions] = useState<ParsedConditions | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   
   useEffect(() => {
     if (id) {
@@ -58,6 +60,10 @@ const ProcessorAssistViewer = () => {
   
   const fetchLoanApplicationData = async (leadId: string) => {
     setLoading(true);
+    setLoadError(null);
+    
+    console.log(`Fetching loan application data for lead ID: ${leadId}`);
+    
     try {
       const { data, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { 
@@ -69,6 +75,7 @@ const ProcessorAssistViewer = () => {
       if (error) {
         console.error("Error fetching loan application:", error);
         toast.error("Failed to load loan application details");
+        setLoadError(`API Error: ${error.message}`);
         setLoading(false);
         return;
       }
@@ -76,11 +83,19 @@ const ProcessorAssistViewer = () => {
       if (!data.success || !data.data || data.data.length === 0) {
         console.error("API returned error or no data:", data.error);
         toast.error(data.error || "Failed to load loan application details");
+        setLoadError(`No data returned for lead ID: ${leadId}`);
         setLoading(false);
         return;
       }
 
       const lead = data.data[0];
+      console.log("Retrieved lead data:", lead);
+      
+      // Check if we have the basic borrower info
+      if (!lead.firstName && !lead.lastName) {
+        console.warn("Lead is missing first name and last name:", lead);
+      }
+      
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
       
@@ -95,7 +110,7 @@ const ProcessorAssistViewer = () => {
         else if (status.includes("submitted")) currentStep = "submitted";
       }
       
-      setLoanApplication({
+      const loanAppData = {
         id: lead.id,
         firstName: lead.firstName || '',
         lastName: lead.lastName || '',
@@ -105,10 +120,14 @@ const ProcessorAssistViewer = () => {
         loanId: lead.mortgageData?.loan?.loanNumber || `ML-${lead.id}`,
         mortgageData: lead.mortgageData || {},
         currentStep: currentStep
-      });
-    } catch (error) {
+      };
+      
+      console.log("Processed loan application data:", loanAppData);
+      setLoanApplication(loanAppData);
+    } catch (error: any) {
       console.error("Error in fetchLoanApplicationData:", error);
       toast.error("An unexpected error occurred");
+      setLoadError(`Unexpected error: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -235,16 +254,23 @@ const ProcessorAssistViewer = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple mx-auto mb-4" />
+          <p className="text-gray-600">Loading borrower data for ID: {id}...</p>
+        </div>
       </div>
     );
   }
 
-  if (!loanApplication) {
+  if (loadError || !loanApplication) {
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <h2 className="text-2xl font-bold text-gray-700">Loan application not found</h2>
-        <p className="mt-2 text-gray-500">The requested loan application could not be found.</p>
+        <h2 className="text-2xl font-bold text-gray-700">
+          {loadError ? "Error loading loan application" : "Loan application not found"}
+        </h2>
+        <p className="mt-2 text-gray-500">
+          {loadError || `The requested loan application (ID: ${id}) could not be found.`}
+        </p>
         <Button onClick={goBack} className="mt-4" variant="outline">
           <ArrowLeft className="mr-2 h-4 w-4" />
           Go Back
@@ -274,12 +300,13 @@ const ProcessorAssistViewer = () => {
           <h1 className="text-2xl font-bold text-orange-700 mb-2">
             Processor Tasks: {loanApplication.loanId}
           </h1>
-          <div className="flex items-center mt-2 text-sm text-gray-600">
-            <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium mr-2">
+          <div className="flex flex-wrap items-center mt-2 text-sm text-gray-600">
+            <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium mr-2 mb-1">
               {loanApplication.loanStatus}
             </span>
-            <span>{loanApplication.firstName} {loanApplication.lastName} • {loanApplication.propertyAddress}</span>
-            <span className="ml-4 font-medium">{formatCurrency(loanApplication.loanAmount)}</span>
+            <span className="mr-4 mb-1">{loanApplication.firstName} {loanApplication.lastName}</span>
+            <span className="mr-4 mb-1">• {loanApplication.propertyAddress}</span>
+            <span className="font-medium mb-1">{formatCurrency(loanApplication.loanAmount)}</span>
           </div>
         </div>
 
