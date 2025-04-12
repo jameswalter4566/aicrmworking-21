@@ -50,17 +50,24 @@ const LoanApplicationViewer: React.FC = () => {
   const fetchLoanApplicationData = async (leadId: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('loan_applications')
-        .select('*')
-        .eq('id', leadId)
-        .single();
+      // Use the edge function to fetch loan application data instead of direct table access
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
+        body: { 
+          leadId: leadId,
+          industryFilter: 'mortgage',
+          exactMatch: true
+        }
+      });
 
       if (error) {
         throw error;
       }
 
-      setLoanData(data || {});
+      if (!data.success || !data.data || data.data.length === 0) {
+        throw new Error(data.error || "No data found");
+      }
+
+      setLoanData(data.data[0] || {});
     } catch (error) {
       console.error('Error fetching loan application data:', error);
       toast.error('Failed to load loan application data');
@@ -73,18 +80,21 @@ const LoanApplicationViewer: React.FC = () => {
     if (!id) return;
     
     try {
-      const { data, error } = await supabase
-        .from('loan_applications')
-        .update({
-          ...formData.data
-        })
-        .eq('id', id);
+      // Use edge function to update data instead of direct table access
+      const { data, error } = await supabase.functions.invoke('update-lead', {
+        body: {
+          leadId: id,
+          updateData: formData.data
+        }
+      });
 
       if (error) {
         throw error;
       }
 
       toast.success('Loan information updated successfully');
+      // Refresh the data
+      await fetchLoanApplicationData(id);
     } catch (error) {
       console.error('Error updating loan application:', error);
       toast.error('Failed to update loan information');
@@ -159,16 +169,27 @@ const LoanApplicationViewer: React.FC = () => {
     );
   }
 
+  // Determine the current step from loan data
+  let currentStep = "applicationCreated";
+  if (loanData?.mortgageData?.loan?.status) {
+    const status = loanData.mortgageData.loan.status.toLowerCase();
+    if (status.includes("processing")) currentStep = "processing";
+    else if (status.includes("approved")) currentStep = "approved";
+    else if (status.includes("closing")) currentStep = "closing";
+    else if (status.includes("funded")) currentStep = "funded";
+    else if (status.includes("submitted")) currentStep = "submitted";
+  }
+
   return (
     <MainLayout>
       <div className="flex flex-col md:flex-row gap-4 p-4">
         <div className="w-full md:w-3/4">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-mortgage-darkPurple">
-              {loanData?.borrower?.firstName || 'New'} {loanData?.borrower?.lastName || 'Application'}
+              {loanData?.firstName || ''} {loanData?.lastName || 'New Application'}
             </h1>
             <div>
-              <LoanProgressTracker progress={loanData?.completionPercentage || 0} />
+              <LoanProgressTracker currentStep={currentStep} />
             </div>
           </div>
 
@@ -176,19 +197,19 @@ const LoanApplicationViewer: React.FC = () => {
             <Card>
               <CardContent className="p-4">
                 <h3 className="font-medium text-lg">Loan Amount</h3>
-                <p className="text-2xl font-bold">${loanData?.loanAmount?.toLocaleString() || '0'}</p>
+                <p className="text-2xl font-bold">${loanData?.mortgageData?.property?.loanAmount?.toLocaleString() || '0'}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <h3 className="font-medium text-lg">Property Value</h3>
-                <p className="text-2xl font-bold">${loanData?.propertyValue?.toLocaleString() || '0'}</p>
+                <p className="text-2xl font-bold">${loanData?.mortgageData?.property?.propertyValue?.toLocaleString() || '0'}</p>
               </CardContent>
             </Card>
             <Card>
               <CardContent className="p-4">
                 <h3 className="font-medium text-lg">Loan Type</h3>
-                <p className="text-2xl font-bold">{loanData?.loanType || 'Conventional'}</p>
+                <p className="text-2xl font-bold">{loanData?.mortgageData?.loan?.loanType || 'Conventional'}</p>
               </CardContent>
             </Card>
           </div>
@@ -331,7 +352,10 @@ const LoanApplicationViewer: React.FC = () => {
         </div>
 
         <div className="w-full md:w-1/4 mt-4 md:mt-0">
-          <LoanApplicationSidebar loanData={loanData} />
+          <LoanApplicationSidebar 
+            activeTab={activeTab} 
+            onTabChange={setActiveTab}
+          />
         </div>
       </div>
     </MainLayout>
