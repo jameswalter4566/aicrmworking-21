@@ -9,6 +9,7 @@ import { PersonalInfoForm } from "@/components/mortgage/1003/PersonalInfoForm";
 import { EmploymentIncomeForm } from "@/components/mortgage/1003/EmploymentIncomeForm";
 import { AssetInformationForm } from "@/components/mortgage/1003/AssetInformationForm";
 import { LiabilityInformationForm } from "@/components/mortgage/1003/LiabilityInformationForm";
+import { RealEstateOwnedForm } from "@/components/mortgage/1003/RealEstateOwnedForm";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -292,7 +293,17 @@ const LoanApplicationViewer = () => {
           />
         )}
         
-        {section !== "personal" && section !== "employment" && section !== "assets" && section !== "liabilities" && (
+        {section === "realEstate" && loanApplication && (
+          <RealEstateOwnedForm
+            leadId={loanApplication.id} 
+            mortgageData={loanApplication.mortgageData} 
+            onSave={saveFormData}
+            isEditable={true}
+          />
+        )}
+        
+        {section !== "personal" && section !== "employment" && section !== "assets" && 
+         section !== "liabilities" && section !== "realEstate" && (
           <div className="mt-4 p-4 border rounded-md bg-gray-50">
             <p className="text-gray-500 italic">
               This section has not been implemented yet. It will contain fields for {title.toLowerCase()}.
