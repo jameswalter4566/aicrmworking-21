@@ -21,8 +21,8 @@ const TwilioDeviceSetup: React.FC<TwilioDeviceSetupProps> = ({ onDeviceReady }) 
 
     const setupDevice = async () => {
       try {
-        // Get token from Supabase Edge Function
-        const { data, error } = await supabase.functions.invoke('twilio-token', {});
+        // Get token from Supabase Edge Function - now with proper CORS settings and no auth requirement
+        const { data, error } = await supabase.functions.invoke('twilio-token');
         
         if (error || !data?.token) {
           console.error('Error fetching Twilio token:', error);
@@ -36,6 +36,7 @@ const TwilioDeviceSetup: React.FC<TwilioDeviceSetupProps> = ({ onDeviceReady }) 
         }
 
         const token = data.token;
+        console.log("Successfully retrieved Twilio token");
         
         // Initialize Twilio device with correct codec types
         // Using string[] type for codecPreferences instead of enum
