@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ListPlus, Users, Phone } from 'lucide-react';
+import { ListPlus, Users, Phone, Tag } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 
 interface CallingList {
@@ -22,13 +22,18 @@ const CallingListsPanel = () => {
 
   return (
     <div className="mb-6 bg-white rounded-2xl border border-gray-200 p-4">
-      <div className="flex items-center justify-between mb-4">
+      <div 
+        className="flex items-center justify-between mb-4 p-3 rounded-t-lg"
+        style={{
+          background: 'linear-gradient(to right, #E5DEFF, #9b87f5)',
+        }}
+      >
         <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-gray-600" />
-          <h2 className="font-semibold text-gray-700">Calling Lists</h2>
+          <Tag className="h-5 w-5 text-white" strokeWidth={2} />
+          <h2 className="font-semibold text-white">Calling Lists</h2>
         </div>
         <Button 
-          className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+          className="bg-white/20 text-white hover:bg-white/30 rounded-lg"
         >
           <ListPlus className="h-4 w-4 mr-2" />
           Create List
