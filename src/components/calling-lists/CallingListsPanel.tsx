@@ -23,10 +23,7 @@ const CallingListsPanel = () => {
   return (
     <div className="mb-6 bg-white rounded-2xl border border-gray-200 p-4">
       <div 
-        className="flex items-center justify-between mb-4 p-3 rounded-t-lg"
-        style={{
-          background: 'linear-gradient(to right, #E5DEFF, #9b87f5)',
-        }}
+        className="flex items-center justify-between mb-4 p-3 rounded-t-lg bg-mortgage-purple"
       >
         <div className="flex items-center gap-2">
           <Tag className="h-5 w-5 text-white" strokeWidth={2} />
