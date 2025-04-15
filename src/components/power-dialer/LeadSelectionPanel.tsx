@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Play } from 'lucide-react';
 
 interface Lead {
   id: string;
@@ -71,7 +71,7 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
     setSelectedLeads(newSelected);
   };
 
-  const handleConfirmSelection = () => {
+  const handleStartDialing = () => {
     const selectedLeadsList = leads.filter(lead => selectedLeads.has(lead.id));
     onLeadsSelected(selectedLeadsList);
   };
@@ -93,6 +93,16 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
         <span className="text-sm text-gray-500">
           {selectedLeads.size} leads selected
         </span>
+
+        {selectedLeads.size > 0 && (
+          <Button 
+            onClick={handleStartDialing}
+            className="bg-green-500 hover:bg-green-600 text-white"
+          >
+            <Play className="mr-2 h-4 w-4" />
+            Start Dialing
+          </Button>
+        )}
       </div>
 
       <ScrollArea className="h-[calc(100vh-450px)]">
