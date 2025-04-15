@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Users, Inbox, ListTodo, Calendar, 
@@ -34,7 +33,6 @@ const itemColors = [
   "bg-emerald-600", // SMS Campaign
   "bg-rose-600", // Start an Application
   "bg-amber-600", // Quick Pricer
-  "bg-cyan-600", // Predictive Dialer
 ];
 
 const Sidebar = () => {
@@ -49,7 +47,6 @@ const Sidebar = () => {
     { name: "Dashboard", icon: Home, path: "/" },
     { name: "Leads", icon: Users, path: "/people" },
     { name: "Power Dialer", icon: PhoneOutgoing, path: "/power-dialer" },
-    { name: "Predictive Dialer", icon: Phone, path: "/predictive-dialer" },
     { name: "AI Dialer", icon: Bot, path: "/ai-dialer" },
     { name: "SMS Campaign", icon: MessageSquare, path: "/sms-campaign" },
     { name: "Inbox", icon: Inbox, badge: 5, path: "#" },
