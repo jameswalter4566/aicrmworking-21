@@ -23,37 +23,42 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
 
   useEffect(() => {
     try {
-      // Create a new audio element instead of using preloaded one to avoid decoding issues
-      const audioElement = new Audio(sound);
+      // Get the audio element from preloaded cache
+      const audioElement = getPreloadedAudio(sound);
       
-      // Configure the audio element
-      audioElement.volume = volume;
-      audioElement.loop = loop;
-      
-      // Set up event handlers
-      audioElement.onended = () => {
-        setIsPlaying(false);
-        if (onEnded) onEnded();
-      };
-      
-      audioElement.onerror = (e) => {
-        console.warn('Audio playback error:', e);
-        // Don't show toast for Twilio internal audio errors to prevent disruption
-        // We'll let Twilio handle its own fallbacks
-      };
-      
-      // Store the reference
-      audioRef.current = audioElement;
-      
-      // Auto-play if requested
-      if (autoPlay) {
-        audioElement.play().catch((err) => {
-          console.warn('Autoplay prevented:', err);
+      if (audioElement) {
+        // Configure the audio element
+        audioElement.volume = volume;
+        audioElement.loop = loop;
+        
+        // Set up event handlers
+        audioElement.onended = () => {
           setIsPlaying(false);
-        });
+          if (onEnded) onEnded();
+        };
+        
+        audioElement.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          toast({
+            title: "Audio Error",
+            description: "Failed to play audio. Please try again.",
+            variant: "destructive",
+          });
+        };
+        
+        // Store the reference
+        audioRef.current = audioElement;
+        
+        // Auto-play if requested
+        if (autoPlay) {
+          audioElement.play().catch((err) => {
+            console.warn('Autoplay prevented:', err);
+            setIsPlaying(false);
+          });
+        }
       }
     } catch (err) {
-      console.warn('Error initializing audio player:', err);
+      console.error('Error initializing audio player:', err);
     }
     
     // Cleanup function
@@ -78,7 +83,7 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
       audioRef.current.play()
         .then(() => setIsPlaying(true))
         .catch(err => {
-          console.warn('Error playing audio:', err);
+          console.error('Error playing audio:', err);
           setIsPlaying(false);
         });
     }
