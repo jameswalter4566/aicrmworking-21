@@ -1,156 +1,110 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
-import { audioProcessing } from '@/services/audioProcessing';
+import React, { useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Volume2, RefreshCw } from "lucide-react";
+import { toast } from "@/components/ui/use-toast";
 
-interface AudioDebugInfo {
-  isWebSocketConnected: boolean;
-  webSocketState: string;
-  activeStreamSid: string | null;
-  isProcessing: boolean;
-  inboundAudioCount: number;
-  outboundAudioCount: number;
-  microphoneActive: boolean;
-  audioContextState: string;
-  reconnectAttempts: number;
-  lastProcessedAudio: string;
-  audioQueueLength: number;
-  isPlaying: boolean;
-  selectedDevice?: string;
-  availableDevices?: number;
+export interface AudioDeviceDropdownProps {
+  devices: MediaDeviceInfo[];
+  currentDeviceId: string;
+  onDeviceChange: (deviceId: string) => Promise<boolean>;
+  onRefreshDevices: () => Promise<MediaDeviceInfo[]>;
+  disabled?: boolean;
 }
 
-export function AudioDebugModal() {
-  const [debugInfo, setDebugInfo] = useState<AudioDebugInfo>({
-    isWebSocketConnected: false,
-    webSocketState: 'disconnected',
-    activeStreamSid: null,
-    isProcessing: false,
-    inboundAudioCount: 0,
-    outboundAudioCount: 0,
-    microphoneActive: false,
-    audioContextState: 'closed',
-    reconnectAttempts: 0,
-    lastProcessedAudio: 'never',
-    audioQueueLength: 0,
-    isPlaying: false,
-    selectedDevice: 'unknown',
-    availableDevices: 0
-  });
+export default function AudioDeviceDropdown({
+  devices,
+  currentDeviceId,
+  onDeviceChange,
+  onRefreshDevices,
+  disabled = false
+}: AudioDeviceDropdownProps) {
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const updateDebugInfo = () => {
-    const info = audioProcessing.getDiagnostics();
-    setDebugInfo(info as AudioDebugInfo);
-  };
-  
-  useEffect(() => {
-    if (isOpen) {
-      updateDebugInfo();
-      const interval = setInterval(updateDebugInfo, 1000);
-      
-      return () => {
-        clearInterval(interval);
-      };
-    }
-  }, [isOpen]);
-  
-  const testAudio = async () => {
-    await audioProcessing.testAudio();
-  };
-  
-  const getStatusColor = (isActive: boolean) => {
-    return isActive ? 'bg-green-500' : 'bg-red-500';
-  };
-  
-  const reconnectWebsocket = async () => {
+  const handleDeviceChange = async (deviceId: string) => {
     try {
-      await audioProcessing.cleanup();
-      await new Promise(resolve => setTimeout(resolve, 500)); // Short delay
-      await audioProcessing.connect();
-      updateDebugInfo();
-    } catch (err) {
-      console.error("Error reconnecting:", err);
+      await onDeviceChange(deviceId);
+      toast({
+        title: "Audio Device Changed",
+        description: "The audio output device has been updated.",
+      });
+      return true;
+    } catch (error) {
+      console.error("Error changing audio device:", error);
+      toast({
+        title: "Device Change Failed",
+        description: "Could not change audio output device.",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+  
+  const handleRefreshDevices = async () => {
+    setIsRefreshing(true);
+    try {
+      const updatedDevices = await onRefreshDevices();
+      toast({
+        title: "Devices Refreshed",
+        description: `Found ${updatedDevices?.length || 0} audio devices.`,
+      });
+    } catch (error) {
+      console.error("Error refreshing devices:", error);
+      toast({
+        title: "Refresh Failed",
+        description: "Could not refresh audio devices list.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm" onClick={() => setIsOpen(true)}>
-          Audio Debug
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild disabled={disabled}>
+        <Button
+          variant="outline"
+          size="icon"
+          title="Audio device options"
+        >
+          <Volume2 size={18} />
         </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Audio Debug Information</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="font-medium">WebSocket:</div>
-            <div className="flex items-center">
-              <div className={`h-2 w-2 rounded-full mr-2 ${getStatusColor(debugInfo.isWebSocketConnected)}`} />
-              {debugInfo.webSocketState}
-            </div>
-            
-            <div className="font-medium">Stream SID:</div>
-            <div>{debugInfo.activeStreamSid || 'None'}</div>
-            
-            <div className="font-medium">Microphone:</div>
-            <div className="flex items-center">
-              <div className={`h-2 w-2 rounded-full mr-2 ${getStatusColor(debugInfo.microphoneActive)}`} />
-              {debugInfo.microphoneActive ? 'Active' : 'Inactive'}
-            </div>
-            
-            <div className="font-medium">Audio Processing:</div>
-            <div className="flex items-center">
-              <div className={`h-2 w-2 rounded-full mr-2 ${getStatusColor(debugInfo.isProcessing)}`} />
-              {debugInfo.isProcessing ? 'Active' : 'Inactive'}
-            </div>
-            
-            <div className="font-medium">Audio Context:</div>
-            <div>{debugInfo.audioContextState}</div>
-            
-            <div className="font-medium">Last Audio:</div>
-            <div>{debugInfo.lastProcessedAudio}</div>
-            
-            <div className="font-medium">Outbound Audio:</div>
-            <div>{debugInfo.outboundAudioCount} packets</div>
-            
-            <div className="font-medium">Inbound Audio:</div>
-            <div>{debugInfo.inboundAudioCount} packets</div>
-            
-            <div className="font-medium">Audio Queue:</div>
-            <div>{debugInfo.audioQueueLength} chunks {debugInfo.isPlaying ? '(playing)' : ''}</div>
-            
-            <div className="font-medium">Selected Device:</div>
-            <div className="truncate">{debugInfo.selectedDevice || 'default'}</div>
-            
-            <div className="font-medium">Available Devices:</div>
-            <div>{debugInfo.availableDevices || 0} devices</div>
-          </div>
-          
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={testAudio}>
-              Test Audio
-            </Button>
-            <Button variant="outline" onClick={reconnectWebsocket}>
-              Reconnect
-            </Button>
-            <Button variant="outline" onClick={updateDebugInfo}>
-              Refresh
-            </Button>
-            <Button variant="default" onClick={() => setIsOpen(false)}>
-              Close
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem
+          className="flex items-center gap-2"
+          onClick={handleRefreshDevices}
+          disabled={isRefreshing}
+        >
+          <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+          Refresh Devices
+        </DropdownMenuItem>
+        <div className="px-2 py-1.5 text-sm font-semibold">Output Devices</div>
+        {devices.length === 0 ? (
+          <DropdownMenuItem disabled>No devices found</DropdownMenuItem>
+        ) : (
+          devices.map((device) => (
+            <DropdownMenuItem
+              key={device.deviceId}
+              className={
+                device.deviceId === currentDeviceId
+                  ? "bg-accent text-accent-foreground"
+                  : ""
+              }
+              onClick={() => handleDeviceChange(device.deviceId)}
+            >
+              {device.label || `Device ${device.deviceId.substring(0, 5)}...`}
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
-
-export default AudioDebugModal;

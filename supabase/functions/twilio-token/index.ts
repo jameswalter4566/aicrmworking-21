@@ -1,7 +1,5 @@
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.21.0';
-import twilio from 'https://esm.sh/twilio@4.10.0';
 
 // Define CORS headers for browser requests
 const corsHeaders = {
@@ -10,6 +8,8 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("Twilio token function loaded");
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -21,24 +21,29 @@ serve(async (req) => {
     const uniqueIdentifier = `browser-refresh-${Date.now()}`;
     console.log(`Generated identity: ${uniqueIdentifier}`);
     
+    // Get Twilio credentials from environment variables
     const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
     const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
     const twilioApiKey = Deno.env.get('TWILIO_API_KEY') || '';
     const twilioApiSecret = Deno.env.get('TWILIO_API_SECRET') || '';
     const twilioTwimlAppSid = Deno.env.get('TWILIO_TWIML_APP_SID') || '';
     
-    // Use API Key authentication for creating tokens
-    const AccessToken = twilio.jwt.AccessToken;
-    const VoiceGrant = AccessToken.VoiceGrant;
+    if (!twilioAccountSid || !twilioApiKey || !twilioApiSecret || !twilioTwimlAppSid) {
+      throw new Error('Missing required Twilio credentials in environment variables');
+    }
     
-    // Create a Voice grant for this token
+    // Import twilio only after validating required environment variables
+    const { default: twilio } = await import('https://esm.sh/twilio@4.10.0');
+    
+    // Create a voice grant for this token
+    const VoiceGrant = twilio.jwt.AccessToken.VoiceGrant;
     const voiceGrant = new VoiceGrant({
       outgoingApplicationSid: twilioTwimlAppSid,
       incomingAllow: true, // Allow incoming calls
     });
     
     // Create an access token valid for 24 hours
-    // Extended for debugging purposes
+    const AccessToken = twilio.jwt.AccessToken;
     const token = new AccessToken(
       twilioAccountSid,
       twilioApiKey,
@@ -55,14 +60,19 @@ serve(async (req) => {
     console.log(`Token generated successfully with 24-hour TTL (Identity: ${uniqueIdentifier})`);
     
     // Return the token to the client
-    return new Response(JSON.stringify({ token: tokenString, identity: uniqueIdentifier }), {
+    return new Response(JSON.stringify({ 
+      token: tokenString, 
+      identity: uniqueIdentifier 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error) {
     console.error('Error generating Twilio token:', error);
     
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message || 'An unknown error occurred' 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
