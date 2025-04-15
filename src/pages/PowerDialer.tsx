@@ -35,6 +35,7 @@ import TwilioScript from "@/components/TwilioScript";
 import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "@/components/ui/use-toast";
+import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
 
 const SAMPLE_LEADS = [
   {
@@ -97,6 +98,7 @@ export default function PowerDialer() {
   const [twilioReady, setTwilioReady] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
+  const [currentCall, setCurrentCall] = useState(null);
 
   const twilioState = useTwilio();
 
@@ -205,6 +207,17 @@ export default function PowerDialer() {
     setCallInProgress(false);
   };
 
+  const handleDisposition = (type: string) => {
+    if (!currentCall) return;
+    
+    toast({
+      title: "Call Dispositioned",
+      description: `Call marked as ${type}`,
+    });
+    
+    handleEndCall(currentCall.parameters.leadId);
+  };
+
   const [isDialing, setIsDialing] = useState(false);
 
   const DialerTab = () => (
@@ -252,6 +265,12 @@ export default function PowerDialer() {
           </CardDescription>
         </CardHeader>
       </Card>
+
+      <PreviewDialerWindow 
+        currentCall={Object.values(twilioState.activeCalls)[0]}
+        onDisposition={handleDisposition}
+        onEndCall={() => Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id))}
+      />
 
       {Object.keys(twilioState.activeCalls).length > 0 && (
         <Card className="bg-muted/50">
