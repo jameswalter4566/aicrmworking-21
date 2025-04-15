@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   Phone, 
   UserX, 
@@ -14,9 +15,22 @@ import {
   Clock,
   RotateCcw,
   Pause,
-  StopCircle 
+  StopCircle,
+  Play,
+  ArrowLeft,
+  ArrowRight,
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
+import { customSupabase } from "@/utils/supabase-custom-client";
+
+interface Lead {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone1?: string;
+  company?: string;
+}
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -29,6 +43,71 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   onDisposition,
   onEndCall
 }) => {
+  const [isDialingStarted, setIsDialingStarted] = useState(false);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [selectedLeads, setSelectedLeads] = useState<Record<string, boolean>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const itemsPerPage = 50;
+
+  const fetchLeads = async () => {
+    setIsLoading(true);
+    try {
+      const { data: leadsData, error } = await customSupabase
+        .functions
+        .invoke('retrieve-leads', {
+          body: {
+            page: currentPage,
+            limit: itemsPerPage
+          }
+        });
+
+      if (error) {
+        console.error('Error fetching leads:', error);
+        return;
+      }
+
+      setLeads(leadsData?.data || []);
+    } catch (error) {
+      console.error('Error fetching leads:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStartDialing = async () => {
+    await fetchLeads();
+    setIsDialingStarted(true);
+  };
+
+  const handleSelectLead = (leadId: string) => {
+    setSelectedLeads(prev => ({
+      ...prev,
+      [leadId]: !prev[leadId]
+    }));
+  };
+
+  const handlePageChange = async (page: number) => {
+    setCurrentPage(page);
+    await fetchLeads();
+  };
+
+  const totalSelectedLeads = Object.values(selectedLeads).filter(Boolean).length;
+
+  if (!isDialingStarted) {
+    return (
+      <div className="flex flex-col items-center justify-center space-y-4 p-8">
+        <Button 
+          onClick={handleStartDialing}
+          className="bg-green-500 hover:bg-green-600 text-white font-semibold py-4 px-8 rounded-lg text-lg flex items-center gap-2"
+        >
+          <Play className="h-6 w-6" />
+          Start Dialing
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <>
       <Card className="bg-gray-800 p-4 rounded-lg mb-0">
@@ -57,59 +136,63 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
             <CardTitle className="text-lg font-medium flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Phone className="h-5 w-5 text-green-500" />
-                Preview Dialer
+                Lead Selection
               </div>
-              {currentCall && (
-                <Badge variant="outline" className="bg-green-50 text-green-700">
-                  On Call
+              {totalSelectedLeads > 0 && (
+                <Badge variant="default" className="bg-green-500">
+                  {totalSelectedLeads} Leads Selected
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {currentCall ? (
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
-                      {currentCall.parameters.To ? currentCall.parameters.To[0].toUpperCase() : '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold">
-                      {currentCall.parameters.To || 'Unknown Contact'}
-                    </h3>
-                    <div className="text-sm text-gray-500 space-y-1">
-                      <p>Company: {currentCall.parameters.company || 'Unknown'}</p>
-                      <p>Phone: {currentCall.parameters.To || 'N/A'}</p>
-                      <p>Status: Active Call</p>
+            {isLoading ? (
+              <div className="text-center py-4">Loading leads...</div>
+            ) : leads.length > 0 ? (
+              <ScrollArea className="h-[calc(100vh-450px)]">
+                <div className="space-y-2">
+                  {leads.map((lead) => (
+                    <div key={lead.id} className="flex items-center space-x-4 p-2 hover:bg-gray-50 rounded-lg">
+                      <Checkbox
+                        checked={selectedLeads[lead.id] || false}
+                        onCheckedChange={() => handleSelectLead(lead.id)}
+                      />
+                      <div className="flex-1">
+                        <div className="font-medium">{`${lead.firstName} ${lead.lastName}`}</div>
+                        <div className="text-sm text-gray-500">{lead.phone1}</div>
+                        {lead.company && (
+                          <div className="text-sm text-gray-500">{lead.company}</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={onEndCall}
-                  >
-                    <PhoneOff className="h-4 w-4 mr-2" />
-                    End Call
-                  </Button>
+                  ))}
                 </div>
                 
-                <div className="border-t pt-4">
-                  <h4 className="font-medium mb-2">Call Notes</h4>
-                  <textarea 
-                    className="w-full h-20 p-2 border rounded-md text-sm"
-                    placeholder="Enter call notes here..."
-                  />
+                <div className="mt-4">
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious 
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                        />
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationLink>Page {currentPage}</PaginationLink>
+                      </PaginationItem>
+                      <PaginationItem>
+                        <PaginationNext 
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={leads.length < itemsPerPage}
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
                 </div>
-              </div>
+              </ScrollArea>
             ) : (
-              <div className="py-6 text-center text-gray-500">
-                <Phone className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                <p>No active call</p>
-                <p className="text-sm">Select a contact from the queue below to start dialing</p>
+              <div className="text-center py-4">
+                No leads available. Try adjusting your filters or add some leads.
               </div>
             )}
           </CardContent>
