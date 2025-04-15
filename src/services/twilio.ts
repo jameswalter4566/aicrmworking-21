@@ -344,7 +344,7 @@ const createTwilioService = (): TwilioService => {
         formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
       }
       
-      console.log(`Attempting to call ${formattedPhoneNumber} for lead ${leadId}`);
+      console.log(`Attempting to call ${formattedPhoneNumber} via browser client`);
       
       try {
         // Make sure we're not already on a call
@@ -365,8 +365,80 @@ const createTwilioService = (): TwilioService => {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // With our new backend approach, we'll initiate the call server-side first
-        console.log("Making server-side call to establish connection first");
+        // Now we can make the call
+        const call = await device.connect({
+          params: {
+            phoneNumber: formattedPhoneNumber,
+            leadId: leadId
+          }
+        });
+        
+        // Add to active calls tracking
+        activeCalls.push(call);
+        
+        console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
+        
+        call.on('error', (error: any) => {
+          console.error('Call error:', error);
+          toast({
+            title: "Call Error",
+            description: `Error during call: ${error.message || error}`,
+            variant: "destructive",
+          });
+          
+          // Remove from active calls on error
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+          
+          // Attempt recovery if we get a connection error
+          if (error.code === '31005') {
+            console.log("Attempting recovery from connection error");
+            setTimeout(() => {
+               hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
+            }, 1000);
+          }
+        });
+        
+        call.on('accept', () => {
+          console.log('Call accepted, audio connection established');
+          toast({
+            title: "Call Connected",
+            description: "You're now connected to the call.",
+          });
+        });
+        
+        call.on('disconnect', () => {
+          console.log('Call disconnected');
+          toast({
+            title: "Call Ended",
+            description: "The call has been disconnected.",
+          });
+          
+          // Remove from active calls when disconnected
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+        });
+        
+        // Listen specifically for no-answer event
+        call.on('cancel', () => {
+          console.log('Call was cancelled or not answered');
+          toast({
+            title: "Call Not Answered",
+            description: "The recipient didn't answer the call.",
+          });
+          
+          // Remove from active calls
+          activeCalls = activeCalls.filter(c => c.sid !== call.sid);
+        });
+        
+        return { 
+          success: true, 
+          callSid: call.sid || 'browser-call',
+          leadId: leadId
+        };
+      } catch (deviceError) {
+        // If browser-based calling fails, try server-side initiation
+        console.warn("Browser-based call initiation failed. Error:", deviceError);
+        console.log("Falling back to server-side call initiation...");
+        
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
           method: 'POST',
           headers: {
@@ -392,7 +464,7 @@ const createTwilioService = (): TwilioService => {
           console.log("Server-side call initiated successfully:", result);
           return {
             success: true,
-            callSid: result.phoneCallSid || result.browserCallSid,
+            callSid: result.callSid || result.phoneCallSid,
             browserCallSid: result.browserCallSid,
             phoneCallSid: result.phoneCallSid,
             conferenceName: result.conferenceName,
@@ -401,9 +473,6 @@ const createTwilioService = (): TwilioService => {
         } else {
           throw new Error(result.error || "Failed to make server-side call");
         }
-      } catch (deviceError) {
-        console.error("Error initiating call:", deviceError);
-        throw deviceError;
       }
     } catch (error: any) {
       console.error("Error making call:", error);
