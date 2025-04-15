@@ -29,8 +29,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   onEndCall
 }) => {
   return (
-    <div className="grid grid-cols-3 gap-4 mb-6">
-      <Card className="col-span-2">
+    <div className="grid grid-cols-4 gap-4 mb-4">
+      <Card className="col-span-3">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-medium flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -48,8 +48,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
           {currentCall ? (
             <div className="space-y-4">
               <div className="flex items-start gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="bg-blue-100 text-blue-600 text-xl">
+                <Avatar className="h-12 w-12">
+                  <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
                     {currentCall.parameters.To ? currentCall.parameters.To[0].toUpperCase() : '?'}
                   </AvatarFallback>
                 </Avatar>
@@ -78,13 +78,13 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               <div className="border-t pt-4">
                 <h4 className="font-medium mb-2">Call Notes</h4>
                 <textarea 
-                  className="w-full h-24 p-2 border rounded-md text-sm"
+                  className="w-full h-20 p-2 border rounded-md text-sm"
                   placeholder="Enter call notes here..."
                 />
               </div>
             </div>
           ) : (
-            <div className="py-8 text-center text-gray-500">
+            <div className="py-6 text-center text-gray-500">
               <Phone className="h-12 w-12 mx-auto mb-3 text-gray-400" />
               <p>No active call</p>
               <p className="text-sm">Select a contact from the queue below to start dialing</p>
@@ -93,82 +93,82 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="bg-[#222222] text-white">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg font-medium">Disposition</CardTitle>
+          <CardTitle className="text-lg font-medium text-white">Disposition</CardTitle>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-450px)]">
+          <ScrollArea className="h-[calc(100vh-650px)]">
             <div className="space-y-2">
               <Button 
                 variant="outline" 
-                className="w-full justify-start" 
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700" 
                 onClick={() => onDisposition('contact')}
               >
-                <Phone className="mr-2 h-4 w-4 text-green-600" />
+                <Phone className="mr-2 h-4 w-4 text-green-400" />
                 Contact
               </Button>
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
                 onClick={() => onDisposition('no-contact')}
               >
-                <UserX className="mr-2 h-4 w-4 text-gray-600" />
+                <UserX className="mr-2 h-4 w-4 text-gray-400" />
                 No Contact
               </Button>
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
                 onClick={() => onDisposition('bad-number')}
               >
-                <PhoneMissed className="mr-2 h-4 w-4 text-red-600" />
+                <PhoneMissed className="mr-2 h-4 w-4 text-red-400" />
                 Bad Number
               </Button>
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
                 onClick={() => onDisposition('drop-message')}
               >
-                <MessageSquare className="mr-2 h-4 w-4 text-blue-600" />
+                <MessageSquare className="mr-2 h-4 w-4 text-blue-400" />
                 Drop Message
               </Button>
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
                 onClick={() => onDisposition('dnc-contact')}
               >
-                <Ban className="mr-2 h-4 w-4 text-yellow-600" />
+                <Ban className="mr-2 h-4 w-4 text-yellow-400" />
                 DNC Contact
               </Button>
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
                 onClick={() => onDisposition('dnc-number')}
               >
-                <PhoneOff className="mr-2 h-4 w-4 text-orange-600" />
+                <PhoneOff className="mr-2 h-4 w-4 text-orange-400" />
                 DNC Number
               </Button>
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
                 onClick={() => onDisposition('callback')}
               >
-                <Clock className="mr-2 h-4 w-4 text-purple-600" />
+                <Clock className="mr-2 h-4 w-4 text-purple-400" />
                 Quick Callback
               </Button>
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start"
+                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
                 onClick={() => onDisposition('redial')}
               >
-                <RotateCcw className="mr-2 h-4 w-4 text-indigo-600" />
+                <RotateCcw className="mr-2 h-4 w-4 text-indigo-400" />
                 Redial
               </Button>
             </div>
