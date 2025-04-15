@@ -9,10 +9,11 @@ import {
   PhoneOff, 
   MessageSquare, 
   Ban, 
-  PhoneCall,
   PhoneMissed,
   Clock,
-  RotateCcw 
+  RotateCcw,
+  Pause,
+  StopCircle 
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -169,6 +170,33 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               >
                 <RotateCcw className="mr-2 h-4 w-4 text-indigo-400" />
                 Redial
+              </Button>
+            </div>
+            
+            <div className="pt-4 border-t border-gray-600 mt-4 space-y-2">
+              <Button 
+                variant="outline" 
+                className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+              >
+                <Pause className="mr-2 h-4 w-4" />
+                Pause
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                onClick={onEndCall}
+              >
+                <PhoneOff className="mr-2 h-4 w-4" />
+                Hang Up
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="w-full justify-center bg-red-900/50 hover:bg-red-900 text-white border-red-900"
+              >
+                <StopCircle className="mr-2 h-4 w-4 text-red-400" />
+                Stop
               </Button>
             </div>
           </ScrollArea>
