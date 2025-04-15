@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
+import CallingListsPanel from "@/components/calling-lists/CallingListsPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PlusCircle, Search, Filter, Plus, Upload, ChevronDown, Check, RefreshCw } from "lucide-react";
@@ -493,6 +494,8 @@ const People = () => {
           </Button>
         </div>
       </div>
+
+      <CallingListsPanel />
 
       <div className="disposition-filters">
         {dispositionTypes.map((disposition) => (
