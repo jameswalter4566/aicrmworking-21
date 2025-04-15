@@ -23,8 +23,12 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Skip audio preloading - we'll handle audio differently to avoid decoding errors
-    console.log("🔊 Skipping audio preload to avoid decoding errors");
+    // Preload audio assets
+    preloadAudioAssets().then(() => {
+      console.log("🔊 Audio assets preloaded successfully");
+    }).catch(err => {
+      console.warn("🔊 Error preloading audio assets:", err);
+    });
     
     // Check if Twilio is already loaded
     if (window.Twilio && window.Twilio.Device) {
@@ -80,19 +84,6 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
             deviceAvailable: !!window.Twilio?.Device,
             isSupported: window.Twilio?.Device?.isSupported
           });
-
-          // Patch Twilio's audio handling to be more resilient
-          try {
-            if (window.Twilio && window.Twilio.Device) {
-              // Override the AudioPlayer's _load method to add error handling
-              const originalTwilioAudio = window.Twilio.Device.audio;
-              if (originalTwilioAudio) {
-                console.log("🔊 Applied audio resilience patch to Twilio Device");
-              }
-            }
-          } catch (patchErr) {
-            console.warn("🔊 Error applying audio patch:", patchErr);
-          }
 
           // Test the Device constructor in SDK 2.x
           try {
