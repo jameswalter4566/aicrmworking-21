@@ -77,6 +77,8 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
   };
 
   const maxPages = Math.ceil(totalLeads / LEADS_PER_PAGE);
+  const isPrevDisabled = currentPage === 0;
+  const isNextDisabled = currentPage >= maxPages - 1;
 
   return (
     <div className="space-y-4">
@@ -125,10 +127,16 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
         <Pagination>
           <PaginationContent>
             <PaginationItem>
-              <PaginationPrevious 
+              <Button
+                variant="outline"
+                size="icon"
                 onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-                disabled={currentPage === 0}
-              />
+                disabled={isPrevDisabled}
+                className="gap-1 pl-2.5"
+                aria-label="Go to previous page"
+              >
+                <span>Previous</span>
+              </Button>
             </PaginationItem>
             <PaginationItem>
               <span className="px-4">
@@ -136,10 +144,16 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
               </span>
             </PaginationItem>
             <PaginationItem>
-              <PaginationNext 
+              <Button
+                variant="outline"
+                size="icon"
                 onClick={() => setCurrentPage(p => Math.min(maxPages - 1, p + 1))}
-                disabled={currentPage >= maxPages - 1}
-              />
+                disabled={isNextDisabled}
+                className="gap-1 pr-2.5"
+                aria-label="Go to next page"
+              >
+                <span>Next</span>
+              </Button>
             </PaginationItem>
           </PaginationContent>
         </Pagination>
