@@ -23,12 +23,8 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    // Preload audio assets
-    preloadAudioAssets().then(() => {
-      console.log("🔊 Audio assets preloaded successfully");
-    }).catch(err => {
-      console.warn("🔊 Error preloading audio assets:", err);
-    });
+    // Skip audio preload to avoid decoding errors
+    // We'll load sounds dynamically when needed instead
     
     // Check if Twilio is already loaded
     if (window.Twilio && window.Twilio.Device) {
@@ -133,36 +129,20 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
     };
     
     loadScript(TWILIO_SDK_URLS).catch((err) => {
-      const errorMessage = new Error("Failed to load Twilio Voice SDK 2.x");
-      console.error("🔶 Error loading Twilio Voice SDK:", errorMessage, err);
-      
-      // Additional diagnostic information
-      console.log("🔶 SDK Load Diagnostics:", {
-        urls: TWILIO_SDK_URLS,
-        timestamp: new Date().toISOString(),
-        networkStatus: navigator.onLine,
-        browserInfo: {
-          userAgent: navigator.userAgent,
-          vendor: navigator.vendor,
-          platform: navigator.platform
-        }
-      });
-      
+      const errorMessage = new Error(`Failed to load Twilio SDK: ${err.message}`);
+      console.error(errorMessage);
       setError(errorMessage);
       if (onError) onError(errorMessage);
       
       toast({
-        title: "Twilio SDK Error",
-        description: "Could not load call functionality. Please refresh the page to try again.",
-        variant: "destructive"
+        title: "Twilio SDK Loading Failed",
+        description: "Could not load the Twilio Voice SDK. Call functionality will be unavailable.",
+        variant: "destructive",
       });
     });
-    
-    // We'll keep the script on unmount as other components might need it
-    return () => {};
   }, [onLoad, onError]);
 
-  return null; // This component doesn't render anything
+  return null;
 };
 
 export default TwilioScript;

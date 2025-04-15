@@ -36,6 +36,7 @@ const createTwilioService = (): TwilioService => {
   let preferredAudioDevice: string | null = null;
   let activeCalls: any[] = []; // Track active calls for better management
   let isCleaningUp: boolean = false;
+  let soundsInitialized: boolean = false;
 
   const initializeAudioContext = async (): Promise<boolean> => {
     try {
@@ -81,6 +82,7 @@ const createTwilioService = (): TwilioService => {
       
       // Reset the cleaning up flag
       isCleaningUp = false;
+      soundsInitialized = false;
       
       console.log("Fetching Twilio token...");
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
@@ -106,38 +108,15 @@ const createTwilioService = (): TwilioService => {
       }
 
       if (window.Twilio && window.Twilio.Device) {
-        // First make sure we terminate any previous device
-        try {
-          // await hangupAllCalls();
-        } catch (err) {
-          console.warn("Error cleaning up existing calls:", err);
-        }
-
+        // First initialize with minimal options to avoid audio loading errors
         device = new window.Twilio.Device(data.token, {
           codecPreferences: ["opus", "pcmu"],
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
-          forceAggressiveIceNomination: true,
-          // Use our local sound files instead of GitHub URLs
-          sounds: {
-            incoming: '/sounds/incoming.mp3',
-            outgoing: '/sounds/outgoing.mp3',
-            disconnect: '/sounds/disconnect.mp3',
-            dtmf0: '/sounds/dtmf-0.mp3',
-            dtmf1: '/sounds/dtmf-1.mp3',
-            dtmf2: '/sounds/dtmf-2.mp3',
-            dtmf3: '/sounds/dtmf-3.mp3',
-            dtmf4: '/sounds/dtmf-4.mp3',
-            dtmf5: '/sounds/dtmf-5.mp3',
-            dtmf6: '/sounds/dtmf-6.mp3',
-            dtmf7: '/sounds/dtmf-7.mp3',
-            dtmf8: '/sounds/dtmf-8.mp3',
-            dtmf9: '/sounds/dtmf-9.mp3',
-            dtmfs: '/sounds/dtmf-star.mp3',
-            dtmfh: '/sounds/dtmf-pound.mp3'
-          }
+          // Start with no sounds to avoid audio decoding errors
         });
 
+        // Set up event handlers
         device.on("error", (error: any) => {
           console.error("Twilio Device Error:", error);
           
@@ -153,12 +132,12 @@ const createTwilioService = (): TwilioService => {
             if (!isCleaningUp) {
               isCleaningUp = true;
               setTimeout(() => {
-                //  hangupAllCalls().then(() => {
-                //   isCleaningUp = false;
-                // }).catch(err => {
-                //   isCleaningUp = false;
-                //   console.warn("Error in auto-cleanup after HANGUP:", err);
-                // });
+                hangupAllCalls().then(() => {
+                  isCleaningUp = false;
+                }).catch(err => {
+                  isCleaningUp = false;
+                  console.warn("Error in auto-cleanup after HANGUP:", err);
+                });
               }, 1000);
             }
           }
@@ -246,6 +225,41 @@ const createTwilioService = (): TwilioService => {
         try {
           await device.register();
           console.log("Twilio device registered successfully.");
+          
+          // Now that device is registered, try to apply sound configuration
+          // But do it with a delay and only if not already done
+          if (!soundsInitialized) {
+            setTimeout(() => {
+              try {
+                // Add sounds after successful registration to avoid initial decode errors
+                device.updateOptions({
+                  // Use our local sound files instead of GitHub URLs
+                  sounds: {
+                    incoming: '/sounds/incoming.mp3',
+                    outgoing: '/sounds/outgoing.mp3',
+                    disconnect: '/sounds/disconnect.mp3',
+                    dtmf0: '/sounds/dtmf-0.mp3',
+                    dtmf1: '/sounds/dtmf-1.mp3',
+                    dtmf2: '/sounds/dtmf-2.mp3',
+                    dtmf3: '/sounds/dtmf-3.mp3',
+                    dtmf4: '/sounds/dtmf-4.mp3',
+                    dtmf5: '/sounds/dtmf-5.mp3',
+                    dtmf6: '/sounds/dtmf-6.mp3',
+                    dtmf7: '/sounds/dtmf-7.mp3',
+                    dtmf8: '/sounds/dtmf-8.mp3',
+                    dtmf9: '/sounds/dtmf-9.mp3',
+                    dtmfs: '/sounds/dtmf-star.mp3',
+                    dtmfh: '/sounds/dtmf-pound.mp3'
+                  }
+                });
+                soundsInitialized = true;
+                console.log("Sound options successfully applied");
+              } catch (soundErr) {
+                console.warn("Could not initialize sound options, will continue without sounds:", soundErr);
+              }
+            }, 1000);
+          }
+          
           return true;
         } catch (registerError) {
           console.error("Error registering Twilio device:", registerError);
@@ -342,6 +356,16 @@ const createTwilioService = (): TwilioService => {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
+        // We need to ensure the device is ready before making a call
+        if (device.state !== 'registered') {
+          console.log("Device not registered, attempting to register...");
+          await device.register();
+          
+          // Small delay after registering
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+        // Now we can make the call
         const call = await device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
@@ -411,6 +435,7 @@ const createTwilioService = (): TwilioService => {
           leadId: leadId
         };
       } catch (deviceError) {
+        // If browser-based calling fails, try server-side initiation
         console.warn("Browser-based call initiation failed. Error:", deviceError);
         console.log("Falling back to server-side call initiation...");
         

@@ -150,33 +150,46 @@ export default function PowerDialer() {
     }
     
     try {
+      setIsDialing(true);
+      
       const initialized = await twilioService.initializeTwilioDevice();
       console.log("Twilio initialization:", initialized ? "successful" : "failed");
       
-      setIsDialing(true);
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       setCallInProgress(true);
       
-      const callResult = await twilioState.makeCall(lead.phone, lead.id);
+      const formattedPhone = lead.phone.replace(/\D/g, '');
+      const callResult = await twilioService.makeCall(formattedPhone, lead.id);
+      
+      console.log("Call result:", callResult);
       
       if (!callResult.success) {
         console.error("Call failed:", JSON.stringify(callResult));
         toast({
           title: "Call Failed",
-          description: callResult.error || "Unable to place call.",
+          description: callResult.error || "Unable to place call. Please check if the number is valid.",
           variant: "destructive",
         });
         setCallInProgress(false);
+        setIsDialing(false);
+      } else {
+        toast({
+          title: "Call Initiated",
+          description: `Calling ${lead.name}...`,
+        });
       }
     } catch (error: any) {
       console.error("Error making call:", error);
       setTokenError(error.message);
+      setCallInProgress(false);
+      setIsDialing(false);
       
       toast({
         title: "Call Error",
         description: error.message || "Error placing call.",
         variant: "destructive",
       });
-      setCallInProgress(false);
     }
   };
 
