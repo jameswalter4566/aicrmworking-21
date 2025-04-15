@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +31,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 }) => {
   return (
     <>
-      <Card className="bg-gray-800 p-4 rounded-lg mb-4">
+      <Card className="bg-gray-800 p-4 rounded-lg mb-0">
         <div className="grid grid-cols-3 gap-4">
           {[1, 2, 3].map((line) => (
             <Card key={line} className="bg-white">
