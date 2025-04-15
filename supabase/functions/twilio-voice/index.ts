@@ -1,4 +1,3 @@
-
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import twilio from 'npm:twilio@4.23.0';
 
@@ -158,6 +157,12 @@ serve(async (req) => {
           console.log(`Call ${requestData.CallSid} failed to connect`);
         }
       }
+      
+      // For status callbacks, always return a simple TwiML response
+      const twimlResponse = new twilio.twiml.VoiceResponse();
+      return new Response(twimlResponse.toString(), {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+      });
     }
     
     // Check if this is a direct call from browser with no action specified
@@ -736,14 +741,13 @@ serve(async (req) => {
       );
     }
   } catch (error) {
+    // Ensure we always return a valid TwiML response even for errors
     console.error('Error in function:', error);
     
-    return new Response(
-      JSON.stringify({ success: false, error: error.message || 'An unexpected error occurred' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    const twimlResponse = new twilio.twiml.VoiceResponse();
+    return new Response(twimlResponse.toString(), {
+      status: 200,  // Always return 200 for Twilio to accept the response
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+    });
   }
 });
