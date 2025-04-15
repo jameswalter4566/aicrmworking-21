@@ -1,5 +1,4 @@
-
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +13,11 @@ import {
   Clock,
   RotateCcw,
   Pause,
-  StopCircle 
+  StopCircle,
+  Play
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
+import LeadSelectionPanel from './LeadSelectionPanel';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -29,9 +30,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   onDisposition,
   onEndCall
 }) => {
+  const [isDialingStarted, setIsDialingStarted] = useState(false);
+
   return (
     <>
-      <Card className="bg-gray-800 p-4 rounded-lg mb-0">
+      <Card className="bg-gray-800 p-4 rounded-lg">
         <div className="grid grid-cols-3 gap-4">
           {[1, 2, 3].map((line) => (
             <Card key={line} className="bg-white">
@@ -51,7 +54,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         </div>
       </Card>
 
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-4 gap-4 mt-0">
         <Card className="col-span-3">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg font-medium flex items-center justify-between">
@@ -67,7 +70,24 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {currentCall ? (
+            {!isDialingStarted ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Button 
+                  onClick={() => setIsDialingStarted(true)}
+                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
+                >
+                  <Play className="h-6 w-6" />
+                  Start Dialing
+                </Button>
+              </div>
+            ) : !currentCall ? (
+              <LeadSelectionPanel 
+                onLeadsSelected={(leads) => {
+                  console.log('Selected leads:', leads);
+                  // Handle the selected leads here
+                }}
+              />
+            ) : (
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
                   <Avatar className="h-12 w-12">
@@ -104,12 +124,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                     placeholder="Enter call notes here..."
                   />
                 </div>
-              </div>
-            ) : (
-              <div className="py-6 text-center text-gray-500">
-                <Phone className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-                <p>No active call</p>
-                <p className="text-sm">Select a contact from the queue below to start dialing</p>
               </div>
             )}
           </CardContent>
