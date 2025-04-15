@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,7 +92,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         </CardContent>
       </Card>
 
-      <Card className="bg-[#222222] text-white">
+      <Card className="bg-gray-800 text-white">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg font-medium text-white">Disposition</CardTitle>
         </CardHeader>
@@ -102,7 +101,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
             <div className="space-y-2">
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700" 
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
                 onClick={() => onDisposition('contact')}
               >
                 <Phone className="mr-2 h-4 w-4 text-green-400" />
@@ -111,7 +110,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 onClick={() => onDisposition('no-contact')}
               >
                 <UserX className="mr-2 h-4 w-4 text-gray-400" />
@@ -120,7 +119,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 onClick={() => onDisposition('bad-number')}
               >
                 <PhoneMissed className="mr-2 h-4 w-4 text-red-400" />
@@ -129,7 +128,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 onClick={() => onDisposition('drop-message')}
               >
                 <MessageSquare className="mr-2 h-4 w-4 text-blue-400" />
@@ -138,7 +137,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 onClick={() => onDisposition('dnc-contact')}
               >
                 <Ban className="mr-2 h-4 w-4 text-yellow-400" />
@@ -147,7 +146,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 onClick={() => onDisposition('dnc-number')}
               >
                 <PhoneOff className="mr-2 h-4 w-4 text-orange-400" />
@@ -156,7 +155,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 onClick={() => onDisposition('callback')}
               >
                 <Clock className="mr-2 h-4 w-4 text-purple-400" />
@@ -165,7 +164,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               
               <Button 
                 variant="outline" 
-                className="w-full justify-start bg-gray-800 hover:bg-gray-700 text-white border-gray-700"
+                className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 onClick={() => onDisposition('redial')}
               >
                 <RotateCcw className="mr-2 h-4 w-4 text-indigo-400" />
