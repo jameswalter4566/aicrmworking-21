@@ -113,30 +113,36 @@ const createTwilioService = (): TwilioService => {
           console.warn("Error cleaning up existing calls:", err);
         }
 
+        // Configure device with minimal sound options initially to avoid audio decoding errors
         device = new window.Twilio.Device(data.token, {
           codecPreferences: ["opus", "pcmu"],
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
-          forceAggressiveIceNomination: true,
-          // Use our local sound files instead of GitHub URLs
-          sounds: {
-            incoming: '/sounds/incoming.mp3',
-            outgoing: '/sounds/outgoing.mp3',
-            disconnect: '/sounds/disconnect.mp3',
-            dtmf0: '/sounds/dtmf-0.mp3',
-            dtmf1: '/sounds/dtmf-1.mp3',
-            dtmf2: '/sounds/dtmf-2.mp3',
-            dtmf3: '/sounds/dtmf-3.mp3',
-            dtmf4: '/sounds/dtmf-4.mp3',
-            dtmf5: '/sounds/dtmf-5.mp3',
-            dtmf6: '/sounds/dtmf-6.mp3',
-            dtmf7: '/sounds/dtmf-7.mp3',
-            dtmf8: '/sounds/dtmf-8.mp3',
-            dtmf9: '/sounds/dtmf-9.mp3',
-            dtmfs: '/sounds/dtmf-star.mp3',
-            dtmfh: '/sounds/dtmf-pound.mp3'
-          }
+          forceAggressiveIceNomination: true
         });
+        
+        // After device is created, try to update with sounds
+        try {
+          // Adding a small delay before setting sounds to allow device initialization
+          setTimeout(() => {
+            try {
+              device.updateOptions({
+                sounds: {
+                  incoming: '/sounds/incoming.mp3',
+                  outgoing: '/sounds/outgoing.mp3',
+                  disconnect: '/sounds/disconnect.mp3'
+                  // Omitting DTMF tones to reduce likelihood of errors
+                }
+              });
+              console.log("Successfully updated device with sound options");
+            } catch (soundErr) {
+              console.warn("Could not set audio options:", soundErr);
+              // Device will still work without custom sounds
+            }
+          }, 1000);
+        } catch (e) {
+          console.warn("Failed to schedule sound update:", e);
+        }
 
         device.on("error", (error: any) => {
           console.error("Twilio Device Error:", error);
