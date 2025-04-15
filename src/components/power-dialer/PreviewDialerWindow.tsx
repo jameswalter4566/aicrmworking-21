@@ -30,23 +30,25 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 }) => {
   return (
     <>
-      <div className="grid grid-cols-3 gap-4 mb-4">
-        {[1, 2, 3].map((line) => (
-          <Card key={line} className="bg-gray-800 text-white">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" />
-                  <span>Line {line}</span>
+      <Card className="bg-gray-800 p-4 rounded-lg mb-4">
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((line) => (
+            <Card key={line} className="bg-white">
+              <CardContent className="p-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-4 w-4 text-gray-600" />
+                    <span className="text-gray-600">Line {line}</span>
+                  </div>
+                  <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">
+                    FREE
+                  </Badge>
                 </div>
-                <Badge variant="outline" className="bg-gray-700 text-white border-gray-600">
-                  FREE
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </Card>
 
       <div className="grid grid-cols-4 gap-4 mb-4">
         <Card className="col-span-3">
