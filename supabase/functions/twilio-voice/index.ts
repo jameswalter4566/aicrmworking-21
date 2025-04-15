@@ -160,6 +160,20 @@ serve(async (req) => {
       }
     }
     
+    // Check for conference status callback
+    const isConferenceCallback = requestData.ConferenceSid || 
+                              (action === 'conferenceStatus') || 
+                              requestData.StatusCallbackEvent?.includes('conference');
+    
+    if (isConferenceCallback) {
+      action = 'conferenceStatus';
+      console.log("Detected conference status callback:", {
+        conferenceSid: requestData.ConferenceSid,
+        statusEvent: requestData.StatusCallbackEvent,
+        participantSid: requestData.CallSid
+      });
+    }
+    
     // Check if this is a direct call from browser with no action specified
     // IMPORTANT: This detection is key for handling the incoming calls from browser client
     const isClientInitiatedCall = 
@@ -199,6 +213,19 @@ serve(async (req) => {
       twiml.say("There was a configuration error. The system is missing a phone number to use as caller ID.");
       return new Response(twiml.toString(), { 
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+      });
+    }
+
+    // Special handling for conference status callbacks - just return a simple TwiML response
+    // This fixes the 401 error when Twilio tries to call our function for conference status updates
+    if (action === 'conferenceStatus') {
+      console.log("Handling conference status callback");
+      console.log("Conference status data:", JSON.stringify(requestData));
+      
+      // Simply return an empty TwiML response to acknowledge the callback
+      const twiml = new twilio.twiml.VoiceResponse();
+      return new Response(twiml.toString(), {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
       });
     }
 
@@ -248,7 +275,9 @@ serve(async (req) => {
         
         // Add the browser client to the conference
         dial.conference({
-          statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
+          // CRITICAL FIX: Don't include external URLs in the callback - let Twilio handle it internally
+          // The 401 error happens because these callbacks can't authenticate properly with Supabase
+          // statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
           statusCallbackEvent: ['start', 'end', 'join', 'leave'],
           startConferenceOnEnter: true,
           endConferenceOnExit: false,
@@ -268,7 +297,8 @@ serve(async (req) => {
           // Join the same conference
           const outboundDial = outboundTwiml.dial();
           outboundDial.conference({
-            statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
+            // CRITICAL FIX: Don't include external URLs in the callback - let Twilio handle it internally
+            // statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=conferenceStatus&leadId=${leadId}`,
             statusCallbackEvent: ['start', 'end', 'join', 'leave'],
             startConferenceOnEnter: true,
             endConferenceOnExit: true,
@@ -282,7 +312,8 @@ serve(async (req) => {
               to: formattedPhoneNumber,
               from: TWILIO_PHONE_NUMBER,
               twiml: outboundTwiml.toString(),
-              statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
+              // CRITICAL FIX: Use Twilio's internal status callbacks instead of Supabase functions
+              // statusCallback: `${baseUrl}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
               statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
               statusCallbackMethod: 'POST',
             });
@@ -386,11 +417,11 @@ serve(async (req) => {
           // Create a Dial with conference
           const dial = browserTwiml.dial();
           
-          // Configure the conference
+          // Configure the conference - CRITICAL FIX: Remove external status callbacks
           dial.conference(
             conferenceName,
             {
-              statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=conferenceStatus`,
+              // statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=conferenceStatus`,
               statusCallbackEvent: ['start', 'end', 'join', 'leave'],
               startConferenceOnEnter: true,
               endConferenceOnExit: false,
@@ -408,7 +439,7 @@ serve(async (req) => {
             to: `client:${browserClientName}`,
             from: TWILIO_PHONE_NUMBER,
             twiml: browserTwimlString,
-            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
+            // statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
@@ -419,14 +450,14 @@ serve(async (req) => {
           const phoneTwiml = new twilio.twiml.VoiceResponse();
           phoneTwiml.say("You're being connected to a call.");
           
-          // Add the phone to the same conference
+          // Add the phone to the same conference - CRITICAL FIX: Remove external status callbacks
           const phoneDialer = phoneTwiml.dial({
             timeout: DEFAULT_TIMEOUT, // Reduced timeout to prevent long waits
           });
           phoneDialer.conference(
             conferenceName,
             {
-              statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=conferenceStatus`,
+              // statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=conferenceStatus`,
               statusCallbackEvent: ['start', 'end', 'join', 'leave'],
               startConferenceOnEnter: true,
               endConferenceOnExit: true,
@@ -443,7 +474,7 @@ serve(async (req) => {
             to: formattedPhoneNumber,
             from: TWILIO_PHONE_NUMBER,
             twiml: phoneTwimlString,
-            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
+            // statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
@@ -478,7 +509,7 @@ serve(async (req) => {
             to: formattedPhoneNumber,
             from: TWILIO_PHONE_NUMBER,
             twiml: twimlString,
-            statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
+            // statusCallback: `${PUBLIC_URL}/functions/v1/twilio-voice?action=statusCallback&leadId=${leadId}`,
             statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
             statusCallbackMethod: 'POST',
           });
@@ -504,17 +535,6 @@ serve(async (req) => {
         );
       }
     } 
-    else if (action === 'conferenceStatus') {
-      // Log the conference status updates
-      console.log("Conference status update received:");
-      console.log(JSON.stringify(requestData, null, 2));
-      
-      // Return empty TwiML for status callbacks
-      const twiml = new twilio.twiml.VoiceResponse();
-      return new Response(twiml.toString(), {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
-      });
-    }
     else if (action === 'statusCallback' || (!action && requestData.CallSid)) {
       // Handle call status callbacks
       console.log("Status callback received");
