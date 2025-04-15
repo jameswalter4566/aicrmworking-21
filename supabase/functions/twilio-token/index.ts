@@ -32,8 +32,10 @@ serve(async (req) => {
       throw new Error('Missing required Twilio credentials in environment variables');
     }
     
-    // Import twilio only after validating required environment variables
-    const { default: twilio } = await import('https://esm.sh/twilio@4.10.0');
+    // Import twilio as a module with proper ESM syntax
+    // This is the proper way to import in Deno to avoid the Object prototype error
+    const twilioModule = await import('npm:twilio@4.10.0');
+    const twilio = twilioModule.default;
     
     // Create a voice grant for this token
     const VoiceGrant = twilio.jwt.AccessToken.VoiceGrant;
