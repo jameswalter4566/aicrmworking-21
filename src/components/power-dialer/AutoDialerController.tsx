@@ -74,8 +74,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       // Get the lead phone number and id
       const phoneNumber = leadData.phone1;
-      // For makeCall, convert to string since our service expects a string
-      const leadId = lead.lead_id;
+      // Explicitly convert lead_id to string to match service expectation
+      const leadId = String(lead.lead_id);
       
       if (!phoneNumber) {
         toast({
