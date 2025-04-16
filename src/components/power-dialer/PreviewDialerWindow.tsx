@@ -26,7 +26,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import DialerQueueMonitor from './DialerQueueMonitor';
-import { AutoDialerController } from './AutoDialerController';
+import { AutoDialerController } from './AutoDialerController";
+import { twilioService } from "@/services/twilio";
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -47,6 +48,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [autoDialerActive, setAutoDialerActive] = useState(false);
+  const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
   const { user } = useAuth();
   
   useEffect(() => {
@@ -153,6 +155,28 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
   };
 
+  const handleStartPowerDialing = async () => {
+    if (!sessionId) {
+      toast.error("No active session found");
+      return;
+    }
+
+    try {
+      await twilioService.initializeTwilioDevice();
+      setAutoDialerActive(true);
+      setIsActivePowerDialing(true);
+      
+      toast.success("Power dialing sequence started", {
+        description: "The system will now automatically dial leads in queue"
+      });
+    } catch (error) {
+      console.error("Error starting power dialing:", error);
+      toast.error("Failed to start power dialing");
+      setAutoDialerActive(false);
+      setIsActivePowerDialing(false);
+    }
+  };
+
   const handleCallComplete = useCallback(() => {
     // This will be called after each call is completed
     console.log('Call completed, ready for next call');
@@ -211,6 +235,24 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 {sessionId && (
                   <>
                     <DialerQueueMonitor sessionId={sessionId} />
+                    
+                    {!autoDialerActive && (
+                      <div className="flex justify-center my-4">
+                        <Button
+                          onClick={handleStartPowerDialing}
+                          className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                          disabled={isCreatingSession || isProcessingCall}
+                        >
+                          {isCreatingSession ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Phone className="h-5 w-5" />
+                          )}
+                          Start Power Dialing
+                        </Button>
+                      </div>
+                    )}
+
                     <AutoDialerController 
                       sessionId={sessionId}
                       isActive={autoDialerActive}
