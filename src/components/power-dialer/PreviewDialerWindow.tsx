@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,6 +50,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [autoDialerActive, setAutoDialerActive] = useState(false);
   const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
+  const [isProcessingCall, setIsProcessingCall] = useState(false);
   const { user } = useAuth();
   
   useEffect(() => {
@@ -162,6 +164,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
 
     try {
+      setIsProcessingCall(true);
       await twilioService.initializeTwilioDevice();
       setAutoDialerActive(true);
       setIsActivePowerDialing(true);
@@ -174,6 +177,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       toast.error("Failed to start power dialing");
       setAutoDialerActive(false);
       setIsActivePowerDialing(false);
+    } finally {
+      setIsProcessingCall(false);
     }
   };
 
@@ -243,7 +248,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                           className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
                           disabled={isCreatingSession || isProcessingCall}
                         >
-                          {isCreatingSession ? (
+                          {isProcessingCall ? (
                             <Loader2 className="h-5 w-5 animate-spin" />
                           ) : (
                             <Phone className="h-5 w-5" />
