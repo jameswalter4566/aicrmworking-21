@@ -69,6 +69,41 @@ export type Database = {
         }
         Relationships: []
       }
+      client_portal_access: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          id: string
+          last_accessed_at: string | null
+          lead_id: number | null
+          portal_slug: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          lead_id?: number | null
+          portal_slug: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          lead_id?: number | null
+          portal_slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_portal_access_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dialing_session_leads: {
         Row: {
           attempt_count: number | null

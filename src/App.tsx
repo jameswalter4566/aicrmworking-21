@@ -279,6 +279,7 @@ function App() {
                 <Route path="/calling-list/:id" element={<CallingListViewer />} />
                 
                 <Route path="/client-portal-landing" element={<ClientPortalLanding />} />
+                <Route path="/client-portal/:slug" element={<ClientPortal />} />
                 <Route path="/client-portal" element={<ClientPortal />} />
                 
                 <Route path="/dialer" element={<Dialer />} />

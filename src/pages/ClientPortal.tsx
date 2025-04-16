@@ -1,6 +1,6 @@
 
-import React, { useState } from "react";
-import { useParams, Navigate, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Home, 
@@ -8,49 +8,18 @@ import {
   AlertTriangle, 
   MessageCircle,
   Upload,
-  CheckCircle
+  CheckCircle,
+  Loader2
 } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import PDFDropZone from "@/components/mortgage/PDFDropZone";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/components/ui/use-toast";
 
-// Mock data - in a real implementation, this would come from an API
-const mockClientData = {
-  name: "John Smith",
-  email: "john.smith@example.com",
-  phone: "(555) 123-4567",
-  loanAmount: 320000,
-  interestRate: 4.5,
-  loanTerm: 30,
-  monthlyPayment: 1621.39,
-  currentMonthlyPayment: 2100.00,
-  savingsPerMonth: 478.61,
-  propertyAddress: "123 Main St, Anytown, CA 12345",
-  propertyValue: 400000,
-  loanOfficer: {
-    name: "Jane Doe",
-    phone: "(555) 987-6543",
-    email: "jane.doe@mortgage.com",
-    photo: "https://randomuser.me/api/portraits/women/44.jpg"
-  },
-  loanProgress: 6, // 0-11 based on progress steps
-  conditions: [
-    { id: 1, title: "Most recent pay stub", completed: false, urgent: true },
-    { id: 2, title: "Bank statements (last 2 months)", completed: false, urgent: true },
-    { id: 3, title: "Tax returns (last 2 years)", completed: true, urgent: false },
-    { id: 4, title: "Proof of insurance", completed: false, urgent: false },
-    { id: 5, title: "Photo ID", completed: true, urgent: false },
-    { id: 6, title: "Gift letter", completed: false, urgent: true },
-  ],
-  disclosures: [
-    { id: 1, title: "Initial Disclosure Package", completed: true, dueDate: "2023-05-15" },
-    { id: 2, title: "Intent to Proceed", completed: true, dueDate: "2023-05-17" },
-    { id: 3, title: "Closing Disclosure", completed: false, dueDate: "2023-06-01" },
-  ]
-};
-
+// Define progress steps for loan progression
 const progressSteps = [
   "Application Created",
   "Disclosures Sent",
@@ -66,7 +35,41 @@ const progressSteps = [
   "FUNDED"
 ];
 
-const ClientPortalNavbar = ({ activeTab, setActiveTab }: { 
+interface ClientData {
+  name: string;
+  email: string;
+  phone: string;
+  loanAmount: number;
+  interestRate: number;
+  loanTerm: number;
+  monthlyPayment: number;
+  currentMonthlyPayment: number;
+  savingsPerMonth: number;
+  propertyAddress: string;
+  propertyValue: number;
+  loanOfficer: {
+    name: string;
+    phone: string;
+    email: string;
+    photo: string;
+  };
+  loanProgress: number; // 0-11 based on progress steps
+  conditions: Array<{
+    id: number;
+    title: string;
+    completed: boolean;
+    urgent: boolean;
+  }>;
+  disclosures: Array<{
+    id: number;
+    title: string;
+    completed: boolean;
+    dueDate: string;
+  }>;
+}
+
+const ClientPortalNavbar = ({ clientData, activeTab, setActiveTab }: { 
+  clientData: ClientData;
   activeTab: string; 
   setActiveTab: (tab: string) => void 
 }) => {
@@ -76,12 +79,12 @@ const ClientPortalNavbar = ({ activeTab, setActiveTab }: {
         <h1 className="text-xl font-bold mb-2">Your Mortgage Portal</h1>
         <div className="w-full mb-4">
           <Progress 
-            value={((mockClientData.loanProgress + 1) / progressSteps.length) * 100} 
+            value={((clientData.loanProgress + 1) / progressSteps.length) * 100} 
             className="h-2.5 bg-gray-200" 
           />
           
           <div className="mt-1 text-xs text-center text-mortgage-lightPurple">
-            <span className="font-semibold">{progressSteps[mockClientData.loanProgress]}</span>
+            <span className="font-semibold">{progressSteps[clientData.loanProgress]}</span>
           </div>
         </div>
         
@@ -108,9 +111,9 @@ const ClientPortalNavbar = ({ activeTab, setActiveTab }: {
           >
             <AlertTriangle size={20} />
             <span className="text-xs mt-1">Attention</span>
-            {mockClientData.conditions.filter(c => c.urgent && !c.completed).length > 0 && (
+            {clientData.conditions.filter(c => c.urgent && !c.completed).length > 0 && (
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                {mockClientData.conditions.filter(c => c.urgent && !c.completed).length}
+                {clientData.conditions.filter(c => c.urgent && !c.completed).length}
               </span>
             )}
           </button>
@@ -128,7 +131,7 @@ const ClientPortalNavbar = ({ activeTab, setActiveTab }: {
   );
 };
 
-const HomeTab = () => {
+const HomeTab = ({ clientData }: { clientData: ClientData }) => {
   return (
     <div className="space-y-6">
       <Card>
@@ -143,19 +146,19 @@ const HomeTab = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-gray-600">Loan Amount:</span>
-                  <span className="font-medium">${mockClientData.loanAmount.toLocaleString()}</span>
+                  <span className="font-medium">${clientData.loanAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Interest Rate:</span>
-                  <span className="font-medium">{mockClientData.interestRate}%</span>
+                  <span className="font-medium">{clientData.interestRate}%</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Term:</span>
-                  <span className="font-medium">{mockClientData.loanTerm} years</span>
+                  <span className="font-medium">{clientData.loanTerm} years</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Monthly Payment:</span>
-                  <span className="font-medium text-mortgage-darkPurple">${mockClientData.monthlyPayment.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                  <span className="font-medium text-mortgage-darkPurple">${clientData.monthlyPayment.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                 </div>
               </div>
             </div>
@@ -165,10 +168,10 @@ const HomeTab = () => {
                 <div className="text-center">
                   <span className="block text-gray-600">Monthly Savings</span>
                   <span className="block text-2xl font-bold text-green-600">
-                    ${mockClientData.savingsPerMonth.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                    ${clientData.savingsPerMonth.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                   </span>
                   <span className="block text-sm text-gray-500 mt-1">
-                    (${(mockClientData.savingsPerMonth * 12).toLocaleString()} per year)
+                    (${(clientData.savingsPerMonth * 12).toLocaleString()} per year)
                   </span>
                 </div>
               </div>
@@ -186,11 +189,11 @@ const HomeTab = () => {
             <div className="space-y-4">
               <div className="space-y-1">
                 <span className="text-sm text-gray-600">Address</span>
-                <p className="font-medium">{mockClientData.propertyAddress}</p>
+                <p className="font-medium">{clientData.propertyAddress}</p>
               </div>
               <div className="space-y-1">
                 <span className="text-sm text-gray-600">Estimated Value</span>
-                <p className="font-medium">${mockClientData.propertyValue.toLocaleString()}</p>
+                <p className="font-medium">${clientData.propertyValue.toLocaleString()}</p>
               </div>
             </div>
           </CardContent>
@@ -203,12 +206,12 @@ const HomeTab = () => {
           <CardContent>
             <div className="flex items-center space-x-4">
               <div className="h-16 w-16 rounded-full bg-gray-200 overflow-hidden">
-                <img src={mockClientData.loanOfficer.photo} alt="Loan Officer" className="h-full w-full object-cover" />
+                <img src={clientData.loanOfficer.photo} alt="Loan Officer" className="h-full w-full object-cover" />
               </div>
               <div>
-                <h3 className="font-medium">{mockClientData.loanOfficer.name}</h3>
-                <p className="text-sm text-gray-600">{mockClientData.loanOfficer.phone}</p>
-                <p className="text-sm text-gray-600">{mockClientData.loanOfficer.email}</p>
+                <h3 className="font-medium">{clientData.loanOfficer.name}</h3>
+                <p className="text-sm text-gray-600">{clientData.loanOfficer.phone}</p>
+                <p className="text-sm text-gray-600">{clientData.loanOfficer.email}</p>
               </div>
             </div>
           </CardContent>
@@ -226,21 +229,21 @@ const HomeTab = () => {
                 <span>{progressSteps[0]}</span>
                 <span>{progressSteps[progressSteps.length - 1]}</span>
               </div>
-              <Progress value={((mockClientData.loanProgress + 1) / progressSteps.length) * 100} className="h-2" />
+              <Progress value={((clientData.loanProgress + 1) / progressSteps.length) * 100} className="h-2" />
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {progressSteps.map((step, index) => (
                 <div 
                   key={index} 
-                  className={`p-3 rounded-lg border ${index <= mockClientData.loanProgress ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} flex items-center space-x-2`}
+                  className={`p-3 rounded-lg border ${index <= clientData.loanProgress ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} flex items-center space-x-2`}
                 >
-                  {index <= mockClientData.loanProgress ? (
+                  {index <= clientData.loanProgress ? (
                     <CheckCircle size={16} className="text-green-500" />
                   ) : (
                     <div className="h-4 w-4 rounded-full border border-gray-300 flex-shrink-0" />
                   )}
-                  <span className={`text-sm ${index <= mockClientData.loanProgress ? 'text-green-800' : 'text-gray-500'}`}>{step}</span>
+                  <span className={`text-sm ${index <= clientData.loanProgress ? 'text-green-800' : 'text-gray-500'}`}>{step}</span>
                 </div>
               ))}
             </div>
@@ -251,11 +254,28 @@ const HomeTab = () => {
   );
 };
 
-const ConditionsTab = () => {
-  const handleFileUpload = (file: File) => {
-    console.log("File uploaded:", file.name);
-    // In a real app, you would upload this to your backend
-    alert(`Document "${file.name}" uploaded successfully!`);
+const ConditionsTab = ({ clientData, refreshData }: { clientData: ClientData, refreshData: () => void }) => {
+  const handleFileUpload = async (file: File) => {
+    try {
+      // In a real app, implement file upload to secure storage
+      console.log("File uploaded:", file.name);
+      
+      // Simulate condition being marked as completed
+      toast({
+        title: "Document uploaded successfully",
+        description: `${file.name} has been uploaded and will be reviewed.`,
+      });
+      
+      // Refresh data after upload
+      setTimeout(refreshData, 1000);
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: "There was an error uploading your document. Please try again.",
+      });
+    }
   };
   
   return (
@@ -267,7 +287,7 @@ const ConditionsTab = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {mockClientData.conditions.map(condition => (
+            {clientData.conditions.map(condition => (
               <div 
                 key={condition.id} 
                 className={`p-4 rounded-lg border flex items-start justify-between ${
@@ -320,9 +340,9 @@ const ConditionsTab = () => {
   );
 };
 
-const AttentionTab = () => {
-  const urgentConditions = mockClientData.conditions.filter(c => c.urgent && !c.completed);
-  const pendingDisclosures = mockClientData.disclosures.filter(d => !d.completed);
+const AttentionTab = ({ clientData }: { clientData: ClientData }) => {
+  const urgentConditions = clientData.conditions.filter(c => c.urgent && !c.completed);
+  const pendingDisclosures = clientData.disclosures.filter(d => !d.completed);
   
   return (
     <div className="space-y-6">
@@ -418,11 +438,11 @@ const SupportTab = () => {
       
       // Simple keyword-based responses
       if (message.toLowerCase().includes("status") || message.toLowerCase().includes("progress")) {
-        response = `Your loan is currently in the ${progressSteps[mockClientData.loanProgress]} stage. It's progressing as expected!`;
+        response = "Your loan is currently in the Processing stage. It's progressing as expected!";
       } else if (message.toLowerCase().includes("document") || message.toLowerCase().includes("upload")) {
         response = "You can upload documents in the Conditions tab. If you're having trouble, we can assist you in uploading them.";
       } else if (message.toLowerCase().includes("payment") || message.toLowerCase().includes("monthly")) {
-        response = `Your estimated monthly payment will be $${mockClientData.monthlyPayment.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}.`;
+        response = "Your estimated monthly payment will be $1,621.39 based on your current loan terms.";
       } else if (message.toLowerCase().includes("closing") || message.toLowerCase().includes("when")) {
         response = "Based on your current progress, we're targeting to close your loan in approximately 2-3 weeks.";
       }
@@ -478,84 +498,207 @@ const SupportTab = () => {
   );
 };
 
-const ClientLogin = ({ onLogin }: { onLogin: () => void }) => {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username === "user1" && password === "password") {
-      onLogin();
-    } else {
-      setError("Invalid username or password");
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-mortgage-purple/20 to-white p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-mortgage-darkPurple">Client Portal Login</CardTitle>
-          <CardDescription>Access your loan information securely</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin}>
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="username" className="text-sm font-medium">Username</label>
-                <input
-                  id="username"
-                  type="text"
-                  className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-mortgage-purple"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium">Password</label>
-                <input
-                  id="password"
-                  type="password"
-                  className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-mortgage-purple"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </div>
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-              <Button type="submit" className="w-full bg-mortgage-purple hover:bg-mortgage-darkPurple">
-                Login
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-2 text-center text-sm text-gray-500">
-          <p>Username: user1</p>
-          <p>Password: password</p>
-        </CardFooter>
-      </Card>
-    </div>
-  );
+// Mock data for fallback when no real data is available
+const mockClientData: ClientData = {
+  name: "John Smith",
+  email: "john.smith@example.com",
+  phone: "(555) 123-4567",
+  loanAmount: 320000,
+  interestRate: 4.5,
+  loanTerm: 30,
+  monthlyPayment: 1621.39,
+  currentMonthlyPayment: 2100.00,
+  savingsPerMonth: 478.61,
+  propertyAddress: "123 Main St, Anytown, CA 12345",
+  propertyValue: 400000,
+  loanOfficer: {
+    name: "Jane Doe",
+    phone: "(555) 987-6543",
+    email: "jane.doe@mortgage.com",
+    photo: "https://randomuser.me/api/portraits/women/44.jpg"
+  },
+  loanProgress: 6, // 0-11 based on progress steps
+  conditions: [
+    { id: 1, title: "Most recent pay stub", completed: false, urgent: true },
+    { id: 2, title: "Bank statements (last 2 months)", completed: false, urgent: true },
+    { id: 3, title: "Tax returns (last 2 years)", completed: true, urgent: false },
+    { id: 4, title: "Proof of insurance", completed: false, urgent: false },
+    { id: 5, title: "Photo ID", completed: true, urgent: false },
+    { id: 6, title: "Gift letter", completed: false, urgent: true },
+  ],
+  disclosures: [
+    { id: 1, title: "Initial Disclosure Package", completed: true, dueDate: "2023-05-15" },
+    { id: 2, title: "Intent to Proceed", completed: true, dueDate: "2023-05-17" },
+    { id: 3, title: "Closing Disclosure", completed: false, dueDate: "2023-06-01" },
+  ]
 };
 
 const ClientPortal = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+  const navigate = useNavigate();
+  
   const [authenticated, setAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [clientData, setClientData] = useState<ClientData | null>(null);
   const [activeTab, setActiveTab] = useState("home");
   
-  if (!authenticated) {
-    return <ClientLogin onLogin={() => setAuthenticated(true)} />;
+  // Verify portal access and fetch client data
+  useEffect(() => {
+    const verifyAccess = async () => {
+      if (!slug || !token) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        // Check portal access
+        const { data: portalData, error: portalError } = await supabase
+          .from('client_portal_access')
+          .select('*')
+          .eq('portal_slug', slug)
+          .eq('access_token', token)
+          .single();
+        
+        if (portalError || !portalData) {
+          console.error("Portal access error:", portalError);
+          setLoading(false);
+          return;
+        }
+        
+        // Update last accessed timestamp
+        await supabase
+          .from('client_portal_access')
+          .update({ last_accessed_at: new Date().toISOString() })
+          .eq('id', portalData.id);
+        
+        // Fetch lead data (in a real app)
+        // For now, use mock data
+        setClientData(mockClientData);
+        setAuthenticated(true);
+        
+        // In a real app, you would fetch real data:
+        /*
+        const { data: leadData, error: leadError } = await supabase
+          .from('leads')
+          .select(`
+            id, 
+            first_name,
+            last_name,
+            email,
+            phone1,
+            property_address,
+            mortgage_data
+          `)
+          .eq('id', portalData.lead_id)
+          .single();
+          
+        if (leadData) {
+          // Process lead data into clientData format
+          setClientData({
+            name: `${leadData.first_name} ${leadData.last_name}`,
+            // ... map other fields
+          });
+          setAuthenticated(true);
+        }
+        */
+      } catch (error) {
+        console.error("Error verifying access:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    verifyAccess();
+  }, [slug, token]);
+  
+  const refreshData = async () => {
+    // In a real app, this would refresh data from the database
+    // For demo purposes, we'll simulate a condition being completed
+    if (clientData) {
+      const updatedConditions = [...clientData.conditions];
+      const urgentIndex = updatedConditions.findIndex(c => c.urgent && !c.completed);
+      if (urgentIndex !== -1) {
+        updatedConditions[urgentIndex].completed = true;
+        setClientData({
+          ...clientData,
+          conditions: updatedConditions
+        });
+      }
+    }
+  };
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 size={48} className="animate-spin text-mortgage-purple mb-4" />
+          <p className="text-lg font-medium text-gray-700">Loading your portal...</p>
+        </div>
+      </div>
+    );
   }
   
+  // If no slug/token provided, or slug is "login", show login page
+  if (!slug || slug === "login" || !token) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-mortgage-purple/20 to-white p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-mortgage-darkPurple">Client Portal Access</CardTitle>
+            <CardDescription>Please use the link provided in your email to access your portal</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center p-4">
+              <p className="mb-4">If you have received a portal access link, please use it to access your loan information.</p>
+              <p className="text-sm text-gray-500">If you need assistance, contact your loan officer.</p>
+            </div>
+          </CardContent>
+          <CardFooter className="justify-center">
+            <Button onClick={() => navigate('/client-portal-landing')} className="bg-mortgage-purple hover:bg-mortgage-darkPurple">
+              Back to Portal Landing
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+  
+  // If not authenticated or no client data available, show access error
+  if (!authenticated || !clientData) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-red-100 to-white p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl font-bold text-red-600">Access Denied</CardTitle>
+            <CardDescription>Unable to verify your portal access</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center p-4">
+              <p className="mb-4">The portal link you used is invalid or has expired.</p>
+              <p className="text-sm text-gray-500">Please contact your loan officer for a new access link.</p>
+            </div>
+          </CardContent>
+          <CardFooter className="justify-center">
+            <Button onClick={() => navigate('/client-portal-landing')} className="bg-mortgage-purple hover:bg-mortgage-darkPurple">
+              Back to Portal Landing
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+  
+  // Show authenticated portal view
   return (
     <div className="min-h-screen bg-gray-50">
-      <ClientPortalNavbar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <div className="container mx-auto p-4 md:p-6 mt-2">
-        {activeTab === "home" && <HomeTab />}
-        {activeTab === "conditions" && <ConditionsTab />}
-        {activeTab === "attention" && <AttentionTab />}
+        {activeTab === "home" && <HomeTab clientData={clientData} />}
+        {activeTab === "conditions" && <ConditionsTab clientData={clientData} refreshData={refreshData} />}
+        {activeTab === "attention" && <AttentionTab clientData={clientData} />}
         {activeTab === "support" && <SupportTab />}
       </div>
     </div>

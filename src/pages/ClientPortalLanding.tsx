@@ -25,7 +25,7 @@ const ClientPortalLanding = () => {
             <p className="text-xl opacity-90 mb-8">Stay updated on your loan progress with our personalized client portal</p>
             <Button 
               size="lg" 
-              onClick={() => navigate('/client-portal')}
+              onClick={() => navigate('/client-portal/login')}
               className="bg-white text-mortgage-darkPurple hover:bg-gray-100"
             >
               Access Client Portal <ChevronRight className="ml-2 h-4 w-4" />
@@ -86,7 +86,7 @@ const ClientPortalLanding = () => {
                 <span className="text-lg font-bold">1</span>
               </div>
               <h3 className="text-xl font-semibold mb-2">Login Securely</h3>
-              <p className="text-gray-600">Access your personalized portal using your credentials</p>
+              <p className="text-gray-600">Access your personalized portal using your secure link</p>
             </div>
             
             <div className="relative pl-12 md:pl-0 md:text-center">
@@ -137,7 +137,7 @@ const ClientPortalLanding = () => {
               
               <Button 
                 className="mt-8 bg-mortgage-purple hover:bg-mortgage-darkPurple"
-                onClick={() => navigate('/client-portal')}
+                onClick={() => navigate('/client-portal/login')}
               >
                 Access Your Portal
               </Button>
@@ -194,7 +194,7 @@ const ClientPortalLanding = () => {
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">Take control of your mortgage journey with our comprehensive client portal</p>
           <Button 
             size="lg"
-            onClick={() => navigate('/client-portal')}
+            onClick={() => navigate('/client-portal/login')}
             className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
           >
             Enter Client Portal

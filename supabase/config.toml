@@ -51,6 +51,10 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 
+[functions.generate-client-portal]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
 # SMS Gateway API functions
 [functions.sms-send-single]
 verify_jwt = false
