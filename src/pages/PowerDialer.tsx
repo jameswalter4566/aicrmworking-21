@@ -36,6 +36,7 @@ import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "@/components/ui/use-toast";
 import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
+import AutoDialerController from "@/components/power-dialer/AutoDialerController";
 
 const SAMPLE_LEADS = [
   {
@@ -99,6 +100,7 @@ export default function PowerDialer() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
   const [currentCall, setCurrentCall] = useState(null);
+  const [currentSessionId, setCurrentSessionId] = useState(null);
 
   const twilioState = useTwilio();
 
@@ -222,6 +224,8 @@ export default function PowerDialer() {
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
+      <AutoDialerController sessionId={currentSessionId} />
+      
       <Card className="bg-muted/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex justify-between items-center">
