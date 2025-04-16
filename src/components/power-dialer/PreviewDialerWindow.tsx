@@ -59,6 +59,15 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
   }, [isDialingStarted]);
 
+  // Add an effect to detect and log state changes
+  useEffect(() => {
+    console.log('Session state update:', { 
+      sessionId, 
+      autoDialerActive, 
+      isActivePowerDialing 
+    });
+  }, [sessionId, autoDialerActive, isActivePowerDialing]);
+
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);
     setError(null);
@@ -141,7 +150,9 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       
       console.log("Dialing session created successfully:", data);
       setSessionId(data.sessionId);
-      setAutoDialerActive(true);
+      // Don't automatically set autoDialerActive to true here
+      // The user should explicitly start the power dialing
+      setAutoDialerActive(false);
       
       toast.success("Dialing Session Started", {
         description: `Preparing to dial ${data.totalLeads} leads`
@@ -241,6 +252,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   <>
                     <DialerQueueMonitor sessionId={sessionId} />
                     
+                    {/* Explicitly check that autoDialerActive is false to ensure button shows */}
                     {!autoDialerActive && (
                       <div className="flex justify-center my-4">
                         <Button
