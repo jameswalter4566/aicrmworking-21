@@ -74,14 +74,16 @@ serve(async (req) => {
       );
     }
 
-    // Log the important parts of the message for debugging
+    // Extract key information for logging
     const phoneNumber = payload.number || payload.from;
-    const message = payload.message || payload.text || payload.content;
+    const message = payload.message || payload.text || payload.content || payload.body;
     const deviceNumber = payload.device_number || payload.to;
+    const deviceId = payload.device_id || payload.deviceId;
     
     console.log(`SMS received at ${now}:`);
     console.log(`- From: ${phoneNumber || 'unknown'}`);
     console.log(`- To: ${deviceNumber || 'unknown'}`);
+    console.log(`- Device ID: ${deviceId || 'unknown'}`);
     console.log(`- Message: ${message || 'no content'}`);
 
     return new Response(

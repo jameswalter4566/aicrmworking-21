@@ -15,20 +15,47 @@ serve(async (req) => {
   }
 
   try {
-    const { leadId } = await req.json();
-    
     // Create a Supabase client for database operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get date 24 hours ago from April 16, 2025
+    // Set date range for April 16-17, 2025
     const startDate = new Date('2025-04-16T00:00:00Z');
     const endDate = new Date('2025-04-17T00:00:00Z');
     
     console.log(`Retrieving messages between ${startDate.toISOString()} and ${endDate.toISOString()}`);
     
-    // Get all SMS webhook data within the specified time range
+    // Step 1: Fetch all available device IDs from the SMS webhooks
+    const { data: deviceData, error: deviceError } = await supabase
+      .from('sms_webhooks')
+      .select('webhook_data')
+      .not('webhook_data->device_id', 'is', null);
+    
+    if (deviceError) {
+      console.error("Error retrieving device IDs:", deviceError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to retrieve device IDs', details: deviceError.message }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    // Extract unique device IDs
+    const deviceIds = new Set();
+    if (deviceData && deviceData.length > 0) {
+      deviceData.forEach(record => {
+        if (record.webhook_data && record.webhook_data.device_id) {
+          deviceIds.add(record.webhook_data.device_id);
+        }
+      });
+    }
+    
+    console.log(`Found ${deviceIds.size} unique device IDs`);
+    
+    // Step 2: Get all SMS webhook data within the specified time range
     const { data: messages, error: messagesError } = await supabase
       .from('sms_webhooks')
       .select('*')
@@ -37,6 +64,7 @@ serve(async (req) => {
       .order('received_at', { ascending: false });
       
     if (messagesError) {
+      console.error("Error retrieving messages:", messagesError);
       return new Response(
         JSON.stringify({ error: 'Failed to retrieve messages', details: messagesError.message }),
         { 
@@ -51,15 +79,24 @@ serve(async (req) => {
     // Format into a standardized message format
     const formattedMessages = (messages || []).map(record => {
       const webhookData = record.webhook_data;
-      const isIncoming = webhookData.type === 'incoming' || webhookData.message_direction === 'inbound';
+      
+      // Determine if the message is incoming based on message type or direction
+      // This handles both the "type" field and the "message_direction" field that might be present
+      const isIncoming = webhookData.type === 'incoming' || 
+                          webhookData.message_direction === 'inbound' || 
+                          webhookData.direction === 'inbound';
+      
+      // Extract device ID information
+      const deviceId = webhookData.device_id || webhookData.deviceId || null;
       
       return {
         id: record.id,
         type: 'sms',
-        content: webhookData.message || webhookData.content || webhookData.text || '',
+        content: webhookData.message || webhookData.content || webhookData.text || webhookData.body || '',
         sender: isIncoming ? 'client' : 'ai',
         timestamp: record.received_at || new Date().toISOString(),
         phone: isIncoming ? webhookData.number || webhookData.from : webhookData.device_number || webhookData.to,
+        deviceId: deviceId,
         rawData: webhookData // Include raw data for debugging
       };
     });
@@ -71,7 +108,8 @@ serve(async (req) => {
         timeRange: {
           start: startDate.toISOString(),
           end: endDate.toISOString()
-        }
+        },
+        deviceIds: Array.from(deviceIds)
       }),
       {
         status: 200,
