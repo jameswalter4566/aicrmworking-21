@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -16,49 +15,143 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   onCallComplete
 }) => {
   const [isProcessingCall, setIsProcessingCall] = useState(false);
+  const [noMoreLeads, setNoMoreLeads] = useState(false);
   const { toast } = useToast();
 
   const getNextLead = useCallback(async () => {
     if (!sessionId) return null;
     
     try {
+      console.log('Fetching next lead for session:', sessionId);
+      
+      // First, check if there are any queued leads left in the session
+      const { data: queuedLeads, error: queueCheckError } = await supabase
+        .from('dialing_session_leads')
+        .select('count')
+        .eq('session_id', sessionId)
+        .eq('status', 'queued');
+      
+      if (queueCheckError) {
+        console.error('Error checking for queued leads:', queueCheckError);
+        throw queueCheckError;
+      }
+      
+      const queuedCount = queuedLeads && queuedLeads.length > 0 ? queuedLeads[0].count : 0;
+      
+      if (queuedCount === 0) {
+        console.log('No more queued leads available in the session');
+        setNoMoreLeads(true);
+        return null;
+      }
+      
+      // If queued leads exist, then get the next lead
       const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
         p_session_id: sessionId
       });
       
-      if (error) throw error;
-      if (!nextLead || nextLead.length === 0) return null;
-      
-      // Get lead details including phone number
-      // Note: lead_id could be a string or number, we'll convert to number for the query
-      const leadIdAsNumber = parseInt(nextLead[0].lead_id);
-      
-      if (isNaN(leadIdAsNumber)) {
-        throw new Error(`Invalid lead ID: ${nextLead[0].lead_id}`);
+      if (error) {
+        console.error('Error calling get_next_session_lead:', error);
+        throw error;
       }
       
-      const { data: leadDetails, error: leadError } = await supabase
-        .from('leads')
-        .select('id, phone1')
-        .eq('id', leadIdAsNumber)
-        .single();
-      
-      if (leadError || !leadDetails) {
-        throw new Error('Could not fetch lead details');
+      if (!nextLead || nextLead.length === 0) {
+        console.log('No lead returned from get_next_session_lead');
+        setNoMoreLeads(true);
+        return null;
       }
       
+      console.log('Next lead retrieved:', nextLead[0]);
+      
+      // Parse the lead notes to get the original lead ID and phone number
+      let leadDetails = { id: null, phone1: null };
+      try {
+        const notesData = JSON.parse(nextLead[0].notes || '{}');
+        const originalLeadId = notesData.originalLeadId;
+        const phoneNumber = notesData.phone;
+        
+        if (phoneNumber) {
+          // If we have the phone number in the notes, use it directly
+          return {
+            ...nextLead[0],
+            phoneNumber: phoneNumber
+          };
+        } else if (originalLeadId) {
+          // Otherwise query the leads table with the original lead ID
+          const { data: leadData, error: leadError } = await supabase
+            .from('leads')
+            .select('id, phone1')
+            .eq('id', originalLeadId)
+            .maybeSingle();
+          
+          if (leadError) {
+            console.error('Error fetching lead details:', leadError);
+            throw leadError;
+          }
+          
+          if (leadData) {
+            leadDetails = leadData;
+          }
+        }
+      } catch (parseError) {
+        console.error('Error parsing lead notes:', parseError);
+        // Continue execution and try to get lead details directly
+      }
+      
+      // If we couldn't get lead details from the notes, try using the lead_id directly
+      if (!leadDetails.phone1) {
+        // Check if lead_id is a number first
+        try {
+          const leadIdAsNumber = parseInt(nextLead[0].lead_id);
+          
+          if (!isNaN(leadIdAsNumber)) {
+            const { data: leadData, error: leadError } = await supabase
+              .from('leads')
+              .select('id, phone1')
+              .eq('id', leadIdAsNumber)
+              .maybeSingle();
+            
+            if (leadError) {
+              console.error('Error fetching lead details using lead_id as number:', leadError);
+            } else if (leadData) {
+              leadDetails = leadData;
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing lead_id as number:', parseError);
+        }
+      }
+      
+      // Return the next lead with phone number
       return {
         ...nextLead[0],
         phoneNumber: leadDetails.phone1
       };
     } catch (error) {
       console.error('Error getting next lead:', error);
+      
+      // If there's an ambiguous id error, we know the function needs fixing
+      if (error.message?.includes('ambiguous') || error.code === '42702') {
+        toast({
+          title: "Database Function Error",
+          description: "Please run the fix-get-next-lead-function to resolve the ambiguous column issue",
+          variant: "destructive",
+        });
+      }
+      
       return null;
     }
-  }, [sessionId]);
+  }, [sessionId, toast]);
 
   const processNextLead = useCallback(async () => {
-    if (isProcessingCall || !isActive || !sessionId) return;
+    if (isProcessingCall || !isActive || !sessionId || noMoreLeads) {
+      if (noMoreLeads && isActive) {
+        toast({
+          title: "All Leads Processed",
+          description: "All leads in the session have been dialed",
+        });
+      }
+      return;
+    }
     
     try {
       setIsProcessingCall(true);
@@ -66,10 +159,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       const lead = await getNextLead();
       
       if (!lead) {
-        toast({
-          title: "Queue Empty",
-          description: "No more leads in the queue"
-        });
+        if (!noMoreLeads) {
+          toast({
+            title: "Queue Empty",
+            description: "No more leads in the queue"
+          });
+          setNoMoreLeads(true);
+        }
         return;
       }
 
@@ -98,7 +194,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       await twilioService.initializeTwilioDevice();
       
       // Make the call using phone number from lead
-      // Pass lead_id as string to the twilio service
+      console.log(`Initiating call to ${lead.phoneNumber} for lead ID ${lead.lead_id}`);
       const callResult = await twilioService.makeCall(lead.phoneNumber, lead.lead_id);
       
       if (!callResult.success) {
@@ -134,7 +230,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       setIsProcessingCall(false);
       onCallComplete();
     }
-  }, [isProcessingCall, isActive, sessionId, getNextLead, toast, onCallComplete]);
+  }, [isProcessingCall, isActive, sessionId, getNextLead, toast, onCallComplete, noMoreLeads]);
 
   // Monitor for completed calls and process next lead
   useEffect(() => {
@@ -153,6 +249,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         (payload) => {
           const newStatus = payload.new.status;
           if (newStatus === 'completed' || newStatus === 'failed') {
+            // Reset noMoreLeads flag when a call completes, in case leads were added
+            setNoMoreLeads(false);
             processNextLead();
           }
         }
@@ -160,14 +258,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       .subscribe();
 
     // Start initial call if active
-    if (!isProcessingCall) {
+    if (!isProcessingCall && !noMoreLeads) {
       processNextLead();
     }
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, isActive, processNextLead, isProcessingCall]);
+  }, [sessionId, isActive, processNextLead, isProcessingCall, noMoreLeads]);
 
   return null;
 };
