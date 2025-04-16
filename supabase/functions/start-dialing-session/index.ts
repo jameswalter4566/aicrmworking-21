@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,13 +7,11 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
   
   try {
-    // Create Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -25,7 +22,6 @@ serve(async (req) => {
       }
     );
     
-    // Verify user authentication
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     
     if (authError || !user) {
@@ -36,7 +32,6 @@ serve(async (req) => {
       );
     }
     
-    // Parse request body
     const requestData = await req.json();
     const { listId, sessionName } = requestData;
     
@@ -49,7 +44,6 @@ serve(async (req) => {
     
     console.log(`Processing request for listId: ${listId}, sessionName: ${sessionName}, userId: ${user.id}`);
     
-    // Verify user has access to the calling list
     const { data: listAccess, error: listAccessError } = await supabaseClient
       .from('calling_lists')
       .select('id')
@@ -72,7 +66,6 @@ serve(async (req) => {
       );
     }
     
-    // Get leads from the calling list
     const { data: listLeads, error: leadsError } = await supabaseClient
       .from('calling_list_leads')
       .select('lead_id')
@@ -95,7 +88,6 @@ serve(async (req) => {
     
     console.log(`Found ${listLeads.length} leads for list ${listId}`);
     
-    // Create dialing session with a proper name
     const finalSessionName = sessionName || `Dialing Session - ${new Date().toLocaleString()}`;
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('dialing_sessions')
@@ -123,11 +115,9 @@ serve(async (req) => {
     console.log(`Created dialing session with ID: ${sessionData.id}`);
     
     try {
-      // Get all lead IDs that we need to process
       const leadIds = listLeads.map(item => item.lead_id);
       console.log(`Processing ${leadIds.length} leads to add to session`);
       
-      // Get actual leads data to ensure we have valid records
       const { data: actualLeads, error: leadsQueryError } = await supabaseClient
         .from('leads')
         .select('id')
@@ -151,7 +141,6 @@ serve(async (req) => {
       
       console.log(`Found ${actualLeads.length} valid leads to add to session`);
       
-      // Explicitly ensure each lead has a string representation of lead ID and is set to 'queued' status
       const sessionLeads = actualLeads.map(lead => ({
         session_id: sessionData.id,
         lead_id: String(lead.id),
@@ -160,7 +149,6 @@ serve(async (req) => {
         attempt_count: 0   // Initial attempt count
       }));
       
-      // Insert in smaller batches if needed
       const BATCH_SIZE = 50;
       let insertedCount = 0;
       
@@ -182,7 +170,6 @@ serve(async (req) => {
         }
       }
       
-      // Double-check that leads were actually inserted with queued status
       const { data: queuedLeads, error: queueCheckError } = await supabaseClient
         .from('dialing_session_leads')
         .select('id, status')
@@ -198,7 +185,6 @@ serve(async (req) => {
         }
       }
       
-      // Update session with accurate count of actually inserted leads
       if (insertedCount > 0) {
         await supabaseClient
           .from('dialing_sessions')
@@ -206,7 +192,6 @@ serve(async (req) => {
           .eq('id', sessionData.id);
       }
       
-      // Force refresh the session_queue_stats view
       const { data: refreshStats, error: refreshError } = await supabaseClient
         .rpc('get_next_session_lead', { p_session_id: sessionData.id })
         .limit(0);
