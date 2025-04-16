@@ -59,14 +59,17 @@ serve(async (req) => {
     }
 
     const devicesData = await devicesResponse.json();
-    const devices = devicesData.data.devices;
+    const devices = devicesData.data.devices || [];
 
     console.log(`Found ${devices.length} devices`);
 
     // Step 2: Get received messages
     // Define time range for April 16-17, 2025
-    const startTimestamp = Math.floor(new Date('2025-04-16T00:00:00Z').getTime() / 1000);
-    const endTimestamp = Math.floor(new Date('2025-04-17T00:00:00Z').getTime() / 1000);
+    const startDate = new Date('2025-04-16T00:00:00Z');
+    const endDate = new Date('2025-04-17T00:00:00Z');
+    
+    const startTimestamp = Math.floor(startDate.getTime() / 1000);
+    const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
     const messagesPayload = {
       key: smsApiKey,
@@ -100,27 +103,40 @@ serve(async (req) => {
     console.log(`Retrieved ${messages.length} messages`);
 
     // Step 3: Format messages for database storage and frontend consumption
-    const formattedMessages = messages.map(message => ({
-      id: message.id,
-      type: 'sms',
-      content: message.message || '',
-      sender: 'client',
-      timestamp: new Date(message.timestamp * 1000).toISOString(),
-      phone: message.number || message.from,
-      deviceId: message.deviceID,
-      rawData: message
-    }));
+    const formattedMessages = messages.map(message => {
+      // Ensure timestamp is valid
+      let timestamp;
+      try {
+        timestamp = new Date(message.timestamp * 1000).toISOString();
+      } catch (e) {
+        // Use current time as fallback if timestamp is invalid
+        timestamp = new Date().toISOString();
+      }
+
+      return {
+        id: message.id,
+        type: 'sms',
+        content: message.message || '',
+        sender: 'client',
+        timestamp: timestamp,
+        phone: message.number || message.from,
+        deviceId: message.deviceID,
+        rawData: message
+      };
+    });
 
     // Store messages in Supabase for future reference
-    const { error: insertError } = await supabase
-      .from('sms_webhooks')
-      .insert(formattedMessages.map(msg => ({
-        webhook_data: msg.rawData,
-        received_at: msg.timestamp
-      })));
+    if (formattedMessages.length > 0) {
+      const { error: insertError } = await supabase
+        .from('sms_webhooks')
+        .insert(formattedMessages.map(msg => ({
+          webhook_data: msg.rawData,
+          received_at: msg.timestamp
+        })));
 
-    if (insertError) {
-      console.error("Error storing messages:", insertError);
+      if (insertError) {
+        console.error("Error storing messages:", insertError);
+      }
     }
 
     return new Response(
@@ -128,8 +144,8 @@ serve(async (req) => {
         success: true,
         messages: formattedMessages,
         timeRange: {
-          start: new Date('2025-04-16T00:00:00Z').toISOString(),
-          end: new Date('2025-04-17T00:00:00Z').toISOString()
+          start: startDate.toISOString(),
+          end: endDate.toISOString()
         },
         devices: devices
       }),
