@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -201,7 +202,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       listId={selectedListId}
                       onLeadsSelected={(leads) => {
                         console.log('Selected leads:', leads);
-                        // Handle the selected leads here
                       }}
                     />
                   </div>
