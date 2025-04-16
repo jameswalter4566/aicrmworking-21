@@ -218,7 +218,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                   .maybeSingle();
                 
                 if (!leadError && leadData && leadData.phone1) {
-                  return { id: leadData.id, phone1: leadData.phone1 };
+                  // Convert the numeric id to string to match the expected return type
+                  return { id: leadData.id.toString(), phone1: leadData.phone1 };
                 }
               }
             } catch (parseError) {
@@ -238,7 +239,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                 .maybeSingle();
               
               if (!leadError && leadData && leadData.phone1) {
-                return { id: leadData.id, phone1: leadData.phone1 };
+                // Convert the numeric id to string to match the expected return type
+                return { id: leadData.id.toString(), phone1: leadData.phone1 };
               }
             }
           } catch (parseError) {
