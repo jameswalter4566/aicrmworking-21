@@ -1,166 +1,160 @@
-import React, { useState, useRef } from 'react';
-import { toast } from 'sonner';
-import { FileUp, CheckCircle, File, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+
+import React, { useState } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { FileUp, CheckCircle, AlertCircle, Brain } from "lucide-react";
 
 interface PDFDropZoneProps {
-  onFileAccepted: (file: File) => void;
-  maxSizeMB?: number;
+  onFileAccepted?: (file: File) => void;
   className?: string;
+  disabled?: boolean;
 }
 
 const PDFDropZone: React.FC<PDFDropZoneProps> = ({ 
-  onFileAccepted,
-  maxSizeMB = 10,
-  className = ''
+  onFileAccepted, 
+  className = "", 
+  disabled = false 
 }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  
-  const handleDragOver = (e: React.DragEvent) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    setIsDragging(true);
+    e.stopPropagation();
+    if (!disabled) setIsDragging(true);
   };
-  
-  const handleDragLeave = () => {
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
   };
-  
-  const handleDrop = (e: React.DragEvent) => {
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
+    e.stopPropagation();
+    if (!disabled) e.dataTransfer.dropEffect = "copy";
+  };
+
+  const validateFile = (file: File) => {
+    if (!file.type.includes('pdf')) {
+      setError("Please upload a PDF file only");
+      return false;
+    }
+    
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      setError(`File size exceeds 10MB limit (${(file.size / (1024 * 1024)).toFixed(2)}MB)`);
+      return false;
+    }
+    
+    return true;
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
+    setError(null);
+    
+    if (disabled) return;
     
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const file = e.dataTransfer.files[0];
-      processFile(file);
-    }
-  };
-  
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      processFile(file);
-    }
-  };
-  
-  const processFile = (file: File) => {
-    if (file.type !== 'application/pdf') {
-      toast.error('Please upload a PDF file');
-      return;
-    }
-    
-    const maxSizeBytes = maxSizeMB * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      toast.error(`File size exceeds the maximum limit of ${maxSizeMB}MB`);
-      return;
-    }
-    
-    setUploadedFile(file);
-    setIsProcessing(true);
-    
-    onFileAccepted(file);
-    
-    setTimeout(() => {
-      setIsProcessing(false);
-    }, 2000);
-  };
-  
-  const handleClearFile = () => {
-    setUploadedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-  
-  const triggerFileInput = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-  
-  return (
-    <div className={`w-full ${className}`}>
-      {!uploadedFile ? (
-        <div
-          className={`border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center transition-colors ${
-            isDragging 
-              ? 'border-blue-500 bg-blue-50' 
-              : 'border-gray-200 hover:border-blue-300'
-          }`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={triggerFileInput}
-          style={{ minHeight: '200px', cursor: 'pointer' }}
-        >
-          <FileUp className="h-10 w-10 text-blue-500 mb-4" />
-          <p className="mb-2 text-lg font-medium text-gray-700">
-            Upload Approval PDF
-          </p>
-          <p className="mb-4 text-sm text-gray-500">
-            Drag and drop your file here, or click to browse
-          </p>
-          <p className="text-xs text-gray-400">
-            PDF only, max {maxSizeMB}MB
-          </p>
-          
-          <input
-            type="file"
-            ref={fileInputRef}
-            className="hidden"
-            onChange={handleFileSelect}
-            accept="application/pdf"
-          />
-        </div>
-      ) : (
-        <div className="border rounded-lg p-4 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-100 p-2 rounded-full">
-                <File className="h-6 w-6 text-blue-600" />
-              </div>
-              
-              <div>
-                <p className="font-medium text-gray-800">{uploadedFile.name}</p>
-                <p className="text-sm text-gray-500">
-                  {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              {isProcessing ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent"></div>
-                  <span className="text-sm text-blue-600">Processing...</span>
-                </div>
-              ) : (
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              )}
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearFile}
-                className="text-gray-500 hover:text-red-500 p-1 h-auto"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      const droppedFile = e.dataTransfer.files[0];
       
-      {uploadedFile && !isProcessing && (
-        <div className="mt-4">
-          <Button onClick={triggerFileInput} variant="outline" className="mr-2">
-            Upload Different File
-          </Button>
+      if (validateFile(droppedFile)) {
+        setFile(droppedFile);
+        if (onFileAccepted) {
+          onFileAccepted(droppedFile);
+        }
+      }
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    
+    if (disabled || !e.target.files || e.target.files.length === 0) return;
+    
+    const selectedFile = e.target.files[0];
+    
+    if (validateFile(selectedFile)) {
+      setFile(selectedFile);
+      if (onFileAccepted) {
+        onFileAccepted(selectedFile);
+      }
+    }
+  };
+
+  return (
+    <Card className={`${className} ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
+      <CardContent>
+        <div
+          className={`
+            border-2 border-dashed rounded-md p-8 text-center transition-colors
+            ${isDragging ? 'border-mortgage-purple bg-mortgage-lightPurple/20' : 'border-gray-300'}
+            ${disabled ? 'bg-gray-100' : 'hover:bg-gray-50'}
+          `}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
+          {file ? (
+            <div className="flex flex-col items-center">
+              <CheckCircle className="h-10 w-10 text-green-500 mb-2" />
+              <p className="text-gray-700 font-medium">{file.name}</p>
+              <p className="text-gray-500 text-sm">
+                {(file.size / (1024 * 1024)).toFixed(2)}MB • PDF
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center">
+              <Brain className="h-12 w-12 text-mortgage-purple mb-3" />
+              <h3 className="text-xl font-bold text-mortgage-darkPurple mb-2">
+                AI Loan Officer Assist
+              </h3>
+              <p className="text-gray-700 font-medium mb-1">
+                Drop your borrower documents here
+              </p>
+              <p className="text-gray-500 text-sm mb-4">
+                or click to browse
+              </p>
+              
+              <label className="cursor-pointer bg-mortgage-purple hover:bg-mortgage-darkPurple text-white px-4 py-2 rounded-md transition-colors">
+                Select PDF
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf" 
+                  onChange={handleFileInputChange}
+                  disabled={disabled}
+                />
+              </label>
+              
+              {error && (
+                <div className="mt-4 flex items-center text-red-600">
+                  <AlertCircle className="h-4 w-4 mr-1" />
+                  <span className="text-sm">{error}</span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
-    </div>
+        
+        <div className="mt-4 text-center text-sm text-gray-500">
+          <p className="font-medium text-mortgage-darkPurple">
+            AI-Powered Document Analysis
+          </p>
+          <p className="text-gray-600">
+            Upload mortgage statements, W-2s, paystubs, or any borrower document and our AI will automatically populate your 1003 application
+          </p>
+          <p className="text-xs mt-1 italic">
+            Supported format: PDF up to 10MB
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
