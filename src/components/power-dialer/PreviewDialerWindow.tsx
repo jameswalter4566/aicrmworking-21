@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -94,9 +95,9 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const handleBeginDialing = async () => {
     if (!selectedListId) return;
     
-    toast({
-      title: "Starting Dialer",
-      description: "Beginning to dial through selected list...",
+    // Fixed: Using the correct toast API format for sonner
+    toast.success("Starting Dialer", {
+      description: "Beginning to dial through selected list..."
     });
     // Additional dialing logic will be added here
   };
