@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -73,8 +74,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       // Get the lead phone number and id
       const phoneNumber = leadData.phone1;
-      // Convert lead_id to a number for makeCall
-      const leadId = parseInt(lead.lead_id, 10);
+      // For makeCall, convert to string since our service expects a string
+      const leadId = lead.lead_id;
       
       if (!phoneNumber) {
         toast({
@@ -97,7 +98,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
       
-      // Make the call using existing Twilio service
+      // Make the call using existing Twilio service - pass leadId as a string
       const callResult = await twilioService.makeCall(phoneNumber, leadId);
       
       if (!callResult.success) {
