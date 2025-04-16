@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,7 +27,52 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
 }) => {
   const [isProcessingCall, setIsProcessingCall] = useState(false);
   const [noMoreLeads, setNoMoreLeads] = useState(false);
+  const [hasAttemptedFix, setHasAttemptedFix] = useState(false);
   const { toast } = useToast();
+
+  // Function to fix the database function if needed
+  const fixDatabaseFunction = useCallback(async () => {
+    try {
+      console.log('Attempting to fix database function...');
+      
+      const { data, error } = await supabase.functions.invoke('fix-get-next-lead-function');
+      
+      if (error) {
+        console.error('Error fixing database function:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fix database function",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      console.log('Database function fix result:', data);
+      
+      if (data.success) {
+        toast({
+          title: "Database Fix Applied",
+          description: "The database function has been fixed. Trying to get next lead again.",
+        });
+        return true;
+      } else {
+        toast({
+          title: "Database Fix Failed",
+          description: data.error || "Unknown error fixing database function",
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error('Error invoking fix function:', error);
+      toast({
+        title: "Error",
+        description: "Failed to invoke database fix function",
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [toast]);
 
   const getNextLead = useCallback(async () => {
     if (!sessionId) return null;
@@ -53,58 +99,127 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return null;
       }
       
-      const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
-        p_session_id: sessionId
-      });
-      
-      if (error) {
-        console.error('Error calling get_next_session_lead:', error);
+      try {
+        const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
+          p_session_id: sessionId
+        });
+        
+        if (error) {
+          console.error('Error calling get_next_session_lead:', error);
+          
+          // Check if this is an ambiguous column error and try to fix it
+          if (error.message?.includes('ambiguous') && error.code === '42702' && !hasAttemptedFix) {
+            setHasAttemptedFix(true);
+            const fixed = await fixDatabaseFunction();
+            
+            if (fixed) {
+              // Retry getting the next lead after fixing
+              console.log('Retrying get_next_session_lead after fix...');
+              const retryResponse = await supabase.rpc('get_next_session_lead', {
+                p_session_id: sessionId
+              });
+              
+              if (retryResponse.error) {
+                console.error('Error after fix attempt:', retryResponse.error);
+                throw retryResponse.error;
+              }
+              
+              if (!retryResponse.data || retryResponse.data.length === 0) {
+                console.log('No lead returned after fix');
+                setNoMoreLeads(true);
+                return null;
+              }
+              
+              console.log('Next lead retrieved after fix:', retryResponse.data[0]);
+              return processFetchedLead(retryResponse.data[0]);
+            } else {
+              throw new Error('Failed to fix database function');
+            }
+          } else {
+            throw error;
+          }
+        }
+        
+        if (!nextLead || nextLead.length === 0) {
+          console.log('No lead returned from get_next_session_lead');
+          setNoMoreLeads(true);
+          return null;
+        }
+        
+        console.log('Next lead retrieved:', nextLead[0]);
+        return processFetchedLead(nextLead[0]);
+      } catch (error) {
+        console.error('Error in getNextLead:', error);
         throw error;
       }
+    } catch (error) {
+      console.error('Error getting next lead:', error);
       
-      if (!nextLead || nextLead.length === 0) {
-        console.log('No lead returned from get_next_session_lead');
-        setNoMoreLeads(true);
-        return null;
+      if (error.message?.includes('ambiguous') || error.code === '42702') {
+        toast({
+          title: "Database Function Error",
+          description: "Attempting to automatically fix the ambiguous column issue",
+        });
+        
+        if (!hasAttemptedFix) {
+          setHasAttemptedFix(true);
+          await fixDatabaseFunction();
+        }
       }
       
-      console.log('Next lead retrieved:', nextLead[0]);
-      
-      let leadDetails = { id: null, phone1: null };
+      return null;
+    }
+  }, [sessionId, hasAttemptedFix, fixDatabaseFunction, toast]);
+
+  // Helper function to process the fetched lead
+  const processFetchedLead = (lead: SessionLead) => {
+    let phoneNumber = null;
+    
+    // Try to extract phone from notes if it exists
+    if (lead.notes) {
       try {
-        const lead = nextLead[0] as SessionLead;
-        const notesData = lead.notes ? JSON.parse(lead.notes) : {};
-        const originalLeadId = notesData.originalLeadId;
-        const phoneNumber = notesData.phone;
+        const notesData = JSON.parse(lead.notes);
+        phoneNumber = notesData.phone;
         
         if (phoneNumber) {
           return {
             ...lead,
-            phoneNumber: phoneNumber
+            phoneNumber
           };
-        } else if (originalLeadId) {
-          const { data: leadData, error: leadError } = await supabase
-            .from('leads')
-            .select('id, phone1')
-            .eq('id', originalLeadId)
-            .maybeSingle();
-          
-          if (leadError) {
-            console.error('Error fetching lead details:', leadError);
-            throw leadError;
-          }
-          
-          if (leadData) {
-            leadDetails = leadData;
+        }
+      } catch (e) {
+        console.error('Error parsing lead notes:', e);
+      }
+    }
+    
+    // Try to get original lead data
+    const getLeadDetails = async (leadId: string) => {
+      try {
+        // First try to get lead from the notes
+        if (lead.notes) {
+          try {
+            const notesData = JSON.parse(lead.notes);
+            const originalLeadId = notesData.originalLeadId;
+            
+            if (originalLeadId) {
+              const { data: leadData, error: leadError } = await supabase
+                .from('leads')
+                .select('id, phone1')
+                .eq('id', originalLeadId)
+                .maybeSingle();
+              
+              if (!leadError && leadData && leadData.phone1) {
+                return { id: leadData.id, phone1: leadData.phone1 };
+              }
+            }
+          } catch (parseError) {
+            console.error('Error parsing lead notes:', parseError);
           }
         }
-      } catch (parseError) {
-        console.error('Error parsing lead notes:', parseError);
-      }
-      
-      if (!leadDetails.phone1) {
+        
+        // Try parsing lead_id as a number
         try {
-          const leadIdAsNumber = parseInt(nextLead[0].lead_id);
+          const leadIdAsNumber = parseInt(leadId);
           
           if (!isNaN(leadIdAsNumber)) {
             const { data: leadData, error: leadError } = await supabase
@@ -113,35 +228,28 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               .eq('id', leadIdAsNumber)
               .maybeSingle();
             
-            if (leadError) {
-              console.error('Error fetching lead details using lead_id as number:', leadError);
-            } else if (leadData) {
-              leadDetails = leadData;
+            if (!leadError && leadData && leadData.phone1) {
+              return { id: leadData.id, phone1: leadData.phone1 };
             }
           }
         } catch (parseError) {
           console.error('Error parsing lead_id as number:', parseError);
         }
+        
+        return { id: null, phone1: null };
+      } catch (error) {
+        console.error('Error fetching lead details:', error);
+        return { id: null, phone1: null };
       }
-      
-      return {
-        ...nextLead[0],
-        phoneNumber: leadDetails.phone1
-      };
-    } catch (error) {
-      console.error('Error getting next lead:', error);
-      
-      if (error.message?.includes('ambiguous') || error.code === '42702') {
-        toast({
-          title: "Database Function Error",
-          description: "Please run the fix-get-next-lead-function to resolve the ambiguous column issue",
-          variant: "destructive",
-        });
-      }
-      
-      return null;
-    }
-  }, [sessionId, toast]);
+    };
+    
+    // Return lead with phone number to be filled in later
+    return {
+      ...lead,
+      phoneNumber: null,
+      getLeadDetails: () => getLeadDetails(lead.lead_id)
+    };
+  };
 
   const processNextLead = useCallback(async () => {
     if (isProcessingCall || !isActive || !sessionId || noMoreLeads) {
@@ -170,14 +278,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      let phoneNumber = null;
-      if (lead.notes) {
-        try {
-          const notesData = JSON.parse(lead.notes);
-          phoneNumber = notesData.phone;
-        } catch (e) {
-          console.error('Error parsing lead notes:', e);
-        }
+      // Determine phone number to call
+      let phoneNumber = lead.phoneNumber;
+      
+      // If no phone number yet, try to get it
+      if (!phoneNumber && lead.getLeadDetails) {
+        const leadDetails = await lead.getLeadDetails();
+        phoneNumber = leadDetails.phone1;
       }
 
       if (!phoneNumber) {
