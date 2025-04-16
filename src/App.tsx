@@ -38,6 +38,11 @@ import LoanApplicationViewer from "./pages/LoanApplicationViewer";
 import ProcessorAssist from "./pages/ProcessorAssist";
 import ProcessorAssistViewer from "./pages/ProcessorAssistViewer";
 import CallingListViewer from "./pages/CallingListViewer";
+import ClientPortal from "./pages/ClientPortal";
+import ClientPortalLanding from "./pages/ClientPortalLanding";
+import LoanApplicationForm from "./pages/LoanApplicationForm";
+import Dialer from "./pages/Dialer";
+import DialerSession from "./pages/DialerSession";
 
 const queryClient = new QueryClient();
 
@@ -269,8 +274,15 @@ function App() {
                 <Route path="/yourhomesolution*" element={<YourHomeSolution />} />
                 
                 <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
+                <Route path="/loan-application-form" element={<ProtectedRoute><LoanApplicationForm /></ProtectedRoute>} />
                 
                 <Route path="/calling-list/:id" element={<CallingListViewer />} />
+                
+                <Route path="/client-portal-landing" element={<ClientPortalLanding />} />
+                <Route path="/client-portal" element={<ClientPortal />} />
+                
+                <Route path="/dialer" element={<Dialer />} />
+                <Route path="/dialer-session" element={<DialerSession />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
