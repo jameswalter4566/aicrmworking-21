@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { 
   Link2, 
@@ -28,6 +27,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import ClientPortalGenerator from "@/components/mortgage/ClientPortalGenerator";
 
 interface Condition {
   id: string;
@@ -53,7 +53,6 @@ const AILoanOfficerAssist = ({ leadId }: AILoanOfficerAssistProps) => {
   const [conditions, setConditions] = useState<Condition[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [portalLink, setPortalLink] = useState(`https://portal.example.com/client/${leadId}`);
 
   useEffect(() => {
     fetchBorrowerInfo();
@@ -165,11 +164,6 @@ const AILoanOfficerAssist = ({ leadId }: AILoanOfficerAssistProps) => {
     setActivityLogs(sampleLogs);
   };
 
-  const copyPortalLink = () => {
-    navigator.clipboard.writeText(portalLink);
-    toast.success("Portal link copied to clipboard");
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return "bg-yellow-100 text-yellow-800";
@@ -199,6 +193,23 @@ const AILoanOfficerAssist = ({ leadId }: AILoanOfficerAssistProps) => {
 
   return (
     <div className="space-y-6">
+      {/* Client Portal Generator Section */}
+      <Card className="bg-white border border-blue-100">
+        <CardHeader className="bg-blue-50 pb-2">
+          <CardTitle className="text-lg font-medium text-blue-900">
+            Client Portal Access
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-4">
+          <div className="p-4 border border-blue-100 rounded-md bg-blue-50">
+            <p className="text-sm mb-4 text-blue-700">
+              Generate a secure portal link for this client to access their loan information and submit documents.
+            </p>
+            <ClientPortalGenerator leadId={parseInt(leadId)} />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Borrower Portal Section */}
       <Card className="bg-white border border-blue-100">
         <CardHeader className="bg-blue-50 pb-2">
