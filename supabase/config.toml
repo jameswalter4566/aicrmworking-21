@@ -50,3 +50,32 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 [functions.twilio-stream]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+# SMS Gateway API functions
+[functions.sms-send-single]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.sms-send-multiple]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.sms-send-to-contacts]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.sms-retrieve-messages]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.sms-contact-management]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.sms-get-balance]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+[functions.sms-webhook-handler]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
