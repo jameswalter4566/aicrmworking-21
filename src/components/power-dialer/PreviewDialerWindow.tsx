@@ -132,19 +132,13 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
           <CardContent>
             {!isDialingStarted ? (
               <div className="flex flex-col items-center justify-center py-12">
-                {callingLists.length > 0 && selectedListId ? (
-                  <Button 
-                    onClick={() => setIsDialingStarted(true)}
-                    className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
-                  >
-                    <Play className="h-6 w-6" />
-                    Start Dialing
-                  </Button>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    Please select a calling list to start dialing
-                  </div>
-                )}
+                <Button 
+                  onClick={() => setIsDialingStarted(true)}
+                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
+                >
+                  <Play className="h-6 w-6" />
+                  Start Dialing
+                </Button>
               </div>
             ) : !currentCall ? (
               <div className="space-y-4">
