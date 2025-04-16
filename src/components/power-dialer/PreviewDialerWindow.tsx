@@ -18,7 +18,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import LeadSelectionPanel from './LeadSelectionPanel";
+import LeadSelectionPanel from './LeadSelectionPanel';
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
