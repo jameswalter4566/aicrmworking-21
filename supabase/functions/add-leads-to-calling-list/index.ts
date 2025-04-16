@@ -87,7 +87,7 @@ serve(async (req) => {
     const leadsToInsert = newLeadIds.map(leadId => ({
       list_id: listId,
       lead_id: leadId,
-      added_by: user.id,
+      added_by: user.id
     }));
     
     const { error: insertError } = await supabaseClient
