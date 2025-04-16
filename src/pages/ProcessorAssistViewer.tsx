@@ -425,6 +425,15 @@ const ProcessorAssistViewer = () => {
             </div>
           )}
         </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <EmailConditionsParser 
+            clientLastName={loanApplication?.lastName || ''} 
+            loanNumber={loanApplication?.loanId || ''}
+            leadId={loanApplication?.id || ''}
+            onConditionsFound={handleConditionsFound}
+          />
+        </div>
       </div>
     );
   };
