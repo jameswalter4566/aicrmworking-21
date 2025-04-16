@@ -91,11 +91,6 @@ const CallingListViewer = () => {
   };
   
   const handleLeadsSelected = async (selectedLeads: Lead[]) => {
-    if (selectedLeads.length === 0) {
-      toast.error("No leads selected");
-      return;
-    }
-    
     try {
       const { error } = await supabase.functions.invoke('add-leads-to-calling-list', {
         body: { 
@@ -110,7 +105,6 @@ const CallingListViewer = () => {
         return;
       }
       
-      toast.success(`Added ${selectedLeads.length} leads to list`);
       setShowLeadSelector(false);
       fetchListLeads();
       fetchListDetails();
@@ -255,7 +249,6 @@ const CallingListViewer = () => {
             <Button 
               className="bg-crm-blue hover:bg-crm-blue/90 text-white"
               onClick={() => {
-                // Start calling logic here
                 toast.info("Calling feature will be implemented soon");
               }}
             >
