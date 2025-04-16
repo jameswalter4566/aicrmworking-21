@@ -13,6 +13,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import ProcessorSidebar from "@/components/mortgage/ProcessorSidebar";
 import ConversationSection from "@/components/mortgage/ConversationSection";
 import OrderServiceSection from "@/components/mortgage/OrderServiceSection";
+import AILoanOfficerAssist from "@/components/mortgage/AILoanOfficerAssist";
 
 interface LoanApplication {
   id: string;
@@ -452,6 +453,8 @@ const ProcessorAssistViewer = () => {
         return <OrderServiceSection serviceName="employmentVerification" leadId={id || ''} />;
       case "titleOrder":
         return <OrderServiceSection serviceName="titleOrder" leadId={id || ''} />;
+      case "aiLoanOfficer":
+        return <AILoanOfficerAssist leadId={id || ''} />;
       default:
         return renderTaskTabs();
     }
@@ -517,7 +520,9 @@ const ProcessorAssistViewer = () => {
                  activeSection === "conversation" ? "Client Conversations" :
                  activeSection === "orderServices" ? "Order Services" :
                  activeSection === "employmentVerification" ? "Employment Verification" :
-                 activeSection === "titleOrder" ? "Title Order" : "Processor Tasks"}: {loanApplication.loanId}
+                 activeSection === "titleOrder" ? "Title Order" :
+                 activeSection === "aiLoanOfficer" ? "AI Loan Officer Assist" : 
+                 "Processor Tasks"}: {loanApplication.loanId}
               </h1>
               <div className="flex flex-wrap items-center mt-2 text-sm text-gray-600">
                 <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium mr-2 mb-1">

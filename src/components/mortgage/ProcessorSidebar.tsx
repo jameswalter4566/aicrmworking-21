@@ -7,7 +7,8 @@ import {
   Package, 
   Briefcase, 
   BookText, 
-  ChevronRight
+  ChevronRight,
+  Brain
 } from "lucide-react";
 import { 
   Sidebar, 
@@ -89,6 +90,18 @@ const ProcessorSidebar = ({
                 >
                   <Package className="h-5 w-5" />
                   <span>Order Services</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  isActive={activeSection === "aiLoanOfficer"} 
+                  onClick={() => onSectionChange("aiLoanOfficer")}
+                  tooltip="AI Loan Officer Assist"
+                  className="text-blue-900 hover:bg-blue-100"
+                >
+                  <Brain className="h-5 w-5" />
+                  <span>AI Loan Officer Assist</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
