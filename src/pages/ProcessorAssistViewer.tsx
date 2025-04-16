@@ -266,18 +266,20 @@ const ProcessorAssistViewer = () => {
   const renderConditionsSection = () => {
     return (
       <div className="space-y-6">
-        <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-orange-800 mb-4">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-blue-700 mb-4">
             Borrower's Remaining Conditions
           </h2>
           
           {parsedConditions ? (
             <div className="grid grid-cols-1 gap-6">
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900 flex items-center">
+                    Master Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
+                <CardContent className="pt-4 bg-white">
                   {parsedConditions.masterConditions?.length > 0 ? (
                     <div className="space-y-2">
                       {parsedConditions.masterConditions.map((condition, index) => (
@@ -288,18 +290,20 @@ const ProcessorAssistViewer = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-sm text-orange-800 italic">
+                    <div className="text-sm text-blue-800 italic">
                       No master conditions found.
                     </div>
                   )}
                 </CardContent>
               </Card>
               
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900">
+                    General Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
+                <CardContent className="pt-4 bg-white">
                   {parsedConditions.generalConditions?.length > 0 ? (
                     <div className="space-y-2">
                       {parsedConditions.generalConditions.map((condition, index) => (
@@ -310,18 +314,20 @@ const ProcessorAssistViewer = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-sm text-orange-800 italic">
+                    <div className="text-sm text-blue-800 italic">
                       No general conditions found.
                     </div>
                   )}
                 </CardContent>
               </Card>
               
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900">
+                    Prior to Final Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
+                <CardContent className="pt-4 bg-white">
                   {parsedConditions.priorToFinalConditions?.length > 0 ? (
                     <div className="space-y-2">
                       {parsedConditions.priorToFinalConditions.map((condition, index) => (
@@ -332,18 +338,20 @@ const ProcessorAssistViewer = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-sm text-orange-800 italic">
+                    <div className="text-sm text-blue-800 italic">
                       No prior to final conditions found.
                     </div>
                   )}
                 </CardContent>
               </Card>
               
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900">
+                    Compliance Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
+                <CardContent className="pt-4 bg-white">
                   {parsedConditions.complianceConditions?.length > 0 ? (
                     <div className="space-y-2">
                       {parsedConditions.complianceConditions.map((condition, index) => (
@@ -354,7 +362,7 @@ const ProcessorAssistViewer = () => {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-sm text-orange-800 italic">
+                    <div className="text-sm text-blue-800 italic">
                       No compliance conditions found.
                     </div>
                   )}
@@ -363,45 +371,53 @@ const ProcessorAssistViewer = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6">
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900">
+                    Master Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
-                  <div className="text-sm text-orange-800 italic">
+                <CardContent className="pt-4 bg-white">
+                  <div className="text-sm text-blue-800 italic">
                     No master conditions found. Conditions will appear here when the approval letter is parsed.
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900">
+                    General Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
-                  <div className="text-sm text-orange-800 italic">
+                <CardContent className="pt-4 bg-white">
+                  <div className="text-sm text-blue-800 italic">
                     No general conditions found. Conditions will appear here when the approval letter is parsed.
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900">
+                    Prior to Final Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
-                  <div className="text-sm text-orange-800 italic">
+                <CardContent className="pt-4 bg-white">
+                  <div className="text-sm text-blue-800 italic">
                     No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
                   </div>
                 </CardContent>
               </Card>
               
-              <Card className="bg-orange-100">
-                <CardHeader className="bg-orange-200 pb-2">
-                  <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
+              <Card className="bg-white border border-blue-100">
+                <CardHeader className="bg-blue-50 pb-2">
+                  <CardTitle className="text-lg font-medium text-blue-900">
+                    Compliance Conditions
+                  </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-4 bg-orange-100">
-                  <div className="text-sm text-orange-800 italic">
+                <CardContent className="pt-4 bg-white">
+                  <div className="text-sm text-blue-800 italic">
                     No compliance conditions found. Conditions will appear here when the approval letter is parsed.
                   </div>
                 </CardContent>
@@ -410,7 +426,7 @@ const ProcessorAssistViewer = () => {
           )}
         </div>
         
-        <div className="bg-orange-50 rounded-lg shadow-sm p-6 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <EmailConditionsParser 
             clientLastName={loanApplication?.lastName || ''} 
             loanNumber={loanApplication?.loanId || ''}
@@ -425,50 +441,50 @@ const ProcessorAssistViewer = () => {
   const renderTaskTabs = () => {
     return (
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid grid-cols-4 mb-4 bg-orange-50">
+        <TabsList className="grid grid-cols-4 mb-4 bg-white border border-blue-100">
           <TabsTrigger 
             value="employment" 
-            className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
           >
             Employment Verification
           </TabsTrigger>
           <TabsTrigger 
             value="title" 
-            className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
           >
             Title Order
           </TabsTrigger>
           <TabsTrigger 
             value="appraisal" 
-            className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
           >
             Appraisal Order
           </TabsTrigger>
           <TabsTrigger 
             value="documents" 
-            className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
           >
             Document Handler
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="employment" className="bg-orange-50 rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-800">Employment Verification Tasks</h2>
+        <TabsContent value="employment" className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Employment Verification Tasks</h2>
           {renderTaskSection("employment")}
         </TabsContent>
         
-        <TabsContent value="title" className="bg-orange-50 rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-800">Title Order Tasks</h2>
+        <TabsContent value="title" className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Title Order Tasks</h2>
           {renderTaskSection("title")}
         </TabsContent>
         
-        <TabsContent value="appraisal" className="bg-orange-50 rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-800">Appraisal Order Tasks</h2>
+        <TabsContent value="appraisal" className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Appraisal Order Tasks</h2>
           {renderTaskSection("appraisal")}
         </TabsContent>
         
-        <TabsContent value="documents" className="bg-orange-50 rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-semibold mb-4 text-orange-800">Document Handler Tasks</h2>
+        <TabsContent value="documents" className="bg-white rounded-lg shadow-sm p-6">
+          <h2 className="text-xl font-semibold mb-4 text-blue-800">Document Handler Tasks</h2>
           {renderTaskSection("documents")}
         </TabsContent>
       </Tabs>
@@ -483,9 +499,9 @@ const ProcessorAssistViewer = () => {
         return <ConversationSection leadId={id || ''} />;
       case "orderServices":
         return (
-          <div className="text-center py-12 bg-orange-50 rounded-lg shadow-sm">
-            <h3 className="text-lg font-medium text-orange-800 mb-2">Select a Service to Order</h3>
-            <p className="text-orange-600">Please select a service from the sidebar to order.</p>
+          <div className="text-center py-12 bg-white rounded-lg shadow-sm">
+            <h3 className="text-lg font-medium text-blue-800 mb-2">Select a Service to Order</h3>
+            <p className="text-blue-600">Please select a service from the sidebar to order.</p>
           </div>
         );
       case "employmentVerification":
@@ -527,7 +543,7 @@ const ProcessorAssistViewer = () => {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen bg-gray-50 w-full">
+      <div className="flex min-h-screen bg-white w-full">
         <ProcessorSidebar 
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
@@ -541,9 +557,9 @@ const ProcessorAssistViewer = () => {
               onClick={goBack} 
               variant="outline" 
               size="sm" 
-              className="rounded-full"
+              className="rounded-full border-blue-300 hover:bg-blue-50"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" />
+              <ArrowLeft className="mr-2 h-4 w-4 text-blue-700" />
               Back to Processor Assist
             </Button>
           </div>
@@ -552,7 +568,7 @@ const ProcessorAssistViewer = () => {
 
           <div className="flex-1 p-6">
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <h1 className="text-2xl font-bold text-orange-700 mb-2">
+              <h1 className="text-2xl font-bold text-blue-700 mb-2">
                 {activeSection === "conditions" ? "Processor Tasks" : 
                  activeSection === "conversation" ? "Client Conversations" :
                  activeSection === "orderServices" ? "Order Services" :
@@ -560,7 +576,7 @@ const ProcessorAssistViewer = () => {
                  activeSection === "titleOrder" ? "Title Order" : "Processor Tasks"}: {loanApplication.loanId}
               </h1>
               <div className="flex flex-wrap items-center mt-2 text-sm text-gray-600">
-                <span className="px-2 py-1 rounded-full bg-orange-100 text-orange-800 text-xs font-medium mr-2 mb-1">
+                <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium mr-2 mb-1">
                   {loanApplication.loanStatus}
                 </span>
                 <span className="mr-4 mb-1">{loanApplication.firstName} {loanApplication.lastName}</span>

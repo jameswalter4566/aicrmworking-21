@@ -42,18 +42,18 @@ const ProcessorSidebar = ({
   return (
     <Sidebar
       variant="floating"
-      className="bg-orange-50 border-orange-200"
+      className="bg-white border border-blue-100"
     >
-      <SidebarHeader className="p-4 border-b border-orange-200">
+      <SidebarHeader className="p-4 border-b border-blue-100">
         <div className="flex flex-col">
-          <span className="font-bold text-orange-800">{loanId || `Loan ID: ML-${id}`}</span>
-          <span className="text-sm text-orange-600">{borrowerName || "Borrower"}</span>
+          <span className="font-bold text-blue-800">{loanId || `Loan ID: ML-${id}`}</span>
+          <span className="text-sm text-blue-600">{borrowerName || "Borrower"}</span>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-orange-700">Processor Tools</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-blue-700">Processor Tools</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -61,7 +61,7 @@ const ProcessorSidebar = ({
                   isActive={activeSection === "conditions"} 
                   onClick={() => onSectionChange("conditions")}
                   tooltip="Borrower's Conditions"
-                  className="text-orange-900 hover:bg-orange-200"
+                  className="text-blue-900 hover:bg-blue-100"
                 >
                   <FileText className="h-5 w-5" />
                   <span>Conditions</span>
@@ -73,7 +73,7 @@ const ProcessorSidebar = ({
                   isActive={activeSection === "conversation"} 
                   onClick={() => onSectionChange("conversation")}
                   tooltip="Client Conversations"
-                  className="text-orange-900 hover:bg-orange-200"
+                  className="text-blue-900 hover:bg-blue-100"
                 >
                   <MessageSquare className="h-5 w-5" />
                   <span>Conversation</span>
@@ -85,7 +85,7 @@ const ProcessorSidebar = ({
                   isActive={activeSection === "orderServices"}
                   onClick={() => onSectionChange("orderServices")}
                   tooltip="Order Services"
-                  className="text-orange-900 hover:bg-orange-200"
+                  className="text-blue-900 hover:bg-blue-100"
                 >
                   <Package className="h-5 w-5" />
                   <span>Order Services</span>
@@ -97,13 +97,13 @@ const ProcessorSidebar = ({
 
         {activeSection === "orderServices" && (
           <SidebarGroup>
-            <SidebarGroupLabel className="text-orange-700">Available Services</SidebarGroupLabel>
+            <SidebarGroupLabel className="text-blue-700">Available Services</SidebarGroupLabel>
             <SidebarGroupContent>
               <div className="space-y-2 px-2">
                 <Button
                   variant="outline"
                   onClick={() => onSectionChange("employmentVerification")}
-                  className="w-full justify-start text-sm bg-white border-orange-200 hover:bg-orange-100"
+                  className="w-full justify-start text-sm bg-white border-blue-200 hover:bg-blue-50 text-blue-900"
                 >
                   <Briefcase className="h-4 w-4 mr-2" />
                   <span>Employment Verification</span>
@@ -113,7 +113,7 @@ const ProcessorSidebar = ({
                 <Button
                   variant="outline"
                   onClick={() => onSectionChange("titleOrder")}
-                  className="w-full justify-start text-sm bg-white border-orange-200 hover:bg-orange-100"
+                  className="w-full justify-start text-sm bg-white border-blue-200 hover:bg-blue-50 text-blue-900"
                 >
                   <BookText className="h-4 w-4 mr-2" />
                   <span>Title Order</span>
@@ -125,12 +125,12 @@ const ProcessorSidebar = ({
         )}
       </SidebarContent>
 
-      <SidebarFooter className="p-4 border-t border-orange-200">
+      <SidebarFooter className="p-4 border-t border-blue-100">
         <Button 
           variant="outline" 
           size="sm" 
           onClick={() => navigate('/processor')}
-          className="w-full bg-white border-orange-300 hover:bg-orange-100"
+          className="w-full bg-white border-blue-300 hover:bg-blue-50 text-blue-900"
         >
           Back to Processor Hub
         </Button>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,11 +24,8 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   
   useEffect(() => {
-    // For demonstration purposes, we'll use mock data
-    // In a real implementation, you would fetch conversation data from Supabase
     setLoading(true);
     
-    // Simulate API call delay
     setTimeout(() => {
       const mockMessages: Message[] = [
         {
@@ -83,38 +79,38 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
   
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-orange-800 mb-4">
+      <h2 className="text-xl font-bold text-blue-800 mb-4">
         Client Conversations
       </h2>
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-        <TabsList className="bg-orange-100 mb-4">
+        <TabsList className="bg-white border border-blue-100 mb-4">
           <TabsTrigger 
             value="all" 
-            className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
           >
             <Phone className="mr-2 h-4 w-4" />
             All Communications
           </TabsTrigger>
           <TabsTrigger 
             value="email" 
-            className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
           >
             <Mail className="mr-2 h-4 w-4" />
             Email
           </TabsTrigger>
           <TabsTrigger 
             value="sms" 
-            className="data-[state=active]:bg-orange-200 data-[state=active]:text-orange-900"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
           >
             <MessageSquare className="mr-2 h-4 w-4" />
             SMS
           </TabsTrigger>
         </TabsList>
         
-        <Card className="bg-orange-50">
-          <CardHeader className="bg-orange-100 pb-2">
-            <CardTitle className="text-lg font-medium text-orange-900">
+        <Card className="bg-white border border-blue-100">
+          <CardHeader className="bg-blue-50 pb-2">
+            <CardTitle className="text-lg font-medium text-blue-900">
               {activeTab === "all" ? "All Communications" : 
                activeTab === "email" ? "Email Communications" : "SMS Communications"}
             </CardTitle>
@@ -122,7 +118,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
           <CardContent className="pt-4">
             {loading ? (
               <div className="flex justify-center py-8">
-                <div className="animate-spin h-8 w-8 rounded-full border-4 border-orange-300 border-t-orange-600"></div>
+                <div className="animate-spin h-8 w-8 rounded-full border-4 border-blue-300 border-t-blue-600"></div>
               </div>
             ) : filteredMessages.length > 0 ? (
               <ScrollArea className="h-[400px] pr-4">
@@ -135,13 +131,13 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
                       <div 
                         className={`max-w-[80%] ${
                           message.sender === "client" 
-                            ? "bg-white" 
-                            : "bg-orange-200"
+                            ? "bg-white border border-blue-100" 
+                            : "bg-blue-100 border border-blue-200"
                         } p-4 rounded-lg shadow-sm`}
                       >
                         <div className="flex items-center gap-2 mb-2">
                           {message.sender === "client" && (
-                            <Avatar className="h-6 w-6 bg-orange-300">
+                            <Avatar className="h-6 w-6 bg-blue-300">
                               <span className="text-xs">C</span>
                             </Avatar>
                           )}
@@ -149,8 +145,8 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
                             variant="outline" 
                             className={`text-xs px-2 py-0 ${
                               message.type === "email" 
-                                ? "bg-blue-100 text-blue-800 hover:bg-blue-100" 
-                                : "bg-green-100 text-green-800 hover:bg-green-100"
+                                ? "bg-blue-50 text-blue-800 hover:bg-blue-100" 
+                                : "bg-blue-50 text-blue-800 hover:bg-blue-100"
                             }`}
                           >
                             {message.type === "email" ? (
@@ -164,12 +160,12 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
                             {formatDate(message.timestamp)}
                           </span>
                           {message.sender === "ai" && (
-                            <Avatar className="h-6 w-6 bg-orange-600">
+                            <Avatar className="h-6 w-6 bg-blue-600">
                               <span className="text-xs">AI</span>
                             </Avatar>
                           )}
                         </div>
-                        <p className={`text-sm ${message.sender === "client" ? "text-orange-900" : "text-orange-900"}`}>
+                        <p className={`text-sm ${message.sender === "client" ? "text-blue-900" : "text-blue-900"}`}>
                           {message.content}
                         </p>
                       </div>
@@ -178,7 +174,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
                 </div>
               </ScrollArea>
             ) : (
-              <div className="text-sm text-orange-800 italic py-8 text-center">
+              <div className="text-sm text-blue-800 italic py-8 text-center">
                 No {activeTab === "all" ? "conversations" : `${activeTab} messages`} found for this borrower yet.
               </div>
             )}
