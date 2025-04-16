@@ -123,85 +123,110 @@ serve(async (req) => {
     console.log(`Created dialing session with ID: ${sessionData.id}`);
     
     try {
-      // Add leads to dialing session - ensuring lead_id is properly handled as UUID
-      const sessionLeads = listLeads.map(lead => {
-        // Check if the lead_id is actually a UUID
-        let leadIdAsUuid;
-        try {
-          // If it's already a valid UUID, use it as is
-          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lead.lead_id)) {
-            leadIdAsUuid = lead.lead_id;
-          } else {
-            // For non-UUID lead IDs, we need to use a different approach
-            // We'll create a UUID based on the lead_id value
-            // For now, we'll skip these leads and log an error
-            console.error(`Lead ID ${lead.lead_id} is not a valid UUID and cannot be added to the session`);
-            return null;
-          }
-        } catch (e) {
-          console.error(`Error processing lead ID ${lead.lead_id}:`, e);
-          return null;
-        }
-        
-        if (!leadIdAsUuid) return null;
-        
-        return {
-          session_id: sessionData.id,
-          lead_id: leadIdAsUuid,
-          status: 'queued'
-        };
-      }).filter(lead => lead !== null); // Remove any null entries
+      // First, get the leads table structure to check the ID type
+      const { data: leadFields, error: fieldsError } = await supabaseClient
+        .rpc('get_table_definition', { table_name: 'leads' });
       
-      if (sessionLeads.length === 0) {
-        console.error('No valid lead UUIDs found to add to session');
+      if (fieldsError) {
+        console.warn('Could not determine leads table structure:', fieldsError);
+      }
+      
+      console.log(`Working with leads - preparing to process ${listLeads.length} leads`);
+      
+      // Create the session leads, adapting to whatever ID format we have
+      let processedLeads = 0;
+      let validLeads = [];
+      
+      // Get actual lead data to convert to string uuid format if needed
+      for (const item of listLeads) {
+        try {
+          // Get the actual lead record to store in session
+          const { data: leadData, error: leadError } = await supabaseClient
+            .from('leads')
+            .select('id')
+            .eq('id', item.lead_id)
+            .maybeSingle();
+          
+          if (leadError) {
+            console.error(`Error fetching lead ${item.lead_id}:`, leadError);
+            continue;
+          }
+          
+          if (!leadData) {
+            console.error(`Lead ${item.lead_id} not found`);
+            continue;
+          }
+          
+          // Create session lead entry - converting number ID to string if necessary
+          validLeads.push({
+            session_id: sessionData.id,
+            lead_id: String(item.lead_id),
+            status: 'queued'
+          });
+          
+          processedLeads++;
+        } catch (e) {
+          console.error(`Error processing lead ID ${item.lead_id}:`, e);
+        }
+      }
+      
+      if (validLeads.length === 0) {
+        console.error('No valid leads could be processed to add to session');
         return new Response(
           JSON.stringify({ 
             error: 'No valid leads to add to session', 
-            message: 'Lead IDs must be valid UUIDs'
+            message: 'Could not process any lead IDs in a compatible format'
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      const { error: sessionLeadsError } = await supabaseClient
-        .from('dialing_session_leads')
-        .insert(sessionLeads);
+      // Insert in smaller batches if needed to avoid potential issues
+      const BATCH_SIZE = 50;
+      let insertedCount = 0;
       
-      if (sessionLeadsError) {
-        console.error('Error adding leads to session:', sessionLeadsError);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Failed to add leads to dialing session', 
-            details: sessionLeadsError 
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+      for (let i = 0; i < validLeads.length; i += BATCH_SIZE) {
+        const batch = validLeads.slice(i, i + BATCH_SIZE);
+        const { error: insertError, count } = await supabaseClient
+          .from('dialing_session_leads')
+          .insert(batch)
+          .select('count');
+        
+        if (insertError) {
+          console.error(`Error inserting batch ${i / BATCH_SIZE + 1}:`, insertError);
+        } else {
+          insertedCount += batch.length;
+          console.log(`Inserted batch ${i / BATCH_SIZE + 1} with ${batch.length} leads`);
+        }
       }
       
-      console.log(`Added ${sessionLeads.length} leads to dialing session ${sessionData.id}`);
+      console.log(`Successfully added ${insertedCount} leads to dialing session ${sessionData.id}`);
+      
+      return new Response(
+        JSON.stringify({ 
+          sessionId: sessionData.id, 
+          totalLeads: insertedCount,
+          message: "Dialing session created successfully" 
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     } catch (error) {
       console.error('Error processing leads for session:', error);
       return new Response(
         JSON.stringify({ 
           error: 'Error processing leads',
-          details: error.message || String(error)
+          details: error instanceof Error ? error.message : String(error)
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    return new Response(
-      JSON.stringify({ 
-        sessionId: sessionData.id, 
-        totalLeads: listLeads.length,
-        message: "Dialing session created successfully" 
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal Server Error', details: error.message || String(error) }),
+      JSON.stringify({ 
+        error: 'Internal Server Error', 
+        details: error instanceof Error ? error.message : String(error)
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
