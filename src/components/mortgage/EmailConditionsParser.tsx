@@ -1,11 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Search, FileText, Info, AlertCircle, Save, RefreshCcw } from 'lucide-react';
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ConditionItem, LoanCondition, ConditionStatus } from './ConditionItem';
 
 interface ParsedConditions {
@@ -35,9 +36,9 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   const [foundEmails, setFoundEmails] = useState<any[]>([]);
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
-  const [conditions, setConditions] = useState<ParsedConditions | null>(null);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [lastError, setLastError] = useState<{code: string, message: string, details?: any} | null>(null);
+  const [emailSender, setEmailSender] = useState<string>('');
 
   useEffect(() => {
     if (leadId) {
@@ -51,7 +52,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     
     try {
       console.log(`Fetching existing conditions for lead ID: ${leadId}`);
-      // Fix: Pass leadId as part of the URL instead of as a query parameter
       const { data, error } = await supabase.functions.invoke(`retrieve-conditions?leadId=${leadId}`, {
         body: {}
       });
@@ -68,7 +68,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       }
 
       if (data.success && data.conditions) {
-        setConditions(data.conditions);
         
         if (onConditionsFound) {
           onConditionsFound(data.conditions);
@@ -101,8 +100,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   };
 
   const saveConditions = async () => {
-    if (!conditions || !leadId) {
-      toast.error("No conditions to save or missing lead ID");
+    if (!leadId) {
+      toast.error("Missing lead ID");
       return;
     }
     
@@ -114,7 +113,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       const { data, error } = await supabase.functions.invoke('update-conditions', {
         body: { 
           leadId,
-          conditions
+          conditions: onConditionsFound
         }
       });
       
@@ -154,53 +153,21 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     }
   };
 
-  const handleFileUpload = (conditionId: string | undefined, file: File) => {
-    if (!conditionId || !conditions) return;
-    
-    const updatedConditions = {...conditions};
-    
-    ["masterConditions", "generalConditions", "priorToFinalConditions", "complianceConditions"].forEach((category) => {
-      const categoryKey = category as keyof ParsedConditions;
-      updatedConditions[categoryKey] = updatedConditions[categoryKey].map(condition => {
-        if (condition.id === conditionId) {
-          return {
-            ...condition,
-            fileName: file.name,
-            fileUrl: URL.createObjectURL(file),
-            conditionStatus: "ready_for_download"
-          };
-        }
-        return condition;
-      });
-    });
-    
-    setConditions(updatedConditions);
-    if (onConditionsFound) {
-      onConditionsFound(updatedConditions);
-    }
-    
-    toast.success(`File "${file.name}" uploaded and ready for download`);
-  };
-
-  const handleDownloadFile = (conditionId: string | undefined, fileUrl: string) => {
-    window.open(fileUrl, '_blank');
-  };
-
   const searchEmails = async () => {
     setIsSearching(true);
     setFoundEmails([]);
     setSelectedEmailId(null);
     setSelectedAttachmentId(null);
-    setConditions(null);
-    setLastError(null);
     setSearchQuery(null);
+    setLastError(null);
     
     try {
-      console.log('Searching for approval emails with:', { clientLastName, loanNumber });
+      console.log('Searching for approval emails with:', { clientLastName, loanNumber, emailSender });
       const { data, error } = await supabase.functions.invoke('search-approval-emails', {
         body: { 
           clientLastName,
-          loanNumber
+          loanNumber,
+          emailSender: emailSender.trim() || undefined
         }
       });
       
@@ -256,7 +223,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     setSelectedEmailId(emailId);
     setSelectedAttachmentId(attachmentId);
     setIsParsing(true);
-    setConditions(null);
     setLastError(null);
     
     try {
@@ -281,7 +247,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
 
       if (data.success && data.conditions) {
         const enhancedConditions = processConditionsWithStatus(data.conditions);
-        setConditions(enhancedConditions);
         
         if (onConditionsFound) {
           onConditionsFound(enhancedConditions);
@@ -379,70 +344,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     };
   };
 
-  // Original function maintained for reference but not used
-  const originalParseDocument = parseDocument;
-  const enhancedParseDocument = async (emailId: string, attachmentId: string) => {
-    setSelectedEmailId(emailId);
-    setSelectedAttachmentId(attachmentId);
-    setIsParsing(true);
-    setConditions(null);
-    setLastError(null);
-    
-    try {
-      console.log(`Parsing document from email ${emailId}, attachment ${attachmentId}`);
-      const { data, error } = await supabase.functions.invoke('parse-approval-document', {
-        body: { 
-          emailId,
-          attachmentId
-        }
-      });
-      
-      if (error) {
-        console.error("Error parsing document:", error);
-        toast.error("Failed to parse document");
-        setLastError({
-          code: 'FUNCTION_ERROR',
-          message: "Failed to invoke parse-approval-document function",
-          details: error
-        });
-        return;
-      }
-
-      if (data.success && data.conditions) {
-        const enhancedConditions = processConditionsWithStatus(data.conditions);
-        setConditions(enhancedConditions);
-        
-        if (onConditionsFound) {
-          onConditionsFound(enhancedConditions);
-        }
-        
-        toast.success("Successfully extracted conditions from document");
-        console.log("Document parsed successfully:", enhancedConditions);
-      } else {
-        const errorMessage = data.error || "Failed to parse conditions from document";
-        toast.error(errorMessage);
-        setLastError({
-          code: data.code || 'UNKNOWN_ERROR',
-          message: errorMessage,
-          details: data.details || {}
-        });
-        console.error("Parsing failed:", data);
-      }
-    } catch (err: any) {
-      console.error("Error in parseDocument:", err);
-      toast.error("An unexpected error occurred");
-      setLastError({
-        code: 'UNEXPECTED_ERROR',
-        message: err.message || "An unexpected error occurred",
-        details: err
-      });
-    } finally {
-      setIsParsing(false);
-    }
-  };
-
-  const parseDocumentWithStatus = enhancedParseDocument;
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -465,7 +366,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
               
               <Button 
                 onClick={saveConditions} 
-                disabled={isSaving || !conditions}
+                disabled={isSaving}
                 className="bg-green-600 hover:bg-green-700"
               >
                 {isSaving ? (
@@ -491,22 +392,43 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </div>
       </div>
       
-      <div className="bg-white border border-blue-200 p-4 rounded-md text-sm text-blue-800">
-        <h3 className="font-medium mb-2 flex items-center">
+      <div className="bg-white border border-blue-200 p-4 rounded-md">
+        <h3 className="font-medium mb-4 flex items-center text-blue-800">
           <Info className="h-4 w-4 mr-1" /> Search Parameters
         </h3>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <span className="font-medium">Client Last Name:</span> {clientLastName || <span className="italic text-blue-500">Not provided</span>}
+            <Label htmlFor="clientLastName" className="text-blue-700">Client Last Name</Label>
+            <Input 
+              id="clientLastName" 
+              value={clientLastName} 
+              disabled 
+              className="bg-gray-50 text-gray-600"
+            />
           </div>
           <div>
-            <span className="font-medium">Loan Number:</span> {loanNumber || <span className="italic text-blue-500">Not provided</span>}
+            <Label htmlFor="loanNumber" className="text-blue-700">Loan Number</Label>
+            <Input 
+              id="loanNumber" 
+              value={loanNumber} 
+              className="border-blue-200 focus:border-blue-400"
+            />
+          </div>
+          <div>
+            <Label htmlFor="emailSender" className="text-blue-700">Email Sender Contains</Label>
+            <Input 
+              id="emailSender" 
+              value={emailSender} 
+              onChange={e => setEmailSender(e.target.value)} 
+              placeholder="e.g. underwriting@bank.com"
+              className="border-blue-200 focus:border-blue-400"
+            />
           </div>
         </div>
         {searchQuery && (
-          <div className="mt-2 pt-2 border-t border-blue-200">
-            <span className="font-medium">Gmail Search Query:</span> 
-            <code className="ml-2 p-1 bg-blue-50 rounded text-blue-700">{searchQuery}</code>
+          <div className="mt-4 pt-3 border-t border-blue-200">
+            <span className="font-medium text-sm text-blue-700">Gmail Search Query:</span> 
+            <code className="ml-2 p-1 bg-blue-50 rounded text-blue-700 text-xs">{searchQuery}</code>
           </div>
         )}
       </div>
@@ -576,7 +498,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </Card>
       )}
       
-      {!isSearching && foundEmails.length === 0 && !conditions && (
+      {!isSearching && foundEmails.length === 0 && (
         <Card className="bg-white border border-blue-100">
           <CardContent className="p-6 text-center">
             <Search className="mx-auto h-12 w-12 text-blue-300 mb-3" />

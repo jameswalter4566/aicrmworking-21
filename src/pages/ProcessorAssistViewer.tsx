@@ -267,172 +267,116 @@ const ProcessorAssistViewer = () => {
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-xl font-bold text-blue-700 mb-4">
-            Borrower's Remaining Conditions
-          </h2>
-          
-          {parsedConditions ? (
-            <div className="grid grid-cols-1 gap-6">
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900 flex items-center">
-                    Master Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  {parsedConditions.masterConditions?.length > 0 ? (
-                    <div className="space-y-2">
-                      {parsedConditions.masterConditions.map((condition, index) => (
-                        <ConditionItem 
-                          key={condition.id || `master-${index}`}
-                          condition={condition}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-blue-800 italic">
-                      No master conditions found.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900">
-                    General Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  {parsedConditions.generalConditions?.length > 0 ? (
-                    <div className="space-y-2">
-                      {parsedConditions.generalConditions.map((condition, index) => (
-                        <ConditionItem 
-                          key={condition.id || `general-${index}`}
-                          condition={condition}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-blue-800 italic">
-                      No general conditions found.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900">
-                    Prior to Final Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  {parsedConditions.priorToFinalConditions?.length > 0 ? (
-                    <div className="space-y-2">
-                      {parsedConditions.priorToFinalConditions.map((condition, index) => (
-                        <ConditionItem 
-                          key={condition.id || `final-${index}`}
-                          condition={condition}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-blue-800 italic">
-                      No prior to final conditions found.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900">
-                    Compliance Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  {parsedConditions.complianceConditions?.length > 0 ? (
-                    <div className="space-y-2">
-                      {parsedConditions.complianceConditions.map((condition, index) => (
-                        <ConditionItem 
-                          key={condition.id || `compliance-${index}`}
-                          condition={condition}
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-sm text-blue-800 italic">
-                      No compliance conditions found.
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-6">
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900">
-                    Master Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  <div className="text-sm text-blue-800 italic">
-                    No master conditions found. Conditions will appear here when the approval letter is parsed.
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900">
-                    General Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  <div className="text-sm text-blue-800 italic">
-                    No general conditions found. Conditions will appear here when the approval letter is parsed.
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900">
-                    Prior to Final Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  <div className="text-sm text-blue-800 italic">
-                    No prior to final conditions found. Conditions will appear here when the approval letter is parsed.
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="bg-white border border-blue-100">
-                <CardHeader className="bg-blue-50 pb-2">
-                  <CardTitle className="text-lg font-medium text-blue-900">
-                    Compliance Conditions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 bg-white">
-                  <div className="text-sm text-blue-800 italic">
-                    No compliance conditions found. Conditions will appear here when the approval letter is parsed.
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <EmailConditionsParser 
             clientLastName={loanApplication?.lastName || ''} 
             loanNumber={loanApplication?.loanId || ''}
             leadId={loanApplication?.id || ''}
             onConditionsFound={handleConditionsFound}
           />
+        </div>
+        
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-xl font-bold text-blue-700 mb-4">
+            Borrower's Remaining Conditions
+          </h2>
+          
+          <div className="grid grid-cols-1 gap-6">
+            <Card className="bg-white border border-blue-100">
+              <CardHeader className="bg-blue-50 pb-2">
+                <CardTitle className="text-lg font-medium text-blue-900 flex items-center">
+                  Master Conditions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 bg-white">
+                {parsedConditions?.masterConditions?.length > 0 ? (
+                  <div className="space-y-2">
+                    {parsedConditions.masterConditions.map((condition, index) => (
+                      <ConditionItem 
+                        key={condition.id || `master-${index}`}
+                        condition={condition}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-blue-800 italic">
+                    No master conditions found.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white border border-blue-100">
+              <CardHeader className="bg-blue-50 pb-2">
+                <CardTitle className="text-lg font-medium text-blue-900">
+                  General Conditions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 bg-white">
+                {parsedConditions?.generalConditions?.length > 0 ? (
+                  <div className="space-y-2">
+                    {parsedConditions.generalConditions.map((condition, index) => (
+                      <ConditionItem 
+                        key={condition.id || `general-${index}`}
+                        condition={condition}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-blue-800 italic">
+                    No general conditions found.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white border border-blue-100">
+              <CardHeader className="bg-blue-50 pb-2">
+                <CardTitle className="text-lg font-medium text-blue-900">
+                  Prior to Final Conditions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 bg-white">
+                {parsedConditions?.priorToFinalConditions?.length > 0 ? (
+                  <div className="space-y-2">
+                    {parsedConditions.priorToFinalConditions.map((condition, index) => (
+                      <ConditionItem 
+                        key={condition.id || `final-${index}`}
+                        condition={condition}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-blue-800 italic">
+                    No prior to final conditions found.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white border border-blue-100">
+              <CardHeader className="bg-blue-50 pb-2">
+                <CardTitle className="text-lg font-medium text-blue-900">
+                  Compliance Conditions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 bg-white">
+                {parsedConditions?.complianceConditions?.length > 0 ? (
+                  <div className="space-y-2">
+                    {parsedConditions.complianceConditions.map((condition, index) => (
+                      <ConditionItem 
+                        key={condition.id || `compliance-${index}`}
+                        condition={condition}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-blue-800 italic">
+                    No compliance conditions found.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     );
