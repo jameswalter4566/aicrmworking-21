@@ -68,6 +68,10 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 
+[functions.sms-retrieve-messages-for-lead]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
 [functions.sms-contact-management]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]

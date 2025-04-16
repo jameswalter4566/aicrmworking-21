@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Phone, Send } from "lucide-react";
+import { Mail, MessageSquare, Phone, Send, RefreshCw } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,8 @@ interface Message {
   type: "email" | "sms";
   content: string;
   sender: "client" | "ai";
-  timestamp: Date;
+  timestamp: Date | string;
+  phone?: string;
 }
 
 interface ConversationSectionProps {
@@ -27,12 +28,15 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
   const [activeTab, setActiveTab] = useState<"all" | "email" | "sms">("all");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [sendingGreeting, setSendingGreeting] = useState<boolean>(false);
   const [leadInfo, setLeadInfo] = useState<{
     firstName?: string;
     lastName?: string;
     phone1?: string;
   } | null>(null);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     setLoading(true);
@@ -41,42 +45,15 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
     fetchLeadInfo();
     
     // Fetch messages
-    setTimeout(() => {
-      const mockMessages: Message[] = [
-        {
-          id: "1",
-          type: "email",
-          content: "Hello, I'm interested in refinancing my home. Can you tell me what rates are available?",
-          sender: "client",
-          timestamp: new Date(2025, 3, 12, 10, 30)
-        },
-        {
-          id: "2",
-          type: "email",
-          content: "Hi there! Current rates for a 30-year fixed refinance are around 5.25% with 0 points for borrowers with good credit. Would you like me to check what specific rate you might qualify for?",
-          sender: "ai",
-          timestamp: new Date(2025, 3, 12, 10, 45)
-        },
-        {
-          id: "3",
-          type: "sms",
-          content: "Yes, please. My credit score is around 750.",
-          sender: "client",
-          timestamp: new Date(2025, 3, 12, 14, 15)
-        },
-        {
-          id: "4",
-          type: "sms",
-          content: "Great! With a 750 credit score, you could qualify for a 5.125% rate on a 30-year fixed refinance. Would you like to schedule a call to discuss this further?",
-          sender: "ai",
-          timestamp: new Date(2025, 3, 12, 14, 20)
-        }
-      ];
-      
-      setMessages(mockMessages);
-      setLoading(false);
-    }, 1000);
+    fetchMessages();
   }, [leadId]);
+  
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
   
   const fetchLeadInfo = async () => {
     try {
@@ -90,6 +67,87 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
     } catch (error) {
       console.error("Error fetching lead info:", error);
       toast.error("Could not retrieve client information");
+    }
+  };
+  
+  const fetchMessages = async () => {
+    try {
+      setLoading(true);
+      
+      if (!leadId) {
+        console.error("No lead ID provided");
+        return;
+      }
+      
+      // Attempt to fetch real messages from our API
+      const { data, error } = await supabase.functions.invoke('sms-retrieve-messages-for-lead', {
+        body: { leadId }
+      });
+      
+      if (error) {
+        throw new Error(`Error fetching messages: ${error.message}`);
+      }
+      
+      if (data.success && data.messages && data.messages.length > 0) {
+        // Format incoming messages to match our expected format
+        const formattedMessages = data.messages.map((msg: any) => ({
+          id: msg.id,
+          type: msg.type,
+          content: msg.content,
+          sender: msg.sender,
+          timestamp: new Date(msg.timestamp),
+          phone: msg.phone
+        }));
+        
+        // Sort by timestamp (oldest first)
+        const sortedMessages = formattedMessages.sort((a: Message, b: Message) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+        
+        setMessages(sortedMessages);
+        console.log("Retrieved messages:", sortedMessages);
+      } else {
+        console.log("No messages found, using sample data");
+        // Fallback to sample data if no messages found
+        const mockMessages: Message[] = [
+          {
+            id: "1",
+            type: "email",
+            content: "Hello, I'm interested in refinancing my home. Can you tell me what rates are available?",
+            sender: "client",
+            timestamp: new Date(2025, 3, 12, 10, 30)
+          },
+          {
+            id: "2",
+            type: "email",
+            content: "Hi there! Current rates for a 30-year fixed refinance are around 5.25% with 0 points for borrowers with good credit. Would you like me to check what specific rate you might qualify for?",
+            sender: "ai",
+            timestamp: new Date(2025, 3, 12, 10, 45)
+          },
+          {
+            id: "3",
+            type: "sms",
+            content: "Yes, please. My credit score is around 750.",
+            sender: "client",
+            timestamp: new Date(2025, 3, 12, 14, 15)
+          },
+          {
+            id: "4",
+            type: "sms",
+            content: "Great! With a 750 credit score, you could qualify for a 5.125% rate on a 30-year fixed refinance. Would you like to schedule a call to discuss this further?",
+            sender: "ai",
+            timestamp: new Date(2025, 3, 12, 14, 20)
+          }
+        ];
+        
+        setMessages(mockMessages);
+      }
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      toast.error("Could not retrieve messages");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
   
@@ -129,7 +187,8 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
         type: "sms",
         content: message,
         sender: "ai",
-        timestamp: new Date()
+        timestamp: new Date(),
+        phone: leadInfo.phone1
       };
       
       setMessages(prev => [...prev, newMessage]);
@@ -144,7 +203,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
         }
       });
       
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error sending greeting SMS:", error);
       toast.error("Failed to send greeting message");
     } finally {
@@ -152,8 +211,14 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
     }
   };
   
-  const formatDate = (date: Date) => {
-    return date.toLocaleString('en-US', {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchMessages();
+  };
+  
+  const formatDate = (date: Date | string) => {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return dateObj.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
       hour: 'numeric',
@@ -172,22 +237,42 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
         <h2 className="text-xl font-bold text-blue-800">
           Client Conversations
         </h2>
-        <Button 
-          onClick={sendTemplateGreeting}
-          disabled={sendingGreeting || !leadInfo?.phone1}
-          className="bg-blue-700 hover:bg-blue-800 text-white"
-        >
-          {sendingGreeting ? (
-            <>
-              <span className="animate-spin mr-2">⏳</span> Sending...
-            </>
-          ) : (
-            <>
-              <Send className="mr-2 h-4 w-4" /> 
-              Send Template Greeting
-            </>
-          )}
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleRefresh}
+            disabled={refreshing}
+            variant="outline"
+            className="border-blue-300 hover:bg-blue-50 text-blue-700"
+          >
+            {refreshing ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> 
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" /> 
+                Refresh Messages
+              </>
+            )}
+          </Button>
+          <Button 
+            onClick={sendTemplateGreeting}
+            disabled={sendingGreeting || !leadInfo?.phone1}
+            className="bg-blue-700 hover:bg-blue-800 text-white"
+          >
+            {sendingGreeting ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span> Sending...
+              </>
+            ) : (
+              <>
+                <Send className="mr-2 h-4 w-4" /> 
+                Send Template Greeting
+              </>
+            )}
+          </Button>
+        </div>
       </div>
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
@@ -275,9 +360,18 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
                         <p className={`text-sm ${message.sender === "client" ? "text-blue-900" : "text-blue-900"}`}>
                           {message.content}
                         </p>
+                        
+                        {message.phone && (
+                          <div className="mt-2">
+                            <span className="text-xs text-gray-500">
+                              Phone: {message.phone}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
+                  <div ref={messagesEndRef} />
                 </div>
               </ScrollArea>
             ) : (

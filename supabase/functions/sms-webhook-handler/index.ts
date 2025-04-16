@@ -53,8 +53,8 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Store the webhook data in the database if needed
-    const { error } = await supabase.from('sms_webhooks').insert({
+    // Store the webhook data in the database
+    const { data, error } = await supabase.from('sms_webhooks').insert({
       webhook_data: payload,
       processed: false,
       received_at: new Date().toISOString()
@@ -62,16 +62,47 @@ serve(async (req) => {
 
     if (error) {
       console.error("Error storing webhook data:", error);
+      return new Response(
+        JSON.stringify({ error: 'Failed to store webhook data' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Process the webhook based on the event type
-    // This is where you would add your SMS Gateway specific webhook handling logic
-    // ...
+    const phoneNumber = payload.number || payload.from;
+    
+    if (phoneNumber) {
+      // Try to find a matching lead based on phone number
+      const formattedPhone = phoneNumber.replace(/\D/g, '');
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select('id, firstName, lastName')
+        .or(`phone1.ilike.%${formattedPhone}%,phone2.ilike.%${formattedPhone}%`)
+        .limit(1);
+        
+      if (!leadError && leadData && leadData.length > 0) {
+        const lead = leadData[0];
+        
+        // Add a lead activity for this incoming message
+        await supabase.from('lead_activities').insert({
+          lead_id: lead.id,
+          type: 'sms_received',
+          description: `Received SMS from ${lead.firstName} ${lead.lastName}: "${payload.message?.substring(0, 50)}${payload.message?.length > 50 ? '...' : ''}"`
+        });
+        
+        console.log(`SMS matched to lead: ${lead.id} (${lead.firstName} ${lead.lastName})`);
+      } else {
+        console.log(`No matching lead found for phone: ${phoneNumber}`);
+      }
+    }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Webhook received successfully'
+        message: 'Webhook received and processed successfully'
       }),
       {
         status: 200,
