@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -30,7 +29,7 @@ Deno.serve(async (req) => {
       
       console.log('Direct SQL test result:', error ? 'Error' : 'Success');
 
-      // Execute the function update directly
+      // Execute the function update directly - UPDATED to include notes column
       const directSqlResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/create_or_replace_function`, {
         method: 'POST',
         headers: {
@@ -41,7 +40,7 @@ Deno.serve(async (req) => {
         body: JSON.stringify({
           function_definition: `
           CREATE OR REPLACE FUNCTION public.get_next_session_lead(p_session_id uuid)
-          RETURNS TABLE(id uuid, lead_id text, session_id uuid, status text, priority integer, attempt_count integer)
+          RETURNS TABLE(id uuid, lead_id text, session_id uuid, status text, priority integer, attempt_count integer, notes text)
           LANGUAGE plpgsql
           SECURITY DEFINER
           AS $function$
@@ -49,7 +48,7 @@ Deno.serve(async (req) => {
             RETURN QUERY
             UPDATE dialing_session_leads
             SET status = 'in_progress',
-                attempt_count = attempt_count + 1
+                attempt_count = dialing_session_leads.attempt_count + 1
             WHERE dialing_session_leads.id = (
               SELECT dialing_session_leads.id 
               FROM dialing_session_leads
@@ -60,7 +59,8 @@ Deno.serve(async (req) => {
               FOR UPDATE SKIP LOCKED
             )
             RETURNING dialing_session_leads.id, dialing_session_leads.lead_id, dialing_session_leads.session_id, 
-                    dialing_session_leads.status, dialing_session_leads.priority, dialing_session_leads.attempt_count;
+                    dialing_session_leads.status, dialing_session_leads.priority, dialing_session_leads.attempt_count,
+                    dialing_session_leads.notes;
           END;
           $function$;
           `
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({
             query: `
             CREATE OR REPLACE FUNCTION public.get_next_session_lead(p_session_id uuid)
-            RETURNS TABLE(id uuid, lead_id text, session_id uuid, status text, priority integer, attempt_count integer)
+            RETURNS TABLE(id uuid, lead_id text, session_id uuid, status text, priority integer, attempt_count integer, notes text)
             LANGUAGE plpgsql
             SECURITY DEFINER
             AS $function$
@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
               RETURN QUERY
               UPDATE dialing_session_leads
               SET status = 'in_progress',
-                  attempt_count = attempt_count + 1
+                  attempt_count = dialing_session_leads.attempt_count + 1
               WHERE dialing_session_leads.id = (
                 SELECT dialing_session_leads.id 
                 FROM dialing_session_leads
@@ -103,7 +103,8 @@ Deno.serve(async (req) => {
                 FOR UPDATE SKIP LOCKED
               )
               RETURNING dialing_session_leads.id, dialing_session_leads.lead_id, dialing_session_leads.session_id, 
-                      dialing_session_leads.status, dialing_session_leads.priority, dialing_session_leads.attempt_count;
+                      dialing_session_leads.status, dialing_session_leads.priority, dialing_session_leads.attempt_count,
+                      dialing_session_leads.notes;
             END;
             $function$;
             `
@@ -117,11 +118,11 @@ Deno.serve(async (req) => {
         console.error('SQL update error:', sqlUpdateError);
       }
     } else {
-      // If execute_sql exists, use it
+      // If execute_sql exists, use it - UPDATED to include notes column
       const { data, error } = await supabase.rpc('execute_sql', {
         sql: `
           CREATE OR REPLACE FUNCTION public.get_next_session_lead(p_session_id uuid)
-          RETURNS TABLE(id uuid, lead_id text, session_id uuid, status text, priority integer, attempt_count integer)
+          RETURNS TABLE(id uuid, lead_id text, session_id uuid, status text, priority integer, attempt_count integer, notes text)
           LANGUAGE plpgsql
           SECURITY DEFINER
           AS $function$
@@ -129,7 +130,7 @@ Deno.serve(async (req) => {
             RETURN QUERY
             UPDATE dialing_session_leads
             SET status = 'in_progress',
-                attempt_count = attempt_count + 1
+                attempt_count = dialing_session_leads.attempt_count + 1
             WHERE dialing_session_leads.id = (
               SELECT dialing_session_leads.id 
               FROM dialing_session_leads
@@ -140,7 +141,8 @@ Deno.serve(async (req) => {
               FOR UPDATE SKIP LOCKED
             )
             RETURNING dialing_session_leads.id, dialing_session_leads.lead_id, dialing_session_leads.session_id, 
-                    dialing_session_leads.status, dialing_session_leads.priority, dialing_session_leads.attempt_count;
+                    dialing_session_leads.status, dialing_session_leads.priority, dialing_session_leads.attempt_count,
+                    dialing_session_leads.notes;
           END;
           $function$;
         `

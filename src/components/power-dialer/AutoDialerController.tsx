@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,6 +8,17 @@ interface AutoDialerControllerProps {
   sessionId: string | null;
   isActive: boolean;
   onCallComplete: () => void;
+}
+
+// Define a new interface for the lead returned by get_next_session_lead
+interface SessionLead {
+  id: string;
+  lead_id: string;
+  session_id: string;
+  status: string;
+  priority: number;
+  attempt_count: number;
+  notes?: string; // Add the notes field as optional
 }
 
 export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
@@ -65,14 +77,16 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       // Parse the lead notes to get the original lead ID and phone number
       let leadDetails = { id: null, phone1: null };
       try {
-        const notesData = JSON.parse(nextLead[0].notes || '{}');
+        // Cast nextLead[0] to SessionLead to avoid TypeScript error
+        const lead = nextLead[0] as SessionLead;
+        const notesData = lead.notes ? JSON.parse(lead.notes) : {};
         const originalLeadId = notesData.originalLeadId;
         const phoneNumber = notesData.phone;
         
         if (phoneNumber) {
           // If we have the phone number in the notes, use it directly
           return {
-            ...nextLead[0],
+            ...lead,
             phoneNumber: phoneNumber
           };
         } else if (originalLeadId) {
