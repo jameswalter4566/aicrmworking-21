@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,10 +30,17 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       if (!nextLead || nextLead.length === 0) return null;
       
       // Get lead details including phone number
+      // Note: lead_id could be a string or number, we'll convert to number for the query
+      const leadIdAsNumber = parseInt(nextLead[0].lead_id);
+      
+      if (isNaN(leadIdAsNumber)) {
+        throw new Error(`Invalid lead ID: ${nextLead[0].lead_id}`);
+      }
+      
       const { data: leadDetails, error: leadError } = await supabase
         .from('leads')
         .select('id, phone1')
-        .eq('id', nextLead[0].lead_id)
+        .eq('id', leadIdAsNumber)
         .single();
       
       if (leadError || !leadDetails) {
@@ -90,7 +98,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       await twilioService.initializeTwilioDevice();
       
       // Make the call using phone number from lead
-      const callResult = await twilioService.makeCall(lead.phoneNumber, String(lead.lead_id));
+      // Pass lead_id as string to the twilio service
+      const callResult = await twilioService.makeCall(lead.phoneNumber, lead.lead_id);
       
       if (!callResult.success) {
         toast({
