@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
+import DialerQueueMonitor from './DialerQueueMonitor';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -201,6 +202,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               </div>
             ) : !currentCall ? (
               <div className="space-y-4">
+                {sessionId && <DialerQueueMonitor sessionId={sessionId} />}
+                
                 {error && (
                   <Alert variant="destructive">
                     <AlertTitle>Error</AlertTitle>

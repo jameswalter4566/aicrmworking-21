@@ -78,6 +78,7 @@ export type Database = {
           last_attempt: string | null
           lead_id: string
           notes: string | null
+          priority: number | null
           session_id: string
           status: string
           updated_at: string
@@ -90,6 +91,7 @@ export type Database = {
           last_attempt?: string | null
           lead_id: string
           notes?: string | null
+          priority?: number | null
           session_id: string
           status?: string
           updated_at?: string
@@ -102,6 +104,7 @@ export type Database = {
           last_attempt?: string | null
           lead_id?: string
           notes?: string | null
+          priority?: number | null
           session_id?: string
           status?: string
           updated_at?: string
@@ -850,10 +853,37 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      session_queue_stats: {
+        Row: {
+          completed_count: number | null
+          in_progress_count: number | null
+          queued_count: number | null
+          session_id: string | null
+          total_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialing_session_leads_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "dialing_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
-      [_ in never]: never
+      get_next_session_lead: {
+        Args: { p_session_id: string }
+        Returns: {
+          id: string
+          lead_id: string
+          session_id: string
+          status: string
+          priority: number
+          attempt_count: number
+        }[]
+      }
     }
     Enums: {
       dialing_session_status: "active" | "paused" | "completed"
