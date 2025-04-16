@@ -48,9 +48,12 @@ serve(async (req) => {
       );
     }
     
+    // Format phone number if needed (remove non-numeric chars)
+    const formattedNumber = phoneNumber.replace(/\D/g, '');
+    
     // Prepare the request payload
     const payload = {
-      number: phoneNumber,
+      number: formattedNumber,
       message: message,
       schedule: schedule || null,
       key: smsApiKey,
@@ -60,10 +63,8 @@ serve(async (req) => {
       prioritize: prioritize ? 1 : 0
     };
 
-    console.log("Sending single SMS with payload:", JSON.stringify({
-      ...payload,
-      key: "[REDACTED]" // Log without exposing the API key
-    }));
+    console.log(`Sending single SMS to: ${formattedNumber}`);
+    console.log("SMS content:", message.substring(0, 50) + (message.length > 50 ? '...' : ''));
 
     try {
       const response = await fetch(`${smsServerUrl}/services/send.php`, {

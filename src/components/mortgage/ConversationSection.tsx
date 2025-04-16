@@ -1,10 +1,15 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Phone } from "lucide-react";
+import { Mail, MessageSquare, Phone, Send } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { leadProfileService } from "@/services/leadProfile";
 
 interface Message {
   id: string;
@@ -22,10 +27,20 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
   const [activeTab, setActiveTab] = useState<"all" | "email" | "sms">("all");
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [sendingGreeting, setSendingGreeting] = useState<boolean>(false);
+  const [leadInfo, setLeadInfo] = useState<{
+    firstName?: string;
+    lastName?: string;
+    phone1?: string;
+  } | null>(null);
   
   useEffect(() => {
     setLoading(true);
     
+    // Fetch lead information
+    fetchLeadInfo();
+    
+    // Fetch messages
     setTimeout(() => {
       const mockMessages: Message[] = [
         {
@@ -63,6 +78,80 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
     }, 1000);
   }, [leadId]);
   
+  const fetchLeadInfo = async () => {
+    try {
+      const leadData = await leadProfileService.getLeadById(leadId);
+      setLeadInfo({
+        firstName: leadData.firstName,
+        lastName: leadData.lastName,
+        phone1: leadData.phone1
+      });
+      console.log("Retrieved lead info:", leadData);
+    } catch (error) {
+      console.error("Error fetching lead info:", error);
+      toast.error("Could not retrieve client information");
+    }
+  };
+  
+  const sendTemplateGreeting = async () => {
+    if (!leadInfo?.phone1) {
+      toast.error("No phone number available for this client");
+      return;
+    }
+    
+    try {
+      setSendingGreeting(true);
+      
+      // Prepare greeting message with client's name
+      const clientName = leadInfo.firstName || "Client";
+      const message = `Welcome ${clientName}! Your loan application has officially been submitted to underwriting! Now sit tight over the next 24-48 hours your documents will be reviewed by underwriting. I will message you as soon as we have your approval letter!`;
+      
+      // Call the SMS send function
+      const { data, error } = await supabase.functions.invoke('sms-send-single', {
+        body: { 
+          phoneNumber: leadInfo.phone1,
+          message,
+          prioritize: true
+        }
+      });
+      
+      if (error) {
+        throw new Error(`Error sending SMS: ${error.message}`);
+      }
+      
+      if (!data.success) {
+        throw new Error(data.error || "Failed to send message");
+      }
+      
+      // Add message to the local state
+      const newMessage: Message = {
+        id: data.messageId || `temp-${Date.now()}`,
+        type: "sms",
+        content: message,
+        sender: "ai",
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, newMessage]);
+      toast.success("Greeting message sent successfully!");
+      
+      // Optional: Record this action in lead activities or notes
+      await supabase.functions.invoke('add-lead-note', {
+        body: {
+          leadId,
+          content: `Sent welcome SMS: "${message.substring(0, 50)}..."`,
+          createdBy: "System"
+        }
+      });
+      
+    } catch (error) {
+      console.error("Error sending greeting SMS:", error);
+      toast.error("Failed to send greeting message");
+    } finally {
+      setSendingGreeting(false);
+    }
+  };
+  
   const formatDate = (date: Date) => {
     return date.toLocaleString('en-US', {
       month: 'short',
@@ -79,9 +168,27 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
   
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold text-blue-800 mb-4">
-        Client Conversations
-      </h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-blue-800">
+          Client Conversations
+        </h2>
+        <Button 
+          onClick={sendTemplateGreeting}
+          disabled={sendingGreeting || !leadInfo?.phone1}
+          className="bg-blue-700 hover:bg-blue-800 text-white"
+        >
+          {sendingGreeting ? (
+            <>
+              <span className="animate-spin mr-2">⏳</span> Sending...
+            </>
+          ) : (
+            <>
+              <Send className="mr-2 h-4 w-4" /> 
+              Send Template Greeting
+            </>
+          )}
+        </Button>
+      </div>
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
         <TabsList className="bg-white border border-blue-100 mb-4">
