@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import DialerQueueMonitor from './DialerQueueMonitor';
+import AutoDialerController from './AutoDialerController';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -45,6 +46,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [autoDialerActive, setAutoDialerActive] = useState(false);
   const { user } = useAuth();
   
   useEffect(() => {
@@ -135,12 +137,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       
       console.log("Dialing session created successfully:", data);
       setSessionId(data.sessionId);
+      setAutoDialerActive(true);
       
       toast.success("Dialing Session Started", {
         description: `Preparing to dial ${data.totalLeads} leads`
       });
-      
-      // TODO: Implement next steps for actually starting the dialing process
     } catch (error) {
       console.error("Unexpected error in handleBeginDialing:", error);
       setError("An unexpected error occurred. Please try again later.");
@@ -151,6 +152,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       setIsCreatingSession(false);
     }
   };
+
+  const handleCallComplete = useCallback(() => {
+    // This will be called after each call is completed
+    console.log('Call completed, ready for next call');
+  }, []);
 
   return (
     <>
@@ -202,7 +208,16 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               </div>
             ) : !currentCall ? (
               <div className="space-y-4">
-                {sessionId && <DialerQueueMonitor sessionId={sessionId} />}
+                {sessionId && (
+                  <>
+                    <DialerQueueMonitor sessionId={sessionId} />
+                    <AutoDialerController 
+                      sessionId={sessionId}
+                      isActive={autoDialerActive}
+                      onCallComplete={handleCallComplete}
+                    />
+                  </>
+                )}
                 
                 {error && (
                   <Alert variant="destructive">
