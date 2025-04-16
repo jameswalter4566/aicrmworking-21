@@ -22,14 +22,15 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     if (!sessionId) return null;
     
     try {
-      const { data: lead, error } = await supabase.rpc('get_next_session_lead', {
+      const { data, error } = await supabase.rpc('get_next_session_lead', {
         p_session_id: sessionId
       });
       
       if (error) throw error;
-      if (!lead) return null;
+      if (!data || data.length === 0) return null;
       
-      return lead;
+      // Return the first item from the array
+      return data[0];
     } catch (error) {
       console.error('Error getting next lead:', error);
       return null;
@@ -54,8 +55,12 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       // Initialize Twilio device if needed
       await twilioService.initializeTwilioDevice();
       
+      // Get the lead phone number and id
+      const phoneNumber = lead.phone_number;
+      const leadId = lead.id;
+      
       // Make the call using existing Twilio service
-      const callResult = await twilioService.makeCall(lead.phone_number, lead.id);
+      const callResult = await twilioService.makeCall(phoneNumber, leadId);
       
       if (!callResult.success) {
         toast({
@@ -71,11 +76,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             status: 'failed',
             notes: callResult.error
           })
-          .eq('id', lead.id);
+          .eq('id', leadId);
       } else {
         toast({
           title: "Call Initiated",
-          description: `Calling lead ${lead.id}`
+          description: `Calling lead ${leadId}`
         });
       }
 
