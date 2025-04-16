@@ -379,6 +379,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     };
   };
 
+  // Original function maintained for reference but not used
   const originalParseDocument = parseDocument;
   const enhancedParseDocument = async (emailId: string, attachmentId: string) => {
     setSelectedEmailId(emailId);
@@ -445,7 +446,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold text-orange-800">Email Conditions Parser</h2>
+        <h2 className="text-xl font-semibold text-blue-800">Email Conditions Parser</h2>
         <div className="flex space-x-2">
           {leadId && (
             <>
@@ -453,7 +454,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                 onClick={() => fetchExistingConditions(leadId.toString())} 
                 disabled={isLoading}
                 variant="outline"
-                className="bg-white hover:bg-gray-50 border-orange-400 text-orange-700"
+                className="bg-white hover:bg-gray-50 border-blue-400 text-blue-700"
               >
                 {isLoading ? (
                   <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading...</>
@@ -479,7 +480,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
           <Button 
             onClick={searchEmails} 
             disabled={isSearching}
-            className="bg-orange-600 hover:bg-orange-700"
+            className="bg-blue-600 hover:bg-blue-700"
           >
             {isSearching ? (
               <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Searching Emails</>
@@ -490,22 +491,22 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </div>
       </div>
       
-      <div className="bg-orange-50 p-4 rounded-md text-sm text-orange-800">
+      <div className="bg-white border border-blue-200 p-4 rounded-md text-sm text-blue-800">
         <h3 className="font-medium mb-2 flex items-center">
           <Info className="h-4 w-4 mr-1" /> Search Parameters
         </h3>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <span className="font-medium">Client Last Name:</span> {clientLastName || <span className="italic text-orange-500">Not provided</span>}
+            <span className="font-medium">Client Last Name:</span> {clientLastName || <span className="italic text-blue-500">Not provided</span>}
           </div>
           <div>
-            <span className="font-medium">Loan Number:</span> {loanNumber || <span className="italic text-orange-500">Not provided</span>}
+            <span className="font-medium">Loan Number:</span> {loanNumber || <span className="italic text-blue-500">Not provided</span>}
           </div>
         </div>
         {searchQuery && (
-          <div className="mt-2 pt-2 border-t border-orange-200">
+          <div className="mt-2 pt-2 border-t border-blue-200">
             <span className="font-medium">Gmail Search Query:</span> 
-            <code className="ml-2 p-1 bg-orange-100 rounded text-orange-700">{searchQuery}</code>
+            <code className="ml-2 p-1 bg-blue-50 rounded text-blue-700">{searchQuery}</code>
           </div>
         )}
       </div>
@@ -529,22 +530,22 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       )}
       
       {foundEmails.length > 0 && (
-        <Card className="bg-orange-100">
-          <CardHeader className="bg-orange-200 pb-2">
-            <CardTitle className="text-lg font-medium text-orange-900">
+        <Card className="bg-white border border-blue-200">
+          <CardHeader className="bg-blue-50 pb-2">
+            <CardTitle className="text-lg font-medium text-blue-900">
               Found {foundEmails.length} Potential Approval Emails
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-4 bg-orange-100">
+          <CardContent className="pt-4 bg-white">
             <div className="space-y-3">
               {foundEmails.map((email) => (
-                <div key={email.id} className="bg-white rounded-lg p-3 shadow-sm">
+                <div key={email.id} className="bg-white rounded-lg p-3 shadow-sm border border-blue-100">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h4 className="font-medium text-orange-900">{email.subject}</h4>
-                      <p className="text-sm text-orange-700">From: {email.from}</p>
-                      <p className="text-xs text-orange-600">Date: {formatDate(email.date)}</p>
-                      <p className="text-sm mt-2 text-orange-800">{email.snippet}...</p>
+                      <h4 className="font-medium text-blue-900">{email.subject}</h4>
+                      <p className="text-sm text-blue-700">From: {email.from}</p>
+                      <p className="text-xs text-blue-600">Date: {formatDate(email.date)}</p>
+                      <p className="text-sm mt-2 text-blue-800">{email.snippet}...</p>
                     </div>
                     <div className="ml-4 flex flex-col gap-2">
                       {email.attachments.map((attachment: any) => (
@@ -554,7 +555,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                           onClick={() => parseDocument(email.id, attachment.id)}
                           disabled={isParsing && selectedEmailId === email.id && selectedAttachmentId === attachment.id}
                           variant="outline"
-                          className="flex items-center space-x-2 border-orange-400 text-orange-800"
+                          className="flex items-center space-x-2 border-blue-400 text-blue-800"
                         >
                           {isParsing && selectedEmailId === email.id && selectedAttachmentId === attachment.id ? (
                             <><Loader2 className="h-3 w-3 animate-spin" /> <span>Parsing...</span></>
@@ -563,7 +564,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                           )}
                         </Button>
                       ))}
-                      <p className="text-xs text-orange-600 mt-1">
+                      <p className="text-xs text-blue-600 mt-1">
                         {email.attachments.length} PDF attachment(s)
                       </p>
                     </div>
@@ -575,112 +576,12 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </Card>
       )}
       
-      {conditions && (
-        <div className="grid grid-cols-1 gap-6">
-          <Card className="bg-orange-100">
-            <CardHeader className="bg-orange-200 pb-2">
-              <CardTitle className="text-lg font-medium text-orange-900">Master Conditions</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 bg-orange-100">
-              {conditions.masterConditions.length > 0 ? (
-                <div className="space-y-2">
-                  {conditions.masterConditions.map((condition, index) => (
-                    <ConditionItem 
-                      key={condition.id || `master-${index}`}
-                      condition={condition}
-                      onUploadFile={handleFileUpload}
-                      onDownloadFile={handleDownloadFile}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-orange-800 italic">
-                  No master conditions found in the document.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-orange-100">
-            <CardHeader className="bg-orange-200 pb-2">
-              <CardTitle className="text-lg font-medium text-orange-900">General Conditions</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 bg-orange-100">
-              {conditions.generalConditions.length > 0 ? (
-                <div className="space-y-2">
-                  {conditions.generalConditions.map((condition, index) => (
-                    <ConditionItem 
-                      key={condition.id || `general-${index}`}
-                      condition={condition}
-                      onUploadFile={handleFileUpload}
-                      onDownloadFile={handleDownloadFile}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-orange-800 italic">
-                  No general conditions found in the document.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-orange-100">
-            <CardHeader className="bg-orange-200 pb-2">
-              <CardTitle className="text-lg font-medium text-orange-900">Prior to Final Conditions</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 bg-orange-100">
-              {conditions.priorToFinalConditions.length > 0 ? (
-                <div className="space-y-2">
-                  {conditions.priorToFinalConditions.map((condition, index) => (
-                    <ConditionItem 
-                      key={condition.id || `final-${index}`}
-                      condition={condition}
-                      onUploadFile={handleFileUpload}
-                      onDownloadFile={handleDownloadFile}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-orange-800 italic">
-                  No prior to final conditions found in the document.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-orange-100">
-            <CardHeader className="bg-orange-200 pb-2">
-              <CardTitle className="text-lg font-medium text-orange-900">Compliance Conditions</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-4 bg-orange-100">
-              {conditions.complianceConditions.length > 0 ? (
-                <div className="space-y-2">
-                  {conditions.complianceConditions.map((condition, index) => (
-                    <ConditionItem 
-                      key={condition.id || `compliance-${index}`}
-                      condition={condition}
-                      onUploadFile={handleFileUpload}
-                      onDownloadFile={handleDownloadFile}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-sm text-orange-800 italic">
-                  No compliance conditions found in the document.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-      
       {!isSearching && foundEmails.length === 0 && !conditions && (
-        <Card className="bg-orange-50">
+        <Card className="bg-white border border-blue-100">
           <CardContent className="p-6 text-center">
-            <Search className="mx-auto h-12 w-12 text-orange-300 mb-3" />
-            <h3 className="text-lg font-medium text-orange-800 mb-2">No Email Search Results</h3>
-            <p className="text-orange-600">
+            <Search className="mx-auto h-12 w-12 text-blue-300 mb-3" />
+            <h3 className="text-lg font-medium text-blue-800 mb-2">No Email Search Results</h3>
+            <p className="text-blue-600">
               Click "Search Approval Emails" to find and parse approval documents for this borrower.
             </p>
           </CardContent>
