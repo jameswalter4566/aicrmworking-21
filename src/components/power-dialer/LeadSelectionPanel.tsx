@@ -5,7 +5,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Pagination, PaginationContent, PaginationItem } from "@/components/ui/pagination";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Play } from 'lucide-react';
+import { Play, Save } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface Lead {
   id: string;
@@ -17,9 +18,10 @@ interface Lead {
 
 interface LeadSelectionPanelProps {
   onLeadsSelected: (leads: Lead[]) => void;
+  listId: string;
 }
 
-const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected }) => {
+const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected, listId }) => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(0);
@@ -71,6 +73,35 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
     setSelectedLeads(newSelected);
   };
 
+  const handleSaveToList = async () => {
+    if (selectedLeads.size === 0) {
+      toast.error("Please select at least one lead");
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.functions.invoke('add-leads-to-calling-list', {
+        body: {
+          listId,
+          leadIds: Array.from(selectedLeads)
+        }
+      });
+
+      if (error) {
+        console.error('Error adding leads:', error);
+        toast.error("Failed to add leads to list");
+        return;
+      }
+
+      toast.success(`Added ${data.addedCount} leads to list`);
+      setSelectedLeads(new Set());
+      onLeadsSelected([]);
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error("Failed to add leads to list");
+    }
+  };
+
   const handleStartDialing = () => {
     const selectedLeadsList = leads.filter(lead => selectedLeads.has(lead.id));
     onLeadsSelected(selectedLeadsList);
@@ -95,13 +126,22 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
         </span>
 
         {selectedLeads.size > 0 && (
-          <Button 
-            onClick={handleStartDialing}
-            className="bg-green-500 hover:bg-green-600 text-white"
-          >
-            <Play className="mr-2 h-4 w-4" />
-            Start Dialing
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              onClick={handleSaveToList}
+              className="bg-green-500 hover:bg-green-600 text-white"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Save to List
+            </Button>
+            <Button 
+              onClick={() => onLeadsSelected(leads.filter(lead => selectedLeads.has(lead.id)))}
+              className="bg-crm-blue hover:bg-crm-blue/90 text-white"
+            >
+              <Play className="mr-2 h-4 w-4" />
+              Start Dialing
+            </Button>
+          </div>
         )}
       </div>
 
