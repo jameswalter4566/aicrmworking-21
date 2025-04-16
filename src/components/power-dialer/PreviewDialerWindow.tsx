@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,11 +94,33 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const handleBeginDialing = async () => {
     if (!selectedListId) return;
     
-    // Fixed: Using the correct toast API format for sonner
-    toast.success("Starting Dialer", {
-      description: "Beginning to dial through selected list..."
-    });
-    // Additional dialing logic will be added here
+    try {
+      const { data, error } = await supabase.functions.invoke('start-dialing-session', {
+        body: { 
+          listId: selectedListId,
+          sessionName: `Dialing Session for ${callingLists.find(list => list.id === selectedListId)?.name}`
+        }
+      });
+      
+      if (error) {
+        console.error("Error starting dialing session:", error);
+        toast.error("Failed to start dialing session", {
+          description: error.message || "Unable to begin dialing"
+        });
+        return;
+      }
+      
+      toast.success("Dialing Session Started", {
+        description: `Preparing to dial ${data.totalLeads} leads`
+      });
+      
+      // TODO: Implement next steps for actually starting the dialing process
+    } catch (error) {
+      console.error("Unexpected error in handleBeginDialing:", error);
+      toast.error("Failed to start dialing session", {
+        description: "An unexpected error occurred"
+      });
+    }
   };
 
   return (

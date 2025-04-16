@@ -69,6 +69,106 @@ export type Database = {
         }
         Relationships: []
       }
+      dialing_session_leads: {
+        Row: {
+          attempt_count: number | null
+          created_at: string
+          disposition: string | null
+          id: string
+          last_attempt: string | null
+          lead_id: string
+          notes: string | null
+          session_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number | null
+          created_at?: string
+          disposition?: string | null
+          id?: string
+          last_attempt?: string | null
+          lead_id: string
+          notes?: string | null
+          session_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number | null
+          created_at?: string
+          disposition?: string | null
+          id?: string
+          last_attempt?: string | null
+          lead_id?: string
+          notes?: string | null
+          session_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialing_session_leads_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "dialing_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dialing_sessions: {
+        Row: {
+          attempted_leads: number | null
+          calling_list_id: string
+          completed_leads: number | null
+          created_at: string
+          created_by: string
+          end_time: string | null
+          id: string
+          name: string
+          start_time: string | null
+          status: Database["public"]["Enums"]["dialing_session_status"]
+          total_leads: number | null
+          updated_at: string
+        }
+        Insert: {
+          attempted_leads?: number | null
+          calling_list_id: string
+          completed_leads?: number | null
+          created_at?: string
+          created_by: string
+          end_time?: string | null
+          id?: string
+          name: string
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["dialing_session_status"]
+          total_leads?: number | null
+          updated_at?: string
+        }
+        Update: {
+          attempted_leads?: number | null
+          calling_list_id?: string
+          completed_leads?: number | null
+          created_at?: string
+          created_by?: string
+          end_time?: string | null
+          id?: string
+          name?: string
+          start_time?: string | null
+          status?: Database["public"]["Enums"]["dialing_session_status"]
+          total_leads?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dialing_sessions_calling_list_id_fkey"
+            columns: ["calling_list_id"]
+            isOneToOne: false
+            referencedRelation: "calling_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_activities: {
         Row: {
           description: string
@@ -756,7 +856,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      dialing_session_status: "active" | "paused" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -871,6 +971,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      dialing_session_status: ["active", "paused", "completed"],
+    },
   },
 } as const
