@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ListPlus, Users, TagIcon, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ListPlus, Users, TagIcon, ChevronDown, ChevronUp, Loader2, Trash2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -90,11 +90,31 @@ const CallingListsPanel = () => {
     navigate(`/calling-list/${listId}`);
   };
 
+  const handleDeleteList = async (listId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    try {
+      const { error } = await supabase.functions.invoke('delete-calling-list', {
+        body: { listId }
+      });
+      
+      if (error) {
+        console.error("Error deleting calling list:", error);
+        toast.error("Failed to delete calling list");
+        return;
+      }
+      
+      toast.success("Calling list deleted successfully");
+      fetchCallingLists();
+    } catch (error) {
+      console.error("Error in handleDeleteList:", error);
+      toast.error("Failed to delete calling list");
+    }
+  };
+
   return (
     <div className="mb-6 bg-white rounded-2xl border border-gray-200 p-4">
-      <div 
-        className="flex items-center justify-between mb-4 p-3 rounded-t-lg bg-mortgage-purple"
-      >
+      <div className="flex items-center justify-between mb-4 p-3 rounded-t-lg bg-mortgage-purple">
         <div className="flex items-center gap-2">
           <TagIcon className="h-5 w-5 text-white" strokeWidth={2} />
           <h2 className="font-semibold text-white">Calling Lists</h2>
@@ -166,10 +186,20 @@ const CallingListsPanel = () => {
                       Created {new Date(list.createdAt).toLocaleDateString()}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="bg-gray-100">
-                    <Users className="h-3 w-3 mr-1" />
-                    {list.leadCount}
-                  </Badge>
+                  <div className="flex items-start gap-2">
+                    <Badge variant="secondary" className="bg-gray-100">
+                      <Users className="h-3 w-3 mr-1" />
+                      {list.leadCount}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                      onClick={(e) => handleDeleteList(list.id, e)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="mt-3">
                   <Button 
