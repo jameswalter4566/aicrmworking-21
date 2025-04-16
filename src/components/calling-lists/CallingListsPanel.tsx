@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ListPlus, Users, Phone, Tag, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ListPlus, Users, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -177,7 +177,6 @@ const CallingListsPanel = () => {
                     size="sm" 
                     className="w-full border-gray-300 hover:bg-crm-blue hover:text-white"
                   >
-                    <Phone className="h-3 w-3 mr-1" />
                     View List
                   </Button>
                 </div>
