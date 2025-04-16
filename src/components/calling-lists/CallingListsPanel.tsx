@@ -115,37 +115,37 @@ const CallingListsPanel = () => {
               )}
             </Button>
           </CollapsibleTrigger>
+          
+          <CollapsibleContent className="mb-4 p-3 border border-gray-200 rounded-lg bg-gray-50 mt-4">
+            <form onSubmit={handleCreateList} className="flex gap-3 items-center">
+              <div className="flex-1">
+                <Input
+                  placeholder="Enter list name..."
+                  value={newListName}
+                  onChange={(e) => setNewListName(e.target.value)}
+                  className="focus:ring-mortgage-purple focus:border-mortgage-purple"
+                  disabled={isSubmitting}
+                  required
+                />
+              </div>
+              <Button 
+                type="submit"
+                className="bg-mortgage-purple hover:bg-mortgage-purple/80 text-white"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  'Save List'
+                )}
+              </Button>
+            </form>
+          </CollapsibleContent>
         </Collapsible>
       </div>
-
-      <CollapsibleContent className="mb-4 p-3 border border-gray-200 rounded-lg bg-gray-50">
-        <form onSubmit={handleCreateList} className="flex gap-3 items-center">
-          <div className="flex-1">
-            <Input
-              placeholder="Enter list name..."
-              value={newListName}
-              onChange={(e) => setNewListName(e.target.value)}
-              className="focus:ring-mortgage-purple focus:border-mortgage-purple"
-              disabled={isSubmitting}
-              required
-            />
-          </div>
-          <Button 
-            type="submit"
-            className="bg-mortgage-purple hover:bg-mortgage-purple/80 text-white"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              'Save List'
-            )}
-          </Button>
-        </form>
-      </CollapsibleContent>
 
       {isLoading ? (
         <div className="flex justify-center items-center py-6">

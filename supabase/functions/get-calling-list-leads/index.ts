@@ -102,9 +102,7 @@ serve(async (req) => {
       firstName: lead.first_name,
       lastName: lead.last_name,
       phone1: lead.phone1,
-      email: lea
-
-d.email
+      email: lead.email
     }));
     
     return new Response(
