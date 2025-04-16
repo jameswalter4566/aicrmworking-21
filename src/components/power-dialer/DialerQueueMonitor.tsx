@@ -10,8 +10,10 @@ import {
   Clock, 
   CheckCircle, 
   AlertCircle,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface QueueStats {
   queued_count: number;
@@ -28,12 +30,15 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [noLeadsError, setNoLeadsError] = useState<string | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
 
   const fetchQueueStats = async () => {
     if (!sessionId) return;
     
     setIsLoading(true);
     try {
+      console.log(`Fetching queue stats for session: ${sessionId}, attempt #${attemptCount + 1}`);
+      
       // Query session_queue_stats view first
       const { data, error } = await supabase
         .from('session_queue_stats')
@@ -63,13 +68,21 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
         console.log("No stats in view, querying leads table directly");
         const { data: leadsData, error: leadsError } = await supabase
           .from('dialing_session_leads')
-          .select('status')
+          .select('status, lead_id, notes')
           .eq('session_id', sessionId);
           
         if (leadsError) throw leadsError;
         
         if (!leadsData || leadsData.length === 0) {
           console.log("No leads found for session:", sessionId);
+          
+          // If this is fewer than 3 attempts, we might just need to wait for DB to update
+          if (attemptCount < 3) {
+            setAttemptCount(prev => prev + 1);
+            setNoLeadsError("Loading leads, please wait...");
+            return;
+          }
+          
           setNoLeadsError("No leads found in this dialing session");
           setStats({
             queued_count: 0,
@@ -86,6 +99,7 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
         const completed = leadsData?.filter(lead => lead.status === 'completed').length || 0;
         
         console.log(`Direct count - Queued: ${queued}, In Progress: ${inProgress}, Completed: ${completed}, Total: ${leadsData.length}`);
+        console.log("Sample lead:", leadsData[0]);
         
         setStats({
           queued_count: queued,
@@ -143,14 +157,41 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
     }
   }, [sessionId]);
 
+  // Extra effect to handle initial loading delays
+  useEffect(() => {
+    if (sessionId && attemptCount > 0 && attemptCount < 3) {
+      const timer = setTimeout(() => {
+        fetchQueueStats();
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [sessionId, attemptCount]);
+
   if (!sessionId) return null;
+
+  const handleRefresh = () => {
+    setAttemptCount(0);
+    fetchQueueStats();
+    toast.info("Refreshing queue data...");
+  };
 
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-medium flex items-center justify-between">
           Queue Status
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          <div className="flex items-center gap-2">
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRefresh}
+              className="h-8 w-8 p-0"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
