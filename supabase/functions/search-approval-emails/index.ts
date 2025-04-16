@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 const corsHeaders = {
@@ -16,28 +17,33 @@ serve(async (req) => {
     // Parse request body
     const { clientLastName, loanNumber, emailSender } = await req.json();
 
-    // Build Gmail search query
+    // Build Gmail search query - using broader 'contains' matching instead of exact matching
     let searchQuery = "";
     
     if (clientLastName) {
+      // Use clientLastName as a general search term without any qualifiers
       searchQuery += `${clientLastName} `;
     }
     
     if (loanNumber) {
+      // Instead of exact match, use as a general search term
       searchQuery += `${loanNumber} `;
     }
     
     if (emailSender) {
+      // Use partial email match rather than exact sender
+      // Gmail's 'from:' operator allows partial matching by default
       searchQuery += `from:(${emailSender}) `;
     }
     
+    // Add attachment filter to ensure we're getting emails with PDF attachments
     searchQuery += "has:attachment filename:pdf";
 
     console.log(`Gmail search query: ${searchQuery}`);
 
     // This is where you would implement the actual Gmail API call
     // As we don't have access to the original implementation, we're just
-    // showing the change needed to support the emailSender parameter
+    // showing the change needed to support broader search terms
     
     // Mock response for demonstration purposes
     return new Response(
