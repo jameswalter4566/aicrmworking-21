@@ -123,81 +123,80 @@ serve(async (req) => {
     console.log(`Created dialing session with ID: ${sessionData.id}`);
     
     try {
-      // First, get the leads table structure to check the ID type
-      const { data: leadFields, error: fieldsError } = await supabaseClient
-        .rpc('get_table_definition', { table_name: 'leads' });
+      // Get all lead IDs that we need to process
+      const leadIds = listLeads.map(item => item.lead_id);
+      console.log(`Processing ${leadIds.length} leads to add to session`);
       
-      if (fieldsError) {
-        console.warn('Could not determine leads table structure:', fieldsError);
-      }
+      // Get actual leads data to ensure we have valid records
+      const { data: actualLeads, error: leadsQueryError } = await supabaseClient
+        .from('leads')
+        .select('id')
+        .in('id', leadIds);
       
-      console.log(`Working with leads - preparing to process ${listLeads.length} leads`);
-      
-      // Create the session leads, adapting to whatever ID format we have
-      let processedLeads = 0;
-      let validLeads = [];
-      
-      // Get actual lead data to convert to string uuid format if needed
-      for (const item of listLeads) {
-        try {
-          // Get the actual lead record to store in session
-          const { data: leadData, error: leadError } = await supabaseClient
-            .from('leads')
-            .select('id')
-            .eq('id', item.lead_id)
-            .maybeSingle();
-          
-          if (leadError) {
-            console.error(`Error fetching lead ${item.lead_id}:`, leadError);
-            continue;
-          }
-          
-          if (!leadData) {
-            console.error(`Lead ${item.lead_id} not found`);
-            continue;
-          }
-          
-          // Create session lead entry - converting number ID to string if necessary
-          validLeads.push({
-            session_id: sessionData.id,
-            lead_id: String(item.lead_id),
-            status: 'queued'
-          });
-          
-          processedLeads++;
-        } catch (e) {
-          console.error(`Error processing lead ID ${item.lead_id}:`, e);
-        }
-      }
-      
-      if (validLeads.length === 0) {
-        console.error('No valid leads could be processed to add to session');
+      if (leadsQueryError) {
+        console.error('Error fetching lead details:', leadsQueryError);
         return new Response(
-          JSON.stringify({ 
-            error: 'No valid leads to add to session', 
-            message: 'Could not process any lead IDs in a compatible format'
-          }),
+          JSON.stringify({ error: 'Failed to validate leads', details: leadsQueryError }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (!actualLeads || actualLeads.length === 0) {
+        console.error('No valid leads found for the provided IDs');
+        return new Response(
+          JSON.stringify({ error: 'No valid leads found' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
       
-      // Insert in smaller batches if needed to avoid potential issues
+      console.log(`Found ${actualLeads.length} valid leads to add to session`);
+      
+      // Prepare session lead entries - always use STRING representation of lead IDs
+      const sessionLeads = actualLeads.map(lead => ({
+        session_id: sessionData.id,
+        lead_id: String(lead.id),
+        status: 'queued',
+        priority: 1,  // Default priority
+        attempt_count: 0
+      }));
+      
+      // Insert in smaller batches if needed
       const BATCH_SIZE = 50;
       let insertedCount = 0;
       
-      for (let i = 0; i < validLeads.length; i += BATCH_SIZE) {
-        const batch = validLeads.slice(i, i + BATCH_SIZE);
-        const { error: insertError, count } = await supabaseClient
+      for (let i = 0; i < sessionLeads.length; i += BATCH_SIZE) {
+        const batch = sessionLeads.slice(i, i + BATCH_SIZE);
+        const { error: insertError } = await supabaseClient
           .from('dialing_session_leads')
-          .insert(batch)
-          .select('count');
+          .insert(batch);
         
         if (insertError) {
           console.error(`Error inserting batch ${i / BATCH_SIZE + 1}:`, insertError);
         } else {
           insertedCount += batch.length;
-          console.log(`Inserted batch ${i / BATCH_SIZE + 1} with ${batch.length} leads`);
+          console.log(`Inserted batch ${i / BATCH_SIZE + 1} with ${batch.length} leads with 'queued' status`);
         }
+      }
+      
+      // Double-check that leads were actually inserted with queued status
+      const { data: queuedLeads, error: queueCheckError } = await supabaseClient
+        .from('dialing_session_leads')
+        .select('status')
+        .eq('session_id', sessionData.id)
+        .eq('status', 'queued');
+        
+      if (queueCheckError) {
+        console.error('Error checking queued leads:', queueCheckError);
+      } else {
+        console.log(`Verified ${queuedLeads?.length || 0} leads are in 'queued' status`);
+      }
+      
+      // Update session with accurate count
+      if (insertedCount > 0) {
+        await supabaseClient
+          .from('dialing_sessions')
+          .update({ total_leads: insertedCount })
+          .eq('id', sessionData.id);
       }
       
       console.log(`Successfully added ${insertedCount} leads to dialing session ${sessionData.id}`);

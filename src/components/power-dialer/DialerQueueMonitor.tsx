@@ -31,18 +31,49 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
   const fetchQueueStats = async () => {
     if (!sessionId) return;
     
+    setIsLoading(true);
     try {
+      // Instead of using .single() which fails if no rows exist, we'll query differently
       const { data, error } = await supabase
         .from('session_queue_stats')
         .select('*')
         .eq('session_id', sessionId)
-        .single();
+        .maybeSingle();
       
-      if (error) throw error;
-      setStats(data);
+      if (error && error.code !== 'PGRST116') {
+        // Only throw for errors other than "no rows returned"
+        throw error;
+      }
+      
+      // If we got data, use it. Otherwise, check dialing_session_leads directly
+      if (data) {
+        setStats(data);
+      } else {
+        // Fallback to counting directly from dialing_session_leads if view doesn't have data yet
+        const { data: leadsData, error: leadsError } = await supabase
+          .from('dialing_session_leads')
+          .select('status', { count: 'exact' })
+          .eq('session_id', sessionId);
+          
+        if (leadsError) throw leadsError;
+        
+        // Count the leads by status
+        const queued = leadsData?.filter(lead => lead.status === 'queued').length || 0;
+        const inProgress = leadsData?.filter(lead => lead.status === 'in_progress').length || 0;
+        const completed = leadsData?.filter(lead => lead.status === 'completed').length || 0;
+        
+        setStats({
+          queued_count: queued,
+          in_progress_count: inProgress,
+          completed_count: completed,
+          total_count: (leadsData?.length || 0)
+        });
+      }
     } catch (error) {
       console.error('Error fetching queue stats:', error);
-      toast.error('Failed to fetch queue statistics');
+      // Don't show toast for this error, as it might happen frequently during initialization
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -67,8 +98,12 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
         )
         .subscribe();
 
+      // Poll for updates every 5 seconds as a fallback
+      const intervalId = setInterval(fetchQueueStats, 5000);
+
       return () => {
         supabase.removeChannel(channel);
+        clearInterval(intervalId);
       };
     }
   }, [sessionId]);
