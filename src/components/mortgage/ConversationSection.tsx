@@ -81,7 +81,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
         return;
       }
       
-      // Attempt to fetch messages from our API (now filtered by date only)
+      // Attempt to fetch messages from our API (filtered by phone number)
       const { data, error } = await supabase.functions.invoke('sms-retrieve-messages-for-lead', {
         body: { leadId }
       });
@@ -91,27 +91,12 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
       }
       
       if (data.success && data.messages && data.messages.length > 0) {
-        // Format incoming messages to match our expected format
-        const formattedMessages = data.messages.map((msg: any) => ({
-          id: msg.id,
-          type: msg.type,
-          content: msg.content,
-          sender: msg.sender,
-          timestamp: new Date(msg.timestamp),
-          phone: msg.phone,
-          rawData: msg.rawData
-        }));
-        
-        // Sort by timestamp (oldest first)
-        const sortedMessages = formattedMessages.sort((a: Message, b: Message) => 
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-        
-        setMessages(sortedMessages);
-        console.log("Retrieved messages:", sortedMessages);
+        // Messages are already formatted correctly by the edge function
+        setMessages(data.messages);
+        console.log("Retrieved messages:", data.messages);
       } else {
-        console.log("No messages found for the specified date range");
-        toast.info("No messages found for April 16-17, 2025");
+        console.log("No messages found for this lead");
+        toast.info("No messages found for this client");
         setMessages([]);
       }
     } catch (error) {
@@ -198,7 +183,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-blue-800">
-          Client Conversations (April 16-17, 2025)
+          Client Conversations
         </h2>
         <div className="flex gap-2">
           <Button 
@@ -363,7 +348,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
               </ScrollArea>
             ) : (
               <div className="text-sm text-blue-800 italic py-8 text-center">
-                No messages found between April 16-17, 2025.
+                No messages found for this client.
               </div>
             )}
           </CardContent>

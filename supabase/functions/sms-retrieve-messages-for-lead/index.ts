@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// This function retrieves messages within a specific time frame
+// This function retrieves messages for a specific lead's phone number
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -15,6 +15,19 @@ serve(async (req) => {
   }
 
   try {
+    // Get the request body
+    const { leadId } = await req.json();
+    
+    if (!leadId) {
+      return new Response(
+        JSON.stringify({ error: 'Lead ID is required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Create a Supabase client for database operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -32,6 +45,38 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // First, fetch the lead to get their phone number
+    const { data: leadData, error: leadError } = await supabase
+      .from('leads')
+      .select('phone1, first_name, last_name')
+      .eq('id', leadId)
+      .single();
+
+    if (leadError || !leadData) {
+      console.error("Error fetching lead:", leadError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch lead information' }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const phoneNumber = leadData.phone1;
+    
+    if (!phoneNumber) {
+      return new Response(
+        JSON.stringify({ error: 'Lead does not have a phone number' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    console.log(`Fetching SMS messages for lead ${leadId} with phone number ${phoneNumber}`);
 
     // Prepare the payload for getting devices
     const devicePayload = {
@@ -63,19 +108,11 @@ serve(async (req) => {
 
     console.log(`Found ${devices.length} devices`);
 
-    // Step 2: Get received messages
-    // Define time range for April 16-17, 2025
-    const startDate = new Date('2025-04-16T00:00:00Z');
-    const endDate = new Date('2025-04-17T00:00:00Z');
-    
-    const startTimestamp = Math.floor(startDate.getTime() / 1000);
-    const endTimestamp = Math.floor(endDate.getTime() / 1000);
-
+    // Step 2: Get received messages with no date filtering
     const messagesPayload = {
       key: smsApiKey,
-      status: 'received',
-      startTimestamp: startTimestamp,
-      endTimestamp: endTimestamp
+      status: 'received'
+      // No time range filtering - we want all messages
     };
 
     const messagesResponse = await fetch(`${smsServerUrl}/services/read-messages.php`, {
@@ -98,12 +135,21 @@ serve(async (req) => {
     }
 
     const messagesData = await messagesResponse.json();
-    const messages = messagesData.data.messages || [];
+    const allMessages = messagesData.data.messages || [];
 
-    console.log(`Retrieved ${messages.length} messages`);
+    console.log(`Retrieved ${allMessages.length} total messages`);
+
+    // Filter messages by the lead's phone number
+    const leadMessages = allMessages.filter(message => {
+      const messageNumber = (message.number || message.from || "").replace(/\D/g, '');
+      const leadPhoneNumber = phoneNumber.replace(/\D/g, '');
+      return messageNumber.includes(leadPhoneNumber) || leadPhoneNumber.includes(messageNumber);
+    });
+
+    console.log(`Filtered to ${leadMessages.length} messages for phone number ${phoneNumber}`);
 
     // Step 3: Format messages for database storage and frontend consumption
-    const formattedMessages = messages.map(message => {
+    const formattedMessages = leadMessages.map(message => {
       // Ensure timestamp is valid
       let timestamp;
       try {
@@ -125,6 +171,11 @@ serve(async (req) => {
       };
     });
 
+    // Sort messages by timestamp (oldest first)
+    const sortedMessages = formattedMessages.sort((a, b) => 
+      new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
     // Store messages in Supabase for future reference
     if (formattedMessages.length > 0) {
       const { error: insertError } = await supabase
@@ -142,10 +193,12 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        messages: formattedMessages,
-        timeRange: {
-          start: startDate.toISOString(),
-          end: endDate.toISOString()
+        messages: sortedMessages,
+        lead: {
+          id: leadId,
+          firstName: leadData.first_name,
+          lastName: leadData.last_name,
+          phone: phoneNumber
         },
         devices: devices
       }),
@@ -155,7 +208,7 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error in SMS retrieve for time range function:", error);
+    console.error("Error in SMS retrieve for lead function:", error);
     return new Response(
       JSON.stringify({ error: error.message || 'Unknown error' }),
       {
