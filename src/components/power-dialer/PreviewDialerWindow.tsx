@@ -26,7 +26,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import DialerQueueMonitor from './DialerQueueMonitor';
-import { AutoDialerController } from './AutoDialerController';
+import { AutoDialerController } from './AutoDialerController";
+import { useTwilio } from "@/context/TwilioContext";
+import { useToast } from "@/context/ToastContext";
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -47,8 +49,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [autoDialerActive, setAutoDialerActive] = useState(false);
+  const [queueStats, setQueueStats] = useState<any>(null);
+  const [isPowerDialing, setIsPowerDialing] = useState(false);
   const { user } = useAuth();
-  
+  const { twilioService } = useTwilio();
+  const { toast } = useToast();
+
   useEffect(() => {
     if (isDialingStarted) {
       fetchCallingLists();
@@ -158,6 +164,60 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     console.log('Call completed, ready for next call');
   }, []);
 
+  const startPowerDialing = async () => {
+    if (!sessionId) return;
+
+    setIsPowerDialing(true);
+    try {
+      const initialized = await twilioService.initializeTwilioDevice();
+      if (!initialized) {
+        throw new Error("Failed to initialize Twilio device");
+      }
+
+      const { data: nextLead } = await supabase.rpc('get_next_session_lead', {
+        p_session_id: sessionId
+      });
+
+      if (nextLead && nextLead[0]) {
+        const lead = nextLead[0];
+        let phoneNumber = null;
+
+        if (lead.notes) {
+          try {
+            const notesData = JSON.parse(lead.notes);
+            phoneNumber = notesData.phone;
+          } catch (e) {
+            console.error('Error parsing lead notes:', e);
+          }
+        }
+
+        if (phoneNumber) {
+          const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
+          
+          if (!callResult.success) {
+            toast({
+              title: "Call Failed",
+              description: callResult.error || "Failed to place call",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Power Dialing Active",
+              description: "Starting calls to leads in queue"
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error starting power dialing:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start power dialing",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <>
       <Card className="bg-gray-800 p-4 rounded-lg">
@@ -210,10 +270,24 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               <div className="space-y-4">
                 {sessionId && (
                   <>
-                    <DialerQueueMonitor sessionId={sessionId} />
+                    <DialerQueueMonitor 
+                      sessionId={sessionId} 
+                      onStatsUpdate={(stats) => setQueueStats(stats)}
+                    />
+                    {queueStats && queueStats.queued_count > 0 && !isPowerDialing && (
+                      <div className="flex justify-center mt-4">
+                        <Button
+                          onClick={startPowerDialing}
+                          className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                        >
+                          <Play className="h-5 w-5" />
+                          Start Power Dialing
+                        </Button>
+                      </div>
+                    )}
                     <AutoDialerController 
                       sessionId={sessionId}
-                      isActive={autoDialerActive}
+                      isActive={isPowerDialing}
                       onCallComplete={handleCallComplete}
                     />
                   </>
