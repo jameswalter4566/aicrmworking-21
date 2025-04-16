@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,6 +89,16 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       console.error("Error in handleDeleteLead:", error);
       toast.error("Failed to delete lead");
     }
+  };
+
+  const handleBeginDialing = async () => {
+    if (!selectedListId) return;
+    
+    toast({
+      title: "Starting Dialer",
+      description: "Beginning to dial through selected list...",
+    });
+    // Additional dialing logic will be added here
   };
 
   return (
@@ -197,13 +206,23 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 )}
                 
                 {selectedListId && (
-                  <div className="mt-6">
+                  <div className="mt-6 space-y-4">
                     <LeadSelectionPanel 
                       listId={selectedListId}
                       onLeadsSelected={(leads) => {
                         console.log('Selected leads:', leads);
                       }}
                     />
+                    
+                    <div className="flex justify-center mt-4">
+                      <Button 
+                        onClick={handleBeginDialing}
+                        className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                      >
+                        <Phone className="h-5 w-5" />
+                        Begin Dialing
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
