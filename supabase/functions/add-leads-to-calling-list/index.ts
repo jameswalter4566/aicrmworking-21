@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -8,7 +7,6 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -46,7 +44,7 @@ serve(async (req) => {
     // Verify user has access to this list
     const { data: listAccess, error: accessError } = await supabaseClient
       .from('calling_lists')
-      .select('id')
+      .select('id, name')
       .eq('id', listId)
       .eq('created_by', user.id)
       .maybeSingle();
@@ -100,6 +98,28 @@ serve(async (req) => {
         JSON.stringify({ error: 'Failed to add leads to list' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // For each new lead, update their activity log
+    for (const leadId of newLeadIds) {
+      // Call update-lead function to log this activity
+      await supabaseClient.functions.invoke('update-lead', {
+        body: {
+          leadId,
+          leadData: {
+            // Keep existing data, just add activity
+          }
+        }
+      });
+
+      // Add an activity record
+      await supabaseClient
+        .from('lead_activities')
+        .insert({
+          lead_id: leadId,
+          type: 'Added to Calling List',
+          description: `Added to calling list: ${listAccess.name}`,
+        });
     }
     
     return new Response(
