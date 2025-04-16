@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { FileUp, CheckCircle, File, X } from 'lucide-react';
@@ -7,11 +6,13 @@ import { Button } from '@/components/ui/button';
 interface PDFDropZoneProps {
   onFileAccepted: (file: File) => void;
   maxSizeMB?: number;
+  className?: string;
 }
 
 const PDFDropZone: React.FC<PDFDropZoneProps> = ({ 
   onFileAccepted,
-  maxSizeMB = 10
+  maxSizeMB = 10,
+  className = ''
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
@@ -45,13 +46,11 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
   };
   
   const processFile = (file: File) => {
-    // Check if it's a PDF
     if (file.type !== 'application/pdf') {
       toast.error('Please upload a PDF file');
       return;
     }
     
-    // Check file size (convert maxSizeMB to bytes)
     const maxSizeBytes = maxSizeMB * 1024 * 1024;
     if (file.size > maxSizeBytes) {
       toast.error(`File size exceeds the maximum limit of ${maxSizeMB}MB`);
@@ -61,10 +60,8 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
     setUploadedFile(file);
     setIsProcessing(true);
     
-    // Call the callback with the file
     onFileAccepted(file);
     
-    // Simulate processing
     setTimeout(() => {
       setIsProcessing(false);
     }, 2000);
@@ -84,7 +81,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
   };
   
   return (
-    <div className="w-full">
+    <div className={`w-full ${className}`}>
       {!uploadedFile ? (
         <div
           className={`border-2 border-dashed rounded-lg p-8 flex flex-col items-center justify-center transition-colors ${
