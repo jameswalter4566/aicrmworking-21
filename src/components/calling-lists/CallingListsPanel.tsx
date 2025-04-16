@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -157,7 +156,8 @@ const CallingListsPanel = () => {
             {lists.map((list) => (
               <div
                 key={list.id}
-                className="flex-none w-64 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-crm-blue transition-colors cursor-pointer"
+                onClick={() => handleViewList(list.id)}
+                className="flex-none w-64 p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-crm-blue transition-colors cursor-pointer hover:bg-gray-100"
               >
                 <div className="flex items-start justify-between">
                   <div>
@@ -176,10 +176,9 @@ const CallingListsPanel = () => {
                     variant="outline" 
                     size="sm" 
                     className="w-full border-gray-300 hover:bg-crm-blue hover:text-white"
-                    onClick={() => handleViewList(list.id)}
                   >
                     <Phone className="h-3 w-3 mr-1" />
-                    Start Calling
+                    View List
                   </Button>
                 </div>
               </div>
