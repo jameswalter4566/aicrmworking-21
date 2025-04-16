@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ListPlus, Users, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { ListPlus, Users, TagIcon, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -96,7 +96,7 @@ const CallingListsPanel = () => {
         className="flex items-center justify-between mb-4 p-3 rounded-t-lg bg-mortgage-purple"
       >
         <div className="flex items-center gap-2">
-          <Tag className="h-5 w-5 text-white" strokeWidth={2} />
+          <TagIcon className="h-5 w-5 text-white" strokeWidth={2} />
           <h2 className="font-semibold text-white">Calling Lists</h2>
         </div>
         
