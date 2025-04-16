@@ -25,7 +25,7 @@ interface EmailConditionsParserProps {
 
 const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   clientLastName,
-  loanNumber,
+  loanNumber: initialLoanNumber,
   leadId,
   onConditionsFound
 }) => {
@@ -38,6 +38,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   const [selectedAttachmentId, setSelectedAttachmentId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState<string | null>(null);
   const [lastError, setLastError] = useState<{code: string, message: string, details?: any} | null>(null);
+  const [loanNumber, setLoanNumber] = useState(initialLoanNumber || '');
   const [emailSender, setEmailSender] = useState<string>('');
 
   useEffect(() => {
@@ -411,7 +412,9 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
             <Input 
               id="loanNumber" 
               value={loanNumber} 
+              onChange={e => setLoanNumber(e.target.value)} 
               className="border-blue-200 focus:border-blue-400"
+              placeholder="Enter loan number"
             />
           </div>
           <div>
