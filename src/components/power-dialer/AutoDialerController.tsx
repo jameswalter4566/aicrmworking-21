@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -74,7 +73,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       // Get the lead phone number and id
       const phoneNumber = leadData.phone1;
-      const leadId = lead.id;
+      // Convert lead_id to a number for makeCall
+      const leadId = parseInt(lead.lead_id, 10);
       
       if (!phoneNumber) {
         toast({
@@ -90,7 +90,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             status: 'failed',
             notes: 'Missing phone number'
           })
-          .eq('id', leadId);
+          .eq('id', lead.id);
           
         setIsProcessingCall(false);
         onCallComplete();
@@ -114,7 +114,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             status: 'failed',
             notes: callResult.error
           })
-          .eq('id', leadId);
+          .eq('id', lead.id);
       } else {
         toast({
           title: "Call Initiated",
