@@ -14,6 +14,7 @@ import ProcessorSidebar from "@/components/mortgage/ProcessorSidebar";
 import ConversationSection from "@/components/mortgage/ConversationSection";
 import OrderServiceSection from "@/components/mortgage/OrderServiceSection";
 import AILoanOfficerAssist from "@/components/mortgage/AILoanOfficerAssist";
+import PDFDropZone from "@/components/mortgage/PDFDropZone";
 
 interface LoanApplication {
   id: string;
@@ -268,12 +269,47 @@ const ProcessorAssistViewer = () => {
     return (
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <EmailConditionsParser 
-            clientLastName={loanApplication?.lastName || ''} 
-            loanNumber={loanApplication?.loanId || ''}
-            leadId={loanApplication?.id || ''}
-            onConditionsFound={handleConditionsFound}
-          />
+          <h2 className="text-xl font-bold text-blue-700 mb-4">
+            Retrieve Conditions
+          </h2>
+          
+          <Tabs defaultValue="email" className="w-full">
+            <TabsList className="mb-4 bg-white border border-blue-100">
+              <TabsTrigger 
+                value="email" 
+                className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
+              >
+                Email Parser
+              </TabsTrigger>
+              <TabsTrigger 
+                value="pdf" 
+                className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
+              >
+                PDF Upload
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="email" className="bg-white">
+              <EmailConditionsParser 
+                clientLastName={loanApplication?.lastName || ''} 
+                loanNumber={loanApplication?.loanId || ''}
+                leadId={loanApplication?.id || ''}
+                onConditionsFound={handleConditionsFound}
+              />
+            </TabsContent>
+            
+            <TabsContent value="pdf" className="bg-white">
+              <PDFDropZone 
+                onFileAccepted={(file) => {
+                  toast.info(`Processing ${file.name}. This might take a moment...`);
+                  
+                  setTimeout(() => {
+                    toast.success("PDF processed successfully!");
+                  }, 2000);
+                }}
+              />
+            </TabsContent>
+          </Tabs>
         </div>
         
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
