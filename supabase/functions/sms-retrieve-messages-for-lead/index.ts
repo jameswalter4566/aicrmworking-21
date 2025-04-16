@@ -18,55 +18,39 @@ serve(async (req) => {
     // Create a Supabase client for database operations
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const smsApiKey = Deno.env.get("SMS_API_KEY");
+    const smsServerUrl = Deno.env.get("SMS_SERVER_URL");
+    
+    if (!smsApiKey || !smsServerUrl) {
+      return new Response(
+        JSON.stringify({ error: 'SMS API credentials are not configured' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Set date range for April 16-17, 2025
-    const startDate = new Date('2025-04-16T00:00:00Z');
-    const endDate = new Date('2025-04-17T00:00:00Z');
-    
-    console.log(`Retrieving messages between ${startDate.toISOString()} and ${endDate.toISOString()}`);
-    
-    // Step 1: Fetch all available device IDs from the SMS webhooks
-    const { data: deviceData, error: deviceError } = await supabase
-      .from('sms_webhooks')
-      .select('webhook_data')
-      .not('webhook_data->device_id', 'is', null);
-    
-    if (deviceError) {
-      console.error("Error retrieving device IDs:", deviceError);
+    // Prepare the payload for getting devices
+    const devicePayload = {
+      key: smsApiKey
+    };
+
+    // Step 1: Get all available devices
+    const devicesResponse = await fetch(`${smsServerUrl}/services/get-devices.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(devicePayload).toString()
+    });
+
+    if (!devicesResponse.ok) {
+      console.error("Failed to retrieve devices");
       return new Response(
-        JSON.stringify({ error: 'Failed to retrieve device IDs', details: deviceError.message }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
-    // Extract unique device IDs
-    const deviceIds = new Set();
-    if (deviceData && deviceData.length > 0) {
-      deviceData.forEach(record => {
-        if (record.webhook_data && record.webhook_data.device_id) {
-          deviceIds.add(record.webhook_data.device_id);
-        }
-      });
-    }
-    
-    console.log(`Found ${deviceIds.size} unique device IDs`);
-    
-    // Step 2: Get all SMS webhook data within the specified time range
-    const { data: messages, error: messagesError } = await supabase
-      .from('sms_webhooks')
-      .select('*')
-      .gte('received_at', startDate.toISOString())
-      .lt('received_at', endDate.toISOString())
-      .order('received_at', { ascending: false });
-      
-    if (messagesError) {
-      console.error("Error retrieving messages:", messagesError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to retrieve messages', details: messagesError.message }),
+        JSON.stringify({ error: 'Failed to retrieve devices' }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -74,42 +58,80 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Retrieved ${messages?.length || 0} messages in the time range`);
-    
-    // Format into a standardized message format
-    const formattedMessages = (messages || []).map(record => {
-      const webhookData = record.webhook_data;
-      
-      // Determine if the message is incoming based on message type or direction
-      // This handles both the "type" field and the "message_direction" field that might be present
-      const isIncoming = webhookData.type === 'incoming' || 
-                          webhookData.message_direction === 'inbound' || 
-                          webhookData.direction === 'inbound';
-      
-      // Extract device ID information
-      const deviceId = webhookData.device_id || webhookData.deviceId || null;
-      
-      return {
-        id: record.id,
-        type: 'sms',
-        content: webhookData.message || webhookData.content || webhookData.text || webhookData.body || '',
-        sender: isIncoming ? 'client' : 'ai',
-        timestamp: record.received_at || new Date().toISOString(),
-        phone: isIncoming ? webhookData.number || webhookData.from : webhookData.device_number || webhookData.to,
-        deviceId: deviceId,
-        rawData: webhookData // Include raw data for debugging
-      };
+    const devicesData = await devicesResponse.json();
+    const devices = devicesData.data.devices;
+
+    console.log(`Found ${devices.length} devices`);
+
+    // Step 2: Get received messages
+    // Define time range for April 16-17, 2025
+    const startTimestamp = Math.floor(new Date('2025-04-16T00:00:00Z').getTime() / 1000);
+    const endTimestamp = Math.floor(new Date('2025-04-17T00:00:00Z').getTime() / 1000);
+
+    const messagesPayload = {
+      key: smsApiKey,
+      status: 'received',
+      startTimestamp: startTimestamp,
+      endTimestamp: endTimestamp
+    };
+
+    const messagesResponse = await fetch(`${smsServerUrl}/services/read-messages.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(messagesPayload).toString()
     });
-    
+
+    if (!messagesResponse.ok) {
+      console.error("Failed to retrieve messages");
+      return new Response(
+        JSON.stringify({ error: 'Failed to retrieve messages' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    const messagesData = await messagesResponse.json();
+    const messages = messagesData.data.messages || [];
+
+    console.log(`Retrieved ${messages.length} messages`);
+
+    // Step 3: Format messages for database storage and frontend consumption
+    const formattedMessages = messages.map(message => ({
+      id: message.id,
+      type: 'sms',
+      content: message.message || '',
+      sender: 'client',
+      timestamp: new Date(message.timestamp * 1000).toISOString(),
+      phone: message.number || message.from,
+      deviceId: message.deviceID,
+      rawData: message
+    }));
+
+    // Store messages in Supabase for future reference
+    const { error: insertError } = await supabase
+      .from('sms_webhooks')
+      .insert(formattedMessages.map(msg => ({
+        webhook_data: msg.rawData,
+        received_at: msg.timestamp
+      })));
+
+    if (insertError) {
+      console.error("Error storing messages:", insertError);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
         messages: formattedMessages,
         timeRange: {
-          start: startDate.toISOString(),
-          end: endDate.toISOString()
+          start: new Date('2025-04-16T00:00:00Z').toISOString(),
+          end: new Date('2025-04-17T00:00:00Z').toISOString()
         },
-        deviceIds: Array.from(deviceIds)
+        devices: devices
       }),
       {
         status: 200,

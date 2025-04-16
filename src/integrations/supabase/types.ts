@@ -818,6 +818,27 @@ export type Database = {
         }
         Relationships: []
       }
+      sms_webhooks: {
+        Row: {
+          id: string
+          processed: boolean
+          received_at: string
+          webhook_data: Json
+        }
+        Insert: {
+          id?: string
+          processed?: boolean
+          received_at?: string
+          webhook_data: Json
+        }
+        Update: {
+          id?: string
+          processed?: boolean
+          received_at?: string
+          webhook_data?: Json
+        }
+        Relationships: []
+      }
       user_email_connections: {
         Row: {
           access_token: string
