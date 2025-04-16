@@ -34,6 +34,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const [isProcessingCall, setIsProcessingCall] = useState(false);
   const [noMoreLeads, setNoMoreLeads] = useState(false);
   const [hasAttemptedFix, setHasAttemptedFix] = useState(false);
+  const [fixAttemptCount, setFixAttemptCount] = useState(0);
   const { toast } = useToast();
 
   // Function to fix the database function if needed
@@ -80,6 +81,53 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, [toast]);
 
+  // Manually execute the get_next_session_lead using a direct SQL query
+  // This is a fallback method if the RPC function is still failing
+  const getNextLeadDirectSQL = useCallback(async (sessionId: string) => {
+    try {
+      console.log('Attempting to get next lead using direct SQL...');
+      
+      // Use a direct SQL query with fully qualified table names
+      const { data, error } = await supabase.rpc('execute_sql', {
+        sql_query: `
+        WITH next_lead AS (
+          SELECT dsl.* 
+          FROM dialing_session_leads dsl
+          WHERE dsl.session_id = '${sessionId}'
+          AND dsl.status = 'queued'
+          ORDER BY dsl.priority DESC, dsl.created_at ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED
+        )
+        UPDATE dialing_session_leads dsl
+        SET status = 'in_progress',
+            attempt_count = dsl.attempt_count + 1
+        FROM next_lead
+        WHERE dsl.id = next_lead.id
+        RETURNING dsl.id, dsl.lead_id, dsl.session_id, dsl.status, 
+                 dsl.priority, dsl.attempt_count, dsl.notes;
+        `
+      });
+      
+      if (error) {
+        console.error('Error with direct SQL approach:', error);
+        return null;
+      }
+      
+      if (!data || data.length === 0) {
+        console.log('No leads found with direct SQL');
+        return null;
+      }
+      
+      console.log('Successfully retrieved lead with direct SQL:', data[0]);
+      return processFetchedLead(data[0]);
+      
+    } catch (error) {
+      console.error('Error with direct SQL approach:', error);
+      return null;
+    }
+  }, []);
+
   const getNextLead = useCallback(async () => {
     if (!sessionId) return null;
     
@@ -114,8 +162,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           console.error('Error calling get_next_session_lead:', error);
           
           // Check if this is an ambiguous column error and try to fix it
-          if (error.message?.includes('ambiguous') && error.code === '42702' && !hasAttemptedFix) {
-            setHasAttemptedFix(true);
+          if (error.message?.includes('ambiguous') && error.code === '42702' && fixAttemptCount < 3) {
+            setFixAttemptCount(count => count + 1);
             const fixed = await fixDatabaseFunction();
             
             if (fixed) {
@@ -127,7 +175,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               
               if (retryResponse.error) {
                 console.error('Error after fix attempt:', retryResponse.error);
-                throw retryResponse.error;
+                
+                // As a last resort, try the direct SQL approach
+                console.log('Attempting direct SQL approach as last resort...');
+                const leadFromSQL = await getNextLeadDirectSQL(sessionId);
+                return leadFromSQL;
               }
               
               if (!retryResponse.data || retryResponse.data.length === 0) {
@@ -139,10 +191,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               console.log('Next lead retrieved after fix:', retryResponse.data[0]);
               return processFetchedLead(retryResponse.data[0]);
             } else {
-              throw new Error('Failed to fix database function');
+              // Try direct SQL as a fallback
+              return await getNextLeadDirectSQL(sessionId);
             }
           } else {
-            throw error;
+            // If it's not an ambiguous column error or we've already tried fixing it
+            // Try direct SQL as a fallback
+            return await getNextLeadDirectSQL(sessionId);
           }
         }
         
@@ -167,15 +222,18 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           description: "Attempting to automatically fix the ambiguous column issue",
         });
         
-        if (!hasAttemptedFix) {
-          setHasAttemptedFix(true);
+        if (fixAttemptCount < 3) {
+          setFixAttemptCount(count => count + 1);
           await fixDatabaseFunction();
+          
+          // Try direct SQL as a fallback
+          return await getNextLeadDirectSQL(sessionId);
         }
       }
       
       return null;
     }
-  }, [sessionId, hasAttemptedFix, fixDatabaseFunction, toast]);
+  }, [sessionId, fixAttemptCount, fixDatabaseFunction, getNextLeadDirectSQL, toast]);
 
   // Helper function to process the fetched lead
   const processFetchedLead = (lead: SessionLead): ProcessedSessionLead => {

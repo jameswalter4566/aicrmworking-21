@@ -21,7 +21,7 @@ Deno.serve(async (req) => {
   try {
     console.log("Starting to fix the get_next_session_lead function");
     
-    // Direct approach to update the function - all column references are fully qualified
+    // Updated approach - ensure ALL column references are fully qualified with table names
     const updateFunctionResponse = await fetch(`${supabaseUrl}/rest/v1/sql`, {
       method: 'POST',
       headers: {
@@ -36,23 +36,33 @@ Deno.serve(async (req) => {
         LANGUAGE plpgsql
         SECURITY DEFINER
         AS $function$
+        DECLARE
+          v_lead_record dialing_session_leads%ROWTYPE;
         BEGIN
-          RETURN QUERY
-          UPDATE dialing_session_leads
-          SET status = 'in_progress',
-              attempt_count = dialing_session_leads.attempt_count + 1
-          WHERE dialing_session_leads.id = (
-            SELECT dialing_session_leads.id 
-            FROM dialing_session_leads
-            WHERE dialing_session_leads.session_id = p_session_id 
-            AND dialing_session_leads.status = 'queued'
-            ORDER BY dialing_session_leads.priority DESC, dialing_session_leads.created_at ASC
-            LIMIT 1
-            FOR UPDATE SKIP LOCKED
-          )
-          RETURNING dialing_session_leads.id, dialing_session_leads.lead_id, dialing_session_leads.session_id, 
-                  dialing_session_leads.status, dialing_session_leads.priority, dialing_session_leads.attempt_count,
-                  dialing_session_leads.notes;
+          SELECT * INTO v_lead_record
+          FROM dialing_session_leads
+          WHERE dialing_session_leads.session_id = p_session_id 
+          AND dialing_session_leads.status = 'queued'
+          ORDER BY dialing_session_leads.priority DESC, dialing_session_leads.created_at ASC
+          LIMIT 1
+          FOR UPDATE SKIP LOCKED;
+          
+          IF v_lead_record.id IS NOT NULL THEN
+            UPDATE dialing_session_leads
+            SET status = 'in_progress',
+                attempt_count = dialing_session_leads.attempt_count + 1
+            WHERE dialing_session_leads.id = v_lead_record.id;
+            
+            RETURN QUERY
+            SELECT 
+              v_lead_record.id,
+              v_lead_record.lead_id,
+              v_lead_record.session_id,
+              'in_progress'::text AS status,
+              v_lead_record.priority,
+              v_lead_record.attempt_count + 1,
+              v_lead_record.notes;
+          END IF;
         END;
         $function$;
         `
