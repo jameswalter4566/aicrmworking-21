@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,8 @@ import {
   Pause,
   StopCircle,
   Play,
-  Trash2
+  Trash2,
+  List
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
@@ -34,7 +35,35 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   onEndCall
 }) => {
   const [isDialingStarted, setIsDialingStarted] = useState(false);
-  const tempListId = "preview-dialer-temp-list";
+  const [callingLists, setCallingLists] = useState<any[]>([]);
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [isLoadingLists, setIsLoadingLists] = useState(false);
+  
+  useEffect(() => {
+    if (isDialingStarted) {
+      fetchCallingLists();
+    }
+  }, [isDialingStarted]);
+
+  const fetchCallingLists = async () => {
+    setIsLoadingLists(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-calling-lists');
+      
+      if (error) {
+        console.error("Error fetching calling lists:", error);
+        toast.error("Failed to load calling lists");
+        return;
+      }
+
+      setCallingLists(data || []);
+    } catch (error) {
+      console.error("Error in fetchCallingLists:", error);
+      toast.error("Failed to load calling lists");
+    } finally {
+      setIsLoadingLists(false);
+    }
+  };
 
   const handleDeleteLead = async (leadId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -111,13 +140,73 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 </Button>
               </div>
             ) : !currentCall ? (
-              <LeadSelectionPanel 
-                listId={tempListId}
-                onLeadsSelected={(leads) => {
-                  console.log('Selected leads:', leads);
-                  // Handle the selected leads here
-                }}
-              />
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium">Select a Calling List</h3>
+                  {selectedListId && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setSelectedListId(null)}
+                      className="text-sm"
+                    >
+                      Change List
+                    </Button>
+                  )}
+                </div>
+                
+                {isLoadingLists ? (
+                  <div className="text-center py-8 text-gray-500">
+                    Loading calling lists...
+                  </div>
+                ) : callingLists.length === 0 ? (
+                  <div className="text-center py-8">
+                    <List className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                    <p className="text-gray-500">No calling lists found.</p>
+                    <p className="text-sm text-gray-400">Create a calling list first to start dialing.</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {callingLists.map((list) => (
+                      <Card 
+                        key={list.id}
+                        className={`
+                          cursor-pointer transition-all
+                          ${selectedListId === list.id ? 'ring-2 ring-green-500' : 'hover:bg-gray-50'}
+                        `}
+                        onClick={() => setSelectedListId(list.id)}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="font-medium">{list.name}</h4>
+                              <p className="text-sm text-gray-500">
+                                {list.leadCount} leads • Created {new Date(list.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            {selectedListId === list.id && (
+                              <Badge className="bg-green-50 text-green-600">
+                                Selected
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+                
+                {selectedListId && (
+                  <div className="mt-6">
+                    <LeadSelectionPanel 
+                      listId={selectedListId}
+                      onLeadsSelected={(leads) => {
+                        console.log('Selected leads:', leads);
+                        // Handle the selected leads here
+                      }}
+                    />
+                  </div>
+                )}
+              </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-start gap-4">
