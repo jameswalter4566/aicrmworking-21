@@ -1,8 +1,8 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
+import { useAuth } from '@/context/AuthContext';
 
 interface AutoDialerControllerProps {
   sessionId: string | null;
@@ -20,7 +20,6 @@ interface SessionLead {
   notes?: string;
 }
 
-// Create a new interface that extends SessionLead with the dynamically added properties
 interface ProcessedSessionLead extends SessionLead {
   phoneNumber: string | null;
   getLeadDetails?: () => Promise<{ id: string | null; phone1: string | null }>;
@@ -36,8 +35,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const [hasAttemptedFix, setHasAttemptedFix] = useState(false);
   const [fixAttemptCount, setFixAttemptCount] = useState(0);
   const { toast } = useToast();
+  const { user } = useAuth();
 
-  // Function to fix the database function if needed
   const fixDatabaseFunction = useCallback(async () => {
     try {
       console.log('Attempting to fix database function...');
@@ -81,52 +80,49 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, [toast]);
 
-  // Manually execute the get_next_session_lead using a direct SQL query
-  // This is a fallback method if the RPC function is still failing
   const getNextLeadDirectSQL = useCallback(async (sessionId: string) => {
     try {
       console.log('Attempting to get next lead using direct SQL...');
       
-      // Use a direct SQL query with fully qualified table names
-      const { data, error } = await supabase.rpc('execute_sql', {
-        sql_query: `
-        WITH next_lead AS (
-          SELECT dsl.* 
-          FROM dialing_session_leads dsl
-          WHERE dsl.session_id = '${sessionId}'
-          AND dsl.status = 'queued'
-          ORDER BY dsl.priority DESC, dsl.created_at ASC
-          LIMIT 1
-          FOR UPDATE SKIP LOCKED
-        )
-        UPDATE dialing_session_leads dsl
-        SET status = 'in_progress',
-            attempt_count = dsl.attempt_count + 1
-        FROM next_lead
-        WHERE dsl.id = next_lead.id
-        RETURNING dsl.id, dsl.lead_id, dsl.session_id, dsl.status, 
-                 dsl.priority, dsl.attempt_count, dsl.notes;
-        `
-      });
+      const { data: agentData, error: agentError } = await supabase
+        .from('power_dialer_agents')
+        .select('id')
+        .eq('user_id', user?.id)
+        .single();
+        
+      if (agentError || !agentData) {
+        console.error('Error getting agent data:', agentError);
+        toast({
+          title: "Agent Error",
+          description: "You need to be registered as an agent to use the power dialer",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      const { data, error } = await supabase
+        .rpc('get_next_session_lead', {
+          p_session_id: sessionId
+        });
       
       if (error) {
-        console.error('Error with direct SQL approach:', error);
+        console.error('Error with getting next lead:', error);
         return null;
       }
       
       if (!data || data.length === 0) {
-        console.log('No leads found with direct SQL');
+        console.log('No leads found');
         return null;
       }
       
-      console.log('Successfully retrieved lead with direct SQL:', data[0]);
+      console.log('Successfully retrieved lead:', data[0]);
       return processFetchedLead(data[0]);
       
     } catch (error) {
-      console.error('Error with direct SQL approach:', error);
+      console.error('Error with getting next lead:', error);
       return null;
     }
-  }, []);
+  }, [user?.id, toast]);
 
   const getNextLead = useCallback(async () => {
     if (!sessionId) return null;
@@ -161,13 +157,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         if (error) {
           console.error('Error calling get_next_session_lead:', error);
           
-          // Check if this is an ambiguous column error and try to fix it
           if (error.message?.includes('ambiguous') && error.code === '42702' && fixAttemptCount < 3) {
             setFixAttemptCount(count => count + 1);
             const fixed = await fixDatabaseFunction();
             
             if (fixed) {
-              // Retry getting the next lead after fixing
               console.log('Retrying get_next_session_lead after fix...');
               const retryResponse = await supabase.rpc('get_next_session_lead', {
                 p_session_id: sessionId
@@ -176,7 +170,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               if (retryResponse.error) {
                 console.error('Error after fix attempt:', retryResponse.error);
                 
-                // As a last resort, try the direct SQL approach
                 console.log('Attempting direct SQL approach as last resort...');
                 const leadFromSQL = await getNextLeadDirectSQL(sessionId);
                 return leadFromSQL;
@@ -191,12 +184,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               console.log('Next lead retrieved after fix:', retryResponse.data[0]);
               return processFetchedLead(retryResponse.data[0]);
             } else {
-              // Try direct SQL as a fallback
               return await getNextLeadDirectSQL(sessionId);
             }
           } else {
-            // If it's not an ambiguous column error or we've already tried fixing it
-            // Try direct SQL as a fallback
             return await getNextLeadDirectSQL(sessionId);
           }
         }
@@ -226,7 +216,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           setFixAttemptCount(count => count + 1);
           await fixDatabaseFunction();
           
-          // Try direct SQL as a fallback
           return await getNextLeadDirectSQL(sessionId);
         }
       }
@@ -235,11 +224,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, [sessionId, fixAttemptCount, fixDatabaseFunction, getNextLeadDirectSQL, toast]);
 
-  // Helper function to process the fetched lead
   const processFetchedLead = (lead: SessionLead): ProcessedSessionLead => {
     let phoneNumber = null;
     
-    // Try to extract phone from notes if it exists
     if (lead.notes) {
       try {
         const notesData = JSON.parse(lead.notes);
@@ -256,13 +243,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       }
     }
     
-    // Create a function to get lead details and attach it to the lead object
     const processedLead: ProcessedSessionLead = {
       ...lead,
       phoneNumber,
       getLeadDetails: async () => {
         try {
-          // First try to get lead from the notes
           if (lead.notes) {
             try {
               const notesData = JSON.parse(lead.notes);
@@ -276,7 +261,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                   .maybeSingle();
                 
                 if (!leadError && leadData && leadData.phone1) {
-                  // Convert the numeric id to string to match the expected return type
                   return { id: leadData.id.toString(), phone1: leadData.phone1 };
                 }
               }
@@ -285,7 +269,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
-          // Try parsing lead_id as a number
           try {
             const leadIdAsNumber = parseInt(lead.lead_id);
             
@@ -297,7 +280,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                 .maybeSingle();
               
               if (!leadError && leadData && leadData.phone1) {
-                // Convert the numeric id to string to match the expected return type
                 return { id: leadData.id.toString(), phone1: leadData.phone1 };
               }
             }
@@ -343,10 +325,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Determine phone number to call
       let phoneNumber = lead.phoneNumber;
       
-      // If no phone number yet, try to get it
       if (!phoneNumber && lead.getLeadDetails) {
         const leadDetails = await lead.getLeadDetails();
         phoneNumber = leadDetails.phone1;
