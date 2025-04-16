@@ -34,7 +34,7 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
 
   const fetchLeads = async () => {
     try {
-      const { data: { data }, error } = await supabase.rpc('get_all_leads');
+      const { data, error } = await supabase.rpc('get_all_leads');
       
       if (error) {
         console.error('Error fetching leads:', error);
@@ -42,6 +42,7 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
         return;
       }
 
+      // Fixed: properly handling the response data which is an array
       setLeads(data || []);
     } catch (error) {
       console.error('Error in fetchLeads:', error);
