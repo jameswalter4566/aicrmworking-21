@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { useParams, useNavigate } from "react-router-dom";
@@ -174,7 +173,10 @@ const CallingListViewer = () => {
         {showLeadSelector && (
           <div className="border rounded-lg p-4 mb-4">
             <h2 className="text-lg font-medium mb-4">Select Leads to Add</h2>
-            <LeadSelectionPanel onLeadsSelected={handleLeadsSelected} />
+            <LeadSelectionPanel 
+              listId={id || ''} 
+              onLeadsSelected={handleLeadsSelected} 
+            />
           </div>
         )}
         

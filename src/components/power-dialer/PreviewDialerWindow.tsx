@@ -31,6 +31,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   onEndCall
 }) => {
   const [isDialingStarted, setIsDialingStarted] = useState(false);
+  const tempListId = "preview-dialer-temp-list";
 
   return (
     <>
@@ -82,6 +83,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               </div>
             ) : !currentCall ? (
               <LeadSelectionPanel 
+                listId={tempListId}
                 onLeadsSelected={(leads) => {
                   console.log('Selected leads:', leads);
                   // Handle the selected leads here
