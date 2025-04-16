@@ -108,25 +108,24 @@ serve(async (req) => {
 
     console.log(`Found ${devices.length} devices`);
 
-    // Step 2: Get received messages with no date filtering
-    const messagesPayload = {
+    // Step 2: Get received messages
+    const receivedPayload = {
       key: smsApiKey,
       status: 'received'
-      // No time range filtering - we want all messages
     };
 
-    const messagesResponse = await fetch(`${smsServerUrl}/services/read-messages.php`, {
+    const receivedResponse = await fetch(`${smsServerUrl}/services/read-messages.php`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams(messagesPayload).toString()
+      body: new URLSearchParams(receivedPayload).toString()
     });
 
-    if (!messagesResponse.ok) {
-      console.error("Failed to retrieve messages");
+    if (!receivedResponse.ok) {
+      console.error("Failed to retrieve received messages");
       return new Response(
-        JSON.stringify({ error: 'Failed to retrieve messages' }),
+        JSON.stringify({ error: 'Failed to retrieve received messages' }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -134,22 +133,66 @@ serve(async (req) => {
       );
     }
 
-    const messagesData = await messagesResponse.json();
-    const allMessages = messagesData.data.messages || [];
+    const receivedData = await receivedResponse.json();
+    const receivedMessages = receivedData.data.messages || [];
 
-    console.log(`Retrieved ${allMessages.length} total messages`);
+    console.log(`Retrieved ${receivedMessages.length} total received messages`);
 
-    // Filter messages by the lead's phone number
-    const leadMessages = allMessages.filter(message => {
-      const messageNumber = (message.number || message.from || "").replace(/\D/g, '');
-      const leadPhoneNumber = phoneNumber.replace(/\D/g, '');
-      return messageNumber.includes(leadPhoneNumber) || leadPhoneNumber.includes(messageNumber);
+    // Step 3: Get sent messages
+    const sentPayload = {
+      key: smsApiKey,
+      status: 'sent'
+    };
+
+    const sentResponse = await fetch(`${smsServerUrl}/services/read-messages.php`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams(sentPayload).toString()
     });
 
-    console.log(`Filtered to ${leadMessages.length} messages for phone number ${phoneNumber}`);
+    if (!sentResponse.ok) {
+      console.error("Failed to retrieve sent messages");
+      return new Response(
+        JSON.stringify({ error: 'Failed to retrieve sent messages' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
-    // Step 3: Format messages for database storage and frontend consumption
-    const formattedMessages = leadMessages.map(message => {
+    const sentData = await sentResponse.json();
+    const sentMessages = sentData.data.messages || [];
+
+    console.log(`Retrieved ${sentMessages.length} total sent messages`);
+
+    // Helper function to normalize phone numbers for comparison
+    const normalizePhoneNumber = (phone: string): string => {
+      return (phone || "").replace(/\D/g, '');
+    };
+
+    const leadPhoneNormalized = normalizePhoneNumber(phoneNumber);
+
+    // Filter received messages by the lead's phone number
+    const leadReceivedMessages = receivedMessages.filter(message => {
+      const messageNumber = normalizePhoneNumber(message.number || message.from || "");
+      return messageNumber.includes(leadPhoneNormalized) || leadPhoneNormalized.includes(messageNumber);
+    });
+
+    console.log(`Filtered to ${leadReceivedMessages.length} received messages for phone number ${phoneNumber}`);
+
+    // Filter sent messages by the lead's phone number
+    const leadSentMessages = sentMessages.filter(message => {
+      const messageNumber = normalizePhoneNumber(message.number || message.to || "");
+      return messageNumber.includes(leadPhoneNormalized) || leadPhoneNormalized.includes(messageNumber);
+    });
+
+    console.log(`Filtered to ${leadSentMessages.length} sent messages for phone number ${phoneNumber}`);
+
+    // Format received messages for database storage and frontend consumption
+    const formattedReceivedMessages = leadReceivedMessages.map(message => {
       // Ensure timestamp is valid
       let timestamp;
       try {
@@ -171,16 +214,42 @@ serve(async (req) => {
       };
     });
 
-    // Sort messages by timestamp (oldest first)
-    const sortedMessages = formattedMessages.sort((a, b) => 
+    // Format sent messages for database storage and frontend consumption
+    const formattedSentMessages = leadSentMessages.map(message => {
+      // Ensure timestamp is valid
+      let timestamp;
+      try {
+        timestamp = new Date(message.timestamp * 1000).toISOString();
+      } catch (e) {
+        // Use current time as fallback if timestamp is invalid
+        timestamp = new Date().toISOString();
+      }
+
+      return {
+        id: message.id,
+        type: 'sms',
+        content: message.message || '',
+        sender: 'ai', // Using 'ai' to represent system/agent sent messages
+        timestamp: timestamp,
+        phone: message.number || message.to,
+        deviceId: message.deviceID,
+        rawData: message
+      };
+    });
+
+    // Combine both received and sent messages
+    const allMessages = [...formattedReceivedMessages, ...formattedSentMessages];
+
+    // Sort all messages by timestamp (oldest first)
+    const sortedMessages = allMessages.sort((a, b) => 
       new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
     // Store messages in Supabase for future reference
-    if (formattedMessages.length > 0) {
+    if (allMessages.length > 0) {
       const { error: insertError } = await supabase
         .from('sms_webhooks')
-        .insert(formattedMessages.map(msg => ({
+        .insert(allMessages.map(msg => ({
           webhook_data: msg.rawData,
           received_at: msg.timestamp
         })));
