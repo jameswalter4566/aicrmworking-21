@@ -16,12 +16,15 @@ import {
   StopCircle,
   Play,
   Trash2,
-  List
+  List,
+  Loader2
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useAuth } from "@/context/AuthContext";
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -38,6 +41,10 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [callingLists, setCallingLists] = useState<any[]>([]);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [isLoadingLists, setIsLoadingLists] = useState(false);
+  const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const { user } = useAuth();
   
   useEffect(() => {
     if (isDialingStarted) {
@@ -47,11 +54,13 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);
+    setError(null);
     try {
       const { data, error } = await supabase.functions.invoke('get-calling-lists');
       
       if (error) {
         console.error("Error fetching calling lists:", error);
+        setError("Failed to load calling lists. Please try again.");
         toast.error("Failed to load calling lists");
         return;
       }
@@ -59,6 +68,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       setCallingLists(data || []);
     } catch (error) {
       console.error("Error in fetchCallingLists:", error);
+      setError("An unexpected error occurred while loading lists.");
       toast.error("Failed to load calling lists");
     } finally {
       setIsLoadingLists(false);
@@ -92,23 +102,38 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   };
 
   const handleBeginDialing = async () => {
-    if (!selectedListId) return;
+    if (!selectedListId) {
+      toast.error("Please select a calling list first");
+      return;
+    }
+    
+    setIsCreatingSession(true);
+    setError(null);
     
     try {
+      const selectedList = callingLists.find(list => list.id === selectedListId);
+      const sessionName = selectedList ? `Dialing Session for ${selectedList.name}` : undefined;
+      
+      console.log("Starting dialing session with:", { listId: selectedListId, sessionName });
+      
       const { data, error } = await supabase.functions.invoke('start-dialing-session', {
         body: { 
           listId: selectedListId,
-          sessionName: `Dialing Session for ${callingLists.find(list => list.id === selectedListId)?.name}`
+          sessionName
         }
       });
       
       if (error) {
         console.error("Error starting dialing session:", error);
+        setError("Failed to start dialing session. Please try again.");
         toast.error("Failed to start dialing session", {
           description: error.message || "Unable to begin dialing"
         });
         return;
       }
+      
+      console.log("Dialing session created successfully:", data);
+      setSessionId(data.sessionId);
       
       toast.success("Dialing Session Started", {
         description: `Preparing to dial ${data.totalLeads} leads`
@@ -117,9 +142,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       // TODO: Implement next steps for actually starting the dialing process
     } catch (error) {
       console.error("Unexpected error in handleBeginDialing:", error);
+      setError("An unexpected error occurred. Please try again later.");
       toast.error("Failed to start dialing session", {
         description: "An unexpected error occurred"
       });
+    } finally {
+      setIsCreatingSession(false);
     }
   };
 
@@ -173,25 +201,46 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               </div>
             ) : !currentCall ? (
               <div className="space-y-4">
-                {selectedListId && (
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Error</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                
+                {sessionId ? (
+                  <div className="text-center py-6">
+                    <Badge className="mb-4 bg-green-100 text-green-800 py-2 px-4 text-sm">
+                      Session Active
+                    </Badge>
+                    <p className="text-lg font-medium">Dialing session has been created successfully!</p>
+                    <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId}</p>
+                  </div>
+                ) : selectedListId && (
                   <div className="mb-4 flex justify-center">
                     <Button 
                       onClick={handleBeginDialing}
                       className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                      disabled={isCreatingSession}
                     >
-                      <Phone className="h-5 w-5" />
-                      Begin Dialing
+                      {isCreatingSession ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <Phone className="h-5 w-5" />
+                      )}
+                      {isCreatingSession ? 'Creating Session...' : 'Begin Dialing'}
                     </Button>
                   </div>
                 )}
 
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium">Select a Calling List</h3>
-                  {selectedListId && (
+                  {selectedListId && !sessionId && (
                     <Button 
                       variant="outline" 
                       onClick={() => setSelectedListId(null)}
                       className="text-sm"
+                      disabled={isCreatingSession}
                     >
                       Change List
                     </Button>
@@ -200,6 +249,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 
                 {isLoadingLists ? (
                   <div className="text-center py-8 text-gray-500">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
                     Loading calling lists...
                   </div>
                 ) : callingLists.length === 0 ? (
@@ -217,7 +267,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                           cursor-pointer transition-all
                           ${selectedListId === list.id ? 'ring-2 ring-green-500' : 'hover:bg-gray-50'}
                         `}
-                        onClick={() => setSelectedListId(list.id)}
+                        onClick={() => !sessionId && setSelectedListId(list.id)}
                       >
                         <CardContent className="p-4">
                           <div className="flex justify-between items-center">
@@ -239,7 +289,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   </div>
                 )}
                 
-                {selectedListId && (
+                {selectedListId && !sessionId && (
                   <div className="mt-6 space-y-4">
                     <LeadSelectionPanel 
                       listId={selectedListId}

@@ -26,11 +26,12 @@ serve(async (req) => {
     );
     
     // Verify user authentication
-    const { data: { user } } = await supabaseClient.auth.getUser();
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
     
-    if (!user) {
+    if (authError || !user) {
+      console.error('Auth error:', authError);
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
+        JSON.stringify({ error: 'Unauthorized', details: authError }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -46,6 +47,8 @@ serve(async (req) => {
       );
     }
     
+    console.log(`Processing request for listId: ${listId}, sessionName: ${sessionName}, userId: ${user.id}`);
+    
     // Verify user has access to the calling list
     const { data: listAccess, error: listAccessError } = await supabaseClient
       .from('calling_lists')
@@ -54,7 +57,15 @@ serve(async (req) => {
       .eq('created_by', user.id)
       .maybeSingle();
     
-    if (listAccessError || !listAccess) {
+    if (listAccessError) {
+      console.error('List access error:', listAccessError);
+      return new Response(
+        JSON.stringify({ error: 'Error checking list access', details: listAccessError }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!listAccess) {
       return new Response(
         JSON.stringify({ error: 'List not found or access denied' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -70,7 +81,7 @@ serve(async (req) => {
     if (leadsError) {
       console.error('Error fetching list leads:', leadsError);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch leads' }),
+        JSON.stringify({ error: 'Failed to fetch leads', details: leadsError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -82,11 +93,14 @@ serve(async (req) => {
       );
     }
     
-    // Create dialing session
+    console.log(`Found ${listLeads.length} leads for list ${listId}`);
+    
+    // Create dialing session with a proper name
+    const finalSessionName = sessionName || `Dialing Session - ${new Date().toLocaleString()}`;
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('dialing_sessions')
       .insert({
-        name: sessionName || `Dialing Session - ${new Date().toLocaleString()}`,
+        name: finalSessionName,
         created_by: user.id,
         calling_list_id: listId,
         status: 'active',
@@ -101,10 +115,12 @@ serve(async (req) => {
     if (sessionError) {
       console.error('Error creating dialing session:', sessionError);
       return new Response(
-        JSON.stringify({ error: 'Failed to create dialing session' }),
+        JSON.stringify({ error: 'Failed to create dialing session', details: sessionError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log(`Created dialing session with ID: ${sessionData.id}`);
     
     // Add leads to dialing session
     const sessionLeads = listLeads.map(lead => ({
@@ -120,22 +136,25 @@ serve(async (req) => {
     if (sessionLeadsError) {
       console.error('Error adding leads to session:', sessionLeadsError);
       return new Response(
-        JSON.stringify({ error: 'Failed to add leads to dialing session' }),
+        JSON.stringify({ error: 'Failed to add leads to dialing session', details: sessionLeadsError }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
+    console.log(`Added ${sessionLeads.length} leads to dialing session ${sessionData.id}`);
+    
     return new Response(
       JSON.stringify({ 
         sessionId: sessionData.id, 
-        totalLeads: listLeads.length 
+        totalLeads: listLeads.length,
+        message: "Dialing session created successfully" 
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal Server Error' }),
+      JSON.stringify({ error: 'Internal Server Error', details: error.message || String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
