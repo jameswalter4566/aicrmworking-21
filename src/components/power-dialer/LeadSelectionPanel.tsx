@@ -34,8 +34,8 @@ const LeadSelectionPanel: React.FC<LeadSelectionPanelProps> = ({ onLeadsSelected
 
   const fetchLeads = async () => {
     try {
-      // Explicitly type the response from the RPC call to match the Lead interface structure
-      const { data, error } = await supabase.rpc<Lead[]>('get_all_leads');
+      // Fixed: Add both type parameters - one for the return type and one for the input params
+      const { data, error } = await supabase.rpc<Lead[], void>('get_all_leads');
       
       if (error) {
         console.error('Error fetching leads:', error);
