@@ -52,12 +52,50 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
+      // We need to get the lead's phone number from the database using lead_id
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select('phone1, id')
+        .eq('id', lead.lead_id)
+        .single();
+      
+      if (leadError || !leadData) {
+        console.error('Error fetching lead details:', leadError);
+        toast({
+          title: "Error",
+          description: "Could not fetch lead contact information",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Initialize Twilio device if needed
       await twilioService.initializeTwilioDevice();
       
       // Get the lead phone number and id
-      const phoneNumber = lead.phone_number;
+      const phoneNumber = leadData.phone1;
       const leadId = lead.id;
+      
+      if (!phoneNumber) {
+        toast({
+          title: "Missing Phone Number",
+          description: "This lead does not have a valid phone number",
+          variant: "destructive",
+        });
+        
+        // Update lead status to failed
+        await supabase
+          .from('dialing_session_leads')
+          .update({
+            status: 'failed',
+            notes: 'Missing phone number'
+          })
+          .eq('id', leadId);
+          
+        setIsProcessingCall(false);
+        onCallComplete();
+        return;
+      }
       
       // Make the call using existing Twilio service
       const callResult = await twilioService.makeCall(phoneNumber, leadId);
