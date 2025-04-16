@@ -14,10 +14,13 @@ import {
   RotateCcw,
   Pause,
   StopCircle,
-  Play
+  Play,
+  Trash2
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import LeadSelectionPanel from './LeadSelectionPanel';
+import LeadSelectionPanel from './LeadSelectionPanel";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -32,6 +35,32 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 }) => {
   const [isDialingStarted, setIsDialingStarted] = useState(false);
   const tempListId = "preview-dialer-temp-list";
+
+  const handleDeleteLead = async (leadId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase.functions.invoke('delete-lead', {
+        body: { leadId }
+      });
+      
+      if (error) {
+        console.error("Error deleting lead:", error);
+        toast.error("Failed to delete lead");
+        return;
+      }
+      
+      toast.success("Lead deleted successfully");
+      // Notify parent component or refresh data as needed
+    } catch (error) {
+      console.error("Error in handleDeleteLead:", error);
+      toast.error("Failed to delete lead");
+    }
+  };
 
   return (
     <>
@@ -109,14 +138,25 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                     </div>
                   </div>
                   
-                  <Button 
-                    variant="destructive" 
-                    size="sm"
-                    onClick={onEndCall}
-                  >
-                    <PhoneOff className="h-4 w-4 mr-2" />
-                    End Call
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={onEndCall}
+                    >
+                      <PhoneOff className="h-4 w-4 mr-2" />
+                      End Call
+                    </Button>
+                    
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                      onClick={(e) => handleDeleteLead(currentCall?.parameters?.leadId, e)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 
                 <div className="border-t pt-4">

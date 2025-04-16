@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
-import { ChevronLeft, Users, Phone, Search, Loader2, PlusCircle } from "lucide-react";
+import { ChevronLeft, Users, Phone, Search, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import LeadSelectionPanel from "@/components/power-dialer/LeadSelectionPanel";
@@ -111,6 +111,32 @@ const CallingListViewer = () => {
     } catch (error) {
       console.error("Error in handleLeadsSelected:", error);
       toast.error("Failed to add leads");
+    }
+  };
+  
+  const handleDeleteLead = async (leadId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (!window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase.functions.invoke('delete-lead', {
+        body: { leadId }
+      });
+      
+      if (error) {
+        console.error("Error deleting lead:", error);
+        toast.error("Failed to delete lead");
+        return;
+      }
+      
+      toast.success("Lead deleted successfully");
+      fetchListLeads();
+    } catch (error) {
+      console.error("Error in handleDeleteLead:", error);
+      toast.error("Failed to delete lead");
     }
   };
   
@@ -223,14 +249,24 @@ const CallingListViewer = () => {
                     <TableCell>{lead.phone1}</TableCell>
                     <TableCell>{lead.email}</TableCell>
                     <TableCell>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="border-gray-300"
-                      >
-                        <Phone className="h-3 w-3 mr-1" />
-                        Call
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="border-gray-300"
+                        >
+                          <Phone className="h-3 w-3 mr-1" />
+                          Call
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                          onClick={(e) => handleDeleteLead(lead.id, e)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
