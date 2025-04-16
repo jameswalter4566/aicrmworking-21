@@ -27,13 +27,14 @@ interface DialerQueueMonitorProps {
 const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) => {
   const [stats, setStats] = useState<QueueStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [noLeadsError, setNoLeadsError] = useState<string | null>(null);
 
   const fetchQueueStats = async () => {
     if (!sessionId) return;
     
     setIsLoading(true);
     try {
-      // Instead of using .single() which fails if no rows exist, we'll query differently
+      // Query session_queue_stats view first
       const { data, error } = await supabase
         .from('session_queue_stats')
         .select('*')
@@ -45,22 +46,46 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
         throw error;
       }
       
-      // If we got data, use it. Otherwise, check dialing_session_leads directly
+      // If we got data, use it
       if (data) {
+        console.log("Queue stats from view:", data);
         setStats(data);
+        if (data.total_count === 0) {
+          setNoLeadsError("No leads found in the queue");
+        } else if (data.queued_count === 0 && data.total_count > 0) {
+          // If we have leads but none are queued, that's unusual
+          console.log("Warning: Found leads but none are queued");
+        } else {
+          setNoLeadsError(null);
+        }
       } else {
-        // Fallback to counting directly from dialing_session_leads if view doesn't have data yet
+        // Fallback to counting directly from dialing_session_leads
+        console.log("No stats in view, querying leads table directly");
         const { data: leadsData, error: leadsError } = await supabase
           .from('dialing_session_leads')
-          .select('status', { count: 'exact' })
+          .select('status')
           .eq('session_id', sessionId);
           
         if (leadsError) throw leadsError;
+        
+        if (!leadsData || leadsData.length === 0) {
+          console.log("No leads found for session:", sessionId);
+          setNoLeadsError("No leads found in this dialing session");
+          setStats({
+            queued_count: 0,
+            in_progress_count: 0,
+            completed_count: 0,
+            total_count: 0
+          });
+          return;
+        }
         
         // Count the leads by status
         const queued = leadsData?.filter(lead => lead.status === 'queued').length || 0;
         const inProgress = leadsData?.filter(lead => lead.status === 'in_progress').length || 0;
         const completed = leadsData?.filter(lead => lead.status === 'completed').length || 0;
+        
+        console.log(`Direct count - Queued: ${queued}, In Progress: ${inProgress}, Completed: ${completed}, Total: ${leadsData.length}`);
         
         setStats({
           queued_count: queued,
@@ -68,10 +93,19 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
           completed_count: completed,
           total_count: (leadsData?.length || 0)
         });
+        
+        if (queued === 0 && leadsData.length > 0) {
+          // If we have leads but none are queued, check what status they have
+          const statuses = [...new Set(leadsData.map(lead => lead.status))];
+          console.log("Lead statuses in session:", statuses);
+          if (!statuses.includes('queued')) {
+            setNoLeadsError(`Leads found but none are queued. Current statuses: ${statuses.join(', ')}`);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching queue stats:', error);
-      // Don't show toast for this error, as it might happen frequently during initialization
+      setNoLeadsError("Error loading queue data");
     } finally {
       setIsLoading(false);
     }
@@ -92,7 +126,8 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
             table: 'dialing_session_leads',
             filter: `session_id=eq.${sessionId}`
           },
-          () => {
+          (payload) => {
+            console.log("Real-time update received:", payload);
             fetchQueueStats();
           }
         )
@@ -119,6 +154,12 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
         </CardTitle>
       </CardHeader>
       <CardContent>
+        {noLeadsError && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700 text-sm">
+            {noLeadsError}
+          </div>
+        )}
+        
         <div className="grid grid-cols-4 gap-4">
           <div className="flex flex-col items-center p-3 bg-gray-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">

@@ -151,13 +151,13 @@ serve(async (req) => {
       
       console.log(`Found ${actualLeads.length} valid leads to add to session`);
       
-      // Prepare session lead entries - always use STRING representation of lead IDs
+      // Explicitly ensure each lead has a string representation of lead ID and is set to 'queued' status
       const sessionLeads = actualLeads.map(lead => ({
         session_id: sessionData.id,
         lead_id: String(lead.id),
-        status: 'queued',
-        priority: 1,  // Default priority
-        attempt_count: 0
+        status: 'queued',  // Explicitly set status to 'queued'
+        priority: 1,       // Default priority
+        attempt_count: 0   // Initial attempt count
       }));
       
       // Insert in smaller batches if needed
@@ -166,22 +166,26 @@ serve(async (req) => {
       
       for (let i = 0; i < sessionLeads.length; i += BATCH_SIZE) {
         const batch = sessionLeads.slice(i, i + BATCH_SIZE);
-        const { error: insertError } = await supabaseClient
+        const { data: insertData, error: insertError } = await supabaseClient
           .from('dialing_session_leads')
-          .insert(batch);
+          .insert(batch)
+          .select();
         
         if (insertError) {
           console.error(`Error inserting batch ${i / BATCH_SIZE + 1}:`, insertError);
         } else {
           insertedCount += batch.length;
           console.log(`Inserted batch ${i / BATCH_SIZE + 1} with ${batch.length} leads with 'queued' status`);
+          if (insertData) {
+            console.log(`First lead in batch: ${JSON.stringify(insertData[0])}`);
+          }
         }
       }
       
       // Double-check that leads were actually inserted with queued status
       const { data: queuedLeads, error: queueCheckError } = await supabaseClient
         .from('dialing_session_leads')
-        .select('status')
+        .select('id, status')
         .eq('session_id', sessionData.id)
         .eq('status', 'queued');
         
@@ -189,14 +193,26 @@ serve(async (req) => {
         console.error('Error checking queued leads:', queueCheckError);
       } else {
         console.log(`Verified ${queuedLeads?.length || 0} leads are in 'queued' status`);
+        if (queuedLeads && queuedLeads.length > 0) {
+          console.log('Sample queued lead:', queuedLeads[0]);
+        }
       }
       
-      // Update session with accurate count
+      // Update session with accurate count of actually inserted leads
       if (insertedCount > 0) {
         await supabaseClient
           .from('dialing_sessions')
           .update({ total_leads: insertedCount })
           .eq('id', sessionData.id);
+      }
+      
+      // Force refresh the session_queue_stats view
+      const { data: refreshStats, error: refreshError } = await supabaseClient
+        .rpc('get_next_session_lead', { p_session_id: sessionData.id })
+        .limit(0);
+        
+      if (refreshError) {
+        console.log('Note: Stats refresh query returned error (this might be expected):', refreshError);
       }
       
       console.log(`Successfully added ${insertedCount} leads to dialing session ${sessionData.id}`);
@@ -205,6 +221,7 @@ serve(async (req) => {
         JSON.stringify({ 
           sessionId: sessionData.id, 
           totalLeads: insertedCount,
+          queuedLeads: queuedLeads?.length || 0,
           message: "Dialing session created successfully" 
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
