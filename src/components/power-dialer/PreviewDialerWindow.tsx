@@ -152,6 +152,18 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               </div>
             ) : !currentCall ? (
               <div className="space-y-4">
+                {selectedListId && (
+                  <div className="mb-4 flex justify-center">
+                    <Button 
+                      onClick={handleBeginDialing}
+                      className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                    >
+                      <Phone className="h-5 w-5" />
+                      Begin Dialing
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-medium">Select a Calling List</h3>
                   {selectedListId && (
@@ -214,16 +226,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                         console.log('Selected leads:', leads);
                       }}
                     />
-                    
-                    <div className="flex justify-center mt-4">
-                      <Button 
-                        onClick={handleBeginDialing}
-                        className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
-                      >
-                        <Phone className="h-5 w-5" />
-                        Begin Dialing
-                      </Button>
-                    </div>
                   </div>
                 )}
               </div>
