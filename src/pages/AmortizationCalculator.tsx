@@ -10,6 +10,7 @@ import { Calculator, DollarSign, PercentIcon, CalendarIcon } from "lucide-react"
 import { useIndustry } from "@/context/IndustryContext";
 import { useNavigate } from "react-router-dom";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface AmortizationEntry {
   payment: number;
@@ -69,9 +70,6 @@ const AmortizationCalculator = () => {
         interest: interestPayment,
         balance: Math.max(0, balance),
       });
-      
-      // Only show first few entries by default
-      if (i >= 24 && !showFullSchedule) break;
     }
     
     setSchedule(schedule);
@@ -84,6 +82,11 @@ const AmortizationCalculator = () => {
       currency: 'USD',
     }).format(value);
   };
+
+  // Get the appropriate schedule based on showFullSchedule state
+  const displaySchedule = showFullSchedule 
+    ? schedule
+    : schedule.slice(0, 24);
 
   return (
     <MainLayout>
@@ -198,9 +201,9 @@ const AmortizationCalculator = () => {
             <CardContent>
               {schedule.length > 0 ? (
                 <>
-                  <div className="border rounded-md overflow-x-auto">
+                  <ScrollArea className="border rounded-md h-[400px]">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-white z-10">
                         <TableRow>
                           <TableHead>Month</TableHead>
                           <TableHead>Payment</TableHead>
@@ -210,7 +213,7 @@ const AmortizationCalculator = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {schedule.map((entry, index) => (
+                        {displaySchedule.map((entry, index) => (
                           <TableRow key={index}>
                             <TableCell>{index + 1}</TableCell>
                             <TableCell>{formatCurrency(entry.payment)}</TableCell>
@@ -221,7 +224,7 @@ const AmortizationCalculator = () => {
                         ))}
                       </TableBody>
                     </Table>
-                  </div>
+                  </ScrollArea>
                   {loanTerm * 12 > 24 && (
                     <Button
                       variant="outline"
