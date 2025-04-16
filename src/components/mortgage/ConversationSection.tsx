@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Mail, MessageSquare, Phone, Send, RefreshCw } from "lucide-react";
+import { Mail, MessageSquare, Phone, Send, RefreshCw, Eye, EyeOff } from "lucide-react";
 import { Avatar } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ interface Message {
   sender: "client" | "ai";
   timestamp: Date | string;
   phone?: string;
+  rawData?: any;
 }
 
 interface ConversationSectionProps {
@@ -30,6 +31,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [sendingGreeting, setSendingGreeting] = useState<boolean>(false);
+  const [showRawData, setShowRawData] = useState<boolean>(false);
   const [leadInfo, setLeadInfo] = useState<{
     firstName?: string;
     lastName?: string;
@@ -79,7 +81,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
         return;
       }
       
-      // Attempt to fetch real messages from our API
+      // Attempt to fetch messages from our API (now filtered by date only)
       const { data, error } = await supabase.functions.invoke('sms-retrieve-messages-for-lead', {
         body: { leadId }
       });
@@ -96,7 +98,8 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
           content: msg.content,
           sender: msg.sender,
           timestamp: new Date(msg.timestamp),
-          phone: msg.phone
+          phone: msg.phone,
+          rawData: msg.rawData
         }));
         
         // Sort by timestamp (oldest first)
@@ -107,40 +110,9 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
         setMessages(sortedMessages);
         console.log("Retrieved messages:", sortedMessages);
       } else {
-        console.log("No messages found, using sample data");
-        // Fallback to sample data if no messages found
-        const mockMessages: Message[] = [
-          {
-            id: "1",
-            type: "email",
-            content: "Hello, I'm interested in refinancing my home. Can you tell me what rates are available?",
-            sender: "client",
-            timestamp: new Date(2025, 3, 12, 10, 30)
-          },
-          {
-            id: "2",
-            type: "email",
-            content: "Hi there! Current rates for a 30-year fixed refinance are around 5.25% with 0 points for borrowers with good credit. Would you like me to check what specific rate you might qualify for?",
-            sender: "ai",
-            timestamp: new Date(2025, 3, 12, 10, 45)
-          },
-          {
-            id: "3",
-            type: "sms",
-            content: "Yes, please. My credit score is around 750.",
-            sender: "client",
-            timestamp: new Date(2025, 3, 12, 14, 15)
-          },
-          {
-            id: "4",
-            type: "sms",
-            content: "Great! With a 750 credit score, you could qualify for a 5.125% rate on a 30-year fixed refinance. Would you like to schedule a call to discuss this further?",
-            sender: "ai",
-            timestamp: new Date(2025, 3, 12, 14, 20)
-          }
-        ];
-        
-        setMessages(mockMessages);
+        console.log("No messages found for the specified date range");
+        toast.info("No messages found for April 16-17, 2025");
+        setMessages([]);
       }
     } catch (error) {
       console.error("Error fetching messages:", error);
@@ -194,15 +166,6 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
       setMessages(prev => [...prev, newMessage]);
       toast.success("Greeting message sent successfully!");
       
-      // Optional: Record this action in lead activities or notes
-      await supabase.functions.invoke('add-lead-note', {
-        body: {
-          leadId,
-          content: `Sent welcome SMS: "${message.substring(0, 50)}..."`,
-          createdBy: "System"
-        }
-      });
-      
     } catch (error: any) {
       console.error("Error sending greeting SMS:", error);
       toast.error("Failed to send greeting message");
@@ -235,9 +198,26 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
     <div className="space-y-4">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold text-blue-800">
-          Client Conversations
+          Client Conversations (April 16-17, 2025)
         </h2>
         <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowRawData(!showRawData)} 
+            variant="outline" 
+            className="border-blue-300 hover:bg-blue-50 text-blue-700"
+          >
+            {showRawData ? (
+              <>
+                <EyeOff className="mr-2 h-4 w-4" /> 
+                Hide Raw Data
+              </>
+            ) : (
+              <>
+                <Eye className="mr-2 h-4 w-4" /> 
+                Show Raw Data
+              </>
+            )}
+          </Button>
           <Button 
             onClick={handleRefresh}
             disabled={refreshing}
@@ -361,13 +341,20 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
                           {message.content}
                         </p>
                         
-                        {message.phone && (
-                          <div className="mt-2">
-                            <span className="text-xs text-gray-500">
-                              Phone: {message.phone}
-                            </span>
-                          </div>
-                        )}
+                        <div className="mt-2 space-y-1">
+                          <span className="text-xs text-gray-500">
+                            Phone: {message.phone || 'Unknown'}
+                          </span>
+                          
+                          {showRawData && message.rawData && (
+                            <div className="mt-2">
+                              <span className="text-xs font-semibold text-gray-500">Raw Data:</span>
+                              <pre className="text-xs bg-gray-50 p-2 rounded-sm overflow-auto max-h-32 mt-1">
+                                {JSON.stringify(message.rawData, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -376,7 +363,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
               </ScrollArea>
             ) : (
               <div className="text-sm text-blue-800 italic py-8 text-center">
-                No {activeTab === "all" ? "conversations" : `${activeTab} messages`} found for this borrower yet.
+                No messages found between April 16-17, 2025.
               </div>
             )}
           </CardContent>

@@ -53,11 +53,14 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Get current timestamp in ISO format
+    const now = new Date().toISOString();
+
     // Store the webhook data in the database
     const { data, error } = await supabase.from('sms_webhooks').insert({
       webhook_data: payload,
       processed: false,
-      received_at: new Date().toISOString()
+      received_at: now
     });
 
     if (error) {
@@ -71,38 +74,21 @@ serve(async (req) => {
       );
     }
 
-    // Process the webhook based on the event type
+    // Log the important parts of the message for debugging
     const phoneNumber = payload.number || payload.from;
+    const message = payload.message || payload.text || payload.content;
+    const deviceNumber = payload.device_number || payload.to;
     
-    if (phoneNumber) {
-      // Try to find a matching lead based on phone number
-      const formattedPhone = phoneNumber.replace(/\D/g, '');
-      const { data: leadData, error: leadError } = await supabase
-        .from('leads')
-        .select('id, firstName, lastName')
-        .or(`phone1.ilike.%${formattedPhone}%,phone2.ilike.%${formattedPhone}%`)
-        .limit(1);
-        
-      if (!leadError && leadData && leadData.length > 0) {
-        const lead = leadData[0];
-        
-        // Add a lead activity for this incoming message
-        await supabase.from('lead_activities').insert({
-          lead_id: lead.id,
-          type: 'sms_received',
-          description: `Received SMS from ${lead.firstName} ${lead.lastName}: "${payload.message?.substring(0, 50)}${payload.message?.length > 50 ? '...' : ''}"`
-        });
-        
-        console.log(`SMS matched to lead: ${lead.id} (${lead.firstName} ${lead.lastName})`);
-      } else {
-        console.log(`No matching lead found for phone: ${phoneNumber}`);
-      }
-    }
+    console.log(`SMS received at ${now}:`);
+    console.log(`- From: ${phoneNumber || 'unknown'}`);
+    console.log(`- To: ${deviceNumber || 'unknown'}`);
+    console.log(`- Message: ${message || 'no content'}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Webhook received and processed successfully'
+        message: 'Webhook received and stored successfully',
+        timestamp: now
       }),
       {
         status: 200,
