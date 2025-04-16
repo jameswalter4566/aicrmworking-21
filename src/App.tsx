@@ -37,7 +37,6 @@ import LeadProfile from "./pages/LeadProfile";
 import LoanApplicationViewer from "./pages/LoanApplicationViewer";
 import ProcessorAssist from "./pages/ProcessorAssist";
 import ProcessorAssistViewer from "./pages/ProcessorAssistViewer";
-import CallingListViewer from "./pages/CallingListViewer";
 
 const queryClient = new QueryClient();
 
@@ -269,8 +268,6 @@ function App() {
                 <Route path="/yourhomesolution*" element={<YourHomeSolution />} />
                 
                 <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
-                
-                <Route path="/calling-list/:id" element={<CallingListViewer />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
