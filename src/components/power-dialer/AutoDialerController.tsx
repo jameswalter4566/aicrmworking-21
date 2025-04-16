@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +9,6 @@ interface AutoDialerControllerProps {
   onCallComplete: () => void;
 }
 
-// Define a new interface for the lead returned by get_next_session_lead
 interface SessionLead {
   id: string;
   lead_id: string;
@@ -18,7 +16,7 @@ interface SessionLead {
   status: string;
   priority: number;
   attempt_count: number;
-  notes?: string; // Add the notes field as optional
+  notes?: string;
 }
 
 export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
@@ -36,7 +34,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     try {
       console.log('Fetching next lead for session:', sessionId);
       
-      // First, check if there are any queued leads left in the session
       const { data: queuedLeads, error: queueCheckError } = await supabase
         .from('dialing_session_leads')
         .select('count')
@@ -56,7 +53,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return null;
       }
       
-      // If queued leads exist, then get the next lead
       const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
         p_session_id: sessionId
       });
@@ -74,23 +70,19 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       console.log('Next lead retrieved:', nextLead[0]);
       
-      // Parse the lead notes to get the original lead ID and phone number
       let leadDetails = { id: null, phone1: null };
       try {
-        // Cast nextLead[0] to SessionLead to avoid TypeScript error
         const lead = nextLead[0] as SessionLead;
         const notesData = lead.notes ? JSON.parse(lead.notes) : {};
         const originalLeadId = notesData.originalLeadId;
         const phoneNumber = notesData.phone;
         
         if (phoneNumber) {
-          // If we have the phone number in the notes, use it directly
           return {
             ...lead,
             phoneNumber: phoneNumber
           };
         } else if (originalLeadId) {
-          // Otherwise query the leads table with the original lead ID
           const { data: leadData, error: leadError } = await supabase
             .from('leads')
             .select('id, phone1')
@@ -108,12 +100,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         }
       } catch (parseError) {
         console.error('Error parsing lead notes:', parseError);
-        // Continue execution and try to get lead details directly
       }
       
-      // If we couldn't get lead details from the notes, try using the lead_id directly
       if (!leadDetails.phone1) {
-        // Check if lead_id is a number first
         try {
           const leadIdAsNumber = parseInt(nextLead[0].lead_id);
           
@@ -135,7 +124,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         }
       }
       
-      // Return the next lead with phone number
       return {
         ...nextLead[0],
         phoneNumber: leadDetails.phone1
@@ -143,7 +131,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     } catch (error) {
       console.error('Error getting next lead:', error);
       
-      // If there's an ambiguous id error, we know the function needs fixing
       if (error.message?.includes('ambiguous') || error.code === '42702') {
         toast({
           title: "Database Function Error",
@@ -183,19 +170,31 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      if (!lead.phoneNumber) {
+      let phoneNumber = null;
+      if (lead.notes) {
+        try {
+          const notesData = JSON.parse(lead.notes);
+          phoneNumber = notesData.phone;
+        } catch (e) {
+          console.error('Error parsing lead notes:', e);
+        }
+      }
+
+      if (!phoneNumber) {
         toast({
           title: "Missing Phone Number",
           description: "This lead does not have a valid phone number",
           variant: "destructive",
         });
         
-        // Update lead status to failed
         await supabase
           .from('dialing_session_leads')
           .update({
             status: 'failed',
-            notes: 'Missing phone number'
+            notes: JSON.stringify({
+              ...JSON.parse(lead.notes || '{}'),
+              error: 'Missing phone number'
+            })
           })
           .eq('id', lead.id);
           
@@ -204,12 +203,10 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Initialize Twilio device
       await twilioService.initializeTwilioDevice();
       
-      // Make the call using phone number from lead
-      console.log(`Initiating call to ${lead.phoneNumber} for lead ID ${lead.lead_id}`);
-      const callResult = await twilioService.makeCall(lead.phoneNumber, lead.lead_id);
+      console.log(`Initiating call to ${phoneNumber} for lead ID ${lead.lead_id}`);
+      const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
       
       if (!callResult.success) {
         toast({
@@ -218,15 +215,29 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           variant: "destructive",
         });
         
-        // Update lead status
         await supabase
           .from('dialing_session_leads')
           .update({
             status: 'failed',
-            notes: callResult.error
+            notes: JSON.stringify({
+              ...JSON.parse(lead.notes || '{}'),
+              error: callResult.error
+            })
           })
           .eq('id', lead.id);
       } else {
+        await supabase
+          .from('dialing_session_leads')
+          .update({
+            status: 'in_progress',
+            notes: JSON.stringify({
+              ...JSON.parse(lead.notes || '{}'),
+              callSid: callResult.callSid,
+              callStartTime: new Date().toISOString()
+            })
+          })
+          .eq('id', lead.id);
+
         toast({
           title: "Call Initiated",
           description: `Calling lead ${lead.lead_id}`
@@ -246,7 +257,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, [isProcessingCall, isActive, sessionId, getNextLead, toast, onCallComplete, noMoreLeads]);
 
-  // Monitor for completed calls and process next lead
   useEffect(() => {
     if (!isActive || !sessionId) return;
 
@@ -263,7 +273,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         (payload) => {
           const newStatus = payload.new.status;
           if (newStatus === 'completed' || newStatus === 'failed') {
-            // Reset noMoreLeads flag when a call completes, in case leads were added
             setNoMoreLeads(false);
             processNextLead();
           }
@@ -271,7 +280,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       )
       .subscribe();
 
-    // Start initial call if active
     if (!isProcessingCall && !noMoreLeads) {
       processNextLead();
     }
