@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,15 +21,28 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     if (!sessionId) return null;
     
     try {
-      const { data, error } = await supabase.rpc('get_next_session_lead', {
+      const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
         p_session_id: sessionId
       });
       
       if (error) throw error;
-      if (!data || data.length === 0) return null;
+      if (!nextLead || nextLead.length === 0) return null;
       
-      // Return the first item from the array
-      return data[0];
+      // Get lead details including phone number
+      const { data: leadDetails, error: leadError } = await supabase
+        .from('leads')
+        .select('id, phone1')
+        .eq('id', nextLead[0].lead_id)
+        .single();
+      
+      if (leadError || !leadDetails) {
+        throw new Error('Could not fetch lead details');
+      }
+      
+      return {
+        ...nextLead[0],
+        phoneNumber: leadDetails.phone1
+      };
     } catch (error) {
       console.error('Error getting next lead:', error);
       return null;
@@ -42,6 +54,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     
     try {
       setIsProcessingCall(true);
+      
       const lead = await getNextLead();
       
       if (!lead) {
@@ -52,32 +65,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // We need to get the lead's phone number from the database using lead_id
-      const { data: leadData, error: leadError } = await supabase
-        .from('leads')
-        .select('phone1, id')
-        .eq('id', lead.lead_id)
-        .single();
-      
-      if (leadError || !leadData) {
-        console.error('Error fetching lead details:', leadError);
-        toast({
-          title: "Error",
-          description: "Could not fetch lead contact information",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Initialize Twilio device if needed
-      await twilioService.initializeTwilioDevice();
-      
-      // Get the lead phone number and id
-      const phoneNumber = leadData.phone1;
-      // Explicitly convert lead_id to string to match service expectation
-      const leadId = String(lead.lead_id);
-      
-      if (!phoneNumber) {
+      if (!lead.phoneNumber) {
         toast({
           title: "Missing Phone Number",
           description: "This lead does not have a valid phone number",
@@ -97,9 +85,12 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         onCallComplete();
         return;
       }
+
+      // Initialize Twilio device
+      await twilioService.initializeTwilioDevice();
       
-      // Make the call using existing Twilio service - pass leadId as a string
-      const callResult = await twilioService.makeCall(phoneNumber, leadId);
+      // Make the call using phone number from lead
+      const callResult = await twilioService.makeCall(lead.phoneNumber, String(lead.lead_id));
       
       if (!callResult.success) {
         toast({
@@ -119,7 +110,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       } else {
         toast({
           title: "Call Initiated",
-          description: `Calling lead ${leadId}`
+          description: `Calling lead ${lead.lead_id}`
         });
       }
 
@@ -169,5 +160,5 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     };
   }, [sessionId, isActive, processNextLead, isProcessingCall]);
 
-  return null; // This is a logic-only component
+  return null;
 };
