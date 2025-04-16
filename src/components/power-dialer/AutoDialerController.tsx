@@ -20,6 +20,12 @@ interface SessionLead {
   notes?: string;
 }
 
+// Create a new interface that extends SessionLead with the dynamically added properties
+interface ProcessedSessionLead extends SessionLead {
+  phoneNumber: string | null;
+  getLeadDetails?: () => Promise<{ id: string | null; phone1: string | null }>;
+}
+
 export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   sessionId,
   isActive,
@@ -172,7 +178,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   }, [sessionId, hasAttemptedFix, fixDatabaseFunction, toast]);
 
   // Helper function to process the fetched lead
-  const processFetchedLead = (lead: SessionLead) => {
+  const processFetchedLead = (lead: SessionLead): ProcessedSessionLead => {
     let phoneNumber = null;
     
     // Try to extract phone from notes if it exists
@@ -192,20 +198,43 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       }
     }
     
-    // Try to get original lead data
-    const getLeadDetails = async (leadId: string) => {
-      try {
-        // First try to get lead from the notes
-        if (lead.notes) {
+    // Create a function to get lead details and attach it to the lead object
+    const processedLead: ProcessedSessionLead = {
+      ...lead,
+      phoneNumber,
+      getLeadDetails: async () => {
+        try {
+          // First try to get lead from the notes
+          if (lead.notes) {
+            try {
+              const notesData = JSON.parse(lead.notes);
+              const originalLeadId = notesData.originalLeadId;
+              
+              if (originalLeadId) {
+                const { data: leadData, error: leadError } = await supabase
+                  .from('leads')
+                  .select('id, phone1')
+                  .eq('id', originalLeadId)
+                  .maybeSingle();
+                
+                if (!leadError && leadData && leadData.phone1) {
+                  return { id: leadData.id, phone1: leadData.phone1 };
+                }
+              }
+            } catch (parseError) {
+              console.error('Error parsing lead notes:', parseError);
+            }
+          }
+          
+          // Try parsing lead_id as a number
           try {
-            const notesData = JSON.parse(lead.notes);
-            const originalLeadId = notesData.originalLeadId;
+            const leadIdAsNumber = parseInt(lead.lead_id);
             
-            if (originalLeadId) {
+            if (!isNaN(leadIdAsNumber)) {
               const { data: leadData, error: leadError } = await supabase
                 .from('leads')
                 .select('id, phone1')
-                .eq('id', originalLeadId)
+                .eq('id', leadIdAsNumber)
                 .maybeSingle();
               
               if (!leadError && leadData && leadData.phone1) {
@@ -213,42 +242,18 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               }
             }
           } catch (parseError) {
-            console.error('Error parsing lead notes:', parseError);
+            console.error('Error parsing lead_id as number:', parseError);
           }
-        }
-        
-        // Try parsing lead_id as a number
-        try {
-          const leadIdAsNumber = parseInt(leadId);
           
-          if (!isNaN(leadIdAsNumber)) {
-            const { data: leadData, error: leadError } = await supabase
-              .from('leads')
-              .select('id, phone1')
-              .eq('id', leadIdAsNumber)
-              .maybeSingle();
-            
-            if (!leadError && leadData && leadData.phone1) {
-              return { id: leadData.id, phone1: leadData.phone1 };
-            }
-          }
-        } catch (parseError) {
-          console.error('Error parsing lead_id as number:', parseError);
+          return { id: null, phone1: null };
+        } catch (error) {
+          console.error('Error fetching lead details:', error);
+          return { id: null, phone1: null };
         }
-        
-        return { id: null, phone1: null };
-      } catch (error) {
-        console.error('Error fetching lead details:', error);
-        return { id: null, phone1: null };
       }
     };
     
-    // Return lead with phone number to be filled in later
-    return {
-      ...lead,
-      phoneNumber: null,
-      getLeadDetails: () => getLeadDetails(lead.lead_id)
-    };
+    return processedLead;
   };
 
   const processNextLead = useCallback(async () => {
