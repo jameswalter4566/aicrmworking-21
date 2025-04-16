@@ -40,12 +40,23 @@ const AutoDialerController: React.FC<AutoDialerControllerProps> = ({ sessionId }
         return null;
       }
 
-      // Parse the lead data from notes
-      const leadData = JSON.parse(nextLead[0].notes);
-      return {
-        ...nextLead[0],
-        ...leadData
-      };
+      // Check if notes exists before parsing
+      if (nextLead[0] && typeof nextLead[0].notes === 'string') {
+        try {
+          // Parse the lead data from notes
+          const leadData = JSON.parse(nextLead[0].notes);
+          return {
+            ...nextLead[0],
+            ...leadData
+          };
+        } catch (parseError) {
+          console.error('Error parsing lead notes:', parseError);
+          return nextLead[0];
+        }
+      } else {
+        // Return the lead without parsing if notes doesn't exist or isn't a string
+        return nextLead[0];
+      }
     } catch (error) {
       console.error('Error in getNextLead:', error);
       return null;
@@ -70,15 +81,12 @@ const AutoDialerController: React.FC<AutoDialerControllerProps> = ({ sessionId }
       
       if (!callResult.success) {
         console.error("Call failed:", callResult.error);
-        toast({
-          title: "Call Failed",
-          description: callResult.error || "Unable to place call",
-          variant: "destructive",
+        toast.error("Call Failed", {
+          description: callResult.error || "Unable to place call"
         });
       } else {
-        toast({
-          title: "Call Initiated",
-          description: `Calling ${lead.firstName} ${lead.lastName}...`,
+        toast.success("Call Initiated", {
+          description: `Calling ${lead.firstName || ''} ${lead.lastName || ''}...`
         });
       }
 
@@ -92,10 +100,8 @@ const AutoDialerController: React.FC<AutoDialerControllerProps> = ({ sessionId }
     } catch (error) {
       console.error('Error making call:', error);
       setIsDialing(false);
-      toast({
-        title: "Error",
-        description: "Failed to initiate call",
-        variant: "destructive",
+      toast.error("Error", {
+        description: "Failed to initiate call"
       });
     }
   };
@@ -200,10 +206,10 @@ const AutoDialerController: React.FC<AutoDialerControllerProps> = ({ sessionId }
               <div className="flex items-center justify-between">
                 <div>
                   <p className="font-medium">
-                    {currentLead.firstName} {currentLead.lastName}
+                    {currentLead.firstName || currentLead.first_name || ''} {currentLead.lastName || currentLead.last_name || ''}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {currentLead.phone}
+                    {currentLead.phone || currentLead.phone1 || ''}
                   </p>
                 </div>
                 <Phone className="h-4 w-4 animate-pulse text-green-500" />
