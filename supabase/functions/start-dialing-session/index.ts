@@ -122,26 +122,73 @@ serve(async (req) => {
     
     console.log(`Created dialing session with ID: ${sessionData.id}`);
     
-    // Add leads to dialing session
-    const sessionLeads = listLeads.map(lead => ({
-      session_id: sessionData.id,
-      lead_id: lead.lead_id,
-      status: 'queued'
-    }));
-    
-    const { error: sessionLeadsError } = await supabaseClient
-      .from('dialing_session_leads')
-      .insert(sessionLeads);
-    
-    if (sessionLeadsError) {
-      console.error('Error adding leads to session:', sessionLeadsError);
+    try {
+      // Add leads to dialing session - ensuring lead_id is properly handled as UUID
+      const sessionLeads = listLeads.map(lead => {
+        // Check if the lead_id is actually a UUID
+        let leadIdAsUuid;
+        try {
+          // If it's already a valid UUID, use it as is
+          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(lead.lead_id)) {
+            leadIdAsUuid = lead.lead_id;
+          } else {
+            // For non-UUID lead IDs, we need to use a different approach
+            // We'll create a UUID based on the lead_id value
+            // For now, we'll skip these leads and log an error
+            console.error(`Lead ID ${lead.lead_id} is not a valid UUID and cannot be added to the session`);
+            return null;
+          }
+        } catch (e) {
+          console.error(`Error processing lead ID ${lead.lead_id}:`, e);
+          return null;
+        }
+        
+        if (!leadIdAsUuid) return null;
+        
+        return {
+          session_id: sessionData.id,
+          lead_id: leadIdAsUuid,
+          status: 'queued'
+        };
+      }).filter(lead => lead !== null); // Remove any null entries
+      
+      if (sessionLeads.length === 0) {
+        console.error('No valid lead UUIDs found to add to session');
+        return new Response(
+          JSON.stringify({ 
+            error: 'No valid leads to add to session', 
+            message: 'Lead IDs must be valid UUIDs'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      const { error: sessionLeadsError } = await supabaseClient
+        .from('dialing_session_leads')
+        .insert(sessionLeads);
+      
+      if (sessionLeadsError) {
+        console.error('Error adding leads to session:', sessionLeadsError);
+        return new Response(
+          JSON.stringify({ 
+            error: 'Failed to add leads to dialing session', 
+            details: sessionLeadsError 
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.log(`Added ${sessionLeads.length} leads to dialing session ${sessionData.id}`);
+    } catch (error) {
+      console.error('Error processing leads for session:', error);
       return new Response(
-        JSON.stringify({ error: 'Failed to add leads to dialing session', details: sessionLeadsError }),
+        JSON.stringify({ 
+          error: 'Error processing leads',
+          details: error.message || String(error)
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    console.log(`Added ${sessionLeads.length} leads to dialing session ${sessionData.id}`);
     
     return new Response(
       JSON.stringify({ 
