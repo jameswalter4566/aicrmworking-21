@@ -26,7 +26,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
 import DialerQueueMonitor from './DialerQueueMonitor';
-import { AutoDialerController } from './AutoDialerController";
+import { AutoDialerController } from './AutoDialerController';
 import { twilioService } from "@/services/twilio";
 
 interface PreviewDialerWindowProps {
