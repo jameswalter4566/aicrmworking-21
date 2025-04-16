@@ -9,6 +9,66 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      calling_list_leads: {
+        Row: {
+          added_at: string
+          added_by: string
+          id: string
+          lead_id: number
+          list_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          id?: string
+          lead_id: number
+          list_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          id?: string
+          lead_id?: number
+          list_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calling_list_leads_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "calling_list_leads_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "calling_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      calling_lists: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       lead_activities: {
         Row: {
           description: string
