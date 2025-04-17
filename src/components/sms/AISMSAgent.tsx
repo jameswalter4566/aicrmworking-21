@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Loader2, Send, RefreshCw, Settings, Bot, Check, TestTube2 } from 'lucide-react';
+import { Loader2, Send, RefreshCw, Settings, Bot, Check, TestTube2, Link } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -25,9 +25,11 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
   const [webhookUrl, setWebhookUrl] = useState<string>("");
   const [showWebhookInfo, setShowWebhookInfo] = useState<boolean>(true);
   const [testingWebhook, setTestingWebhook] = useState<boolean>(false);
+  const [registeringWebhook, setRegisteringWebhook] = useState<boolean>(false);
+  const [webhookRegistered, setWebhookRegistered] = useState<boolean>(false);
   
   // Get the webhook URL - typically this would be configured in your SMS gateway
-  React.useEffect(() => {
+  useEffect(() => {
     const projectRef = 'imrmboyczebjlbnkgjns';
     setWebhookUrl(`https://${projectRef}.supabase.co/functions/v1/sms-webhook-receiver`);
   }, []);
@@ -162,6 +164,44 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
     }
   };
 
+  // Register webhook with SMS Gateway
+  const handleRegisterWebhook = async () => {
+    if (!webhookUrl) {
+      toast.error('Webhook URL is required');
+      return;
+    }
+    
+    try {
+      setRegisteringWebhook(true);
+      
+      const { data, error } = await supabase.functions.invoke('sms-register-webhook', {
+        body: { 
+          webhookUrl: webhookUrl,
+          eventType: "message_received"
+        }
+      });
+      
+      if (error) {
+        throw new Error(`Error registering webhook: ${error.message}`);
+      }
+      
+      console.log('Webhook registration response:', data);
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to register webhook');
+      }
+      
+      setWebhookRegistered(true);
+      toast.success('Webhook registered successfully with SMS Gateway');
+      
+    } catch (error) {
+      console.error('Failed to register webhook:', error);
+      toast.error(`Failed to register webhook: ${error.message}`);
+    } finally {
+      setRegisteringWebhook(false);
+    }
+  };
+
   // Copy webhook URL to clipboard
   const copyWebhookUrl = () => {
     navigator.clipboard.writeText(webhookUrl);
@@ -243,6 +283,32 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
                   size="sm"
                 >
                   Copy
+                </Button>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <Button
+                  onClick={handleRegisterWebhook}
+                  disabled={registeringWebhook || webhookRegistered}
+                  variant="outline"
+                  size="sm"
+                  className="border-green-200 text-green-600 hover:bg-green-50"
+                >
+                  {registeringWebhook ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Registering...
+                    </>
+                  ) : webhookRegistered ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Webhook Registered
+                    </>
+                  ) : (
+                    <>
+                      <Link className="mr-2 h-4 w-4" />
+                      Register with SMS Gateway
+                    </>
+                  )}
                 </Button>
               </div>
               <div className="text-xs text-blue-600 mt-2">
@@ -346,6 +412,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
           <p>The AI SMS Agent processes incoming messages in real-time via webhook and stores responses in the database.</p>
           <p className="mt-1">Use the "Process Backlog" button to manually process any older unprocessed messages.</p>
           <p className="mt-1">Use the "Test Full Webhook" button to simulate an incoming SMS from your gateway.</p>
+          <p className="mt-1">Use the "Register with SMS Gateway" button to automatically register your webhook URL with the SMS gateway.</p>
         </div>
       </CardContent>
     </Card>

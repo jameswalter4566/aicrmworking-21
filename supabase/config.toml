@@ -9,3 +9,6 @@ verify_jwt = false # Make this endpoint publicly accessible for testing
 
 [functions.sms-send-single]
 verify_jwt = true
+
+[functions.sms-register-webhook]
+verify_jwt = true
