@@ -212,9 +212,6 @@ const ProcessorAssistViewer = () => {
     try {
       console.log(`Fetching saved conditions for lead ID: ${leadId}`);
       
-      const url = new URL(`${supabase.functions.url}/retrieve-conditions`);
-      url.searchParams.append('leadId', leadId);
-      
       const { data, error } = await supabase.functions.invoke('retrieve-conditions', {
         body: { leadId }
       });
