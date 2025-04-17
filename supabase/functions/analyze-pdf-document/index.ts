@@ -7,6 +7,204 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Gets an access token for Adobe PDF Services API
+ */
+async function getAdobeAccessToken() {
+  const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
+  const clientSecret = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_SECRET');
+  
+  if (!clientId || !clientSecret) {
+    throw new Error("Adobe PDF Services API credentials not configured");
+  }
+  
+  const response = await fetch('https://pdf-services.adobe.io/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams({
+      'client_id': clientId,
+      'client_secret': clientSecret
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to get Adobe access token: ${error}`);
+  }
+  
+  const tokenData = await response.json();
+  return tokenData.access_token;
+}
+
+/**
+ * Uploads a PDF to Adobe's cloud storage
+ */
+async function uploadPdfToAdobe(accessToken: string, pdfArrayBuffer: ArrayBuffer) {
+  const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
+  
+  // Step 1: Get upload URI
+  const uploadResponse = await fetch('https://pdf-services.adobe.io/assets', {
+    method: 'POST',
+    headers: {
+      'X-API-Key': clientId!,
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      'mediaType': 'application/pdf'
+    })
+  });
+  
+  if (!uploadResponse.ok) {
+    const error = await uploadResponse.text();
+    throw new Error(`Failed to get Adobe upload URI: ${error}`);
+  }
+  
+  const uploadData = await uploadResponse.json();
+  const { uploadUri, assetID } = uploadData;
+  
+  if (!uploadUri || !assetID) {
+    throw new Error("Invalid upload URI or asset ID from Adobe");
+  }
+  
+  // Step 2: Upload the PDF to the provided URI
+  const uploadResult = await fetch(uploadUri, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/pdf'
+    },
+    body: pdfArrayBuffer
+  });
+  
+  if (!uploadResult.ok) {
+    const error = await uploadResult.text();
+    throw new Error(`Failed to upload PDF to Adobe: ${error}`);
+  }
+  
+  return assetID;
+}
+
+/**
+ * Creates a PDF extraction job with Adobe
+ */
+async function createExtractionJob(accessToken: string, assetID: string) {
+  const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
+  
+  const extractResponse = await fetch('https://pdf-services.adobe.io/operation/extractpdf', {
+    method: 'POST',
+    headers: {
+      'X-API-Key': clientId!,
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      "assetID": assetID,
+      "elementsToExtract": [
+        "text",
+        "tables",
+        "structuredData"
+      ]
+    })
+  });
+  
+  if (extractResponse.status !== 201) {
+    const error = await extractResponse.text();
+    throw new Error(`Failed to create extraction job: ${error}`);
+  }
+  
+  const location = extractResponse.headers.get('location');
+  if (!location) {
+    throw new Error("No location header returned for extraction job");
+  }
+  
+  return location;
+}
+
+/**
+ * Polls the job status until completion
+ */
+async function pollJobStatus(accessToken: string, jobLocation: string) {
+  const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
+  let status = "in progress";
+  let downloadUri = null;
+  
+  // Poll every 2 seconds until done or failed
+  while (status === "in progress") {
+    const statusResponse = await fetch(jobLocation, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'x-api-key': clientId!
+      }
+    });
+    
+    if (!statusResponse.ok) {
+      const error = await statusResponse.text();
+      throw new Error(`Failed to get job status: ${error}`);
+    }
+    
+    const statusData = await statusResponse.json();
+    status = statusData.status;
+    
+    if (status === "done") {
+      downloadUri = statusData.downloadUri;
+      break;
+    } else if (status === "failed") {
+      throw new Error(`PDF extraction job failed: ${JSON.stringify(statusData.error || {})}`);
+    }
+    
+    // Wait 2 seconds before polling again
+    await new Promise(resolve => setTimeout(resolve, 2000));
+  }
+  
+  if (!downloadUri) {
+    throw new Error("No download URI available");
+  }
+  
+  return downloadUri;
+}
+
+/**
+ * Downloads the extracted content
+ */
+async function downloadExtractedContent(downloadUri: string) {
+  const downloadResponse = await fetch(downloadUri);
+  
+  if (!downloadResponse.ok) {
+    const error = await downloadResponse.text();
+    throw new Error(`Failed to download extracted content: ${error}`);
+  }
+  
+  return await downloadResponse.json();
+}
+
+/**
+ * Process PDF extraction with Adobe PDF Services API
+ */
+async function extractPdfWithAdobe(pdfArrayBuffer: ArrayBuffer) {
+  console.log("🔑 Getting Adobe PDF Services access token...");
+  const accessToken = await getAdobeAccessToken();
+  
+  console.log("📤 Uploading PDF to Adobe cloud storage...");
+  const assetID = await uploadPdfToAdobe(accessToken, pdfArrayBuffer);
+  
+  console.log("🔍 Creating PDF extraction job...");
+  const jobLocation = await createExtractionJob(accessToken, assetID);
+  
+  console.log("⏳ Polling job status until completion...");
+  const downloadUri = await pollJobStatus(accessToken, jobLocation);
+  
+  console.log("📥 Downloading extracted content...");
+  const extractedContent = await downloadExtractedContent(downloadUri);
+  
+  return extractedContent;
+}
+
+/**
+ * Main handler for the edge function
+ */
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -46,11 +244,20 @@ serve(async (req) => {
     // Get the array buffer of the PDF
     const pdfArrayBuffer = await fileResponse.arrayBuffer();
     
-    console.log("📑 Processing PDF document text extraction...");
+    console.log("📑 Processing PDF document extraction...");
     
-    // Instead of treating the PDF as an image, we'll use OpenAI's text extraction capabilities
-    // First, let's convert the PDF to a base64 string to send it to OpenAI
-    const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+    // Extract PDF content using Adobe PDF Services API
+    let extractedContent;
+    try {
+      extractedContent = await extractPdfWithAdobe(pdfArrayBuffer);
+      console.log("✅ Adobe PDF extraction completed successfully");
+    } catch (adobeError) {
+      console.error("❌ Adobe PDF extraction failed:", adobeError);
+      console.log("⚠️ Falling back to OpenAI for direct analysis...");
+      
+      // Fallback to use OpenAI directly if Adobe extraction fails
+      extractedContent = null;
+    }
     
     // Determine the appropriate prompt based on fileType
     let systemPrompt = "";
@@ -83,9 +290,65 @@ Instructions:
       systemPrompt = `You are an intelligent mortgage document analyzer. Analyze the provided document text and classify it.`;
     }
 
-    console.log("📤 Sending PDF to OpenAI for text extraction and analysis...");
+    console.log("📤 Sending extracted PDF content to OpenAI for analysis...");
     
-    // Use OpenAI's text capabilities to analyze the PDF content
+    const messages = [
+      {
+        role: "system",
+        content: systemPrompt
+      }
+    ];
+    
+    // Use different approaches based on whether Adobe extraction was successful
+    if (extractedContent) {
+      // If we have Adobe extraction results, use that structured data
+      console.log("Using Adobe extracted content for OpenAI analysis");
+      
+      // Get all text elements from Adobe's extraction
+      let documentText = "";
+      
+      // Process the extracted content from Adobe to create a simpler text representation
+      if (extractedContent.elements && Array.isArray(extractedContent.elements)) {
+        for (const element of extractedContent.elements) {
+          if (element.Text) {
+            documentText += element.Text + "\n";
+          }
+        }
+      }
+      
+      messages.push({
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Please analyze the following document that was extracted from a PDF file."
+          },
+          {
+            type: "text",
+            text: documentText
+          }
+        ]
+      });
+    } else {
+      // Fallback: Convert PDF to base64 and use GPT-4's ability to work with text
+      const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+      
+      messages.push({
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Please extract and analyze the text content from this PDF document."
+          },
+          {
+            type: "text",
+            text: `I'm providing this document as a base64-encoded PDF. The document is a mortgage approval letter containing loan conditions. Please extract the conditions and categorize them according to the instructions.`
+          }
+        ]
+      });
+    }
+    
+    // Use OpenAI to analyze the content
     const aiResult = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -94,25 +357,7 @@ Instructions:
       },
       body: JSON.stringify({
         model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Please extract and analyze the text content from this PDF document."
-              },
-              {
-                type: "text",
-                text: `I'm providing this document as a base64-encoded PDF. The document is a mortgage approval letter containing loan conditions. Please extract the conditions and categorize them according to the instructions.`
-              }
-            ]
-          }
-        ],
+        messages: messages,
         temperature: 0.2, // Lower temperature for more consistent results
         response_format: { type: "json_object" }
       })
@@ -129,6 +374,18 @@ Instructions:
     
     // Parse the analysis result
     const extractedData = JSON.parse(analysisResult.choices[0].message.content);
+    
+    // Add the raw extracted text from Adobe if available
+    if (extractedContent) {
+      extractedData.rawExtractedText = {
+        source: "adobe_pdf_services",
+        fullText: extractedContent.elements
+          ?.filter(element => element.Text)
+          ?.map(element => element.Text)
+          ?.join("\n") || "",
+        extractionTimestamp: new Date().toISOString()
+      };
+    }
     
     // Process conditions if this is a conditions document
     if (fileType === "conditions" && leadId) {
