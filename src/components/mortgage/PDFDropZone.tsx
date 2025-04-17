@@ -1,33 +1,42 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { FileUp, CheckCircle, AlertCircle, Brain } from "lucide-react";
-import { useDropzone } from 'react-dropzone';
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 interface PDFDropZoneProps {
   onFileAccepted?: (file: File) => void;
   className?: string;
   disabled?: boolean;
-  leadId?: string;
-  fileType?: string;
-  autoProcessConditions?: boolean;
 }
 
 const PDFDropZone: React.FC<PDFDropZoneProps> = ({ 
   onFileAccepted, 
   className = "", 
-  disabled = false,
-  leadId,
-  fileType = "",
-  autoProcessConditions = true
+  disabled = false 
 }) => {
+  const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
 
-  const validateFile = useCallback((file: File) => {
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!disabled) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!disabled) e.dataTransfer.dropEffect = "copy";
+  };
+
+  const validateFile = (file: File) => {
     if (!file.type.includes('pdf')) {
       setError("Please upload a PDF file only");
       return false;
@@ -40,134 +49,58 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
     }
     
     return true;
-  }, []);
+  };
 
-  const processFile = useCallback(async (file: File) => {
-    if (!validateFile(file)) return;
-    
-    setFile(file);
-    setIsProcessing(true);
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
     setError(null);
-
-    try {
-      // Create a URL for the file to upload to Supabase storage
-      const timestamp = new Date().getTime();
-      const filePath = `uploads/${timestamp}_${file.name}`;
+    
+    if (disabled) return;
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFile = e.dataTransfer.files[0];
       
-      // Upload file to Supabase storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-
-      if (uploadError) {
-        throw new Error(`Upload error: ${uploadError.message}`);
-      }
-
-      // Get a temporary public URL for the uploaded file
-      const { data: urlData } = await supabase.storage
-        .from('documents')
-        .createSignedUrl(filePath, 3600);
-
-      if (!urlData || !urlData.signedUrl) {
-        throw new Error('Failed to get file URL');
-      }
-
-      const fileUrl = urlData.signedUrl;
-
-      // Call the analyze-pdf-document edge function
-      const { data: analysisData, error: analysisError } = await supabase.functions.invoke(
-        'analyze-pdf-document',
-        {
-          body: { 
-            fileUrl,
-            fileType: fileType || (fileType === "conditions" ? "conditions" : ""),
-            leadId
-          }
-        }
-      );
-
-      if (analysisError) {
-        throw new Error(`Analysis error: ${analysisError.message}`);
-      }
-
-      console.log('PDF Analysis completed successfully:', analysisData);
-      toast.success('Document analyzed successfully');
-
-      // If this is a conditions document and we have a leadId, run the automation matcher
-      if (autoProcessConditions && fileType === "conditions" && leadId && analysisData?.data) {
-        try {
-          console.log('Running condition automation matcher...');
-          const { data: automationData, error: automationError } = await supabase.functions.invoke(
-            'automation-matcher',
-            {
-              body: { 
-                leadId,
-                conditions: analysisData.data
-              }
-            }
-          );
-
-          if (automationError) {
-            console.error('Error running automation:', automationError);
-            toast.error('Error running condition automation');
-          } else {
-            console.log('Automation results:', automationData);
-            toast.success('Condition automation completed');
-          }
-        } catch (automationErr) {
-          console.error('Exception running automation:', automationErr);
+      if (validateFile(droppedFile)) {
+        setFile(droppedFile);
+        if (onFileAccepted) {
+          onFileAccepted(droppedFile);
         }
       }
-
-      // Call the external onFileAccepted prop if provided
-      if (onFileAccepted) {
-        onFileAccepted(file);
-      }
-    } catch (err: any) {
-      console.error('Error processing file:', err);
-      setError(err.message || 'An error occurred while processing the file');
-      toast.error('Error processing document');
-    } finally {
-      setIsProcessing(false);
     }
-  }, [validateFile, leadId, fileType, onFileAccepted, autoProcessConditions]);
+  };
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: acceptedFiles => {
-      if (acceptedFiles.length > 0) {
-        processFile(acceptedFiles[0]);
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setError(null);
+    
+    if (disabled || !e.target.files || e.target.files.length === 0) return;
+    
+    const selectedFile = e.target.files[0];
+    
+    if (validateFile(selectedFile)) {
+      setFile(selectedFile);
+      if (onFileAccepted) {
+        onFileAccepted(selectedFile);
       }
-    },
-    accept: {
-      'application/pdf': ['.pdf']
-    },
-    maxFiles: 1,
-    disabled: disabled || isProcessing
-  });
+    }
+  };
 
   return (
     <Card className={`${className} ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
-      <CardContent className="p-4">
+      <CardContent>
         <div
-          {...getRootProps()}
           className={`
-            border-2 border-dashed rounded-md p-6 text-center transition-colors
-            ${isDragActive ? 'border-mortgage-purple bg-mortgage-lightPurple/20' : 'border-gray-300'}
-            ${disabled || isProcessing ? 'bg-gray-100' : 'hover:bg-gray-50'}
-            ${disabled || isProcessing ? 'cursor-not-allowed' : 'cursor-pointer'}
+            border-2 border-dashed rounded-md p-8 text-center transition-colors
+            ${isDragging ? 'border-mortgage-purple bg-mortgage-lightPurple/20' : 'border-gray-300'}
+            ${disabled ? 'bg-gray-100' : 'hover:bg-gray-50'}
           `}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
         >
-          <input {...getInputProps()} />
-          
-          {isProcessing ? (
-            <div className="flex flex-col items-center">
-              <div className="animate-spin rounded-full h-10 w-10 border-4 border-mortgage-purple border-t-transparent mb-2"></div>
-              <p className="text-gray-700 font-medium">Processing...</p>
-            </div>
-          ) : file ? (
+          {file ? (
             <div className="flex flex-col items-center">
               <CheckCircle className="h-10 w-10 text-green-500 mb-2" />
               <p className="text-gray-700 font-medium">{file.name}</p>
@@ -188,9 +121,16 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
                 or click to browse
               </p>
               
-              <div className="cursor-pointer bg-mortgage-purple hover:bg-mortgage-darkPurple text-white px-4 py-2 rounded-md transition-colors">
+              <label className="cursor-pointer bg-mortgage-purple hover:bg-mortgage-darkPurple text-white px-4 py-2 rounded-md transition-colors">
                 Select PDF
-              </div>
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept=".pdf" 
+                  onChange={handleFileInputChange}
+                  disabled={disabled}
+                />
+              </label>
               
               {error && (
                 <div className="mt-4 flex items-center text-red-600">

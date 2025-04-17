@@ -17,4 +17,3 @@ verify_jwt = false
 
 [functions."asset-verification"]
 verify_jwt = false
-
