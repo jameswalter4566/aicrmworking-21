@@ -23,21 +23,21 @@ serve(async (req) => {
       throw new Error("OpenAI API key is not configured");
     }
 
-    // Get the request parameters
-    const { mode, messageId, processAllUnprocessed = false } = await req.json();
+    // Parse the request body ONCE and store it
+    const requestBody = await req.json();
     
     // Handle different operation modes
-    if (mode === "process-specific" && messageId) {
+    if (requestBody.mode === "process-specific" && requestBody.messageId) {
       // Process a specific message by ID
-      return await processSpecificMessage(messageId, supabase, openAiApiKey);
+      return await processSpecificMessage(requestBody.messageId, supabase, openAiApiKey);
       
-    } else if (mode === "process-all-unprocessed" || processAllUnprocessed) {
+    } else if (requestBody.mode === "process-all-unprocessed" || requestBody.processAllUnprocessed) {
       // Process all unprocessed messages
       return await processUnprocessedMessages(supabase, openAiApiKey);
       
     } else {
       // Run in manual mode with specific payload
-      const { phoneNumber, messageContent } = await req.json();
+      const { phoneNumber, messageContent } = requestBody;
       
       if (!phoneNumber || !messageContent) {
         return new Response(
