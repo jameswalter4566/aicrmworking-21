@@ -1,17 +1,7 @@
 
+# This file controls the configuration for your Supabase project.
 project_id = "imrmboyczebjlbnkgjns"
+app_settings.streaming.minimum_version = "1.23.0"
 
-[functions.sms-webhook-receiver]
-verify_jwt = false # Make this endpoint publicly accessible for webhook calls
-
-[functions.sms-test-webhook]
-verify_jwt = false # Make this endpoint publicly accessible for testing
-
-[functions.sms-send-single]
-verify_jwt = true
-
-[functions.sms-register-webhook]
-verify_jwt = true
-
-[functions.sms-test-gateway-webhook]
-verify_jwt = false # Make this endpoint publicly accessible for testing
+[functions."twilio-token"]
+verify_jwt = false

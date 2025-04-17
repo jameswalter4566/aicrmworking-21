@@ -18,7 +18,7 @@ serve(async (req) => {
   try {
     // Generate a unique identity for this browser session
     // This helps prevent conflicts between different tabs/sessions
-    const uniqueIdentifier = `browser-refresh-${Date.now()}`;
+    const uniqueIdentifier = `browser-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
     console.log(`Generated identity: ${uniqueIdentifier}`);
     
     // Get Twilio credentials from environment variables

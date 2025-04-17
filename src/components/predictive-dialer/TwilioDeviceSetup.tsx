@@ -21,27 +21,30 @@ const TwilioDeviceSetup: React.FC<TwilioDeviceSetupProps> = ({ onDeviceReady }) 
 
     const setupDevice = async () => {
       try {
-        // Get token from Supabase Edge Function - now with proper CORS settings and no auth requirement
-        const { data, error } = await supabase.functions.invoke('twilio-token');
+        // Get token from Supabase Edge Function - public endpoint, no auth required
+        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}) // Empty body is fine
+        });
         
-        if (error || !data?.token) {
-          console.error('Error fetching Twilio token:', error);
-          toast({
-            title: "Error",
-            description: "Failed to connect to phone system. Please try again.",
-            variant: "destructive",
-          });
-          setDeviceStatus('error');
-          return;
+        if (!response.ok) {
+          throw new Error(`Failed to fetch Twilio token: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.token) {
+          throw new Error(data.error || 'No token in response');
         }
 
-        const token = data.token;
         console.log("Successfully retrieved Twilio token");
         
         // Initialize Twilio device with correct codec types
-        // Using string[] type for codecPreferences instead of enum
-        twilioDevice = new Device(token, {
-          codecPreferences: ["opus", "pcmu"] as any[], // Cast to any[] to resolve type error
+        twilioDevice = new Device(data.token, {
+          codecPreferences: ["opus", "pcmu"],
           disableAudioContextSounds: false,
           logLevel: 'info'
         });

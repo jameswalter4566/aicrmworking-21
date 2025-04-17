@@ -85,6 +85,7 @@ const createTwilioService = (): TwilioService => {
       soundsInitialized = false;
       
       console.log("Fetching Twilio token...");
+      // Using direct fetch to bypass authorization header requirements
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
         method: 'POST',
         headers: {
