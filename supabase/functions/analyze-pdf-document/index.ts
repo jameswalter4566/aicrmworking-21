@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -19,6 +18,7 @@ async function getAdobeAccessToken() {
   }
   
   try {
+    console.log("Requesting Adobe access token...");
     const response = await fetch('https://pdf-services.adobe.io/token', {
       method: 'POST',
       headers: {
@@ -36,6 +36,7 @@ async function getAdobeAccessToken() {
     }
     
     const tokenData = await response.json();
+    console.log("Successfully obtained Adobe access token");
     return tokenData.access_token;
   } catch (error) {
     console.error("Error getting Adobe access token:", error);
@@ -113,7 +114,7 @@ async function createExtractionJob(accessToken: string, assetID: string) {
   try {
     console.log(`Creating extraction job for asset ID: ${assetID}`);
     
-    // Try the most basic extraction request possible
+    // Use the simplest possible extraction request
     const extractResponse = await fetch('https://pdf-services.adobe.io/operation/extractpdf', {
       method: 'POST',
       headers: {
@@ -122,7 +123,9 @@ async function createExtractionJob(accessToken: string, assetID: string) {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        "assetID": assetID
+        "assetID": assetID,
+        // Explicitly specify the elements to extract to make sure we're using valid parameters
+        "elementsToExtract": ["text", "tables"]
       })
     });
     
@@ -155,11 +158,12 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
   let status = "in progress";
   let downloadUri = null;
   let attempt = 0;
-  const maxAttempts = 10; // Reduce to 10 attempts (20 seconds total wait time)
+  const maxAttempts = 20; // Increase to 20 attempts (40 seconds total wait time)
+  const pollingInterval = 2000; // 2 seconds between each attempt
   
   console.log("Starting to poll job status...");
   
-  // Poll every 2 seconds until done or failed
+  // Poll until done, failed, or timeout
   while (status === "in progress" && attempt < maxAttempts) {
     attempt++;
     console.log(`Polling attempt ${attempt}/${maxAttempts}...`);
@@ -176,32 +180,46 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
       if (!statusResponse.ok) {
         const errorText = await statusResponse.text();
         console.error(`Status check failed: ${statusResponse.status} ${statusResponse.statusText}`, errorText);
-        throw new Error(`Failed to get job status: ${errorText}`);
+        
+        // If we get a 401 Unauthorized, the token might have expired
+        if (statusResponse.status === 401) {
+          throw new Error("Adobe API authentication failed - token may have expired");
+        }
+        
+        // For other errors, continue polling
+        console.warn("Non-fatal error during polling, will retry");
+      } else {
+        const statusData = await statusResponse.json();
+        status = statusData.status;
+        console.log(`Job status: ${status}`);
+        
+        if (status === "done") {
+          downloadUri = statusData.downloadUri;
+          console.log("Job completed successfully, download URI available");
+          break;
+        } else if (status === "failed") {
+          console.error("Job failed:", JSON.stringify(statusData.error || {}));
+          throw new Error(`PDF extraction job failed: ${JSON.stringify(statusData.error || {})}`);
+        }
       }
       
-      const statusData = await statusResponse.json();
-      status = statusData.status;
-      console.log(`Job status: ${status}`);
-      
-      if (status === "done") {
-        downloadUri = statusData.downloadUri;
-        console.log("Job completed successfully, download URI available");
-        break;
-      } else if (status === "failed") {
-        console.error("Job failed:", JSON.stringify(statusData.error || {}));
-        throw new Error(`PDF extraction job failed: ${JSON.stringify(statusData.error || {})}`);
-      }
-      
-      // Wait 2 seconds before polling again
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Wait before polling again
+      await new Promise(resolve => setTimeout(resolve, pollingInterval));
     } catch (error) {
       console.error(`Error during poll attempt ${attempt}:`, error);
-      // Continue polling despite errors
+      
+      // If this is a fatal error, stop polling
+      if (error.message.includes("token may have expired") || error.message.includes("PDF extraction job failed")) {
+        throw error;
+      }
+      
+      // Otherwise continue polling
+      await new Promise(resolve => setTimeout(resolve, pollingInterval));
     }
   }
   
   if (!downloadUri) {
-    throw new Error("PDF extraction timed out or no download URI available");
+    throw new Error(`PDF extraction timed out after ${maxAttempts} polling attempts (${maxAttempts * 2} seconds)`);
   }
   
   return downloadUri;
@@ -221,7 +239,22 @@ async function downloadExtractedContent(downloadUri: string) {
       throw new Error(`Failed to download extracted content: ${errorText}`);
     }
     
-    return await downloadResponse.json();
+    try {
+      const jsonContent = await downloadResponse.json();
+      console.log("Successfully parsed extracted content as JSON");
+      return jsonContent;
+    } catch (jsonError) {
+      console.error("Failed to parse response as JSON:", jsonError);
+      
+      // Try to get the raw text if JSON parsing failed
+      const rawText = await downloadResponse.text();
+      if (!rawText || rawText.trim() === '') {
+        throw new Error("Downloaded content is empty or invalid");
+      }
+      
+      console.log("Retrieved raw text content instead of JSON");
+      return { elements: [{ Text: rawText }] };
+    }
   } catch (error) {
     console.error("Error downloading extracted content:", error);
     throw error;
@@ -247,6 +280,12 @@ async function extractPdfWithAdobe(pdfArrayBuffer: ArrayBuffer) {
     
     console.log("📥 Downloading extracted content...");
     const extractedContent = await downloadExtractedContent(downloadUri);
+    
+    // Validate extracted content
+    if (!extractedContent || !extractedContent.elements || extractedContent.elements.length === 0) {
+      console.warn("Adobe extraction returned empty or invalid content structure");
+      throw new Error("Adobe extraction returned no usable content");
+    }
     
     return extractedContent;
   } catch (error) {
@@ -367,6 +406,8 @@ Instructions:
       
       // Process the extracted content from Adobe to create a simpler text representation
       if (extractedContent.elements && Array.isArray(extractedContent.elements)) {
+        console.log(`Found ${extractedContent.elements.length} elements in Adobe extraction`);
+        
         for (const element of extractedContent.elements) {
           if (element.Text) {
             documentText += element.Text + "\n";
