@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { FileUp, CheckCircle, AlertCircle, Brain } from "lucide-react";
@@ -107,6 +106,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       const fileType = "conditions"; // Assuming we're processing conditions
       
       toast.info("Analyzing conditions document...");
+      console.log("Starting PDF analysis process...");
       
       // Step 1: Upload the document to Supabase Storage
       console.log("Uploading PDF to Supabase storage...");
@@ -141,37 +141,65 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       console.log("Document analysis complete:", analysisData);
       
-      // The automation-matcher should now be triggered from inside the analyze-pdf-document function
-      
-      if (analysisData && analysisData.success) {
-        if (analysisData.automationTriggered) {
-          toast.success('Document successfully analyzed and conditions processing is underway!');
-        } else {
-          // If automation wasn't triggered in the function for some reason, trigger it manually here
-          console.log("Automation not triggered in analyze-pdf-document, triggering it now");
-          try {
-            const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
-              body: { 
-                leadId,
-                conditions: analysisData.data
-              }
-            });
-            
-            if (automationError) {
-              console.error("Error from automation-matcher:", automationError);
-              toast.warning('Document processed, but automation had errors. Please check the conditions.');
-            } else {
-              console.log("Automation matcher completed successfully:", automationData);
-              toast.success('Document successfully analyzed and conditions processed!');
+      // Step 3: Explicitly call the LOE generator function with the conditions data
+      if (analysisData && analysisData.data) {
+        console.log("Starting LOE generation process...");
+        try {
+          const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
+            body: { 
+              leadId,
+              conditions: [
+                ...(analysisData.data.masterConditions || []),
+                ...(analysisData.data.generalConditions || []),
+                ...(analysisData.data.priorToFinalConditions || []),
+                ...(analysisData.data.complianceConditions || [])
+              ].filter(c => 
+                c.text && (
+                  c.text.toLowerCase().includes('explanation') || 
+                  c.text.toLowerCase().includes('loe') ||
+                  c.text.toLowerCase().includes('letter')
+                )
+              )
             }
-          } catch (autoError: any) {
-            console.error("Exception in automation-matcher call:", autoError);
-            toast.warning('Document processed, but automation encountered an error: ' + (autoError.message || 'Unknown error'));
+          });
+          
+          if (loeError) {
+            console.error("Error generating LOE documents:", loeError);
+            toast.warning('Conditions processed, but LOE generation had errors.');
+          } else {
+            console.log("LOE generation completed successfully:", loeData);
+            toast.success(`Successfully generated ${loeData?.processedCount || 0} LOE document(s)!`);
           }
+        } catch (loeGenError: any) {
+          console.error("Exception in LOE generator call:", loeGenError);
+          toast.warning(`Conditions processed, but LOE generation encountered an error: ${loeGenError.message || 'Unknown error'}`);
+        }
+      }
+      
+      // Step 4: Call automation-matcher if not already triggered
+      if (!analysisData.automationTriggered) {
+        console.log("Calling automation-matcher with conditions data");
+        try {
+          const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+            body: { 
+              leadId,
+              conditions: analysisData.data
+            }
+          });
+          
+          if (automationError) {
+            console.error("Error from automation-matcher:", automationError);
+            toast.warning('Document processed, but automation had errors. Please check the conditions.');
+          } else {
+            console.log("Automation matcher completed successfully:", automationData);
+            toast.success('Document successfully analyzed and conditions processed!');
+          }
+        } catch (autoError: any) {
+          console.error("Exception in automation-matcher call:", autoError);
+          toast.warning(`Document processed, but automation encountered an error: ${autoError.message || 'Unknown error'}`);
         }
       } else {
-        console.warn("Document analysis returned unexpected response:", analysisData);
-        toast.warning('Document processed but with warnings. Check the conditions.');
+        toast.success('Document successfully analyzed and conditions processing is underway!');
       }
       
     } catch (error: any) {

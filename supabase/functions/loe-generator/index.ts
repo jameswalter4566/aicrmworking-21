@@ -170,6 +170,10 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
   content += `Subject: Letter of Explanation - ${formatLOETypeTitle(loeType)}\n\n`;
   content += `Dear Underwriter,\n\n`;
   
+  // Include the FULL condition text verbatim
+  content += `I am writing in response to the following condition from underwriting:\n\n`;
+  content += `"${condition.text || condition.description}"\n\n`;
+  
   // Type-specific content
   switch (loeType) {
     case 'credit_inquiry':
@@ -214,7 +218,6 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
       break;
       
     default:
-      content += `I am writing in response to your request for a letter of explanation regarding "${condition.text || condition.description}". `;
       content += `I would like to clarify that this situation occurred due to specific circumstances that I can explain in detail. `;
       content += `The information provided in my loan application is accurate and complete to the best of my knowledge. `;
       content += `I am committed to providing any additional information or documentation required to process my mortgage application.\n\n`;

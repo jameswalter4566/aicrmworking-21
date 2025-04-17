@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -54,11 +53,11 @@ serve(async (req) => {
     let systemPrompt = "";
     
     if (fileType === "conditions") {
-      // Special prompt for loan condition documents
+      // Special prompt for loan condition documents - modified to ensure full verbatim capture of conditions
       systemPrompt = `You are an expert mortgage loan condition analyzer. Your task is to extract loan conditions from underwriting approval letters and organize them into categories. 
 
 Instructions:
-1. Extract all conditions from the mortgage approval document.
+1. Extract all conditions from the mortgage approval document. EXTRACT THE FULL VERBATIM TEXT of each condition exactly as written.
 2. Categorize conditions into these standard sections:
    - "masterConditions" - The most critical conditions that must be met
    - "generalConditions" - Standard conditions that apply to most loans
@@ -66,10 +65,11 @@ Instructions:
    - "complianceConditions" - Regulatory and legal compliance requirements
 
 3. For each condition, provide:
-   - "text" - The full text of the condition
+   - "text" - The FULL VERBATIM TEXT of the condition EXACTLY as written in the document. DO NOT summarize or paraphrase.
    - "category" - Which category it belongs to
    - "id" - A unique identifier (you can generate this)
    - "status" - Default to "no_action" for all conditions
+   - "originalText" - Also provide the complete original text as a separate field
 
 4. Return the data in a structured JSON format with the following array fields:
    - masterConditions
@@ -79,7 +79,8 @@ Instructions:
 
 5. If you find a condition but are unsure which category it belongs to, place it in generalConditions.
 
-6. Be comprehensive. Make sure to capture ALL conditions mentioned in the document.`;
+6. Be comprehensive. Make sure to capture ALL conditions mentioned in the document.
+7. Do not abbreviate or shorten conditions. Include ALL text verbatim.`;
     } else {
       // General mortgage document analysis prompt
       systemPrompt = `You are an intelligent mortgage document analyzer. Your job is to:
@@ -171,34 +172,38 @@ Return all extracted and classified data as structured **JSON**, organized by se
       let processedData = extractedData;
       
       if (fileType === "conditions") {
-        // Enhance condition data with status, notes, etc.
+        // Enhance condition data with status, notes, etc. and preserve the full text
         processedData = {
           masterConditions: (extractedData.masterConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           })),
           generalConditions: (extractedData.generalConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           })),
           priorToFinalConditions: (extractedData.priorToFinalConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           })),
           complianceConditions: (extractedData.complianceConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           }))
         };
@@ -408,34 +413,38 @@ Return all extracted and classified data as structured **JSON**, organized by se
       let processedData = extractedData;
       
       if (fileType === "conditions") {
-        // Enhance condition data with status, notes, etc.
+        // Enhance condition data with status, notes, etc. and preserve the full text
         processedData = {
           masterConditions: (extractedData.masterConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           })),
           generalConditions: (extractedData.generalConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           })),
           priorToFinalConditions: (extractedData.priorToFinalConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           })),
           complianceConditions: (extractedData.complianceConditions || []).map(condition => ({
             ...condition,
             id: condition.id || crypto.randomUUID(),
             conditionStatus: condition.status || "no_action",
-            text: condition.text || condition.description || "",
+            text: condition.text || condition.description || "", // This should now contain full verbatim text
+            originalText: condition.originalText || condition.text || condition.description || "", // Preserve original text
             notes: ""
           }))
         };
