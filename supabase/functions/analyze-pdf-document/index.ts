@@ -1,16 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import * as pdfLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/+esm";
-
-// Configure PDF.js for a Node.js/Deno environment
-const pdfjsLib = pdfLib.default;
-
-// Required for Deno environment
-globalThis.navigator = { userAgent: "deno" } as any;
-
-// Set the worker source path for PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,96 +46,14 @@ serve(async (req) => {
     // Get the array buffer of the PDF
     const pdfArrayBuffer = await fileResponse.arrayBuffer();
     
-    console.log("🔍 Loading PDF document...");
+    console.log("📑 Converting PDF to text using alternative approach...");
     
-    // Load the PDF document with enhanced options
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(pdfArrayBuffer),
-      // Enable all features to ensure maximum content extraction
-      disableFontFace: false,
-      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
-      cMapPacked: true,
-      standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/"
-    });
+    // Instead of using PDF.js directly, we'll send the PDF to OpenAI's API
+    // which can handle document analysis with its vision capabilities
+    console.log("📤 Sending PDF content to OpenAI for analysis...");
     
-    const pdfDocument = await loadingTask.promise;
-    
-    console.log(`📄 PDF loaded successfully. Pages: ${pdfDocument.numPages}`);
-    
-    // Extract text from all pages with improved extraction
-    let fullText = '';
-    let pageTexts = []; // Array to store text from each page
-    
-    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
-      console.log(`Processing page ${pageNum} of ${pdfDocument.numPages}`);
-      
-      const page = await pdfDocument.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.0 });
-      
-      // Get text content with more options
-      const textContent = await page.getTextContent({
-        normalizeWhitespace: false,  // Don't normalize whitespace to preserve exact content
-        disableCombineTextItems: false // Combining items helps with better flow in headless environment
-      });
-      
-      // Process text items with positioning to maintain proper order and spacing
-      const textItems = textContent.items;
-      let lastY = null;
-      let lastX = null;
-      let pageText = '';
-      
-      // Sort items by vertical position first, then by horizontal position
-      const sortedItems = [...textItems].sort((a, b) => {
-        // Get y-coordinate in page space
-        const yDiff = b.transform[5] - a.transform[5];
-        
-        // If items are on different lines (using a small threshold)
-        if (Math.abs(yDiff) > 5) {
-          return yDiff; // Sort by y-coordinate (top to bottom)
-        } else {
-          // If on same line, sort by x-coordinate (left to right)
-          return a.transform[4] - b.transform[4];
-        }
-      });
-      
-      // Process each text item
-      for (const item of sortedItems) {
-        if (!item.str) continue; // Skip empty items
-        
-        // Get coordinates
-        const x = item.transform[4];
-        const y = item.transform[5];
-        
-        // Insert appropriate spacing
-        if (lastY !== null) {
-          // If significant change in y-position, add a new line
-          if (Math.abs(y - lastY) > 5) {
-            pageText += '\n';
-            lastX = null; // Reset x position after line break
-          } 
-          // If on the same line but with significant horizontal gap, add space
-          else if (lastX !== null && (x - lastX) > (item.width || 10)) {
-            pageText += ' ';
-          }
-        }
-        
-        // Add the text
-        pageText += item.str;
-        
-        // Update last positions
-        lastX = x + (item.width || 0);
-        lastY = y;
-      }
-      
-      pageTexts.push({
-        pageNumber: pageNum,
-        text: pageText
-      });
-      
-      fullText += pageText + '\n\n--- PAGE BREAK ---\n\n';
-    }
-    
-    console.log("📝 Extracted text from PDF, sending to OpenAI for analysis...");
+    // Create a base64 version of the PDF for OpenAI
+    const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
     
     // Determine the appropriate prompt based on fileType
     let systemPrompt = "";
@@ -177,8 +85,8 @@ Instructions:
       // General mortgage document analysis prompt
       systemPrompt = `You are an intelligent mortgage document analyzer. Analyze the provided document text and classify it.`;
     }
-    
-    // Send the extracted text to OpenAI for analysis
+
+    // Use a simpler approach with OpenAI's vision capabilities to analyze the PDF
     const aiResult = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -194,7 +102,18 @@ Instructions:
           },
           {
             role: "user",
-            content: `Here is the full text extracted from the document. Please analyze it according to the instructions. The text has been extracted VERBATIM, with page breaks indicated:\n\n${fullText}`
+            content: [
+              {
+                type: "text",
+                text: "Please analyze this PDF document and extract information according to the instructions."
+              },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:application/pdf;base64,${base64PDF}`
+                }
+              }
+            ]
           }
         ],
         temperature: 0.2, // Lower temperature for more consistent results
@@ -213,12 +132,6 @@ Instructions:
     
     // Parse the analysis result
     const extractedData = JSON.parse(analysisResult.choices[0].message.content);
-    
-    // Add the raw extracted text to the response for verification
-    extractedData.rawExtractedText = {
-      fullText: fullText,
-      pageByPage: pageTexts
-    };
     
     // Process conditions if this is a conditions document
     if (fileType === "conditions" && leadId) {
