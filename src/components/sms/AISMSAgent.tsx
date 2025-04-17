@@ -23,7 +23,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
   const [testMessage, setTestMessage] = useState<string>("");
   const [testResponse, setTestResponse] = useState<string>("");
   
-  // Process unprocessed messages
+  // Process unprocessed messages (manual trigger for any backlog)
   const handleProcessUnprocessed = async () => {
     try {
       setProcessing(true);
@@ -128,7 +128,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
             ) : (
               <>
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Process Unprocessed
+                Process Backlog
               </>
             )}
           </Button>
@@ -204,8 +204,8 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
         </div>
         
         <div className="text-xs text-gray-500 mt-4">
-          <p>The AI SMS Agent will automatically respond to incoming messages from clients.</p>
-          <p className="mt-1">It uses OpenAI to generate appropriate responses to client inquiries.</p>
+          <p>The AI SMS Agent now automatically responds to incoming messages in real-time.</p>
+          <p className="mt-1">Use the "Process Backlog" button to manually process any older unprocessed messages.</p>
         </div>
       </CardContent>
     </Card>
