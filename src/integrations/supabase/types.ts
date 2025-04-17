@@ -855,21 +855,36 @@ export type Database = {
       }
       sms_webhooks: {
         Row: {
+          ai_response: string | null
           id: string
+          message_hash: string | null
           processed: boolean
+          processed_at: string | null
+          processing_error: string | null
           received_at: string
+          request_id: string | null
           webhook_data: Json
         }
         Insert: {
+          ai_response?: string | null
           id?: string
+          message_hash?: string | null
           processed?: boolean
+          processed_at?: string | null
+          processing_error?: string | null
           received_at?: string
+          request_id?: string | null
           webhook_data: Json
         }
         Update: {
+          ai_response?: string | null
           id?: string
+          message_hash?: string | null
           processed?: boolean
+          processed_at?: string | null
+          processing_error?: string | null
           received_at?: string
+          request_id?: string | null
           webhook_data?: Json
         }
         Relationships: []

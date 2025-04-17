@@ -129,11 +129,16 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
           try {
             // Try to fetch the processed message
             if (data.webhookResponse.webhookId) {
-              const { data: webhookData } = await supabase
+              const { data: webhookData, error: fetchError } = await supabase
                 .from('sms_webhooks')
-                .select('ai_response, processed')
+                .select('*')
                 .eq('id', data.webhookResponse.webhookId)
                 .single();
+              
+              if (fetchError) {
+                console.error('Error fetching webhook data:', fetchError);
+                return;
+              }
               
               if (webhookData?.ai_response) {
                 setTestResponse(webhookData.ai_response);
