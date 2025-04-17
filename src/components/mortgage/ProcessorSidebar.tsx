@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
   FileText, 
@@ -8,7 +8,8 @@ import {
   Briefcase, 
   BookText, 
   ChevronRight,
-  Brain
+  Brain,
+  Upload
 } from "lucide-react";
 import { 
   Sidebar, 
@@ -23,22 +24,59 @@ import {
   SidebarFooter
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { useLoanProgress } from "@/hooks/use-loan-progress";
 
 interface ProcessorSidebarProps {
   activeSection: string;
   onSectionChange: (section: string) => void;
   loanId?: string;
   borrowerName?: string;
+  leadId?: string | number;
 }
 
 const ProcessorSidebar = ({ 
   activeSection, 
   onSectionChange, 
   loanId, 
-  borrowerName 
+  borrowerName,
+  leadId
 }: ProcessorSidebarProps) => {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { updateLoanProgress, isUpdating } = useLoanProgress();
+
+  const handleSubmitLoan = async () => {
+    const loanLeadId = leadId || id;
+    
+    if (!loanLeadId) {
+      toast.error("Cannot submit loan: Lead ID is missing");
+      return;
+    }
+    
+    try {
+      const result = await updateLoanProgress(loanLeadId, "submitted", "Loan submitted for processing by processor");
+      if (result.success) {
+        toast.success("Loan successfully submitted for processing");
+      } else {
+        toast.error("Failed to submit loan: " + result.error);
+      }
+    } catch (error) {
+      console.error("Error submitting loan:", error);
+      toast.error("Failed to submit loan due to an unexpected error");
+    } finally {
+      setIsDialogOpen(false);
+    }
+  };
 
   return (
     <Sidebar
@@ -53,6 +91,19 @@ const ProcessorSidebar = ({
       </SidebarHeader>
 
       <SidebarContent>
+        {/* Submit Loan Button */}
+        <div className="p-2">
+          <Button
+            onClick={() => setIsDialogOpen(true)}
+            variant="default"
+            size="sm"
+            className="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white"
+          >
+            <Upload className="mr-1 h-4 w-4" />
+            Submit Loan (3.4)
+          </Button>
+        </div>
+        
         <SidebarGroup>
           <SidebarGroupLabel className="text-blue-700">Processor Tools</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -148,6 +199,28 @@ const ProcessorSidebar = ({
           Back to Processor Hub
         </Button>
       </SidebarFooter>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit Loan</DialogTitle>
+            <DialogDescription>
+              This will submit the loan for processing. Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSubmitLoan} 
+              disabled={isUpdating}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isUpdating ? "Submitting..." : "Submit Loan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sidebar>
   );
 };

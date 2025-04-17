@@ -470,7 +470,11 @@ const LoanApplicationViewer = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <LoanApplicationSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <LoanApplicationSidebar 
+          activeTab={activeTab} 
+          onTabChange={setActiveTab}
+          leadId={id}
+        />
         <div className="flex-1 overflow-auto bg-white border-l">
           <div className="p-6 border-b bg-gray-50">
             <h1 className="text-2xl font-bold text-mortgage-darkPurple">

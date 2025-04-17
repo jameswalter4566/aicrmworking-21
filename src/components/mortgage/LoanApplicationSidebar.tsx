@@ -21,22 +21,59 @@ import {
   Info,
   Utensils,
   Flag,
-  Shield
+  Shield,
+  Upload
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
+} from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { useLoanProgress } from "@/hooks/use-loan-progress";
 
 interface LoanApplicationSidebarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  leadId?: string | number;
 }
 
 const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({ 
   activeTab, 
-  onTabChange 
+  onTabChange,
+  leadId
 }) => {
   const [is1003Expanded, setIs1003Expanded] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { updateLoanProgress, isUpdating } = useLoanProgress();
 
   const toggle1003Menu = () => {
     setIs1003Expanded(!is1003Expanded);
+  };
+
+  const handleSubmitLoan = async () => {
+    if (!leadId) {
+      toast.error("Cannot submit loan: Lead ID is missing");
+      return;
+    }
+    
+    try {
+      const result = await updateLoanProgress(leadId, "submitted", "Loan submitted for processing");
+      if (result.success) {
+        toast.success("Loan successfully submitted for processing");
+      } else {
+        toast.error("Failed to submit loan: " + result.error);
+      }
+    } catch (error) {
+      console.error("Error submitting loan:", error);
+      toast.error("Failed to submit loan due to an unexpected error");
+    } finally {
+      setIsDialogOpen(false);
+    }
   };
 
   const form1003Sections = [
@@ -74,6 +111,20 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
       <div className="p-4 border-b">
         <h2 className="font-semibold text-lg text-mortgage-darkPurple">Loan Application</h2>
       </div>
+      
+      {/* Submit Loan Button */}
+      <div className="px-4 py-2 border-b">
+        <Button
+          onClick={() => setIsDialogOpen(true)}
+          variant="default"
+          size="sm"
+          className="w-full flex items-center justify-center bg-mortgage-purple hover:bg-mortgage-darkPurple"
+        >
+          <Upload className="mr-1 h-4 w-4" />
+          Submit Loan (3.4)
+        </Button>
+      </div>
+      
       <nav className="flex-1 overflow-y-auto py-2">
         <ul className="space-y-1">
           {mainTabs.map((tab) => {
@@ -160,6 +211,28 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
           })}
         </ul>
       </nav>
+      
+      {/* Confirmation Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Submit Loan</DialogTitle>
+            <DialogDescription>
+              This will submit the loan for processing. Are you sure you want to continue?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
+            <Button 
+              onClick={handleSubmitLoan} 
+              disabled={isUpdating}
+              className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
+            >
+              {isUpdating ? "Submitting..." : "Submit Loan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
