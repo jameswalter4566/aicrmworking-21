@@ -18,24 +18,29 @@ async function getAdobeAccessToken() {
     throw new Error("Adobe PDF Services API credentials not configured");
   }
   
-  const response = await fetch('https://pdf-services.adobe.io/token', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: new URLSearchParams({
-      'client_id': clientId,
-      'client_secret': clientSecret
-    })
-  });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Failed to get Adobe access token: ${error}`);
+  try {
+    const response = await fetch('https://pdf-services.adobe.io/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        'client_id': clientId,
+        'client_secret': clientSecret
+      })
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Failed to get Adobe access token: ${error}`);
+    }
+    
+    const tokenData = await response.json();
+    return tokenData.access_token;
+  } catch (error) {
+    console.error("Error getting Adobe access token:", error);
+    throw new Error(`Failed to authenticate with Adobe API: ${error.message}`);
   }
-  
-  const tokenData = await response.json();
-  return tokenData.access_token;
 }
 
 /**
@@ -44,46 +49,59 @@ async function getAdobeAccessToken() {
 async function uploadPdfToAdobe(accessToken: string, pdfArrayBuffer: ArrayBuffer) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   
-  // Step 1: Get upload URI
-  const uploadResponse = await fetch('https://pdf-services.adobe.io/assets', {
-    method: 'POST',
-    headers: {
-      'X-API-Key': clientId!,
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      'mediaType': 'application/pdf'
-    })
-  });
-  
-  if (!uploadResponse.ok) {
-    const error = await uploadResponse.text();
-    throw new Error(`Failed to get Adobe upload URI: ${error}`);
+  try {
+    // Step 1: Get upload URI
+    console.log("Requesting upload URI from Adobe...");
+    const uploadResponse = await fetch('https://pdf-services.adobe.io/assets', {
+      method: 'POST',
+      headers: {
+        'X-API-Key': clientId!,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        'mediaType': 'application/pdf'
+      })
+    });
+    
+    if (!uploadResponse.ok) {
+      const errorBody = await uploadResponse.text();
+      console.error(`Upload URI request failed: ${uploadResponse.status} ${uploadResponse.statusText}`, errorBody);
+      throw new Error(`Failed to get Adobe upload URI: ${errorBody}`);
+    }
+    
+    const uploadData = await uploadResponse.json();
+    const { uploadUri, assetID } = uploadData;
+    
+    if (!uploadUri || !assetID) {
+      console.error("Invalid response from Adobe asset creation:", uploadData);
+      throw new Error("Invalid upload URI or asset ID from Adobe");
+    }
+    
+    console.log(`Got asset ID: ${assetID} and upload URI`);
+    
+    // Step 2: Upload the PDF to the provided URI
+    console.log(`Uploading PDF (${pdfArrayBuffer.byteLength} bytes) to Adobe cloud...`);
+    const uploadResult = await fetch(uploadUri, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/pdf'
+      },
+      body: pdfArrayBuffer
+    });
+    
+    if (!uploadResult.ok) {
+      const errorBody = await uploadResult.text();
+      console.error(`PDF upload failed: ${uploadResult.status} ${uploadResult.statusText}`, errorBody);
+      throw new Error(`Failed to upload PDF to Adobe: ${errorBody}`);
+    }
+    
+    console.log("PDF successfully uploaded to Adobe cloud");
+    return assetID;
+  } catch (error) {
+    console.error("Error in uploadPdfToAdobe:", error);
+    throw error;
   }
-  
-  const uploadData = await uploadResponse.json();
-  const { uploadUri, assetID } = uploadData;
-  
-  if (!uploadUri || !assetID) {
-    throw new Error("Invalid upload URI or asset ID from Adobe");
-  }
-  
-  // Step 2: Upload the PDF to the provided URI
-  const uploadResult = await fetch(uploadUri, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/pdf'
-    },
-    body: pdfArrayBuffer
-  });
-  
-  if (!uploadResult.ok) {
-    const error = await uploadResult.text();
-    throw new Error(`Failed to upload PDF to Adobe: ${error}`);
-  }
-  
-  return assetID;
 }
 
 /**
@@ -92,70 +110,94 @@ async function uploadPdfToAdobe(accessToken: string, pdfArrayBuffer: ArrayBuffer
 async function createExtractionJob(accessToken: string, assetID: string) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   
-  // Using the simplest possible extraction parameters that are known to work
-  const extractResponse = await fetch('https://pdf-services.adobe.io/operation/extractpdf', {
-    method: 'POST',
-    headers: {
-      'X-API-Key': clientId!,
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      "assetID": assetID
-    })
-  });
-  
-  if (extractResponse.status !== 201) {
-    const error = await extractResponse.text();
-    throw new Error(`Failed to create extraction job: ${error}`);
+  try {
+    console.log(`Creating extraction job for asset ID: ${assetID}`);
+    
+    // Try the most basic extraction request possible
+    const extractResponse = await fetch('https://pdf-services.adobe.io/operation/extractpdf', {
+      method: 'POST',
+      headers: {
+        'X-API-Key': clientId!,
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        "assetID": assetID
+      })
+    });
+    
+    console.log(`Extract response status: ${extractResponse.status}`);
+    
+    if (extractResponse.status !== 201) {
+      const errorBody = await extractResponse.text();
+      console.error(`Extract request failed: ${extractResponse.status} ${extractResponse.statusText}`, errorBody);
+      throw new Error(`Failed to create extraction job: ${errorBody}`);
+    }
+    
+    const location = extractResponse.headers.get('location');
+    if (!location) {
+      throw new Error("No location header returned for extraction job");
+    }
+    
+    console.log(`Extraction job created, location: ${location}`);
+    return location;
+  } catch (error) {
+    console.error("Error in createExtractionJob:", error);
+    throw error;
   }
-  
-  const location = extractResponse.headers.get('location');
-  if (!location) {
-    throw new Error("No location header returned for extraction job");
-  }
-  
-  return location;
 }
 
 /**
- * Polls the job status until completion
+ * Polls the job status until completion or timeout
  */
 async function pollJobStatus(accessToken: string, jobLocation: string) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   let status = "in progress";
   let downloadUri = null;
   let attempt = 0;
-  const maxAttempts = 20; // 40 seconds total wait time
+  const maxAttempts = 10; // Reduce to 10 attempts (20 seconds total wait time)
+  
+  console.log("Starting to poll job status...");
   
   // Poll every 2 seconds until done or failed
   while (status === "in progress" && attempt < maxAttempts) {
-    const statusResponse = await fetch(jobLocation, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'x-api-key': clientId!
-      }
-    });
-    
-    if (!statusResponse.ok) {
-      const error = await statusResponse.text();
-      throw new Error(`Failed to get job status: ${error}`);
-    }
-    
-    const statusData = await statusResponse.json();
-    status = statusData.status;
-    
-    if (status === "done") {
-      downloadUri = statusData.downloadUri;
-      break;
-    } else if (status === "failed") {
-      throw new Error(`PDF extraction job failed: ${JSON.stringify(statusData.error || {})}`);
-    }
-    
-    // Wait 2 seconds before polling again
-    await new Promise(resolve => setTimeout(resolve, 2000));
     attempt++;
+    console.log(`Polling attempt ${attempt}/${maxAttempts}...`);
+    
+    try {
+      const statusResponse = await fetch(jobLocation, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-api-key': clientId!
+        }
+      });
+      
+      if (!statusResponse.ok) {
+        const errorText = await statusResponse.text();
+        console.error(`Status check failed: ${statusResponse.status} ${statusResponse.statusText}`, errorText);
+        throw new Error(`Failed to get job status: ${errorText}`);
+      }
+      
+      const statusData = await statusResponse.json();
+      status = statusData.status;
+      console.log(`Job status: ${status}`);
+      
+      if (status === "done") {
+        downloadUri = statusData.downloadUri;
+        console.log("Job completed successfully, download URI available");
+        break;
+      } else if (status === "failed") {
+        console.error("Job failed:", JSON.stringify(statusData.error || {}));
+        throw new Error(`PDF extraction job failed: ${JSON.stringify(statusData.error || {})}`);
+      }
+      
+      // Wait 2 seconds before polling again
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (error) {
+      console.error(`Error during poll attempt ${attempt}:`, error);
+      // Continue polling despite errors
+    }
   }
   
   if (!downloadUri) {
@@ -169,36 +211,48 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
  * Downloads the extracted content
  */
 async function downloadExtractedContent(downloadUri: string) {
-  const downloadResponse = await fetch(downloadUri);
-  
-  if (!downloadResponse.ok) {
-    const error = await downloadResponse.text();
-    throw new Error(`Failed to download extracted content: ${error}`);
+  try {
+    console.log("Downloading extracted content...");
+    const downloadResponse = await fetch(downloadUri);
+    
+    if (!downloadResponse.ok) {
+      const errorText = await downloadResponse.text();
+      console.error(`Download failed: ${downloadResponse.status} ${downloadResponse.statusText}`, errorText);
+      throw new Error(`Failed to download extracted content: ${errorText}`);
+    }
+    
+    return await downloadResponse.json();
+  } catch (error) {
+    console.error("Error downloading extracted content:", error);
+    throw error;
   }
-  
-  return await downloadResponse.json();
 }
 
 /**
  * Process PDF extraction with Adobe PDF Services API
  */
 async function extractPdfWithAdobe(pdfArrayBuffer: ArrayBuffer) {
-  console.log("🔑 Getting Adobe PDF Services access token...");
-  const accessToken = await getAdobeAccessToken();
-  
-  console.log("📤 Uploading PDF to Adobe cloud storage...");
-  const assetID = await uploadPdfToAdobe(accessToken, pdfArrayBuffer);
-  
-  console.log("🔍 Creating PDF extraction job...");
-  const jobLocation = await createExtractionJob(accessToken, assetID);
-  
-  console.log("⏳ Polling job status until completion...");
-  const downloadUri = await pollJobStatus(accessToken, jobLocation);
-  
-  console.log("📥 Downloading extracted content...");
-  const extractedContent = await downloadExtractedContent(downloadUri);
-  
-  return extractedContent;
+  try {
+    console.log("🔑 Getting Adobe PDF Services access token...");
+    const accessToken = await getAdobeAccessToken();
+    
+    console.log("📤 Uploading PDF to Adobe cloud storage...");
+    const assetID = await uploadPdfToAdobe(accessToken, pdfArrayBuffer);
+    
+    console.log("🔍 Creating PDF extraction job...");
+    const jobLocation = await createExtractionJob(accessToken, assetID);
+    
+    console.log("⏳ Polling job status until completion...");
+    const downloadUri = await pollJobStatus(accessToken, jobLocation);
+    
+    console.log("📥 Downloading extracted content...");
+    const extractedContent = await downloadExtractedContent(downloadUri);
+    
+    return extractedContent;
+  } catch (error) {
+    console.error("❌ Adobe PDF extraction failed:", error);
+    throw error;
+  }
 }
 
 /**
@@ -234,22 +288,27 @@ serve(async (req) => {
     }
 
     // Download the PDF file
-    console.log("📥 Downloading PDF file...");
+    console.log("📥 Downloading PDF file from:", fileUrl);
     const fileResponse = await fetch(fileUrl);
     if (!fileResponse.ok) {
+      const errorText = await fileResponse.text();
+      console.error(`Failed to download file: ${fileResponse.status} ${fileResponse.statusText}`, errorText);
       throw new Error(`Failed to download file: ${fileResponse.statusText}`);
     }
 
     // Get the array buffer of the PDF
     const pdfArrayBuffer = await fileResponse.arrayBuffer();
+    console.log(`📄 PDF file downloaded successfully (${pdfArrayBuffer.byteLength} bytes)`);
     
     console.log("📑 Processing PDF document extraction...");
     
     // Extract PDF content using Adobe PDF Services API
     let extractedContent;
+    let isAdobeExtraction = false;
     try {
       extractedContent = await extractPdfWithAdobe(pdfArrayBuffer);
       console.log("✅ Adobe PDF extraction completed successfully");
+      isAdobeExtraction = true;
     } catch (adobeError) {
       console.error("❌ Adobe PDF extraction failed:", adobeError);
       console.log("⚠️ Falling back to OpenAI for direct analysis...");
@@ -289,7 +348,7 @@ Instructions:
       systemPrompt = `You are an intelligent mortgage document analyzer. Analyze the provided document text and classify it.`;
     }
 
-    console.log("📤 Sending extracted PDF content to OpenAI for analysis...");
+    console.log("📤 Sending PDF content to OpenAI for analysis...");
     
     const messages = [
       {
@@ -299,7 +358,7 @@ Instructions:
     ];
     
     // Use different approaches based on whether Adobe extraction was successful
-    if (extractedContent) {
+    if (isAdobeExtraction && extractedContent) {
       // If we have Adobe extraction results, use that structured data
       console.log("Using Adobe extracted content for OpenAI analysis");
       
@@ -315,21 +374,44 @@ Instructions:
         }
       }
       
-      messages.push({
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Please analyze the following document that was extracted from a PDF file."
-          },
-          {
-            type: "text",
-            text: documentText
-          }
-        ]
-      });
+      console.log(`Document text length: ${documentText.length} characters`);
+      
+      if (documentText.length === 0) {
+        console.warn("No text extracted from Adobe results, falling back to base64 method");
+        // Convert PDF to base64 as fallback
+        const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
+        
+        messages.push({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Please extract and analyze the text content from this PDF document."
+            },
+            {
+              type: "text",
+              text: `I'm providing this document as a base64-encoded PDF. The document is a mortgage approval letter containing loan conditions. Please extract the conditions and categorize them according to the instructions.`
+            }
+          ]
+        });
+      } else {
+        messages.push({
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: "Please analyze the following document that was extracted from a PDF file."
+            },
+            {
+              type: "text",
+              text: documentText
+            }
+          ]
+        });
+      }
     } else {
       // Fallback: Convert PDF to base64 and use GPT-4's ability to work with text
+      console.log("Using base64 encoding for OpenAI PDF analysis");
       const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
       
       messages.push({
@@ -348,6 +430,7 @@ Instructions:
     }
     
     // Use OpenAI to analyze the content
+    console.log("Making request to OpenAI API...");
     const aiResult = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -363,9 +446,9 @@ Instructions:
     });
 
     if (!aiResult.ok) {
-      const error = await aiResult.text();
-      console.error("❌ OpenAI API error:", error);
-      throw new Error(`OpenAI API error: ${error}`);
+      const errorBody = await aiResult.text();
+      console.error(`OpenAI API error: ${aiResult.status} ${aiResult.statusText}`, errorBody);
+      throw new Error(`OpenAI API error: ${errorBody}`);
     }
 
     const analysisResult = await aiResult.json();
@@ -375,12 +458,12 @@ Instructions:
     const extractedData = JSON.parse(analysisResult.choices[0].message.content);
     
     // Add the raw extracted text from Adobe if available
-    if (extractedContent) {
+    if (isAdobeExtraction && extractedContent) {
       extractedData.rawExtractedText = {
         source: "adobe_pdf_services",
         fullText: extractedContent.elements
-          ?.filter(element => element.Text)
-          ?.map(element => element.Text)
+          ?.filter((element: any) => element.Text)
+          ?.map((element: any) => element.Text)
           ?.join("\n") || "",
         extractionTimestamp: new Date().toISOString()
       };
