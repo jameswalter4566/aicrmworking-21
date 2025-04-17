@@ -40,8 +40,9 @@ serve(async (req) => {
     
     console.log(`Registering webhook URL: ${webhookUrl} for event: ${eventType}`);
     
-    // Call the SMS Gateway API to register the webhook
-    const response = await fetch(`${smsServerUrl}/services/register-webhook.php`, {
+    // Call the SMS Gateway API to register the webhook - updated to use the correct endpoint
+    // Typically for SMS gateways, webhook registration would be at a path like 'webhook' or 'settings/webhook'
+    const response = await fetch(`${smsServerUrl}/services/webhook-register.php`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -53,16 +54,21 @@ serve(async (req) => {
       }).toString()
     });
     
-    // Handle response
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`SMS Gateway API error: ${response.status} ${errorText}`);
+    // Log the actual response for debugging
+    const responseText = await response.text();
+    console.log(`API Response Status: ${response.status}`);
+    console.log(`API Response Body: ${responseText}`);
+    
+    // Try to parse the response as JSON, but handle cases where it's not valid JSON
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      throw new Error(`SMS Gateway API returned invalid JSON: ${responseText}`);
     }
     
-    const data = await response.json();
-    
-    if (!data.success) {
-      throw new Error(data.error?.message || "Failed to register webhook");
+    if (!response.ok || !data.success) {
+      throw new Error(data.error?.message || `API Error: ${response.status} - ${responseText}`);
     }
     
     console.log("Webhook registered successfully");
