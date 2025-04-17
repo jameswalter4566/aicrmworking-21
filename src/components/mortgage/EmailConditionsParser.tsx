@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       updateStepStatus("parse", "completed");
       updateStepStatus("extract", "processing");
       
-      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: unknown) => {
+      // Safely calculate total conditions count by ensuring we're working with arrays
+      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: any) => {
         return Array.isArray(arr) ? sum + arr.length : sum;
       }, 0);
     

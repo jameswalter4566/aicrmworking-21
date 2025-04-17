@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { create } from "https://deno.land/x/openpdf@1.0.2/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,18 +17,54 @@ async function generateTextContent(content: string): Promise<Uint8Array> {
   return encoder.encode(content);
 }
 
-async function generatePDFContent(content: string): Promise<Uint8Array> {
-  const pdf = create();
+async function generateBasicPDF(content: string): Promise<Uint8Array> {
+  // Create a very basic PDF using text content
+  // This is a simplified approach without using external PDF libraries
   
-  // Add content to PDF with proper formatting
-  pdf.text(content, {
-    size: 11,
-    font: "Helvetica",
-    lineHeight: 1.5,
-    wrap: true
-  });
+  // PDF header
+  const header = "%PDF-1.7\n";
   
-  return pdf.save();
+  // Objects
+  const objects: string[] = [];
+  
+  // Catalog
+  objects.push("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+  
+  // Pages
+  objects.push("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+  
+  // Page
+  objects.push("3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n");
+  
+  // Font
+  objects.push("4 0 obj\n<< /Type /Font /Subtype /Type1 /Name /F1 /BaseFont /Helvetica >>\nendobj\n");
+  
+  // Content - Here we add the actual letter content
+  const lines = content.split("\n").map(line => line.trim());
+  const contentStream = lines.map(line => 
+    line ? `BT /F1 12 Tf 50 ${700 - (lines.indexOf(line) * 15)} Td (${line.replace(/[()\\]/g, "\\$&")}) Tj ET` : ""
+  ).join("\n");
+  
+  objects.push(`5 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream\nendobj\n`);
+  
+  // Cross-reference table
+  let xref = "xref\n0 6\n0000000000 65535 f \n";
+  let offset = header.length;
+  
+  for (const obj of objects) {
+    xref += `${offset.toString().padStart(10, '0')} 00000 n \n`;
+    offset += obj.length;
+  }
+  
+  // Trailer
+  const trailer = "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + offset + "\n%%EOF";
+  
+  // Combine everything
+  const pdf = header + objects.join("") + xref + trailer;
+  
+  // Convert to Uint8Array
+  const encoder = new TextEncoder();
+  return encoder.encode(pdf);
 }
 
 serve(async (req) => {
@@ -83,7 +118,8 @@ serve(async (req) => {
       const loeContent = generateLOEContent(loeType, lead, condition);
       
       try {
-        const pdfBytes = await generatePDFContent(loeContent);
+        // Generate PDF content
+        const pdfBytes = await generateBasicPDF(loeContent);
         
         const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
         const filePath = `leads/${leadId}/loe/${fileName}`;
@@ -341,24 +377,6 @@ function formatLOETypeTitle(loeType: string): string {
   }
 }
 
-/**
- * Mock function to simulate PDF generation and DocuSign envelope creation
- * In a production environment, this would be replaced with actual DocuSign API calls
- */
-async function mockDocuSignProcess(lead: any, condition: any, loeType: string, loeContent: string) {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  const mockDocumentId = `LOE-${loeType}-${Date.now()}`;
-  const mockEnvelopeId = `env-${Date.now()}`;
-  
-  return {
-    documentUrl: `https://example.com/documents/${mockDocumentId}.pdf`,
-    envelopeId: mockEnvelopeId,
-    recipientEmail: lead.email || 'borrower@example.com',
-    sentTimestamp: new Date().toISOString()
-  };
-}
-
 // Helper functions for generating realistic mock content
 
 function getRandomCreditInquiryReason(): string {
@@ -475,7 +493,7 @@ function getRandomNameVariation(firstName?: string, lastName?: string): string {
     `${first.charAt(0)}. ${last}`,
     `${first} ${last.charAt(0)}.`,
     `${first.substring(0, first.length-1)}y ${last}`,
-    `${first} ${lastName.charAt(0)}-${lastName.charAt(1)}`,
+    `${first} ${lastName?.charAt(0)}-${lastName?.charAt(1)}`,
     `${firstName || 'Jane'} ${lastName || 'Smith'} (née ${randomLastName()})`,
     `${firstName || 'J.'} ${lastName || 'D.'}`
   ];
