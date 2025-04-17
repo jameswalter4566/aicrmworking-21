@@ -92,6 +92,7 @@ async function uploadPdfToAdobe(accessToken: string, pdfArrayBuffer: ArrayBuffer
 async function createExtractionJob(accessToken: string, assetID: string) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   
+  // Modified extraction parameters to use supported values
   const extractResponse = await fetch('https://pdf-services.adobe.io/operation/extractpdf', {
     method: 'POST',
     headers: {
@@ -101,10 +102,13 @@ async function createExtractionJob(accessToken: string, assetID: string) {
     },
     body: JSON.stringify({
       "assetID": assetID,
-      "elementsToExtract": [
-        "text",
-        "tables",
-        "structuredData"
+      "elements": [
+        {
+          "type": "text"
+        },
+        {
+          "type": "tables"
+        }
       ]
     })
   });
