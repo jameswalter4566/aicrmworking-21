@@ -119,6 +119,7 @@ const ProcessorAssistViewer = () => {
   useEffect(() => {
     if (id) {
       fetchLoanApplicationData(id);
+      fetchLoanConditions(id);
     }
   }, [id]);
   
@@ -204,6 +205,32 @@ const ProcessorAssistViewer = () => {
       setLoadError(`Unexpected error: ${error.message}`);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLoanConditions = async (leadId: string) => {
+    try {
+      console.log(`Fetching saved conditions for lead ID: ${leadId}`);
+      
+      const url = new URL(`${supabase.functions.url}/retrieve-conditions`);
+      url.searchParams.append('leadId', leadId);
+      
+      const { data, error } = await supabase.functions.invoke('retrieve-conditions', {
+        body: { leadId }
+      });
+      
+      if (error) {
+        console.error("Error retrieving conditions:", error);
+        return;
+      }
+      
+      console.log("Retrieved conditions:", data);
+      
+      if (data.success && data.conditions) {
+        setParsedConditions(data.conditions);
+      }
+    } catch (error: any) {
+      console.error(`Error fetching loan conditions: ${error.message}`, error);
     }
   };
 

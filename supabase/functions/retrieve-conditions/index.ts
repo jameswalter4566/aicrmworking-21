@@ -14,9 +14,18 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Get the leadId from the URL query parameter
-    const url = new URL(req.url);
-    const leadId = url.searchParams.get('leadId');
+    // Get the leadId from the request
+    let leadId;
+    
+    // Check if it's GET or POST and extract leadId accordingly
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      leadId = url.searchParams.get('leadId');
+    } else {
+      // For POST requests, get leadId from the body
+      const body = await req.json();
+      leadId = body.leadId;
+    }
 
     if (!leadId) {
       return new Response(
@@ -47,6 +56,8 @@ serve(async (req: Request) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
+
+    console.log("Found conditions data:", data);
 
     // Return the conditions if found
     return new Response(
