@@ -537,7 +537,7 @@ Return all extracted and classified data as structured **JSON**, organized by se
             }
           } catch (err) {
             console.error("Error in data storage process:", err);
-            // Continue execution to return the extracted data even if storing fails
+            // Continue with the response even if storing fails
           }
         }
       }
