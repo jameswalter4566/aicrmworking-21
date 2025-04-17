@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { create } from "https://deno.land/x/openpdf@1.0.2/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,6 +16,20 @@ async function generateTextContent(content: string): Promise<Uint8Array> {
   // Convert text content to a Uint8Array for upload
   const encoder = new TextEncoder();
   return encoder.encode(content);
+}
+
+async function generatePDFContent(content: string): Promise<Uint8Array> {
+  const pdf = create();
+  
+  // Add content to PDF with proper formatting
+  pdf.text(content, {
+    size: 11,
+    font: "Helvetica",
+    lineHeight: 1.5,
+    wrap: true
+  });
+  
+  return pdf.save();
 }
 
 serve(async (req) => {
@@ -68,21 +83,21 @@ serve(async (req) => {
       const loeContent = generateLOEContent(loeType, lead, condition);
       
       try {
-        const textBytes = await generateTextContent(loeContent);
+        const pdfBytes = await generatePDFContent(loeContent);
         
-        const fileName = `LOE_${condition.id}_${Date.now()}.txt`;
+        const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
         const filePath = `leads/${leadId}/loe/${fileName}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('borrower-documents')
-          .upload(filePath, textBytes, {
-            contentType: 'text/plain',
+          .upload(filePath, pdfBytes, {
+            contentType: 'application/pdf',
             upsert: true
           });
           
         if (uploadError) {
-          console.error('Error uploading text file:', uploadError);
-          throw new Error('Failed to upload LOE text file');
+          console.error('Error uploading PDF file:', uploadError);
+          throw new Error('Failed to upload LOE PDF file');
         }
         
         const { data: { publicUrl } } = supabase.storage
@@ -95,16 +110,14 @@ serve(async (req) => {
         return {
           conditionId: condition.id,
           loeType,
-          loeContent,
           documentUrl: publicUrl,
           success: true
         };
       } catch (error) {
-        console.error(`Error generating text file for condition ${condition.id}:`, error);
+        console.error(`Error generating PDF for condition ${condition.id}:`, error);
         return {
           conditionId: condition.id,
           loeType,
-          loeContent,
           success: false,
           error: error.message
         };

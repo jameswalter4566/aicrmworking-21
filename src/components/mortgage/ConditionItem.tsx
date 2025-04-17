@@ -1,6 +1,6 @@
 
 import React from "react";
-import { Check, Loader2, FileText } from "lucide-react";
+import { Check, Loader2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
@@ -14,6 +14,16 @@ export interface LoanCondition {
 }
 
 export const ConditionItem: React.FC<{ condition: LoanCondition }> = ({ condition }) => {
+  const handleDownload = (url: string) => {
+    // Create temporary link and trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `LOE_${condition.id}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-blue-100">
       <div className="flex-1">
@@ -23,17 +33,10 @@ export const ConditionItem: React.FC<{ condition: LoanCondition }> = ({ conditio
             variant="link" 
             size="sm" 
             className="p-0 h-auto text-blue-600 hover:text-blue-800"
-            asChild
+            onClick={() => handleDownload(condition.documentUrl!)}
           >
-            <a 
-              href={condition.documentUrl} 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="inline-flex items-center mt-1"
-            >
-              <FileText className="h-3 w-3 mr-1" />
-              View LOE
-            </a>
+            <Download className="h-3 w-3 mr-1" />
+            Download LOE
           </Button>
         )}
       </div>
