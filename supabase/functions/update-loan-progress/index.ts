@@ -166,6 +166,28 @@ serve(async (req) => {
         console.error(`[${requestId}] Error triggering loan-submitted-sms:`, error);
       });
     }
+    
+    // NEW CODE: If the current step is "approved" and it's different from the previous step,
+    // trigger the loan-approved-sms function
+    if (currentStep === "approved" && previousStep !== "approved") {
+      console.log(`[${requestId}] Triggering loan-approved-sms function for lead ${leadId}`);
+      
+      // Invoke the loan-approved-sms function
+      supabase.functions.invoke('loan-approved-sms', {
+        body: { 
+          leadId,
+          currentStep,
+          previousStep,
+          firstName: leadData?.first_name,
+          lastName: leadData?.last_name,
+          phoneNumber: leadData?.phone1
+        }
+      })
+      .catch(error => {
+        // Log the error but don't fail the request
+        console.error(`[${requestId}] Error triggering loan-approved-sms:`, error);
+      });
+    }
 
     console.log(`[${requestId}] Successfully updated loan progress for lead ${leadId}`);
 
