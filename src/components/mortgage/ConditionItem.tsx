@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { CheckCircle, Clock, HelpCircle, ChevronDown, ChevronUp, Info, FileUp, Download } from "lucide-react";
 import { 
@@ -85,9 +86,11 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
     }
   };
 
-  const handleDownloadLOE = () => {
+  const handleDownloadLOE = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (condition.documentUrl) {
       window.open(condition.documentUrl, '_blank');
+      toast.success("Opening Letter of Explanation");
     }
   };
 
@@ -161,10 +164,7 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
         <div className="flex items-center space-x-2">
           {condition.documentUrl && (
             <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDownloadLOE();
-              }}
+              onClick={handleDownloadLOE}
               className="p-1 rounded-full hover:bg-gray-100"
               title="Download Letter of Explanation"
             >
@@ -206,6 +206,20 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
                   <Download className="h-3 w-3 mr-1" /> Download
                 </Button>
               )}
+            </div>
+          )}
+          
+          {condition.documentUrl && (
+            <div className="mb-3 text-sm">
+              <span className="font-medium">Letter of Explanation: </span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="ml-2 py-0 h-6"
+                onClick={handleDownloadLOE}
+              >
+                <Download className="h-3 w-3 mr-1" /> View LOE
+              </Button>
             </div>
           )}
           

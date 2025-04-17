@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import * as PDFDocument from 'https://esm.sh/pdfkit@0.13.0';
+import { default as PDFDocument } from 'https://esm.sh/pdfkit@0.13.0?dts';
+import { Buffer } from "https://deno.land/std@0.177.0/node/buffer.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,13 +14,22 @@ const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function generatePDF(content: string): Promise<Uint8Array> {
+  // Create a document
   const doc = new PDFDocument();
   const chunks: Uint8Array[] = [];
 
   return new Promise((resolve, reject) => {
-    doc.on('data', (chunk) => chunks.push(chunk));
+    // Capture chunks as they're written
+    doc.on('data', (chunk) => chunks.push(new Uint8Array(chunk)));
     doc.on('end', () => {
-      const result = new Uint8Array(Buffer.concat(chunks));
+      // Combine chunks into a single Uint8Array
+      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+      const result = new Uint8Array(totalLength);
+      let offset = 0;
+      chunks.forEach(chunk => {
+        result.set(chunk, offset);
+        offset += chunk.length;
+      });
       resolve(result);
     });
     
@@ -34,6 +44,7 @@ async function generatePDF(content: string): Promise<Uint8Array> {
       
       doc.end();
     } catch (error) {
+      console.error('Error generating PDF:', error);
       reject(error);
     }
   });
@@ -89,34 +100,45 @@ serve(async (req) => {
       const loeType = determineLOEType(condition.text || condition.description);
       const loeContent = generateLOEContent(loeType, lead, condition);
       
-      const pdfBytes = await generatePDF(loeContent);
-      
-      const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
-      const filePath = `leads/${leadId}/loe/${fileName}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('borrower-documents')
-        .upload(filePath, pdfBytes, {
-          contentType: 'application/pdf',
-          upsert: true
-        });
+      try {
+        const pdfBytes = await generatePDF(loeContent);
         
-      if (uploadError) {
-        console.error('Error uploading PDF:', uploadError);
-        throw new Error('Failed to upload LOE PDF');
+        const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
+        const filePath = `leads/${leadId}/loe/${fileName}`;
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('borrower-documents')
+          .upload(filePath, pdfBytes, {
+            contentType: 'application/pdf',
+            upsert: true
+          });
+          
+        if (uploadError) {
+          console.error('Error uploading PDF:', uploadError);
+          throw new Error('Failed to upload LOE PDF');
+        }
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('borrower-documents')
+          .getPublicUrl(filePath);
+        
+        return {
+          conditionId: condition.id,
+          loeType,
+          loeContent,
+          documentUrl: publicUrl,
+          success: true
+        };
+      } catch (error) {
+        console.error(`Error generating PDF for condition ${condition.id}:`, error);
+        return {
+          conditionId: condition.id,
+          loeType,
+          loeContent,
+          success: false,
+          error: error.message
+        };
       }
-      
-      const { data: { publicUrl } } = supabase.storage
-        .from('borrower-documents')
-        .getPublicUrl(filePath);
-      
-      return {
-        conditionId: condition.id,
-        loeType,
-        loeContent,
-        documentUrl: publicUrl,
-        success: true
-      };
     }));
     
     console.log('LOE processing completed successfully');
