@@ -153,20 +153,28 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         if (totalConditions > 0) {
           toast.info(`Processing ${totalConditions} conditions through automation...`);
           
-          // Call automation-matcher with the extracted conditions
-          const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
-            body: { 
-              leadId,
-              conditions
-            }
-          });
+          console.log("Calling automation-matcher with conditions:", conditions);
           
-          if (automationError) {
-            console.error("Error from automation-matcher:", automationError);
-            toast.error("Failed to process conditions automatically");
-          } else if (automationData.success) {
-            const automatedCount = automationData.automationResults?.automatedConditionIds?.length || 0;
-            toast.success(`${automatedCount} conditions were processed automatically`);
+          // Call automation-matcher with the extracted conditions
+          try {
+            const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+              body: { 
+                leadId,
+                conditions
+              }
+            });
+            
+            if (automationError) {
+              console.error("Error from automation-matcher:", automationError);
+              toast.error("Failed to process conditions automatically");
+            } else if (automationData.success) {
+              const automatedCount = automationData.automationResults?.automatedConditionIds?.length || 0;
+              toast.success(`${automatedCount} conditions were processed automatically`);
+              console.log("Automation results:", automationData);
+            }
+          } catch (autoError) {
+            console.error("Error calling automation-matcher:", autoError);
+            toast.error("Failed to run automation process");
           }
         }
       }
