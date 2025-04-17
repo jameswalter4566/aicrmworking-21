@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -12,16 +11,11 @@ import { supabase } from "@/integrations/supabase/client";
 interface Props {
   leadId: string;
   conditions: any;
-  initialAutomationResults?: any;
 }
 
-const ConditionAutomationTester: React.FC<Props> = ({ 
-  leadId, 
-  conditions,
-  initialAutomationResults
-}) => {
+const ConditionAutomationTester: React.FC<Props> = ({ leadId, conditions }) => {
   const [isProcessing, setIsProcessing] = useState(false);
-  const [results, setResults] = useState<any>(initialAutomationResults || null);
+  const [results, setResults] = useState<any>(null);
 
   const runAutomation = async () => {
     setIsProcessing(true);
