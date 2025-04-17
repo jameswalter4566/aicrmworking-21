@@ -1,7 +1,8 @@
-
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { supabase } from "@/integrations/supabase/client";
 import {
   FileText,
   Send,
@@ -13,7 +14,8 @@ import {
   FileUp,
   DoorClosed,
   BanknoteIcon,
-  BadgeCheck
+  BadgeCheck,
+  Loader2
 } from "lucide-react";
 
 interface CheckpointProps {
@@ -24,7 +26,10 @@ interface CheckpointProps {
 }
 
 interface LoanProgressTrackerProps {
-  currentStep: string;
+  leadId: string | number;
+  onProgressLoaded?: (progressData: any) => void;
+  showLoader?: boolean;
+  className?: string;
 }
 
 const checkpoints = [
@@ -62,40 +67,114 @@ const Checkpoint: React.FC<CheckpointProps> = ({ label, isCompleted, isActive, i
   );
 };
 
-const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({ currentStep }) => {
+const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({ 
+  leadId, 
+  onProgressLoaded,
+  showLoader = false,
+  className = ""
+}) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [progressData, setProgressData] = useState<{
+    currentStep: string;
+    progressPercentage: number;
+  }>({
+    currentStep: "applicationCreated",
+    progressPercentage: (1 / checkpoints.length) * 100
+  });
+
+  useEffect(() => {
+    const fetchLoanProgress = async () => {
+      if (!leadId) return;
+      
+      setLoading(true);
+      setError(null);
+      
+      try {
+        const { data, error } = await supabase.functions.invoke('retrieve-loan-progress', {
+          body: { leadId }
+        });
+
+        if (error) {
+          console.error("Error fetching loan progress:", error);
+          setError("Failed to load loan progress");
+          return;
+        }
+
+        if (!data.success) {
+          console.error("API returned error:", data.error);
+          setError(data.error || "Failed to load loan progress");
+          return;
+        }
+
+        setProgressData({
+          currentStep: data.data.currentStep,
+          progressPercentage: data.data.progressPercentage
+        });
+        
+        // Notify parent component if callback provided
+        if (onProgressLoaded) {
+          onProgressLoaded(data.data);
+        }
+      } catch (err) {
+        console.error("Unexpected error fetching loan progress:", err);
+        setError("An unexpected error occurred");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLoanProgress();
+  }, [leadId, onProgressLoaded]);
+
   // Find the index of the current step
-  const currentIndex = checkpoints.findIndex((checkpoint) => checkpoint.id === currentStep);
+  const currentIndex = checkpoints.findIndex((checkpoint) => checkpoint.id === progressData.currentStep);
   
   // If current step is not found, default to first step
   const activeIndex = currentIndex >= 0 ? currentIndex : 0;
-  
-  // Calculate progress percentage
-  const progressPercentage = ((activeIndex + 1) / checkpoints.length) * 100;
 
   return (
-    <div className="w-full px-8 py-6 bg-white">
+    <div className={`w-full px-8 py-6 bg-white ${className}`}>
       <h3 className="text-lg font-bold mb-6 text-mortgage-darkPurple">Loan Progress</h3>
       
-      {/* Progress bar container with increased vertical spacing */}
-      <div className="relative mb-8">
-        <Progress 
-          value={progressPercentage} 
-          className="h-3 bg-gray-200" // Increased height from h-2 to h-3
-        />
-      </div>
-      
-      {/* Checkpoints */}
-      <div className="flex justify-between mt-[-24px]"> {/* Adjusted negative margin */}
-        {checkpoints.map((checkpoint, index) => (
-          <Checkpoint
-            key={checkpoint.id}
-            label={checkpoint.label}
-            icon={checkpoint.icon}
-            isActive={index === activeIndex}
-            isCompleted={index < activeIndex}
-          />
-        ))}
-      </div>
+      {loading && showLoader ? (
+        <div className="space-y-4">
+          <Skeleton className="h-3 w-full" />
+          <div className="flex justify-between mt-2">
+            {Array(6).fill(0).map((_, i) => (
+              <div key={i} className="flex flex-col items-center">
+                <Skeleton className="h-2 w-16 mb-2" />
+                <Skeleton className="h-8 w-8 rounded-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : error ? (
+        <div className="text-red-500 text-sm">{error}</div>
+      ) : (
+        <>
+          {/* Progress bar container with increased vertical spacing */}
+          <div className="relative mb-8">
+            <Progress 
+              value={progressData.progressPercentage} 
+              className="h-3 bg-gray-200" // Increased height from h-2 to h-3
+            />
+          </div>
+          
+          {/* Checkpoints */}
+          <div className="flex justify-between mt-[-24px]"> {/* Adjusted negative margin */}
+            {checkpoints.map((checkpoint, index) => (
+              <Checkpoint
+                key={checkpoint.id}
+                label={checkpoint.label}
+                icon={checkpoint.icon}
+                isActive={index === activeIndex}
+                isCompleted={index < activeIndex}
+              />
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };

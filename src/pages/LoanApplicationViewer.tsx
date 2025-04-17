@@ -460,7 +460,7 @@ const LoanApplicationViewer = () => {
         </Button>
       </div>
 
-      <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
+      <LoanProgressTracker leadId={id || ''} showLoader={true} />
       
       <div className="bg-white px-8 py-4 border-b">
         <PDFDropZone 

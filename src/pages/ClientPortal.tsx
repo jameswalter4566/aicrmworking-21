@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,8 +17,8 @@ import { Button } from "@/components/ui/button";
 import PDFDropZone from "@/components/mortgage/PDFDropZone";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/components/ui/use-toast";
+import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProgress";
 
-// Define progress steps for loan progression
 const progressSteps = [
   "Application Created",
   "Disclosures Sent",
@@ -36,6 +35,7 @@ const progressSteps = [
 ];
 
 interface ClientData {
+  leadId?: string | number;
   name: string;
   email: string;
   phone: string;
@@ -78,10 +78,14 @@ const ClientPortalNavbar = ({ clientData, activeTab, setActiveTab }: {
       <div className="container mx-auto flex flex-col items-center">
         <h1 className="text-xl font-bold mb-2">Your Mortgage Portal</h1>
         <div className="w-full mb-4">
-          <Progress 
-            value={((clientData.loanProgress + 1) / progressSteps.length) * 100} 
-            className="h-2.5 bg-gray-200" 
-          />
+          {clientData.leadId ? (
+            <ClientPortalLoanProgress leadId={clientData.leadId} displayStyle="compact" />
+          ) : (
+            <Progress 
+              value={((clientData.loanProgress + 1) / progressSteps.length) * 100} 
+              className="h-2.5 bg-gray-200" 
+            />
+          )}
           
           <div className="mt-1 text-xs text-center text-mortgage-lightPurple">
             <span className="font-semibold">{progressSteps[clientData.loanProgress]}</span>
@@ -223,31 +227,35 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
           <CardTitle className="text-lg text-mortgage-darkPurple">Loan Progress</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            <div>
-              <div className="flex justify-between mb-1 text-sm">
-                <span>{progressSteps[0]}</span>
-                <span>{progressSteps[progressSteps.length - 1]}</span>
-              </div>
-              <Progress value={((clientData.loanProgress + 1) / progressSteps.length) * 100} className="h-2" />
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-              {progressSteps.map((step, index) => (
-                <div 
-                  key={index} 
-                  className={`p-3 rounded-lg border ${index <= clientData.loanProgress ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} flex items-center space-x-2`}
-                >
-                  {index <= clientData.loanProgress ? (
-                    <CheckCircle size={16} className="text-green-500" />
-                  ) : (
-                    <div className="h-4 w-4 rounded-full border border-gray-300 flex-shrink-0" />
-                  )}
-                  <span className={`text-sm ${index <= clientData.loanProgress ? 'text-green-800' : 'text-gray-500'}`}>{step}</span>
+          {clientData.leadId ? (
+            <ClientPortalLoanProgress leadId={clientData.leadId} />
+          ) : (
+            <div className="space-y-6">
+              <div>
+                <div className="flex justify-between mb-1 text-sm">
+                  <span>{progressSteps[0]}</span>
+                  <span>{progressSteps[progressSteps.length - 1]}</span>
                 </div>
-              ))}
+                <Progress value={((clientData.loanProgress + 1) / progressSteps.length) * 100} className="h-2" />
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {progressSteps.map((step, index) => (
+                  <div 
+                    key={index} 
+                    className={`p-3 rounded-lg border ${index <= clientData.loanProgress ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} flex items-center space-x-2`}
+                  >
+                    {index <= clientData.loanProgress ? (
+                      <CheckCircle size={16} className="text-green-500" />
+                    ) : (
+                      <div className="h-4 w-4 rounded-full border border-gray-300 flex-shrink-0" />
+                    )}
+                    <span className={`text-sm ${index <= clientData.loanProgress ? 'text-green-800' : 'text-gray-500'}`}>{step}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -257,16 +265,13 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
 const ConditionsTab = ({ clientData, refreshData }: { clientData: ClientData, refreshData: () => void }) => {
   const handleFileUpload = async (file: File) => {
     try {
-      // In a real app, implement file upload to secure storage
       console.log("File uploaded:", file.name);
       
-      // Simulate condition being marked as completed
       toast({
         title: "Document uploaded successfully",
         description: `${file.name} has been uploaded and will be reviewed.`,
       });
       
-      // Refresh data after upload
       setTimeout(refreshData, 1000);
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -428,15 +433,12 @@ const SupportTab = () => {
   const sendMessage = () => {
     if (!message.trim()) return;
     
-    // Add user message to chat
     setChat([...chat, { sender: "user", text: message }]);
     setMessage("");
     
-    // Simulate AI response after a short delay
     setTimeout(() => {
       let response = "Thank you for your message. A mortgage specialist will respond shortly. For urgent matters, please call your loan officer directly.";
       
-      // Simple keyword-based responses
       if (message.toLowerCase().includes("status") || message.toLowerCase().includes("progress")) {
         response = "Your loan is currently in the Processing stage. It's progressing as expected!";
       } else if (message.toLowerCase().includes("document") || message.toLowerCase().includes("upload")) {
@@ -498,7 +500,6 @@ const SupportTab = () => {
   );
 };
 
-// Mock data for fallback when no real data is available
 const mockClientData: ClientData = {
   name: "John Smith",
   email: "john.smith@example.com",
@@ -517,7 +518,7 @@ const mockClientData: ClientData = {
     email: "jane.doe@mortgage.com",
     photo: "https://randomuser.me/api/portraits/women/44.jpg"
   },
-  loanProgress: 6, // 0-11 based on progress steps
+  loanProgress: 6,
   conditions: [
     { id: 1, title: "Most recent pay stub", completed: false, urgent: true },
     { id: 2, title: "Bank statements (last 2 months)", completed: false, urgent: true },
@@ -530,7 +531,8 @@ const mockClientData: ClientData = {
     { id: 1, title: "Initial Disclosure Package", completed: true, dueDate: "2023-05-15" },
     { id: 2, title: "Intent to Proceed", completed: true, dueDate: "2023-05-17" },
     { id: 3, title: "Closing Disclosure", completed: false, dueDate: "2023-06-01" },
-  ]
+  ],
+  leadId: "12345"
 };
 
 const ClientPortal = () => {
@@ -544,7 +546,6 @@ const ClientPortal = () => {
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [activeTab, setActiveTab] = useState("home");
   
-  // Verify portal access and fetch client data
   useEffect(() => {
     const verifyAccess = async () => {
       if (!slug || !token) {
@@ -553,7 +554,6 @@ const ClientPortal = () => {
       }
       
       try {
-        // Check portal access
         const { data: portalData, error: portalError } = await supabase
           .from('client_portal_access')
           .select('*')
@@ -567,42 +567,13 @@ const ClientPortal = () => {
           return;
         }
         
-        // Update last accessed timestamp
         await supabase
           .from('client_portal_access')
           .update({ last_accessed_at: new Date().toISOString() })
           .eq('id', portalData.id);
         
-        // Fetch lead data (in a real app)
-        // For now, use mock data
         setClientData(mockClientData);
         setAuthenticated(true);
-        
-        // In a real app, you would fetch real data:
-        /*
-        const { data: leadData, error: leadError } = await supabase
-          .from('leads')
-          .select(`
-            id, 
-            first_name,
-            last_name,
-            email,
-            phone1,
-            property_address,
-            mortgage_data
-          `)
-          .eq('id', portalData.lead_id)
-          .single();
-          
-        if (leadData) {
-          // Process lead data into clientData format
-          setClientData({
-            name: `${leadData.first_name} ${leadData.last_name}`,
-            // ... map other fields
-          });
-          setAuthenticated(true);
-        }
-        */
       } catch (error) {
         console.error("Error verifying access:", error);
       } finally {
@@ -614,8 +585,6 @@ const ClientPortal = () => {
   }, [slug, token]);
   
   const refreshData = async () => {
-    // In a real app, this would refresh data from the database
-    // For demo purposes, we'll simulate a condition being completed
     if (clientData) {
       const updatedConditions = [...clientData.conditions];
       const urgentIndex = updatedConditions.findIndex(c => c.urgent && !c.completed);
@@ -640,7 +609,6 @@ const ClientPortal = () => {
     );
   }
   
-  // If no slug/token provided, or slug is "login", show login page
   if (!slug || slug === "login" || !token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-mortgage-purple/20 to-white p-4">
@@ -665,7 +633,6 @@ const ClientPortal = () => {
     );
   }
   
-  // If not authenticated or no client data available, show access error
   if (!authenticated || !clientData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-red-100 to-white p-4">
@@ -690,7 +657,6 @@ const ClientPortal = () => {
     );
   }
   
-  // Show authenticated portal view
   return (
     <div className="min-h-screen bg-gray-50">
       <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />

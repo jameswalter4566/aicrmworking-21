@@ -15,6 +15,7 @@ import ConversationSection from "@/components/mortgage/ConversationSection";
 import OrderServiceSection from "@/components/mortgage/OrderServiceSection";
 import AILoanOfficerAssist from "@/components/mortgage/AILoanOfficerAssist";
 import PDFDropZone from "@/components/mortgage/PDFDropZone";
+import { ProcessorActionHeader } from "@/components/mortgage/ProcessorActionHeader";
 
 interface LoanApplication {
   id: string;
@@ -547,25 +548,22 @@ const ProcessorAssistViewer = () => {
             </Button>
           </div>
 
-          <LoanProgressTracker currentStep={loanApplication.currentStep || "applicationCreated"} />
+          <LoanProgressTracker leadId={id || ''} showLoader={true} />
 
           <div className="flex-1 p-6">
             <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-              <h1 className="text-2xl font-bold text-blue-700 mb-2">
-                {activeSection === "conditions" ? "Processor Tasks" : 
-                 activeSection === "conversation" ? "Client Conversations" :
-                 activeSection === "orderServices" ? "Order Services" :
-                 activeSection === "employmentVerification" ? "Employment Verification" :
-                 activeSection === "titleOrder" ? "Title Order" :
-                 activeSection === "aiLoanOfficer" ? "AI Loan Officer Assist" : 
-                 "Processor Tasks"}: {loanApplication.loanId}
-              </h1>
-              <div className="flex flex-wrap items-center mt-2 text-sm text-gray-600">
+              <ProcessorActionHeader
+                leadId={loanApplication.id}
+                loanId={loanApplication.loanId}
+                borrowerName={`${loanApplication.firstName} ${loanApplication.lastName}`}
+                onRefresh={() => fetchLoanApplicationData(id)}
+              />
+              
+              <div className="flex flex-wrap items-center mt-4 text-sm text-gray-600">
                 <span className="px-2 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-medium mr-2 mb-1">
                   {loanApplication.loanStatus}
                 </span>
-                <span className="mr-4 mb-1">{loanApplication.firstName} {loanApplication.lastName}</span>
-                <span className="mr-4 mb-1">• {loanApplication.propertyAddress}</span>
+                <span className="mr-4 mb-1">{loanApplication.propertyAddress}</span>
                 <span className="font-medium mb-1">{formatCurrency(loanApplication.loanAmount)}</span>
               </div>
             </div>
