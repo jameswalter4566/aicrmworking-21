@@ -211,6 +211,7 @@ Return all extracted and classified data as structured **JSON**, organized by se
           processedData.complianceConditions.length > 0
         )) {
           try {
+            console.log("Saving conditions data to the database...");
             // Save the conditions data
             const { error: saveError } = await supabase
               .from('loan_conditions')
@@ -245,7 +246,7 @@ Return all extracted and classified data as structured **JSON**, organized by se
                   console.log("Successfully updated loan status to Approved");
                 }
                 
-                // NEW: Call the automation-matcher after conditions are saved
+                // Explicitly call the automation-matcher after conditions are saved
                 console.log("Calling automation-matcher with conditions");
                 try {
                   const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
@@ -349,7 +350,8 @@ Return all extracted and classified data as structured **JSON**, organized by se
           success: true,
           data: processedData,
           documentType: extractedData.documentType || (fileType === "conditions" ? "Conditions" : "Unknown"),
-          message: "Document successfully analyzed"
+          message: "Document successfully analyzed",
+          automationTriggered: true // Indicate that automation was triggered
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -446,6 +448,7 @@ Return all extracted and classified data as structured **JSON**, organized by se
           processedData.complianceConditions.length > 0
         )) {
           try {
+            console.log("Saving conditions data to database");
             // Save the conditions data
             const { error: saveError } = await supabase
               .from('loan_conditions')
@@ -478,25 +481,32 @@ Return all extracted and classified data as structured **JSON**, organized by se
                   console.error("Error updating loan progress:", progressError);
                 } else {
                   console.log("Successfully updated loan status to Approved");
-                }
-                
-                // NEW: Call the automation-matcher after conditions are saved
-                console.log("Calling automation-matcher with conditions");
-                try {
-                  const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
-                    body: { 
-                      leadId,
-                      conditions: processedData
-                    }
-                  });
                   
-                  if (automationError) {
-                    console.error("Error from automation-matcher:", automationError);
-                  } else {
-                    console.log("Automation matcher completed successfully:", automationData);
+                  // IMMEDIATELY call the automation-matcher after conditions are saved
+                  console.log("Calling automation-matcher with conditions");
+                  let automationSuccess = false;
+                  try {
+                    const automationStart = Date.now();
+                    console.log(`Automation start time: ${automationStart}`);
+                    const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+                      body: { 
+                        leadId,
+                        conditions: processedData
+                      }
+                    });
+                    
+                    const automationEnd = Date.now();
+                    console.log(`Automation end time: ${automationEnd}, duration: ${automationEnd - automationStart}ms`);
+                    
+                    if (automationError) {
+                      console.error("Error from automation-matcher:", automationError);
+                    } else {
+                      console.log("Automation matcher completed successfully:", automationData);
+                      automationSuccess = true;
+                    }
+                  } catch (autoError) {
+                    console.error("Exception in automation-matcher call:", autoError);
                   }
-                } catch (autoError) {
-                  console.error("Exception in automation-matcher call:", autoError);
                 }
               } catch (progressErr) {
                 console.error("Exception during status update:", progressErr);

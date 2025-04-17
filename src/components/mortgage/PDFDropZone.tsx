@@ -106,11 +106,13 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       const uniqueFileName = `${Date.now()}_${file.name}`;
       const fileType = "conditions"; // Assuming we're processing conditions
       
-      toast.info(`Analyzing conditions document...`);
+      toast.info("Analyzing conditions document...");
       
+      // Step 1: Upload the document to Supabase Storage
+      console.log("Uploading PDF to Supabase storage...");
       const { error: uploadError, data } = await supabase.storage
         .from('borrower-documents')
-        .upload(`leads/${leadId}/${uniqueFileName}`, file);
+        .upload(`leads/${leadId}/conditions/${uniqueFileName}`, file);
         
       if (uploadError) {
         throw new Error(`Error uploading document: ${uploadError.message}`);
@@ -118,16 +120,17 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       const { data: { publicUrl } } = supabase.storage
         .from('borrower-documents')
-        .getPublicUrl(`leads/${leadId}/${uniqueFileName}`);
+        .getPublicUrl(`leads/${leadId}/conditions/${uniqueFileName}`);
       
-      console.log(`Document uploaded successfully. Starting analysis...`);
+      console.log(`Document uploaded successfully at: ${publicUrl}`);
+      console.log(`Starting analysis with analyze-pdf-document function...`);
       
-      // Call analyze-pdf-document edge function
+      // Step 2: Call analyze-pdf-document edge function with explicit fileType
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-pdf-document', {
         body: { 
           fileUrl: publicUrl, 
-          fileType: "conditions",
-          leadId: leadId
+          fileType: "conditions", // Explicitly stating this is a conditions document
+          leadId
         }
       });
       
@@ -138,11 +141,34 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       console.log("Document analysis complete:", analysisData);
       
-      // The automation-matcher should now be triggered automatically within the analyze-pdf-document function
-      // We just need to check if it was successful
+      // The automation-matcher should now be triggered from inside the analyze-pdf-document function
       
       if (analysisData && analysisData.success) {
-        toast.success('Document successfully analyzed and conditions processed!');
+        if (analysisData.automationTriggered) {
+          toast.success('Document successfully analyzed and conditions processing is underway!');
+        } else {
+          // If automation wasn't triggered in the function for some reason, trigger it manually here
+          console.log("Automation not triggered in analyze-pdf-document, triggering it now");
+          try {
+            const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+              body: { 
+                leadId,
+                conditions: analysisData.data
+              }
+            });
+            
+            if (automationError) {
+              console.error("Error from automation-matcher:", automationError);
+              toast.warning('Document processed, but automation had errors. Please check the conditions.');
+            } else {
+              console.log("Automation matcher completed successfully:", automationData);
+              toast.success('Document successfully analyzed and conditions processed!');
+            }
+          } catch (autoError: any) {
+            console.error("Exception in automation-matcher call:", autoError);
+            toast.warning('Document processed, but automation encountered an error: ' + (autoError.message || 'Unknown error'));
+          }
+        }
       } else {
         console.warn("Document analysis returned unexpected response:", analysisData);
         toast.warning('Document processed but with warnings. Check the conditions.');
