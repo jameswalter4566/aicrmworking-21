@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import JSZip from "https://esm.sh/jszip@3.10.1";
@@ -279,7 +278,7 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
           // Final check if we have a valid downloadUri
           if (!downloadUri) {
             console.error("Job completed but no downloadUri was found in any expected location:", statusData);
-            throw new Error("PDF extraction job completed but downloadUri not found in response");
+            throw new Error("PDF extraction job completed but no downloadUri was provided: " + JSON.stringify(statusData, null, 2));
           }
           
           console.log("Successfully found download URI");
@@ -336,11 +335,34 @@ async function downloadExtractedContent(downloadUri: string) {
       throw new Error(`Failed to download extracted content: ${errorText}`);
     }
     
+    // Store the content type for content handling decision
+    const contentType = downloadResponse.headers.get("content-type") || "";
+    console.log(`Downloaded content type: ${contentType}`);
+    
+    // Get the response once as an array buffer
+    const responseData = await downloadResponse.arrayBuffer();
+    console.log(`Downloaded data size: ${responseData.byteLength} bytes`);
+    
+    // If it's JSON, parse directly
+    if (contentType.includes("application/json")) {
+      console.log("Processing direct JSON response...");
+      const jsonText = new TextDecoder().decode(responseData);
+      try {
+        const extractedContent = JSON.parse(jsonText);
+        console.log("Successfully parsed JSON data");
+        return extractedContent;
+      } catch (jsonError) {
+        console.error("Failed to parse JSON:", jsonError);
+        throw new Error("Invalid JSON format in response");
+      }
+    }
+    
+    // Otherwise, assume it's a ZIP and process accordingly
     console.log("Processing ZIP file result...");
     try {
-      // Get the response as an array buffer for JSZip
-      const zipArray = new Uint8Array(await downloadResponse.arrayBuffer());
-      console.log(`Downloaded ZIP file size: ${zipArray.length} bytes`);
+      // Convert array buffer to Uint8Array for JSZip
+      const zipArray = new Uint8Array(responseData);
+      console.log(`Processing ZIP file: ${zipArray.length} bytes`);
       
       // Load the ZIP file 
       const jszip = await JSZip.loadAsync(zipArray);
@@ -366,23 +388,28 @@ async function downloadExtractedContent(downloadUri: string) {
     } catch (zipError) {
       console.error("Failed to process ZIP file:", zipError);
       
-      // If ZIP processing fails, try to get the raw response as a fallback
+      // If ZIP processing fails, try to decode the raw response as a fallback
       console.log("Attempting to parse response directly as a fallback...");
       
-      // Try to get the raw text
-      const rawText = await downloadResponse.text();
-      if (!rawText || rawText.trim() === '') {
-        throw new Error("Downloaded content is empty or invalid");
-      }
-      
-      // Try to parse as JSON first
       try {
-        const jsonContent = JSON.parse(rawText);
-        console.log("Successfully parsed response as JSON");
-        return jsonContent;
-      } catch (jsonError) {
-        console.log("Response is not JSON, using as raw text");
-        return { elements: [{ Text: rawText }] };
+        // Try to decode as text
+        const rawText = new TextDecoder().decode(responseData);
+        if (!rawText || rawText.trim() === '') {
+          throw new Error("Downloaded content is empty or invalid");
+        }
+        
+        // Try to parse as JSON
+        try {
+          const jsonContent = JSON.parse(rawText);
+          console.log("Successfully parsed response data as JSON");
+          return jsonContent;
+        } catch (jsonError) {
+          console.log("Response is not valid JSON, using as raw text");
+          return { elements: [{ Text: rawText }] };
+        }
+      } catch (textError) {
+        console.error("Failed to decode response as text:", textError);
+        throw new Error("Failed to process downloaded content in any supported format");
       }
     }
   } catch (error) {
