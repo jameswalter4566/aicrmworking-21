@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -49,7 +50,7 @@ serve(async (req) => {
     }
 
     console.log(`Processing conditions for lead ID: ${leadId}`);
-    console.log(`Received conditions:`, JSON.stringify(conditions));
+    console.log(`Received conditions:`, JSON.stringify(conditions).substring(0, 200) + '...');
     
     // Process all condition categories
     const allConditions = [
@@ -154,8 +155,39 @@ serve(async (req) => {
       console.log(`Routing ${conditions.length} conditions to ${automationType}`);
       
       try {
-        // Call the appropriate automation function (mocked for now)
-        const result = await mockAutomationExecution(automationType, conditions, leadId);
+        // Process based on automation type
+        let result;
+        
+        // Handle LOE generator specifically - now using our new edge function
+        if (automationType === AUTOMATION_TYPES.LOE) {
+          console.log(`Processing ${conditions.length} conditions with LOE generator`);
+          try {
+            // Call our LOE generator function
+            const { data: loeResult, error: loeError } = await supabase.functions.invoke('loe-generator', {
+              body: { 
+                leadId, 
+                conditions 
+              }
+            });
+            
+            if (loeError) {
+              console.error("Error from LOE generator:", loeError);
+              throw new Error(`LOE generation failed: ${loeError.message || "Unknown error"}`);
+            }
+            
+            console.log("LOE generator completed successfully:", JSON.stringify(loeResult).substring(0, 200) + '...');
+            result = {
+              success: loeResult.success,
+              details: loeResult
+            };
+          } catch (loeExcept) {
+            console.error("Exception in LOE generator:", loeExcept);
+            throw loeExcept;
+          }
+        } else {
+          // For other automation types, use the mock function
+          result = await mockAutomationExecution(automationType, conditions, leadId);
+        }
         
         // Update the automation summary with results
         automationResults.automationSummary[automationType].success = result.success;
@@ -306,11 +338,18 @@ Respond with only the exact name of the appropriate automation type from the lis
 function ruleBasedClassification(conditionText) {
   const text = conditionText.toLowerCase();
   
-  // LOE patterns
+  // LOE patterns - now with more detailed matching for better accuracy
   if (text.includes('letter of explanation') || 
       text.includes('loe') || 
-      text.includes('explanation') || 
-      text.includes('explain')) {
+      text.includes('explain') || 
+      text.includes('explanation') ||
+      text.includes('clarify') ||
+      text.includes('clarification') ||
+      text.includes('credit inquir') ||
+      text.includes('large deposit') ||
+      text.includes('employment gap') ||
+      text.includes('address') && (text.includes('discrepanc') || text.includes('histor')) ||
+      text.includes('name') && (text.includes('variation') || text.includes('discrepanc'))) {
     return AUTOMATION_TYPES.LOE;
   }
   
@@ -320,7 +359,9 @@ function ruleBasedClassification(conditionText) {
       text.includes('w2') || 
       text.includes('income') || 
       text.includes('employment verification') || 
-      text.includes('salary')) {
+      text.includes('salary') ||
+      text.includes('tax return') ||
+      text.includes('earnings')) {
     return AUTOMATION_TYPES.INCOME_VERIFICATION;
   }
   
@@ -330,7 +371,9 @@ function ruleBasedClassification(conditionText) {
       text.includes('investment') || 
       text.includes('asset') || 
       text.includes('funds') || 
-      text.includes('deposit')) {
+      text.includes('deposit') ||
+      text.includes('savings') ||
+      text.includes('checking account')) {
     return AUTOMATION_TYPES.ASSET_VERIFICATION;
   }
   
@@ -338,7 +381,9 @@ function ruleBasedClassification(conditionText) {
   if (text.includes('insurance') || 
       text.includes('hazard') || 
       text.includes('flood') || 
-      text.includes('policy')) {
+      text.includes('policy') ||
+      text.includes('coverage') ||
+      text.includes('homeowner')) {
     return AUTOMATION_TYPES.INSURANCE;
   }
   
@@ -346,7 +391,10 @@ function ruleBasedClassification(conditionText) {
   if (text.includes('title') || 
       text.includes('deed') || 
       text.includes('legal description') || 
-      text.includes('survey')) {
+      text.includes('survey') ||
+      text.includes('property boundary') ||
+      text.includes('encumbrance') ||
+      text.includes('lien')) {
     return AUTOMATION_TYPES.TITLE;
   }
   
@@ -377,24 +425,6 @@ async function mockAutomationExecution(automationType, conditions, leadId) {
   const successRate = successRates[automationType] || 0.5;
   const isSuccess = Math.random() <= successRate;
   
-  // For LOE, add specific mock data
-  if (automationType === AUTOMATION_TYPES.LOE) {
-    if (isSuccess) {
-      return {
-        success: true,
-        details: {
-          processedConditions: conditions.length,
-          loeType: conditions[0]?.text?.includes('credit') ? 'credit_inquiry' : 'general',
-          mockDocumentId: `doc-${Date.now()}`,
-          mockEnvelopeId: `env-${Date.now()}`
-        }
-      };
-    } else {
-      throw new Error("Failed to generate LOE document");
-    }
-  }
-  
-  // For other automation types
   if (isSuccess) {
     return {
       success: true,

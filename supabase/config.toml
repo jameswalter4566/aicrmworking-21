@@ -1,19 +1,29 @@
 
-# This file controls the configuration for your Supabase project.
 project_id = "imrmboyczebjlbnkgjns"
-app_settings.streaming.minimum_version = "1.23.0"
 
-[functions."twilio-token"]
-verify_jwt = false
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
 
-[functions."automation-matcher"]
-verify_jwt = false
+[db]
+port = 54322
 
-[functions."loe-generator"]
-verify_jwt = false
+[studio]
+port = 54323
 
-[functions."income-verification"]
-verify_jwt = false
+[inbucket]
+port = 54324
 
-[functions."asset-verification"]
-verify_jwt = false
+[auth]
+enabled = true
+
+[storage]
+enabled = true
+
+[realtime]
+enabled = true
+
+[functions]
+  [functions.loe-generator]
+  verify_jwt = true
