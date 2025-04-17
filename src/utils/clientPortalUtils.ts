@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
-// Type for portal access data
 export interface PortalAccess {
   id: string;
   lead_id: number;
@@ -11,7 +10,6 @@ export interface PortalAccess {
   last_accessed_at?: string;
 }
 
-// Generate portal access for a lead
 export const generateClientPortal = async (leadId: number): Promise<{
   url: string;
   portal: PortalAccess | null;
@@ -39,9 +37,12 @@ export const generateClientPortal = async (leadId: number): Promise<{
       return { url: '', portal: null, error: error.message };
     }
     
+    // Prepend the full domain to the URL
+    const fullPortalUrl = `https://mortgagesalespro.com${data.url}`;
+    
     // Return the portal URL and data
     return {
-      url: data.url,
+      url: fullPortalUrl,
       portal: data.portal
     };
   } catch (error) {
