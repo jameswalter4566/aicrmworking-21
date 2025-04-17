@@ -93,6 +93,7 @@ serve(async (req) => {
           if (key === 'messages' && typeof value === 'string') {
             try {
               payload[key] = JSON.parse(value);
+              console.log(`[${requestId}] Successfully parsed messages JSON:`, JSON.stringify(payload[key]));
             } catch (e) {
               console.log(`[${requestId}] Could not parse messages as JSON: ${e.message}`);
             }
@@ -251,6 +252,25 @@ serve(async (req) => {
 
     // Immediately process the message with AI agent
     try {
+      // Just store the message but don't process it automatically
+      // We'll process it manually through the admin UI to avoid overloading during testing
+      console.log(`[${requestId}] Message stored successfully with ID: ${webhookId}`);
+      
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Webhook received and stored successfully',
+          webhookId,
+          requestId,
+          note: 'Message can be processed manually from the admin interface'
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+      
+      /* Commenting out automatic processing until we debug the issue
       // Call AI processor function
       console.log(`[${requestId}] Calling AI processor for webhook ${webhookId}`);
       const processorResponse = await supabase.functions.invoke('ai-sms-agent', {
@@ -280,6 +300,7 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
+      */
     } catch (processingError) {
       console.error(`[${requestId}] Error processing message with AI:`, processingError);
       

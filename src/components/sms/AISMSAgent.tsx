@@ -1,499 +1,370 @@
+
 import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Loader2, Send, RefreshCw, Settings, Bot, Check, TestTube2, Link } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { InfoIcon, RefreshCw, Loader } from "lucide-react";
+import ManualWebhookProcessor from "./ManualWebhookProcessor";
 
-interface AISMSAgentProps {
-  enabled?: boolean;
-}
+export const AISMSAgent = () => {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [message, setMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState('');
+  const [webhookUrl, setWebhookUrl] = useState('');
+  const [webhookEvent, setWebhookEvent] = useState('message_received');
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [activeTab, setActiveTab] = useState('test');
 
-const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
-  const [isEnabled, setIsEnabled] = useState<boolean>(enabled);
-  const [processing, setProcessing] = useState<boolean>(false);
-  const [testMode, setTestMode] = useState<boolean>(false);
-  const [testPhoneNumber, setTestPhoneNumber] = useState<string>("");
-  const [testMessage, setTestMessage] = useState<string>("");
-  const [testResponse, setTestResponse] = useState<string>("");
-  const [webhookUrl, setWebhookUrl] = useState<string>("");
-  const [showWebhookInfo, setShowWebhookInfo] = useState<boolean>(true);
-  const [testingWebhook, setTestingWebhook] = useState<boolean>(false);
-  const [registeringWebhook, setRegisteringWebhook] = useState<boolean>(false);
-  const [webhookRegistered, setWebhookRegistered] = useState<boolean>(false);
-  const [testingGatewayFormat, setTestingGatewayFormat] = useState<boolean>(false);
-  
   useEffect(() => {
-    const projectRef = 'imrmboyczebjlbnkgjns';
-    setWebhookUrl(`https://${projectRef}.supabase.co/functions/v1/sms-webhook-receiver`);
+    // Generate the webhook URL based on the current site URL
+    const baseUrl = window.location.origin;
+    const webhookEndpoint = `${baseUrl.replace('localhost', '127.0.0.1')}/functions/v1/sms-webhook-receiver`;
+    setWebhookUrl(webhookEndpoint);
   }, []);
 
-  const handleProcessUnprocessed = async () => {
-    try {
-      setProcessing(true);
-      
-      const { data, error } = await supabase.functions.invoke('ai-sms-agent', {
-        body: { mode: 'process-all-unprocessed' }
-      });
-      
-      if (error) {
-        throw new Error(`Error processing messages: ${error.message}`);
-      }
-      
-      const processedCount = data?.processed || 0;
-      toast.success(`Processed ${processedCount} messages successfully`);
-      
-      console.log('AI SMS Agent results:', data);
-    } catch (error) {
-      console.error('Failed to process unprocessed messages:', error);
-      toast.error('Failed to process messages');
-    } finally {
-      setProcessing(false);
-    }
-  };
-  
-  const handleTestAIResponse = async () => {
-    if (!testPhoneNumber || !testMessage) {
-      toast.error('Phone number and message are required');
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!phoneNumber || !message) {
+      toast.error("Please enter both phone number and message");
       return;
     }
-    
+
+    setIsLoading(true);
+    setAiResponse('');
+
     try {
-      setProcessing(true);
-      setTestResponse("");
-      
       const { data, error } = await supabase.functions.invoke('ai-sms-agent', {
         body: { 
-          phoneNumber: testPhoneNumber, 
-          messageContent: testMessage 
+          phoneNumber, 
+          messageContent: message,
+          sendSms: false // Set to true to actually send SMS, false just for testing AI response
         }
       });
-      
-      if (error) {
-        throw new Error(`Error getting AI response: ${error.message}`);
+
+      if (error) throw error;
+
+      if (data?.response) {
+        setAiResponse(data.response);
+        toast.success("AI response generated successfully");
+      } else {
+        throw new Error("No response received from AI");
       }
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to get AI response');
-      }
-      
-      setTestResponse(data.response);
-      toast.success('AI response generated successfully');
     } catch (error) {
-      console.error('Failed to test AI response:', error);
-      toast.error('Failed to generate AI response');
+      console.error("Error testing AI SMS agent:", error);
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setProcessing(false);
+      setIsLoading(false);
     }
   };
 
-  const handleTestWebhook = async () => {
-    if (!testPhoneNumber || !testMessage) {
-      toast.error('Phone number and message are required');
+  const handleSendReal = async () => {
+    if (!phoneNumber || !message) {
+      toast.error("Please enter both phone number and message");
       return;
     }
-    
+
+    setIsLoading(true);
+
     try {
-      setTestingWebhook(true);
-      
-      const { data, error } = await supabase.functions.invoke('sms-test-webhook', {
+      const { data, error } = await supabase.functions.invoke('ai-sms-agent', {
         body: { 
-          phoneNumber: testPhoneNumber, 
-          message: testMessage,
-          format: "json" // You can change this to "form" to test form-encoded format
+          phoneNumber, 
+          messageContent: message,
+          sendSms: true
         }
       });
-      
-      if (error) {
-        throw new Error(`Error testing webhook: ${error.message}`);
+
+      if (error) throw error;
+
+      if (data?.response) {
+        setAiResponse(data.response);
+        toast.success("Message sent and AI response generated");
+      } else {
+        throw new Error("Failed to send message");
       }
-      
-      console.log('Webhook test response:', data);
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to test webhook');
-      }
-      
-      toast.success('Webhook test successful');
-      
-      if (data.webhookResponse?.success) {
-        setTimeout(async () => {
-          try {
-            if (data.webhookResponse.webhookId) {
-              const { data: webhookData, error: fetchError } = await supabase
-                .from('sms_webhooks')
-                .select('*')
-                .eq('id', data.webhookResponse.webhookId)
-                .single();
-              
-              if (fetchError) {
-                console.error('Error fetching webhook data:', fetchError);
-                return;
-              }
-              
-              if (webhookData?.ai_response) {
-                setTestResponse(webhookData.ai_response);
-              } else if (webhookData?.processed) {
-                setTestResponse("Message was processed but no AI response was stored.");
-              } else {
-                setTestResponse("Message received but not yet processed by AI.");
-              }
-            }
-          } catch (fetchError) {
-            console.error('Error fetching AI response:', fetchError);
-          }
-        }, 2000);
-      }
-      
     } catch (error) {
-      console.error('Failed to test webhook:', error);
-      toast.error(`Failed to test webhook: ${error.message}`);
+      console.error("Error sending AI SMS:", error);
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setTestingWebhook(false);
+      setIsLoading(false);
     }
   };
 
-  const handleTestGatewayWebhook = async () => {
-    if (!testPhoneNumber || !testMessage) {
-      toast.error('Phone number and message are required');
+  const registerWebhook = async () => {
+    if (!webhookUrl) {
+      toast.error("Please enter a webhook URL");
       return;
     }
+
+    setIsRegistering(true);
     
     try {
-      setTestingGatewayFormat(true);
-      
+      const { data, error } = await supabase.functions.invoke('sms-register-webhook', {
+        body: { 
+          webhookUrl, 
+          eventType: webhookEvent
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success("Webhook registered successfully");
+      } else {
+        throw new Error(data?.error || "Failed to register webhook");
+      }
+    } catch (error) {
+      console.error("Error registering webhook:", error);
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsRegistering(false);
+    }
+  };
+
+  const testGatewayWebhook = async () => {
+    if (!phoneNumber) {
+      toast.error("Please enter a phone number for the test");
+      return;
+    }
+
+    const testMessage = message || "This is a test message from the webhook simulator";
+    setIsTesting(true);
+    
+    try {
       const { data, error } = await supabase.functions.invoke('sms-test-gateway-webhook', {
         body: { 
-          phoneNumber: testPhoneNumber, 
+          phoneNumber, 
           message: testMessage,
           includeSignature: true
         }
       });
-      
-      if (error) {
-        throw new Error(`Error testing gateway webhook: ${error.message}`);
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast.success("Test webhook sent successfully");
+        console.log("Webhook test response:", data);
+      } else {
+        throw new Error(data?.error || "Failed to test webhook");
       }
-      
-      console.log('Gateway webhook test response:', data);
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to test gateway webhook');
-      }
-      
-      toast.success('Gateway webhook test successful');
-      
-      if (data.webhookResponse?.success || data.webhookResponse?.webhookId) {
-        setTimeout(async () => {
-          try {
-            if (data.webhookResponse.webhookId) {
-              const { data: webhookData, error: fetchError } = await supabase
-                .from('sms_webhooks')
-                .select('*')
-                .eq('id', data.webhookResponse.webhookId)
-                .single();
-              
-              if (fetchError) {
-                console.error('Error fetching webhook data:', fetchError);
-                return;
-              }
-              
-              if (webhookData?.ai_response) {
-                setTestResponse(webhookData.ai_response);
-              } else if (webhookData?.processed) {
-                setTestResponse("Message was processed but no AI response was stored.");
-              } else {
-                setTestResponse("Message received but not yet processed by AI.");
-              }
-            }
-          } catch (fetchError) {
-            console.error('Error fetching AI response:', fetchError);
-          }
-        }, 2000);
-      }
-      
     } catch (error) {
-      console.error('Failed to test gateway webhook:', error);
-      toast.error(`Failed to test gateway webhook: ${error.message}`);
+      console.error("Error testing webhook:", error);
+      toast.error(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setTestingGatewayFormat(false);
+      setIsTesting(false);
     }
   };
 
-  const handleRegisterWebhook = async () => {
-    if (!webhookUrl) {
-      toast.error('Webhook URL is required');
-      return;
-    }
-    
-    try {
-      setRegisteringWebhook(true);
-      
-      const { data, error } = await supabase.functions.invoke('sms-register-webhook', {
-        body: { 
-          webhookUrl: webhookUrl,
-          eventType: "message_received"
-        }
-      });
-      
-      if (error) {
-        throw new Error(`Error registering webhook: ${error.message}`);
-      }
-      
-      console.log('Webhook registration response:', data);
-      
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to register webhook');
-      }
-      
-      setWebhookRegistered(true);
-      toast.success('Webhook registered successfully with SMS Gateway');
-      
-    } catch (error) {
-      console.error('Failed to register webhook:', error);
-      toast.error(`Failed to register webhook: ${error.message}`);
-    } finally {
-      setRegisteringWebhook(false);
-    }
-  };
-
-  const copyWebhookUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    toast.success('Webhook URL copied to clipboard');
-  };
-  
   return (
-    <Card className="bg-white border border-blue-100 shadow-sm">
-      <CardHeader className="bg-blue-50 pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg font-medium text-blue-900 flex items-center">
-            <Bot className="mr-2 h-5 w-5 text-blue-600" />
-            AI SMS Agent
-          </CardTitle>
-          <Badge 
-            variant="outline"
-            className="bg-green-100 text-green-800 hover:bg-green-200"
-          >
-            <Check className="mr-1 h-3 w-3" /> Webhook Enabled
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div className="text-sm text-green-700 font-medium">
-              Real-time responses via webhook are active
-            </div>
-          </div>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            className="text-blue-600 border-blue-200 hover:bg-blue-50"
-            onClick={handleProcessUnprocessed}
-            disabled={processing}
-          >
-            {processing ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Process Backlog
-              </>
-            )}
-          </Button>
-        </div>
-
-        <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-blue-800">SMS Webhook Information</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowWebhookInfo(!showWebhookInfo)}
-              className="h-7 px-2"
-            >
-              {showWebhookInfo ? 'Hide' : 'Show'}
-            </Button>
-          </div>
-
-          {showWebhookInfo && (
-            <div className="mt-2 space-y-2">
-              <div className="text-xs text-blue-700">
-                <p>Configure your SMS gateway to forward incoming messages to this webhook URL:</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input 
-                  value={webhookUrl}
-                  readOnly
-                  className="text-xs font-mono bg-white"
-                />
-                <Button
-                  onClick={copyWebhookUrl}
-                  variant="outline"
-                  size="sm"
-                >
-                  Copy
-                </Button>
-              </div>
-              <div className="flex items-center gap-2 mt-2">
-                <Button
-                  onClick={handleRegisterWebhook}
-                  disabled={registeringWebhook || webhookRegistered}
-                  variant="outline"
-                  size="sm"
-                  className="border-green-200 text-green-600 hover:bg-green-50"
-                >
-                  {registeringWebhook ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Registering...
-                    </>
-                  ) : webhookRegistered ? (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Webhook Registered
-                    </>
-                  ) : (
-                    <>
-                      <Link className="mr-2 h-4 w-4" />
-                      Register with SMS Gateway
-                    </>
-                  )}
-                </Button>
-              </div>
-              <div className="text-xs text-blue-600 mt-2">
-                <p><strong>Troubleshooting:</strong> If your SMS gateway isn't sending data to the webhook, test it directly below.</p>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="space-y-6 p-4">
+      <h2 className="text-2xl font-bold">AI SMS Agent</h2>
+      
+      <Tabs defaultValue="test" value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="test">Test AI</TabsTrigger>
+          <TabsTrigger value="webhook">Register Webhook</TabsTrigger>
+          <TabsTrigger value="gateway">Test Gateway Format</TabsTrigger>
+          <TabsTrigger value="process">Process Messages</TabsTrigger>
+        </TabsList>
         
-        <div className="border-t border-blue-100 pt-4">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-md font-medium text-blue-900 flex items-center">
-              <Settings className="mr-2 h-4 w-4" />
-              Test AI Response
-            </h3>
-            <Switch
-              id="test-mode-switch"
-              checked={testMode}
-              onCheckedChange={setTestMode}
-              className="ml-2"
-            />
-          </div>
-          
-          {testMode && (
-            <div className="space-y-3 mt-4">
-              <div className="grid grid-cols-1 gap-3">
+        <TabsContent value="test" className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Test AI SMS Response</CardTitle>
+              <CardDescription>
+                Test how the AI would respond to an incoming SMS message
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="test-phone">Phone Number</Label>
+                  <Label htmlFor="phoneNumber">Phone Number</Label>
                   <Input
-                    id="test-phone"
-                    placeholder="+1234567890"
-                    value={testPhoneNumber}
-                    onChange={(e) => setTestPhoneNumber(e.target.value)}
+                    id="phoneNumber"
+                    placeholder="+11234567890"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    required
                   />
                 </div>
-                
                 <div className="space-y-2">
-                  <Label htmlFor="test-message">Test Message</Label>
+                  <Label htmlFor="message">Message</Label>
                   <Textarea
-                    id="test-message"
-                    placeholder="Enter a message to test the AI response"
-                    value={testMessage}
-                    onChange={(e) => setTestMessage(e.target.value)}
-                    className="min-h-[100px]"
+                    id="message"
+                    placeholder="Type the message content here..."
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={4}
+                    required
                   />
                 </div>
-                
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button
-                    onClick={handleTestAIResponse}
-                    disabled={processing || !testPhoneNumber || !testMessage}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {processing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="mr-2 h-4 w-4" />
-                        Test Direct Response
-                      </>
-                    )}
+                <div className="flex space-x-2">
+                  <Button type="submit" disabled={isLoading} className="flex-1">
+                    {isLoading ? 
+                      <><Loader size={16} className="mr-2 animate-spin" /> Testing...</> : 
+                      'Test AI Response'}
                   </Button>
-                  
-                  <Button
-                    onClick={handleTestWebhook}
-                    disabled={testingWebhook || !testPhoneNumber || !testMessage}
-                    variant="outline"
-                    className="border-blue-300 text-blue-700 hover:bg-blue-50"
+                  <Button 
+                    type="button" 
+                    variant="secondary" 
+                    onClick={handleSendReal} 
+                    disabled={isLoading}
+                    className="flex-1"
                   >
-                    {testingWebhook ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Testing Webhook...
-                      </>
-                    ) : (
-                      <>
-                        <TestTube2 className="mr-2 h-4 w-4" />
-                        Test Simple Webhook
-                      </>
-                    )}
-                  </Button>
-                  
-                  <Button
-                    onClick={handleTestGatewayWebhook}
-                    disabled={testingGatewayFormat || !testPhoneNumber || !testMessage}
-                    variant="outline"
-                    className="border-green-300 text-green-700 hover:bg-green-50"
-                  >
-                    {testingGatewayFormat ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Testing Gateway Format...
-                      </>
-                    ) : (
-                      <>
-                        <TestTube2 className="mr-2 h-4 w-4" />
-                        Test Gateway Format
-                      </>
-                    )}
+                    {isLoading ? 
+                      <><Loader size={16} className="mr-2 animate-spin" /> Sending...</> : 
+                      'Send Real Message'}
                   </Button>
                 </div>
-                
-                {testResponse && (
-                  <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-md">
-                    <Label>AI Response:</Label>
-                    <p className="mt-2 text-blue-900 whitespace-pre-line">
-                      {testResponse}
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+              </form>
+            </CardContent>
+            {aiResponse && (
+              <CardFooter className="flex-col items-start">
+                <p className="font-medium mb-2">AI Response:</p>
+                <div className="p-3 bg-muted rounded-md w-full">
+                  {aiResponse}
+                </div>
+              </CardFooter>
+            )}
+          </Card>
+        </TabsContent>
         
-        <div className="text-xs text-gray-500 mt-4">
-          <p>The AI SMS Agent processes incoming messages in real-time via webhook and stores responses in the database.</p>
-          <p className="mt-1">Use the "Process Backlog" button to manually process any older unprocessed messages.</p>
-          <p className="mt-1">Use the "Test Simple Webhook" button to simulate a basic incoming SMS.</p>
-          <p className="mt-1">Use the "Test Gateway Format" button to simulate an SMS in the gateway's specific format, including signature verification.</p>
-          <p className="mt-1">Use the "Register with SMS Gateway" button to automatically register your webhook URL with the SMS gateway.</p>
-        </div>
-      </CardContent>
-    </Card>
+        <TabsContent value="webhook" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Register SMS Gateway Webhook</CardTitle>
+              <CardDescription>
+                Register your webhook URL with the SMS Gateway
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="webhookUrl">Webhook URL</Label>
+                <Input
+                  id="webhookUrl"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  required
+                />
+                <p className="text-sm text-muted-foreground">
+                  This URL will receive incoming SMS notifications
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label>Event Type</Label>
+                <RadioGroup value={webhookEvent} onValueChange={setWebhookEvent}>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="message_received" id="message_received" />
+                    <Label htmlFor="message_received">message_received</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="all" id="all" />
+                    <Label htmlFor="all">all</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              <Alert>
+                <InfoIcon className="h-4 w-4" />
+                <AlertTitle>Important</AlertTitle>
+                <AlertDescription>
+                  Make sure your SMS Gateway can reach this URL. If you're running locally, you may need to use a service like ngrok.
+                </AlertDescription>
+              </Alert>
+              
+              <Button 
+                onClick={registerWebhook} 
+                disabled={isRegistering} 
+                className="w-full"
+              >
+                {isRegistering ? 
+                  <><Loader size={16} className="mr-2 animate-spin" /> Registering...</> : 
+                  'Register with SMS Gateway'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="gateway" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Test Gateway Webhook Format</CardTitle>
+              <CardDescription>
+                Test if your webhook can handle the SMS Gateway format correctly
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="testPhone">Phone Number</Label>
+                <Input
+                  id="testPhone"
+                  placeholder="+11234567890"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  required
+                />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="testMessage">Test Message (Optional)</Label>
+                <Textarea
+                  id="testMessage"
+                  placeholder="Test message content..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
+                />
+                <p className="text-sm text-muted-foreground">
+                  If left empty, a default test message will be used
+                </p>
+              </div>
+              
+              <Alert>
+                <InfoIcon className="h-4 w-4" />
+                <AlertTitle>How This Works</AlertTitle>
+                <AlertDescription>
+                  This will simulate an incoming SMS from the Gateway by sending a test request to your webhook endpoint in the same format the Gateway uses
+                </AlertDescription>
+              </Alert>
+              
+              <Button 
+                onClick={testGatewayWebhook} 
+                disabled={isTesting} 
+                className="w-full"
+              >
+                {isTesting ? 
+                  <><Loader size={16} className="mr-2 animate-spin" /> Sending Test...</> : 
+                  'Test Gateway Format'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        <TabsContent value="process" className="mt-4">
+          <ManualWebhookProcessor />
+        </TabsContent>
+      </Tabs>
+      
+      <Separator />
+      
+      <div className="text-sm text-muted-foreground">
+        <p>
+          The AI SMS Agent can automatically respond to incoming SMS messages using AI.
+        </p>
+      </div>
+    </div>
   );
 };
 
