@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -11,11 +10,20 @@ serve(async (req) => {
   }
 
   try {
-    // Create a Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const requestId = crypto.randomUUID();
+    const requestTimestamp = new Date().toISOString();
     
+    console.log(`[${requestId}] AI SMS Agent Invoked at ${requestTimestamp}`);
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const requestBody = await req.json();
+    
+    console.log(`[${requestId}] Request Body: ${JSON.stringify(requestBody)}`);
+    console.log(`[${requestId}] Processing Mode: ${requestBody.mode || 'Not Specified'}`);
+
     // Get OpenAI API key from environment variables
     const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
     
@@ -24,9 +32,7 @@ serve(async (req) => {
     }
 
     // Parse the request body ONCE and store it
-    const requestBody = await req.json();
-    const requestId = crypto.randomUUID();
-    console.log(`[${requestId}] AI SMS Agent request received`);
+    
     
     // Handle different operation modes
     if (requestBody.mode === "process-specific" && requestBody.messageId) {
@@ -70,13 +76,30 @@ serve(async (req) => {
         }
       );
     }
-  } catch (error) {
-    console.error("Error in AI SMS agent:", error);
+
+    console.log(`[${requestId}] AI SMS Agent Processing Completed`);
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
+      JSON.stringify({
+        success: true,
+        requestId,
+        timestamp: requestTimestamp
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  } catch (error) {
+    console.error(`[${requestId}] AI SMS Agent Error:`, error);
+    return new Response(
+      JSON.stringify({ 
+        error: 'AI SMS Agent processing failed', 
+        details: error.message 
+      }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }

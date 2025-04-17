@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
 
@@ -130,15 +129,22 @@ async function sendSMSResponse(phoneNumber: string, message: string, supabase: a
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const requestId = crypto.randomUUID();
+    const requestTimestamp = new Date().toISOString();
+    
+    console.log(`[${requestId}] SMS Webhook Handler Invoked at ${requestTimestamp}`);
+    
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
     // Get the request body
     let payload;
-    const requestId = crypto.randomUUID();
     console.log(`[${requestId}] SMS webhook received`);
     
     // Check content type and parse accordingly
@@ -171,14 +177,6 @@ serve(async (req) => {
 
     console.log(`[${requestId}] SMS webhook payload:`, JSON.stringify(payload));
 
-    // Create a Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get current timestamp in ISO format
-    const now = new Date().toISOString();
-
     // Extract key information for logging and processing
     const phoneNumber = payload.number || payload.from;
     const message = payload.message || payload.text || payload.content || payload.body;
@@ -205,7 +203,7 @@ serve(async (req) => {
     const { data, error } = await supabase.from('sms_webhooks').insert({
       webhook_data: payload,
       processed: false,
-      received_at: now,
+      received_at: requestTimestamp,
       request_id: requestId
     }).select('id');
 
@@ -242,25 +240,29 @@ serve(async (req) => {
       console.log(`[${requestId}] Skipping AI processing - incomplete message data`);
     }
 
+    console.log(`[${requestId}] Webhook Handler Processing Completed`);
+    
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Webhook received and processed successfully',
         requestId,
-        timestamp: now
+        timestamp: requestTimestamp
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   } catch (error) {
-    console.error("Error processing SMS webhook:", error);
+    console.error(`[${requestId}] Webhook Handler Error:`, error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      JSON.stringify({ 
+        error: 'Webhook handler failed', 
+        details: error.message 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }

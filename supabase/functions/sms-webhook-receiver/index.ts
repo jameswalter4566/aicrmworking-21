@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
 import * as base64 from "https://deno.land/std@0.177.0/encoding/base64.ts";
@@ -20,13 +19,16 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
+    // Enhanced logging with timestamp and more context
+    const requestTimestamp = new Date().toISOString();
+    const requestId = crypto.randomUUID();
+    
+    console.log(`[${requestId}] SMS Webhook Received at ${requestTimestamp}`);
+    console.log(`[${requestId}] Request Method: ${req.method}`);
+    console.log(`[${requestId}] Request Headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
+
     // Get SMS Gateway API key for signature verification
     const smsApiKey = Deno.env.get("SMS_API_KEY");
-    
-    // Generate a unique request ID for tracking
-    const requestId = crypto.randomUUID();
-    console.log(`[${requestId}] SMS webhook received - URL: ${req.url}, Method: ${req.method}`);
-    console.log(`[${requestId}] Headers:`, JSON.stringify(Object.fromEntries(req.headers.entries())));
     
     // Check for signature header if using their signature verification
     const signature = req.headers.get('x-sg-signature');
@@ -256,6 +258,9 @@ serve(async (req) => {
       // We'll process it manually through the admin UI to avoid overloading during testing
       console.log(`[${requestId}] Message stored successfully with ID: ${webhookId}`);
       
+      console.log(`[${requestId}] Webhook Processing Status: Completed Successfully`);
+      console.log(`[${requestId}] Stored Webhook ID: ${webhookId}`);
+      
       return new Response(
         JSON.stringify({
           success: true,
@@ -319,9 +324,12 @@ serve(async (req) => {
       );
     }
   } catch (error) {
-    console.error("Error in webhook receiver:", error);
+    console.error(`[ERROR] Webhook Processing Failed:`, error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
+      JSON.stringify({ 
+        error: 'Webhook processing failed', 
+        details: error.message 
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
