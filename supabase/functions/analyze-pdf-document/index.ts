@@ -4,12 +4,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import * as pdfLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/+esm";
 
 // Configure PDF.js for a Node.js/Deno environment
-// IMPORTANT: PDF.js needs to be configured for headless environments
 const pdfjsLib = pdfLib.default;
 
 // Required for Deno environment
-// @ts-ignore - Deno doesn't have a global 'window' or 'document'
-globalThis.navigator = { userAgent: "deno" };
+globalThis.navigator = { userAgent: "deno" } as any;
+
+// Set the worker source path for PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,9 +57,6 @@ serve(async (req) => {
     const pdfArrayBuffer = await fileResponse.arrayBuffer();
     
     console.log("🔍 Loading PDF document...");
-    
-    // Set up the worker for PDF.js in Deno environment
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
     
     // Load the PDF document with enhanced options
     const loadingTask = pdfjsLib.getDocument({
