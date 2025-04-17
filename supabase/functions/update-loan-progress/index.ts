@@ -167,7 +167,7 @@ serve(async (req) => {
       });
     }
     
-    // NEW CODE: If the current step is "approved" and it's different from the previous step,
+    // If the current step is "approved" and it's different from the previous step,
     // trigger the loan-approved-sms function
     if (currentStep === "approved" && previousStep !== "approved") {
       console.log(`[${requestId}] Triggering loan-approved-sms function for lead ${leadId}`);

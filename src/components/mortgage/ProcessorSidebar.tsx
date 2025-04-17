@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
   FileText, 
@@ -9,7 +9,8 @@ import {
   BookText, 
   ChevronRight,
   Brain,
-  Upload
+  Upload,
+  Download
 } from "lucide-react";
 import { 
   Sidebar, 
@@ -34,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useLoanProgress } from "@/hooks/use-loan-progress";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ProcessorSidebarProps {
   activeSection: string;
@@ -53,7 +55,34 @@ const ProcessorSidebar = ({
   const navigate = useNavigate();
   const { id } = useParams();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoanSubmitted, setIsLoanSubmitted] = useState(false);
   const { updateLoanProgress, isUpdating } = useLoanProgress();
+
+  // Check the current loan status when the component loads
+  useEffect(() => {
+    const checkLoanStatus = async () => {
+      const loanLeadId = leadId || id;
+      if (!loanLeadId) return;
+
+      try {
+        const { data, error } = await supabase.functions.invoke('retrieve-loan-progress', {
+          body: { leadId: loanLeadId }
+        });
+
+        if (!error && data?.data?.currentStep) {
+          // Check if the loan is already in submitted status or beyond
+          const isSubmitted = data.data.currentStep === "submitted" || 
+            data.data.stepIndex >= data.data.allSteps.indexOf("submitted");
+          
+          setIsLoanSubmitted(isSubmitted);
+        }
+      } catch (error) {
+        console.error("Error checking loan status:", error);
+      }
+    };
+
+    checkLoanStatus();
+  }, [leadId, id]);
 
   const handleSubmitLoan = async () => {
     const loanLeadId = leadId || id;
@@ -63,10 +92,18 @@ const ProcessorSidebar = ({
       return;
     }
     
+    // If the loan is already submitted, we don't want to update the status again
+    if (isLoanSubmitted) {
+      // Handle the download action instead
+      handleDownload34();
+      return;
+    }
+    
     try {
       const result = await updateLoanProgress(loanLeadId, "submitted", "Loan submitted for processing by processor");
       if (result.success) {
         toast.success("Loan successfully submitted for processing");
+        setIsLoanSubmitted(true);
       } else {
         toast.error("Failed to submit loan: " + result.error);
       }
@@ -76,6 +113,12 @@ const ProcessorSidebar = ({
     } finally {
       setIsDialogOpen(false);
     }
+  };
+
+  const handleDownload34 = () => {
+    // In a real implementation, this would download the 3.4 form
+    toast.info("Downloading 3.4 form... This is a placeholder for the actual download functionality");
+    setIsDialogOpen(false);
   };
 
   return (
@@ -91,16 +134,29 @@ const ProcessorSidebar = ({
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Submit Loan Button */}
+        {/* Submit Loan Button or Download 3.4 Button */}
         <div className="p-2">
           <Button
             onClick={() => setIsDialogOpen(true)}
             variant="default"
             size="sm"
-            className="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white"
+            className={`w-full flex items-center justify-center ${
+              isLoanSubmitted 
+                ? "bg-green-600 hover:bg-green-700 text-white" 
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+            }`}
           >
-            <Upload className="mr-1 h-4 w-4" />
-            Submit Loan (3.4)
+            {isLoanSubmitted ? (
+              <>
+                <Download className="mr-1 h-4 w-4" />
+                Download 3.4
+              </>
+            ) : (
+              <>
+                <Upload className="mr-1 h-4 w-4" />
+                Submit Loan (3.4)
+              </>
+            )}
           </Button>
         </div>
         
@@ -200,13 +256,17 @@ const ProcessorSidebar = ({
         </Button>
       </SidebarFooter>
 
-      {/* Confirmation Dialog */}
+      {/* Confirmation Dialog - Modified for both submit and download */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Submit Loan</DialogTitle>
+            <DialogTitle>
+              {isLoanSubmitted ? "Download 3.4" : "Submit Loan"}
+            </DialogTitle>
             <DialogDescription>
-              This will submit the loan for processing. Are you sure you want to continue?
+              {isLoanSubmitted 
+                ? "Do you want to download the 3.4 form?" 
+                : "This will submit the loan for processing. Are you sure you want to continue?"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -214,9 +274,13 @@ const ProcessorSidebar = ({
             <Button 
               onClick={handleSubmitLoan} 
               disabled={isUpdating}
-              className="bg-blue-600 hover:bg-blue-700"
+              className={isLoanSubmitted 
+                ? "bg-green-600 hover:bg-green-700" 
+                : "bg-blue-600 hover:bg-blue-700"}
             >
-              {isUpdating ? "Submitting..." : "Submit Loan"}
+              {isLoanSubmitted 
+                ? "Download" 
+                : isUpdating ? "Submitting..." : "Submit Loan"}
             </Button>
           </DialogFooter>
         </DialogContent>

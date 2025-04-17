@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { 
   FileText, 
@@ -22,7 +21,8 @@ import {
   Utensils,
   Flag,
   Shield,
-  Upload
+  Upload,
+  Download
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { useLoanProgress } from "@/hooks/use-loan-progress";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LoanApplicationSidebarProps {
   activeTab: string;
@@ -49,7 +50,31 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
 }) => {
   const [is1003Expanded, setIs1003Expanded] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isLoanSubmitted, setIsLoanSubmitted] = useState(false);
   const { updateLoanProgress, isUpdating } = useLoanProgress();
+
+  useEffect(() => {
+    const checkLoanStatus = async () => {
+      if (!leadId) return;
+
+      try {
+        const { data, error } = await supabase.functions.invoke('retrieve-loan-progress', {
+          body: { leadId }
+        });
+
+        if (!error && data?.data?.currentStep) {
+          const isSubmitted = data.data.currentStep === "submitted" || 
+            data.data.stepIndex >= data.data.allSteps.indexOf("submitted");
+          
+          setIsLoanSubmitted(isSubmitted);
+        }
+      } catch (error) {
+        console.error("Error checking loan status:", error);
+      }
+    };
+
+    checkLoanStatus();
+  }, [leadId]);
 
   const toggle1003Menu = () => {
     setIs1003Expanded(!is1003Expanded);
@@ -61,10 +86,16 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
       return;
     }
     
+    if (isLoanSubmitted) {
+      handleDownload34();
+      return;
+    }
+    
     try {
       const result = await updateLoanProgress(leadId, "submitted", "Loan submitted for processing");
       if (result.success) {
         toast.success("Loan successfully submitted for processing");
+        setIsLoanSubmitted(true);
       } else {
         toast.error("Failed to submit loan: " + result.error);
       }
@@ -74,6 +105,11 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
     } finally {
       setIsDialogOpen(false);
     }
+  };
+
+  const handleDownload34 = () => {
+    toast.info("Downloading 3.4 form... This is a placeholder for the actual download functionality");
+    setIsDialogOpen(false);
   };
 
   const form1003Sections = [
@@ -101,7 +137,6 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
     { id: "withdraw", name: "Withdraw / Cancel", icon: XCircle },
   ];
 
-  // Helper to check if a form section is active
   const isFormSectionActive = (sectionId: string) => {
     return activeTab === `1003-${sectionId}`;
   };
@@ -112,16 +147,28 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
         <h2 className="font-semibold text-lg text-mortgage-darkPurple">Loan Application</h2>
       </div>
       
-      {/* Submit Loan Button */}
       <div className="px-4 py-2 border-b">
         <Button
           onClick={() => setIsDialogOpen(true)}
           variant="default"
           size="sm"
-          className="w-full flex items-center justify-center bg-mortgage-purple hover:bg-mortgage-darkPurple"
+          className={`w-full flex items-center justify-center ${
+            isLoanSubmitted 
+              ? "bg-green-600 hover:bg-green-700 text-white" 
+              : "bg-mortgage-purple hover:bg-mortgage-darkPurple text-white"
+          }`}
         >
-          <Upload className="mr-1 h-4 w-4" />
-          Submit Loan (3.4)
+          {isLoanSubmitted ? (
+            <>
+              <Download className="mr-1 h-4 w-4" />
+              Download 3.4
+            </>
+          ) : (
+            <>
+              <Upload className="mr-1 h-4 w-4" />
+              Submit Loan (3.4)
+            </>
+          )}
         </Button>
       </div>
       
@@ -134,7 +181,6 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
             
             const Icon = tab.icon;
             
-            // For the 1003 tab with submenu
             if (tab.id === "1003") {
               return (
                 <React.Fragment key={tab.id}>
@@ -158,7 +204,6 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
                       }
                     </button>
                   </li>
-                  {/* Submenu for 1003 form sections */}
                   <div 
                     className={cn(
                       "overflow-hidden transition-all duration-300 ease-in-out pl-8",
@@ -191,7 +236,6 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
               );
             }
             
-            // For other tabs without submenu
             return (
               <li key={tab.id}>
                 <button
@@ -212,13 +256,16 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
         </ul>
       </nav>
       
-      {/* Confirmation Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Submit Loan</DialogTitle>
+            <DialogTitle>
+              {isLoanSubmitted ? "Download 3.4" : "Submit Loan"}
+            </DialogTitle>
             <DialogDescription>
-              This will submit the loan for processing. Are you sure you want to continue?
+              {isLoanSubmitted 
+                ? "Do you want to download the 3.4 form?" 
+                : "This will submit the loan for processing. Are you sure you want to continue?"}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -226,9 +273,13 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
             <Button 
               onClick={handleSubmitLoan} 
               disabled={isUpdating}
-              className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
+              className={isLoanSubmitted 
+                ? "bg-green-600 hover:bg-green-700" 
+                : "bg-mortgage-purple hover:bg-mortgage-darkPurple"}
             >
-              {isUpdating ? "Submitting..." : "Submit Loan"}
+              {isLoanSubmitted 
+                ? "Download" 
+                : isUpdating ? "Submitting..." : "Submit Loan"}
             </Button>
           </DialogFooter>
         </DialogContent>
