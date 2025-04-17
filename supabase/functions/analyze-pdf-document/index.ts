@@ -223,14 +223,61 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
         console.log(`Job status: ${status}`);
         
         if (status === "done") {
-          // Ensure downloadUri is present before continuing
-          if (!statusData.downloadUri) {
-            console.error("Job completed but no downloadUri was provided:", statusData);
-            throw new Error("PDF extraction completed but no download URI was provided");
+          // Look for downloadUri in outputs array (preferred) or output array (older accounts)
+          console.log("Job completed, looking for downloadUri in outputs...");
+          
+          // Log the entire response structure for debugging
+          console.log("Response structure:", JSON.stringify(statusData, null, 2));
+          
+          let downloadUri = null;
+          
+          // Search in outputs array (newer API response format)
+          if (statusData.outputs && Array.isArray(statusData.outputs)) {
+            console.log(`Found ${statusData.outputs.length} outputs`);
+            
+            // First try to find JSON output type (more efficient if we only need text)
+            const jsonOutput = statusData.outputs.find((o: any) => o.type === "application/json");
+            if (jsonOutput && jsonOutput.downloadUri) {
+              console.log("Found JSON output with downloadUri");
+              downloadUri = jsonOutput.downloadUri;
+            } else {
+              // Fall back to ZIP output type
+              const zipOutput = statusData.outputs.find((o: any) => o.type === "application/zip");
+              if (zipOutput && zipOutput.downloadUri) {
+                console.log("Found ZIP output with downloadUri");
+                downloadUri = zipOutput.downloadUri;
+              }
+            }
           }
           
-          console.log("Job completed successfully, download URI available");
-          return statusData.downloadUri;
+          // Search in output property (older API response format)
+          if (!downloadUri && statusData.output) {
+            console.log("Checking older 'output' format");
+            if (typeof statusData.output === 'object' && statusData.output.downloadUri) {
+              downloadUri = statusData.output.downloadUri;
+            }
+          }
+          
+          // Check if downloadUri is in the content object
+          if (!downloadUri && statusData.content && statusData.content.downloadUri) {
+            console.log("Found downloadUri in content object");
+            downloadUri = statusData.content.downloadUri;
+          }
+          
+          // Check if downloadUri is directly on the statusData object
+          if (!downloadUri && statusData.downloadUri) {
+            console.log("Found downloadUri directly on status object");
+            downloadUri = statusData.downloadUri;
+          }
+          
+          // Final check if we have a valid downloadUri
+          if (!downloadUri) {
+            console.error("Job completed but no downloadUri was found in any expected location:", statusData);
+            throw new Error("PDF extraction job completed but downloadUri not found in response");
+          }
+          
+          console.log("Successfully found download URI");
+          return downloadUri;
         } else if (status === "failed") {
           const errorDetails = JSON.stringify(statusData.error || {});
           console.error("Job failed:", errorDetails);
@@ -252,7 +299,7 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
       // If this is a fatal error, stop polling
       if (error.message.includes("token may have expired") || 
           error.message.includes("PDF extraction job failed") ||
-          error.message.includes("but no download URI was provided")) {
+          error.message.includes("downloadUri not found")) {
         throw error;
       }
       
