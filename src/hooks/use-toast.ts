@@ -7,35 +7,68 @@ export type Toast = {
   variant?: "default" | "destructive";
 };
 
-// Fix for TypeScript error TS2349 - making toast callable directly
+// Define a more comprehensive toast function interface
 interface ToastFunction {
   (message: string): void;
-  success: (message: string) => void;
-  error: (message: string) => void;
-  info: (message: string) => void;
-  warning: (message: string) => void;
+  (options: { title: string; description?: string; variant?: "default" | "destructive" }): void;
+  success: (message: string | { title: string; description?: string }) => void;
+  error: (message: string | { title: string; description?: string; variant?: string }) => void;
+  info: (message: string | { title: string; description?: string }) => void;
+  warning: (message: string | { title: string; description?: string; variant?: string }) => void;
   custom: (title: string, description?: string, variant?: "default" | "destructive") => string;
   dismiss: (toastId?: string) => void;
 }
 
-const toast = ((message: string) => {
-  sonnerToast(message);
+const toast = ((messageOrOptions: string | { title: string; description?: string; variant?: "default" | "destructive" }) => {
+  if (typeof messageOrOptions === 'string') {
+    sonnerToast(messageOrOptions);
+  } else {
+    sonnerToast(messageOrOptions.title, {
+      description: messageOrOptions.description,
+      // Use default variant if not specified
+      ...(messageOrOptions.variant && { className: `toast-${messageOrOptions.variant}` }),
+    });
+  }
 }) as ToastFunction;
 
-toast.success = (message: string) => {
-  sonnerToast.success(message);
+toast.success = (messageOrOptions: string | { title: string; description?: string }) => {
+  if (typeof messageOrOptions === 'string') {
+    sonnerToast.success(messageOrOptions);
+  } else {
+    sonnerToast.success(messageOrOptions.title, {
+      description: messageOrOptions.description,
+    });
+  }
 };
 
-toast.error = (message: string) => {
-  sonnerToast.error(message);
+toast.error = (messageOrOptions: string | { title: string; description?: string; variant?: string }) => {
+  if (typeof messageOrOptions === 'string') {
+    sonnerToast.error(messageOrOptions);
+  } else {
+    sonnerToast.error(messageOrOptions.title, {
+      description: messageOrOptions.description,
+    });
+  }
 };
 
-toast.info = (message: string) => {
-  sonnerToast.info(message);
+toast.info = (messageOrOptions: string | { title: string; description?: string }) => {
+  if (typeof messageOrOptions === 'string') {
+    sonnerToast.info(messageOrOptions);
+  } else {
+    sonnerToast.info(messageOrOptions.title, {
+      description: messageOrOptions.description,
+    });
+  }
 };
 
-toast.warning = (message: string) => {
-  sonnerToast.warning(message);
+toast.warning = (messageOrOptions: string | { title: string; description?: string; variant?: string }) => {
+  if (typeof messageOrOptions === 'string') {
+    sonnerToast.error(messageOrOptions);
+  } else {
+    sonnerToast.error(messageOrOptions.title, {
+      description: messageOrOptions.description,
+    });
+  }
 };
 
 toast.custom = (title: string, description?: string, variant: "default" | "destructive" = "default"): string => {

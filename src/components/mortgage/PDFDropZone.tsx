@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
-import { FileUp, CheckCircle, AlertCircle, Brain } from "lucide-react";
-import { toast } from "sonner";
+import { FileUp, CheckCircle, AlertCircle, Brain, Download } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 
 interface PDFDropZoneProps {
   onFileAccepted?: (file: File) => void;
@@ -21,6 +23,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [generatedLoeUrl, setGeneratedLoeUrl] = useState<string | null>(null);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -60,6 +63,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
     e.stopPropagation();
     setIsDragging(false);
     setError(null);
+    setGeneratedLoeUrl(null);
     
     if (disabled) return;
     
@@ -80,6 +84,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
+    setGeneratedLoeUrl(null);
     
     if (disabled || !e.target.files || e.target.files.length === 0) return;
     
@@ -98,6 +103,8 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
 
   const processFile = async (file: File, leadId: string) => {
     setIsProcessing(true);
+    setGeneratedLoeUrl(null);
+    
     try {
       const formData = new FormData();
       formData.append('file', file);
@@ -105,8 +112,13 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       const uniqueFileName = `${Date.now()}_${file.name}`;
       const fileType = "conditions"; // Assuming we're processing conditions
       
-      toast.info("Analyzing conditions document...");
+      toast({
+        title: "Analyzing Document",
+        description: "Analyzing conditions document..."
+      });
+
       console.log("Starting PDF analysis process...");
+      console.log(`Processing file: ${file.name} (${file.size} bytes)`);
       
       // Step 1: Upload the document to Supabase Storage
       console.log("Uploading PDF to Supabase storage...");
@@ -115,6 +127,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         .upload(`leads/${leadId}/conditions/${uniqueFileName}`, file);
         
       if (uploadError) {
+        console.error("Error uploading document:", uploadError);
         throw new Error(`Error uploading document: ${uploadError.message}`);
       }
       
@@ -123,9 +136,11 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         .getPublicUrl(`leads/${leadId}/conditions/${uniqueFileName}`);
       
       console.log(`Document uploaded successfully at: ${publicUrl}`);
-      console.log(`Starting analysis with analyze-pdf-document function...`);
       
       // Step 2: Call analyze-pdf-document edge function with explicit fileType
+      console.log(`Starting analysis with analyze-pdf-document function. File URL: ${publicUrl}`);
+      const analysisStartTime = Date.now();
+      
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-pdf-document', {
         body: { 
           fileUrl: publicUrl, 
@@ -134,6 +149,9 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         }
       });
       
+      const analysisEndTime = Date.now();
+      console.log(`Analysis completed in ${analysisEndTime - analysisStartTime}ms`);
+      
       if (analysisError) {
         console.error("Error analyzing document:", analysisError);
         throw new Error(`Error analyzing document: ${analysisError.message}`);
@@ -141,38 +159,74 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       console.log("Document analysis complete:", analysisData);
       
+      // Count the number of conditions found
+      const conditionsData = analysisData.data || {};
+      const totalConditions = (
+        (conditionsData.masterConditions || []).length +
+        (conditionsData.generalConditions || []).length +
+        (conditionsData.priorToFinalConditions || []).length +
+        (conditionsData.complianceConditions || []).length
+      );
+      
+      toast.success(`Found ${totalConditions} conditions in the document.`);
+      
       // Step 3: Explicitly call the LOE generator function with the conditions data
       if (analysisData && analysisData.data) {
         console.log("Starting LOE generation process...");
-        try {
-          const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
-            body: { 
-              leadId,
-              conditions: [
-                ...(analysisData.data.masterConditions || []),
-                ...(analysisData.data.generalConditions || []),
-                ...(analysisData.data.priorToFinalConditions || []),
-                ...(analysisData.data.complianceConditions || [])
-              ].filter(c => 
-                c.text && (
-                  c.text.toLowerCase().includes('explanation') || 
-                  c.text.toLowerCase().includes('loe') ||
-                  c.text.toLowerCase().includes('letter')
-                )
-              )
+        
+        // Find conditions that need a letter of explanation
+        const loeConditions = [
+          ...(analysisData.data.masterConditions || []),
+          ...(analysisData.data.generalConditions || []),
+          ...(analysisData.data.priorToFinalConditions || []),
+          ...(analysisData.data.complianceConditions || [])
+        ].filter(c => 
+          c.text && (
+            c.text.toLowerCase().includes('explanation') || 
+            c.text.toLowerCase().includes('loe') ||
+            c.text.toLowerCase().includes('letter')
+          )
+        );
+        
+        console.log(`Found ${loeConditions.length} conditions that may need a letter of explanation`);
+        
+        if (loeConditions.length > 0) {
+          try {
+            console.log("Calling loe-generator with conditions:", loeConditions);
+            
+            const loeStartTime = Date.now();
+            const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
+              body: { 
+                leadId,
+                conditions: loeConditions
+              }
+            });
+            const loeEndTime = Date.now();
+            
+            console.log(`LOE generation completed in ${loeEndTime - loeStartTime}ms`);
+            
+            if (loeError) {
+              console.error("Error generating LOE documents:", loeError);
+              toast.warning('Conditions processed, but LOE generation had errors.');
+            } else {
+              console.log("LOE generation completed successfully:", loeData);
+              
+              // If we have a document URL from the LOE generator, save it
+              if (loeData?.results && loeData.results.length > 0 && loeData.results[0].generatedDocumentUrl) {
+                setGeneratedLoeUrl(loeData.results[0].generatedDocumentUrl);
+              }
+              
+              toast.success(`Successfully generated ${loeData?.processedCount || 0} LOE document(s)!`);
             }
-          });
-          
-          if (loeError) {
-            console.error("Error generating LOE documents:", loeError);
-            toast.warning('Conditions processed, but LOE generation had errors.');
-          } else {
-            console.log("LOE generation completed successfully:", loeData);
-            toast.success(`Successfully generated ${loeData?.processedCount || 0} LOE document(s)!`);
+          } catch (loeGenError: any) {
+            console.error("Exception in LOE generator call:", loeGenError);
+            toast.warning({
+              title: "LOE Generation Warning",
+              description: `Conditions processed, but LOE generation encountered an error: ${loeGenError.message || 'Unknown error'}`
+            });
           }
-        } catch (loeGenError: any) {
-          console.error("Exception in LOE generator call:", loeGenError);
-          toast.warning(`Conditions processed, but LOE generation encountered an error: ${loeGenError.message || 'Unknown error'}`);
+        } else {
+          console.log("No conditions requiring letters of explanation were found");
         }
       }
       
@@ -180,23 +234,33 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       if (!analysisData.automationTriggered) {
         console.log("Calling automation-matcher with conditions data");
         try {
+          const autoStartTime = Date.now();
           const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
             body: { 
               leadId,
               conditions: analysisData.data
             }
           });
+          const autoEndTime = Date.now();
+          
+          console.log(`Automation matching completed in ${autoEndTime - autoStartTime}ms`);
           
           if (automationError) {
             console.error("Error from automation-matcher:", automationError);
-            toast.warning('Document processed, but automation had errors. Please check the conditions.');
+            toast.warning({
+              title: "Automation Warning",
+              description: 'Document processed, but automation had errors. Please check the conditions.'
+            });
           } else {
             console.log("Automation matcher completed successfully:", automationData);
             toast.success('Document successfully analyzed and conditions processed!');
           }
         } catch (autoError: any) {
           console.error("Exception in automation-matcher call:", autoError);
-          toast.warning(`Document processed, but automation encountered an error: ${autoError.message || 'Unknown error'}`);
+          toast.warning({
+            title: "Automation Error",
+            description: `Document processed, but automation encountered an error: ${autoError.message || 'Unknown error'}`
+          });
         }
       } else {
         toast.success('Document successfully analyzed and conditions processing is underway!');
@@ -237,6 +301,24 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-mortgage-purple mr-2"></div>
                   <span className="text-sm text-mortgage-purple">Processing...</span>
                 </div>
+              )}
+              
+              {generatedLoeUrl && !isProcessing && (
+                <a 
+                  href={generatedLoeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3"
+                >
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download LOE Document
+                  </Button>
+                </a>
               )}
             </div>
           ) : (
