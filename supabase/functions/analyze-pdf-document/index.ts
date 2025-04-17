@@ -1,7 +1,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
-import * as pdfjs from "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/+esm";
+import * as pdfLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/+esm";
+
+// Get the pdfjs object properly for Deno
+const pdfjs = pdfLib.default;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -48,6 +51,9 @@ serve(async (req) => {
     const pdfArrayBuffer = await fileResponse.arrayBuffer();
     
     console.log("🔍 Loading PDF document...");
+    
+    // Set worker source for PDF.js
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
     
     // Load the PDF document with enhanced options
     const loadingTask = pdfjs.getDocument({
@@ -131,7 +137,7 @@ Instructions:
         "Authorization": `Bearer ${openAiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",

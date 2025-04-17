@@ -63,9 +63,9 @@ toast.info = (messageOrOptions: string | { title: string; description?: string }
 
 toast.warning = (messageOrOptions: string | { title: string; description?: string }) => {
   if (typeof messageOrOptions === 'string') {
-    sonnerToast.error(messageOrOptions);
+    sonnerToast.warning(messageOrOptions);
   } else {
-    sonnerToast.error(messageOrOptions.title, {
+    sonnerToast.warning(messageOrOptions.title, {
       description: messageOrOptions.description,
     });
   }
@@ -80,6 +80,15 @@ toast.custom = (title: string, description?: string, variant: "default" | "destr
 toast.dismiss = (toastId?: string) => {
   sonnerToast.dismiss(toastId);
 };
+
+// Hook to use with the Toaster component
+export function useToast() {
+  return {
+    toast,
+    // This is a simple implementation that works with the Toaster component
+    toasts: [] as Toast[],
+  };
+}
 
 export { toast };
 export default toast;
