@@ -240,7 +240,7 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
         </div>
       </div>
       
-      <AISMSAgent enabled={true} />
+      <AISMSAgent />
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
         <TabsList className="bg-white border border-blue-100 mb-4">
