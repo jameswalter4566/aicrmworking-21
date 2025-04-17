@@ -1,10 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import JSZip from "https://esm.sh/jszip@3.10.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+/**
+ * Simple delay function for async/await
+ */
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Gets an access token for Adobe PDF Services API
@@ -37,7 +43,15 @@ async function getAdobeAccessToken() {
     
     const tokenData = await response.json();
     console.log("Successfully obtained Adobe access token");
-    return tokenData.access_token;
+    
+    // Store the API access point for all subsequent requests
+    const api_access_point = tokenData.api_access_point || 'https://pdf-services.adobe.io';
+    
+    return {
+      access_token: tokenData.access_token,
+      api_base: api_access_point,
+      expires_in: tokenData.expires_in
+    };
   } catch (error) {
     console.error("Error getting Adobe access token:", error);
     throw new Error(`Failed to authenticate with Adobe API: ${error.message}`);
@@ -45,15 +59,26 @@ async function getAdobeAccessToken() {
 }
 
 /**
+ * Builds Adobe API URL using the base URL from token response
+ */
+function buildAdobeApiUrl(apiBase: string, path: string): string {
+  // Ensure path starts with / and apiBase doesn't end with /
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  const cleanBase = apiBase.endsWith('/') ? apiBase.slice(0, -1) : apiBase;
+  return `${cleanBase}${cleanPath}`;
+}
+
+/**
  * Uploads a PDF to Adobe's cloud storage
  */
-async function uploadPdfToAdobe(accessToken: string, pdfArrayBuffer: ArrayBuffer) {
+async function uploadPdfToAdobe(accessToken: string, apiBase: string, pdfArrayBuffer: ArrayBuffer) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   
   try {
     // Step 1: Get upload URI
     console.log("Requesting upload URI from Adobe...");
-    const uploadResponse = await fetch('https://pdf-services.adobe.io/assets', {
+    const uploadUrl = buildAdobeApiUrl(apiBase, '/assets');
+    const uploadResponse = await fetch(uploadUrl, {
       method: 'POST',
       headers: {
         'X-API-Key': clientId!,
@@ -108,14 +133,14 @@ async function uploadPdfToAdobe(accessToken: string, pdfArrayBuffer: ArrayBuffer
 /**
  * Creates a PDF extraction job with Adobe
  */
-async function createExtractionJob(accessToken: string, assetID: string) {
+async function createExtractionJob(accessToken: string, apiBase: string, assetID: string) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   
   try {
     console.log(`Creating extraction job for asset ID: ${assetID}`);
     
-    // Use the simplest possible extraction request
-    const extractResponse = await fetch('https://pdf-services.adobe.io/operation/extractpdf', {
+    const extractUrl = buildAdobeApiUrl(apiBase, '/operation/extractpdf');
+    const extractResponse = await fetch(extractUrl, {
       method: 'POST',
       headers: {
         'X-API-Key': clientId!,
@@ -124,14 +149,14 @@ async function createExtractionJob(accessToken: string, assetID: string) {
       },
       body: JSON.stringify({
         "assetID": assetID,
-        // Explicitly specify the elements to extract to make sure we're using valid parameters
         "elementsToExtract": ["text", "tables"]
       })
     });
     
     console.log(`Extract response status: ${extractResponse.status}`);
     
-    if (extractResponse.status !== 201) {
+    // Fix #1: Accept both 201 and 202 status codes as successful responses
+    if (![201, 202].includes(extractResponse.status)) {
       const errorBody = await extractResponse.text();
       console.error(`Extract request failed: ${extractResponse.status} ${extractResponse.statusText}`, errorBody);
       throw new Error(`Failed to create extraction job: ${errorBody}`);
@@ -158,8 +183,9 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
   let status = "in progress";
   let downloadUri = null;
   let attempt = 0;
-  const maxAttempts = 20; // Increase to 20 attempts (40 seconds total wait time)
-  const pollingInterval = 2000; // 2 seconds between each attempt
+  // Fix #2: Increase polling attempts and respect Adobe's retry interval
+  const maxAttempts = 120; // 4 minutes at 2 second intervals
+  const defaultPollingInterval = 2000; // 2 seconds between each attempt
   
   console.log("Starting to poll job status...");
   
@@ -198,13 +224,19 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
           console.log("Job completed successfully, download URI available");
           break;
         } else if (status === "failed") {
-          console.error("Job failed:", JSON.stringify(statusData.error || {}));
-          throw new Error(`PDF extraction job failed: ${JSON.stringify(statusData.error || {})}`);
+          const errorDetails = JSON.stringify(statusData.error || {});
+          console.error("Job failed:", errorDetails);
+          throw new Error(`PDF extraction job failed: ${errorDetails}`);
+        }
+        
+        // Check if Adobe recommends a specific retry interval
+        if (statusData.retryIn) {
+          // Adobe returns retryIn in seconds, convert to ms
+          await delay(statusData.retryIn * 1000);
+        } else {
+          await delay(defaultPollingInterval);
         }
       }
-      
-      // Wait before polling again
-      await new Promise(resolve => setTimeout(resolve, pollingInterval));
     } catch (error) {
       console.error(`Error during poll attempt ${attempt}:`, error);
       
@@ -214,19 +246,23 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
       }
       
       // Otherwise continue polling
-      await new Promise(resolve => setTimeout(resolve, pollingInterval));
+      await delay(defaultPollingInterval);
     }
   }
   
-  if (!downloadUri) {
+  if (status === "in progress") {
     throw new Error(`PDF extraction timed out after ${maxAttempts} polling attempts (${maxAttempts * 2} seconds)`);
+  }
+  
+  if (!downloadUri) {
+    throw new Error(`PDF extraction completed but no download URI available`);
   }
   
   return downloadUri;
 }
 
 /**
- * Downloads the extracted content
+ * Downloads and processes the extracted content
  */
 async function downloadExtractedContent(downloadUri: string) {
   try {
@@ -239,21 +275,49 @@ async function downloadExtractedContent(downloadUri: string) {
       throw new Error(`Failed to download extracted content: ${errorText}`);
     }
     
+    // Fix #3: Handle the ZIP file returned by Adobe
     try {
-      const jsonContent = await downloadResponse.json();
-      console.log("Successfully parsed extracted content as JSON");
-      return jsonContent;
-    } catch (jsonError) {
-      console.error("Failed to parse response as JSON:", jsonError);
+      // Get the response as an array buffer for JSZip
+      const zipArray = new Uint8Array(await downloadResponse.arrayBuffer());
+      console.log(`Downloaded ZIP file size: ${zipArray.length} bytes`);
       
-      // Try to get the raw text if JSON parsing failed
+      // Load the ZIP file
+      const jszip = await JSZip.loadAsync(zipArray);
+      
+      // Extract structuredData.json from the ZIP
+      const structuredDataFile = jszip.file('structuredData.json');
+      if (!structuredDataFile) {
+        console.error("No structuredData.json found in the ZIP file");
+        throw new Error("Invalid ZIP format: missing structuredData.json");
+      }
+      
+      // Get the JSON content from the file
+      const jsonString = await structuredDataFile.async('string');
+      const extractedContent = JSON.parse(jsonString);
+      
+      console.log("Successfully parsed structured JSON data from ZIP");
+      return extractedContent;
+    } catch (zipError) {
+      console.error("Failed to process ZIP file:", zipError);
+      
+      // If ZIP processing fails, try to get the raw response as a fallback
+      console.log("Attempting to parse response directly as a fallback...");
+      
+      // Try to get the raw text
       const rawText = await downloadResponse.text();
       if (!rawText || rawText.trim() === '') {
         throw new Error("Downloaded content is empty or invalid");
       }
       
-      console.log("Retrieved raw text content instead of JSON");
-      return { elements: [{ Text: rawText }] };
+      // Try to parse as JSON first
+      try {
+        const jsonContent = JSON.parse(rawText);
+        console.log("Successfully parsed response as JSON");
+        return jsonContent;
+      } catch (jsonError) {
+        console.log("Response is not JSON, using as raw text");
+        return { elements: [{ Text: rawText }] };
+      }
     }
   } catch (error) {
     console.error("Error downloading extracted content:", error);
@@ -267,13 +331,13 @@ async function downloadExtractedContent(downloadUri: string) {
 async function extractPdfWithAdobe(pdfArrayBuffer: ArrayBuffer) {
   try {
     console.log("🔑 Getting Adobe PDF Services access token...");
-    const accessToken = await getAdobeAccessToken();
+    const { access_token: accessToken, api_base: apiBase } = await getAdobeAccessToken();
     
     console.log("📤 Uploading PDF to Adobe cloud storage...");
-    const assetID = await uploadPdfToAdobe(accessToken, pdfArrayBuffer);
+    const assetID = await uploadPdfToAdobe(accessToken, apiBase, pdfArrayBuffer);
     
     console.log("🔍 Creating PDF extraction job...");
-    const jobLocation = await createExtractionJob(accessToken, assetID);
+    const jobLocation = await createExtractionJob(accessToken, apiBase, assetID);
     
     console.log("⏳ Polling job status until completion...");
     const downloadUri = await pollJobStatus(accessToken, jobLocation);
