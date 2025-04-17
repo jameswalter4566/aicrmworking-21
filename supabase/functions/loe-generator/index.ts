@@ -1,7 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { default as PDFDocument } from 'https://esm.sh/pdfkit@0.13.0?dts';
-import { Buffer } from "https://deno.land/std@0.177.0/node/buffer.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,41 +11,10 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function generatePDF(content: string): Promise<Uint8Array> {
-  // Create a document
-  const doc = new PDFDocument();
-  const chunks: Uint8Array[] = [];
-
-  return new Promise((resolve, reject) => {
-    // Capture chunks as they're written
-    doc.on('data', (chunk) => chunks.push(new Uint8Array(chunk)));
-    doc.on('end', () => {
-      // Combine chunks into a single Uint8Array
-      const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-      const result = new Uint8Array(totalLength);
-      let offset = 0;
-      chunks.forEach(chunk => {
-        result.set(chunk, offset);
-        offset += chunk.length;
-      });
-      resolve(result);
-    });
-    
-    try {
-      // Add content to PDF
-      doc.fontSize(12);
-      const paragraphs = content.split('\n\n');
-      paragraphs.forEach(paragraph => {
-        doc.text(paragraph.trim());
-        doc.moveDown();
-      });
-      
-      doc.end();
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      reject(error);
-    }
-  });
+async function generateTextContent(content: string): Promise<Uint8Array> {
+  // Convert text content to a Uint8Array for upload
+  const encoder = new TextEncoder();
+  return encoder.encode(content);
 }
 
 serve(async (req) => {
@@ -101,21 +68,21 @@ serve(async (req) => {
       const loeContent = generateLOEContent(loeType, lead, condition);
       
       try {
-        const pdfBytes = await generatePDF(loeContent);
+        const textBytes = await generateTextContent(loeContent);
         
-        const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
+        const fileName = `LOE_${condition.id}_${Date.now()}.txt`;
         const filePath = `leads/${leadId}/loe/${fileName}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('borrower-documents')
-          .upload(filePath, pdfBytes, {
-            contentType: 'application/pdf',
+          .upload(filePath, textBytes, {
+            contentType: 'text/plain',
             upsert: true
           });
           
         if (uploadError) {
-          console.error('Error uploading PDF:', uploadError);
-          throw new Error('Failed to upload LOE PDF');
+          console.error('Error uploading text file:', uploadError);
+          throw new Error('Failed to upload LOE text file');
         }
         
         const { data: { publicUrl } } = supabase.storage
@@ -130,7 +97,7 @@ serve(async (req) => {
           success: true
         };
       } catch (error) {
-        console.error(`Error generating PDF for condition ${condition.id}:`, error);
+        console.error(`Error generating text file for condition ${condition.id}:`, error);
         return {
           conditionId: condition.id,
           loeType,
@@ -429,7 +396,7 @@ function getRandomNameVariation(firstName?: string, lastName?: string): string {
     `${first.charAt(0)}. ${last}`,
     `${first} ${last.charAt(0)}.`,
     `${first.substring(0, first.length-1)}y ${last}`,
-    `${first} ${lastName}-Smith`,
+    `${first} ${lastName.charAt(0)}-${lastName.charAt(1)}`,
     `${firstName || 'Jane'} ${lastName || 'Smith'} (née ${randomLastName()})`,
     `${firstName || 'J.'} ${lastName || 'D.'}`
   ];
