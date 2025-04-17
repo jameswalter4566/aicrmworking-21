@@ -19,7 +19,8 @@ export type ConditionStatus = "in_review" | "no_action" | "waiting_borrower" | "
 
 export interface LoanCondition {
   id?: string;
-  description: string;
+  text?: string;  // Added to support the text field from the API response
+  description?: string;
   status: "pending" | "cleared" | "waived";
   conditionStatus?: ConditionStatus;
   notes?: string;
@@ -46,6 +47,9 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
   const conditionStatus = condition.conditionStatus || 
     (condition.status === "cleared" ? "cleared" : 
      condition.status === "waived" ? "waived" : "in_review");
+
+  // Get the condition text/description (use text if available, otherwise fall back to description)
+  const conditionText = condition.text || condition.description || "";
 
   // Generate notes based on condition status
   const defaultNotes = () => {
@@ -153,7 +157,7 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
       <CollapsibleTrigger className="flex items-start w-full p-3 text-left hover:bg-gray-50">
         <div className="flex-1 flex items-start">
           <div className="mr-2 mt-0.5">{statusInfo.icon}</div>
-          <span className="text-gray-800">{condition.description}</span>
+          <span className="text-gray-800">{conditionText}</span>
         </div>
         <div className="flex items-center space-x-2">
           <HoverCard>
