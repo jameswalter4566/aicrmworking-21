@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,60 +12,52 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-async function generateTextContent(content: string): Promise<Uint8Array> {
-  // Convert text content to a Uint8Array for upload
-  const encoder = new TextEncoder();
-  return encoder.encode(content);
-}
+async function generatePDF(content: string): Promise<Uint8Array> {
+  // Create a new PDF document
+  const pdfDoc = await PDFDocument.create();
+  
+  // Add a new page
+  const page = pdfDoc.addPage([612, 792]); // Letter size
+  
+  // Get the font
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const fontSize = 11;
+  const lineHeight = 14;
+  
+  // Set margins
+  const margin = {
+    top: 50,
+    left: 50,
+    right: 50,
+    bottom: 50
+  };
 
-async function generateBasicPDF(content: string): Promise<Uint8Array> {
-  // Create a very basic PDF using text content
-  // This is a simplified approach without using external PDF libraries
-  
-  // PDF header
-  const header = "%PDF-1.7\n";
-  
-  // Objects
-  const objects: string[] = [];
-  
-  // Catalog
-  objects.push("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
-  
-  // Pages
-  objects.push("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
-  
-  // Page
-  objects.push("3 0 obj\n<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>\nendobj\n");
-  
-  // Font
-  objects.push("4 0 obj\n<< /Type /Font /Subtype /Type1 /Name /F1 /BaseFont /Helvetica >>\nendobj\n");
-  
-  // Content - Here we add the actual letter content
-  const lines = content.split("\n").map(line => line.trim());
-  const contentStream = lines.map(line => 
-    line ? `BT /F1 12 Tf 50 ${700 - (lines.indexOf(line) * 15)} Td (${line.replace(/[()\\]/g, "\\$&")}) Tj ET` : ""
-  ).join("\n");
-  
-  objects.push(`5 0 obj\n<< /Length ${contentStream.length} >>\nstream\n${contentStream}\nendstream\nendobj\n`);
-  
-  // Cross-reference table
-  let xref = "xref\n0 6\n0000000000 65535 f \n";
-  let offset = header.length;
-  
-  for (const obj of objects) {
-    xref += `${offset.toString().padStart(10, '0')} 00000 n \n`;
-    offset += obj.length;
+  // Split content into lines
+  const lines = content.split('\n');
+  let y = page.getHeight() - margin.top;
+
+  // Draw content
+  for (const line of lines) {
+    if (y < margin.bottom) {
+      // Add new page if we run out of space
+      y = page.getHeight() - margin.top;
+      page = pdfDoc.addPage([612, 792]);
+    }
+
+    if (line.trim()) {
+      page.drawText(line.trim(), {
+        x: margin.left,
+        y,
+        size: fontSize,
+        font,
+        color: rgb(0, 0, 0),
+      });
+    }
+    y -= lineHeight;
   }
-  
-  // Trailer
-  const trailer = "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n" + offset + "\n%%EOF";
-  
-  // Combine everything
-  const pdf = header + objects.join("") + xref + trailer;
-  
-  // Convert to Uint8Array
-  const encoder = new TextEncoder();
-  return encoder.encode(pdf);
+
+  // Save the PDF
+  return await pdfDoc.save();
 }
 
 serve(async (req) => {
@@ -118,8 +111,8 @@ serve(async (req) => {
       const loeContent = generateLOEContent(loeType, lead, condition);
       
       try {
-        // Generate PDF content
-        const pdfBytes = await generateBasicPDF(loeContent);
+        // Generate PDF content using our new PDF generator
+        const pdfBytes = await generatePDF(loeContent);
         
         const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
         const filePath = `leads/${leadId}/loe/${fileName}`;
