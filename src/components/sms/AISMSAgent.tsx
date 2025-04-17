@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Loader2, Send, RefreshCw, Settings, Bot } from 'lucide-react';
+import { Loader2, Send, RefreshCw, Settings, Bot, Check } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -22,7 +22,15 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
   const [testPhoneNumber, setTestPhoneNumber] = useState<string>("");
   const [testMessage, setTestMessage] = useState<string>("");
   const [testResponse, setTestResponse] = useState<string>("");
+  const [webhookUrl, setWebhookUrl] = useState<string>("");
+  const [showWebhookInfo, setShowWebhookInfo] = useState<boolean>(false);
   
+  // Get the webhook URL - typically this would be configured in your SMS gateway
+  React.useEffect(() => {
+    const projectRef = 'imrmboyczebjlbnkgjns';
+    setWebhookUrl(`https://${projectRef}.supabase.co/functions/v1/sms-webhook-receiver`);
+  }, []);
+
   // Process unprocessed messages (manual trigger for any backlog)
   const handleProcessUnprocessed = async () => {
     try {
@@ -83,6 +91,12 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
       setProcessing(false);
     }
   };
+
+  // Copy webhook URL to clipboard
+  const copyWebhookUrl = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    toast.success('Webhook URL copied to clipboard');
+  };
   
   return (
     <Card className="bg-white border border-blue-100 shadow-sm">
@@ -96,7 +110,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
             variant="outline"
             className="bg-green-100 text-green-800 hover:bg-green-200"
           >
-            Real-time Enabled
+            <Check className="mr-1 h-3 w-3" /> Webhook Enabled
           </Badge>
         </div>
       </CardHeader>
@@ -104,7 +118,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="text-sm text-green-700 font-medium">
-              Real-time responses are automatically enabled
+              Real-time responses via webhook are active
             </div>
           </div>
           
@@ -127,6 +141,42 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
               </>
             )}
           </Button>
+        </div>
+
+        <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-blue-800">SMS Webhook Information</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowWebhookInfo(!showWebhookInfo)}
+              className="h-7 px-2"
+            >
+              {showWebhookInfo ? 'Hide' : 'Show'}
+            </Button>
+          </div>
+
+          {showWebhookInfo && (
+            <div className="mt-2 space-y-2">
+              <div className="text-xs text-blue-700">
+                <p>Configure your SMS gateway to forward incoming messages to this webhook URL:</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Input 
+                  value={webhookUrl}
+                  readOnly
+                  className="text-xs font-mono bg-white"
+                />
+                <Button
+                  onClick={copyWebhookUrl}
+                  variant="outline"
+                  size="sm"
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
         
         <div className="border-t border-blue-100 pt-4">
@@ -180,7 +230,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
                   ) : (
                     <>
                       <Send className="mr-2 h-4 w-4" />
-                      Generate & Send Response
+                      Generate & Test Response
                     </>
                   )}
                 </Button>
@@ -199,7 +249,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
         </div>
         
         <div className="text-xs text-gray-500 mt-4">
-          <p>The AI SMS Agent processes incoming messages in real-time and stores responses in the database.</p>
+          <p>The AI SMS Agent processes incoming messages in real-time via webhook and stores responses in the database.</p>
           <p className="mt-1">Use the "Process Backlog" button to manually process any older unprocessed messages.</p>
           <p className="mt-1">Message deduplication is enabled to prevent multiple responses to the same message.</p>
         </div>
