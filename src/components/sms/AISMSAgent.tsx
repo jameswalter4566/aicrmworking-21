@@ -93,24 +93,19 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
             AI SMS Agent
           </CardTitle>
           <Badge 
-            variant={isEnabled ? "default" : "outline"}
-            className={isEnabled ? "bg-green-100 text-green-800 hover:bg-green-200" : "bg-gray-100 text-gray-800"}
+            variant="outline"
+            className="bg-green-100 text-green-800 hover:bg-green-200"
           >
-            {isEnabled ? "Enabled" : "Disabled"}
+            Real-time Enabled
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="pt-4 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <Switch
-              id="ai-agent-switch"
-              checked={isEnabled}
-              onCheckedChange={setIsEnabled}
-            />
-            <Label htmlFor="ai-agent-switch">
-              {isEnabled ? "AI Agent is active" : "AI Agent is inactive"}
-            </Label>
+            <div className="text-sm text-green-700 font-medium">
+              Real-time responses are automatically enabled
+            </div>
           </div>
           
           <Button
@@ -118,7 +113,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
             size="sm"
             className="text-blue-600 border-blue-200 hover:bg-blue-50"
             onClick={handleProcessUnprocessed}
-            disabled={processing || !isEnabled}
+            disabled={processing}
           >
             {processing ? (
               <>
@@ -204,8 +199,9 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
         </div>
         
         <div className="text-xs text-gray-500 mt-4">
-          <p>The AI SMS Agent now automatically responds to incoming messages in real-time.</p>
+          <p>The AI SMS Agent processes incoming messages in real-time and stores responses in the database.</p>
           <p className="mt-1">Use the "Process Backlog" button to manually process any older unprocessed messages.</p>
+          <p className="mt-1">Message deduplication is enabled to prevent multiple responses to the same message.</p>
         </div>
       </CardContent>
     </Card>

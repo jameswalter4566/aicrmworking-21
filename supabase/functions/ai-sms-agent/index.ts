@@ -25,15 +25,17 @@ serve(async (req) => {
 
     // Parse the request body ONCE and store it
     const requestBody = await req.json();
+    const requestId = crypto.randomUUID();
+    console.log(`[${requestId}] AI SMS Agent request received`);
     
     // Handle different operation modes
     if (requestBody.mode === "process-specific" && requestBody.messageId) {
       // Process a specific message by ID
-      return await processSpecificMessage(requestBody.messageId, supabase, openAiApiKey);
+      return await processSpecificMessage(requestBody.messageId, supabase, openAiApiKey, requestId);
       
     } else if (requestBody.mode === "process-all-unprocessed" || requestBody.processAllUnprocessed) {
       // Process all unprocessed messages
-      return await processUnprocessedMessages(supabase, openAiApiKey);
+      return await processUnprocessedMessages(supabase, openAiApiKey, requestId);
       
     } else {
       // Run in manual mode with specific payload
@@ -47,14 +49,20 @@ serve(async (req) => {
       }
       
       // Process the manual message
-      const responseMessage = await generateAIResponse(messageContent, openAiApiKey);
-      await sendSMSResponse(phoneNumber, responseMessage, supabase);
+      console.log(`[${requestId}] Manual message processing requested for ${phoneNumber}`);
+      const responseMessage = await generateAIResponse(messageContent, openAiApiKey, requestId);
+      
+      // Only send SMS in non-test mode
+      if (requestBody.sendSms !== false) {
+        await sendSMSResponse(phoneNumber, responseMessage, supabase, requestId);
+      }
       
       return new Response(
         JSON.stringify({ 
           success: true,
           original: messageContent,
-          response: responseMessage
+          response: responseMessage,
+          requestId
         }),
         { 
           status: 200,
@@ -75,7 +83,9 @@ serve(async (req) => {
 });
 
 // Process a specific SMS message by ID
-async function processSpecificMessage(messageId: string, supabase: any, openAiApiKey: string) {
+async function processSpecificMessage(messageId: string, supabase: any, openAiApiKey: string, requestId: string) {
+  console.log(`[${requestId}] Processing specific message ID: ${messageId}`);
+  
   // Fetch the message from the database
   const { data: webhookData, error: fetchError } = await supabase
     .from('sms_webhooks')
@@ -84,6 +94,7 @@ async function processSpecificMessage(messageId: string, supabase: any, openAiAp
     .single();
   
   if (fetchError || !webhookData) {
+    console.error(`[${requestId}] Message not found:`, fetchError);
     return new Response(
       JSON.stringify({ error: 'Message not found' }),
       { 
@@ -95,7 +106,7 @@ async function processSpecificMessage(messageId: string, supabase: any, openAiAp
   
   // Process the message
   try {
-    const result = await processWebhookMessage(webhookData, supabase, openAiApiKey);
+    const result = await processWebhookMessage(webhookData, supabase, openAiApiKey, requestId);
     
     return new Response(
       JSON.stringify(result),
@@ -105,6 +116,7 @@ async function processSpecificMessage(messageId: string, supabase: any, openAiAp
       }
     );
   } catch (error) {
+    console.error(`[${requestId}] Failed to process message:`, error);
     return new Response(
       JSON.stringify({ error: error.message || 'Failed to process message' }),
       { 
@@ -116,7 +128,9 @@ async function processSpecificMessage(messageId: string, supabase: any, openAiAp
 }
 
 // Process all unprocessed SMS messages
-async function processUnprocessedMessages(supabase: any, openAiApiKey: string) {
+async function processUnprocessedMessages(supabase: any, openAiApiKey: string, requestId: string) {
+  console.log(`[${requestId}] Processing all unprocessed messages`);
+  
   // Fetch unprocessed webhook messages
   const { data: webhooks, error: fetchError } = await supabase
     .from('sms_webhooks')
@@ -126,6 +140,7 @@ async function processUnprocessedMessages(supabase: any, openAiApiKey: string) {
     .limit(10); // Process in batches to avoid timeouts
   
   if (fetchError) {
+    console.error(`[${requestId}] Failed to fetch unprocessed messages:`, fetchError);
     return new Response(
       JSON.stringify({ error: 'Failed to fetch unprocessed messages' }),
       { 
@@ -136,6 +151,7 @@ async function processUnprocessedMessages(supabase: any, openAiApiKey: string) {
   }
   
   if (!webhooks || webhooks.length === 0) {
+    console.log(`[${requestId}] No unprocessed messages found`);
     return new Response(
       JSON.stringify({ success: true, message: 'No unprocessed messages found' }),
       { 
@@ -147,17 +163,33 @@ async function processUnprocessedMessages(supabase: any, openAiApiKey: string) {
   
   // Process each webhook
   const results = [];
+  console.log(`[${requestId}] Found ${webhooks.length} unprocessed messages to process`);
+  
   for (const webhook of webhooks) {
     try {
-      const result = await processWebhookMessage(webhook, supabase, openAiApiKey);
+      const result = await processWebhookMessage(webhook, supabase, openAiApiKey, requestId);
       results.push(result);
     } catch (error) {
-      console.error(`Error processing webhook ${webhook.id}:`, error);
+      console.error(`[${requestId}] Error processing webhook ${webhook.id}:`, error);
       results.push({
         webhookId: webhook.id,
         success: false,
         error: error.message
       });
+      
+      // Mark as processed even on error to prevent retries
+      try {
+        await supabase
+          .from('sms_webhooks')
+          .update({
+            processed: true,
+            processing_error: error.message || 'Unknown error',
+            processed_at: new Date().toISOString()
+          })
+          .eq('id', webhook.id);
+      } catch (updateError) {
+        console.error(`[${requestId}] Failed to update webhook status:`, updateError);
+      }
     }
   }
   
@@ -175,7 +207,21 @@ async function processUnprocessedMessages(supabase: any, openAiApiKey: string) {
 }
 
 // Process an individual webhook message
-async function processWebhookMessage(webhook: any, supabase: any, openAiApiKey: string) {
+async function processWebhookMessage(webhook: any, supabase: any, openAiApiKey: string, requestId: string) {
+  const webhookId = webhook.id;
+  console.log(`[${requestId}] Processing webhook message ${webhookId}`);
+  
+  // Check if already processed
+  if (webhook.processed) {
+    console.log(`[${requestId}] Webhook ${webhookId} already processed, skipping`);
+    return {
+      webhookId,
+      success: true,
+      skipped: true,
+      reason: 'Already processed'
+    };
+  }
+  
   // Extract the message content and phone number from the webhook data
   const webhookData = webhook.webhook_data;
   
@@ -184,25 +230,44 @@ async function processWebhookMessage(webhook: any, supabase: any, openAiApiKey: 
   const messageContent = webhookData.message || webhookData.text || webhookData.body || webhookData.content;
   
   if (!phoneNumber || !messageContent) {
-    throw new Error('Could not extract phone number or message content from webhook data');
+    const error = 'Could not extract phone number or message content from webhook data';
+    console.error(`[${requestId}] ${error}`);
+    
+    // Mark as processed with error
+    await supabase
+      .from('sms_webhooks')
+      .update({
+        processed: true,
+        processing_error: error,
+        processed_at: new Date().toISOString()
+      })
+      .eq('id', webhookId);
+      
+    throw new Error(error);
   }
   
+  console.log(`[${requestId}] Processing message from ${phoneNumber}: "${messageContent.substring(0, 50)}${messageContent.length > 50 ? '...' : ''}"`);
+  
   // Generate AI response
-  const responseMessage = await generateAIResponse(messageContent, openAiApiKey);
+  const responseMessage = await generateAIResponse(messageContent, openAiApiKey, requestId);
   
   // Send the response SMS
-  await sendSMSResponse(phoneNumber, responseMessage, supabase);
+  await sendSMSResponse(phoneNumber, responseMessage, supabase, requestId);
   
   // Mark the webhook as processed
   await supabase
     .from('sms_webhooks')
     .update({
-      processed: true
+      processed: true,
+      ai_response: responseMessage,
+      processed_at: new Date().toISOString()
     })
-    .eq('id', webhook.id);
+    .eq('id', webhookId);
+  
+  console.log(`[${requestId}] Webhook ${webhookId} processed successfully`);
   
   return {
-    webhookId: webhook.id,
+    webhookId,
     phoneNumber,
     originalMessage: messageContent,
     responseMessage,
@@ -212,8 +277,10 @@ async function processWebhookMessage(webhook: any, supabase: any, openAiApiKey: 
 }
 
 // Generate an AI response using OpenAI
-async function generateAIResponse(messageContent: string, openAiApiKey: string): Promise<string> {
+async function generateAIResponse(messageContent: string, openAiApiKey: string, requestId: string): Promise<string> {
   try {
+    console.log(`[${requestId}] Generating AI response for message: "${messageContent.substring(0, 50)}${messageContent.length > 50 ? '...' : ''}"`);
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -244,22 +311,25 @@ async function generateAIResponse(messageContent: string, openAiApiKey: string):
     
     if (!response.ok) {
       const errorData = await response.json();
-      console.error("OpenAI API Error:", errorData);
+      console.error(`[${requestId}] OpenAI API Error:`, errorData);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
     
     const data = await response.json();
+    console.log(`[${requestId}] AI response generated successfully`);
     return data.choices[0].message.content.trim();
     
   } catch (error) {
-    console.error("Error generating AI response:", error);
+    console.error(`[${requestId}] Error generating AI response:`, error);
     return "Thank you for your message. A loan officer will review your request and get back to you shortly.";
   }
 }
 
 // Send an SMS response using the SMS Gateway API
-async function sendSMSResponse(phoneNumber: string, message: string, supabase: any): Promise<void> {
+async function sendSMSResponse(phoneNumber: string, message: string, supabase: any, requestId: string): Promise<void> {
   try {
+    console.log(`[${requestId}] Sending SMS response to ${phoneNumber}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+    
     // Call our existing SMS send function
     const { data, error } = await supabase.functions.invoke('sms-send-single', {
       body: { 
@@ -273,10 +343,10 @@ async function sendSMSResponse(phoneNumber: string, message: string, supabase: a
       throw new Error(error?.message || data?.error || 'SMS send failed');
     }
     
-    console.log(`AI response sent to ${phoneNumber}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+    console.log(`[${requestId}] SMS response sent successfully to ${phoneNumber}`);
     
   } catch (error) {
-    console.error("Error sending SMS response:", error);
+    console.error(`[${requestId}] Error sending SMS response:`, error);
     throw new Error(`Failed to send SMS response: ${error.message}`);
   }
 }

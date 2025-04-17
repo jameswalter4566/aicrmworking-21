@@ -8,8 +8,10 @@ const corsHeaders = {
 };
 
 // Function to process a message with the AI SMS agent
-async function processMessageWithAI(phoneNumber: string, messageContent: string, supabase: any): Promise<void> {
+async function processMessageWithAI(phoneNumber: string, messageContent: string, supabase: any, webhookId: string): Promise<void> {
   try {
+    console.log(`Processing message from ${phoneNumber} with AI: "${messageContent.substring(0, 50)}${messageContent.length > 50 ? '...' : ''}"`);
+    
     // Get OpenAI API key from environment variables
     const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
     
@@ -24,15 +26,42 @@ async function processMessageWithAI(phoneNumber: string, messageContent: string,
     // Send the AI-generated SMS response
     await sendSMSResponse(phoneNumber, responseMessage, supabase);
     
-    console.log(`AI response sent to ${phoneNumber}: "${responseMessage.substring(0, 50)}${responseMessage.length > 50 ? '...' : ''}"`);
+    // Mark the webhook as processed in the database
+    await supabase
+      .from('sms_webhooks')
+      .update({
+        processed: true,
+        ai_response: responseMessage,
+        processed_at: new Date().toISOString()
+      })
+      .eq('id', webhookId);
+    
+    console.log(`AI response sent to ${phoneNumber} and webhook ${webhookId} marked as processed`);
   } catch (error) {
-    console.error("Error in processMessageWithAI:", error);
+    console.error(`Error in processMessageWithAI for webhook ${webhookId}:`, error);
+    
+    // Mark as processed even on error to prevent retries of problematic messages
+    try {
+      await supabase
+        .from('sms_webhooks')
+        .update({
+          processed: true,
+          processing_error: error.message || 'Unknown error',
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', webhookId);
+      console.log(`Webhook ${webhookId} marked as processed despite error`);
+    } catch (updateError) {
+      console.error(`Failed to update webhook ${webhookId} status:`, updateError);
+    }
   }
 }
 
 // Generate an AI response using OpenAI
 async function generateAIResponse(messageContent: string, openAiApiKey: string): Promise<string> {
   try {
+    console.log("Generating AI response...");
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -78,6 +107,8 @@ async function generateAIResponse(messageContent: string, openAiApiKey: string):
 // Send an SMS response using the SMS Gateway API
 async function sendSMSResponse(phoneNumber: string, message: string, supabase: any): Promise<void> {
   try {
+    console.log(`Sending SMS response to ${phoneNumber}`);
+    
     // Call our existing SMS send function
     const { data, error } = await supabase.functions.invoke('sms-send-single', {
       body: { 
@@ -90,6 +121,8 @@ async function sendSMSResponse(phoneNumber: string, message: string, supabase: a
     if (error || !data.success) {
       throw new Error(error?.message || data?.error || 'SMS send failed');
     }
+    
+    console.log("SMS response sent successfully");
   } catch (error) {
     console.error("Error sending SMS response:", error);
     throw new Error(`Failed to send SMS response: ${error.message}`);
@@ -105,6 +138,8 @@ serve(async (req) => {
   try {
     // Get the request body
     let payload;
+    const requestId = crypto.randomUUID();
+    console.log(`[${requestId}] SMS webhook received`);
     
     // Check content type and parse accordingly
     const contentType = req.headers.get('content-type');
@@ -123,7 +158,7 @@ serve(async (req) => {
         const text = await req.text();
         payload = JSON.parse(text);
       } catch (e) {
-        console.error("Failed to parse webhook payload:", e);
+        console.error(`[${requestId}] Failed to parse webhook payload:`, e);
         return new Response(
           JSON.stringify({ error: 'Invalid request format' }),
           { 
@@ -134,7 +169,7 @@ serve(async (req) => {
       }
     }
 
-    console.log("SMS webhook received: ", JSON.stringify(payload));
+    console.log(`[${requestId}] SMS webhook payload:`, JSON.stringify(payload));
 
     // Create a Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -150,15 +185,32 @@ serve(async (req) => {
     const deviceNumber = payload.device_number || payload.to;
     const deviceId = payload.device_id || payload.deviceId;
     
+    // Check if this message has already been received
+    if (phoneNumber && message) {
+      const { data: existingMessages, error: checkError } = await supabase
+        .from('sms_webhooks')
+        .select('id, processed')
+        .eq('processed', false)
+        .ilike('webhook_data->number', phoneNumber)
+        .ilike('webhook_data->message', message)
+        .order('received_at', { ascending: false })
+        .limit(1);
+        
+      if (!checkError && existingMessages && existingMessages.length > 0) {
+        console.log(`[${requestId}] Similar message from ${phoneNumber} already exists (ID: ${existingMessages[0].id})`);
+      }
+    }
+    
     // Store the webhook data in the database
     const { data, error } = await supabase.from('sms_webhooks').insert({
       webhook_data: payload,
       processed: false,
-      received_at: now
+      received_at: now,
+      request_id: requestId
     }).select('id');
 
     if (error) {
-      console.error("Error storing webhook data:", error);
+      console.error(`[${requestId}] Error storing webhook data:`, error);
       return new Response(
         JSON.stringify({ error: 'Failed to store webhook data' }),
         { 
@@ -168,29 +220,33 @@ serve(async (req) => {
       );
     }
 
-    console.log(`SMS received at ${now}:`);
-    console.log(`- From: ${phoneNumber || 'unknown'}`);
-    console.log(`- To: ${deviceNumber || 'unknown'}`);
-    console.log(`- Device ID: ${deviceId || 'unknown'}`);
-    console.log(`- Message: ${message || 'no content'}`);
+    const webhookId = data![0].id;
+    console.log(`[${requestId}] SMS stored in database with ID ${webhookId}:`);
+    console.log(`[${requestId}] - From: ${phoneNumber || 'unknown'}`);
+    console.log(`[${requestId}] - To: ${deviceNumber || 'unknown'}`);
+    console.log(`[${requestId}] - Device ID: ${deviceId || 'unknown'}`);
+    console.log(`[${requestId}] - Message: ${message || 'no content'}`);
 
     // Immediately process the message with AI agent if message and phone number are valid
     if (message && phoneNumber) {
       try {
         // Process the message synchronously
-        await processMessageWithAI(phoneNumber, message, supabase);
+        await processMessageWithAI(phoneNumber, message, supabase, webhookId);
         
-        console.log(`AI processing completed for message from ${phoneNumber}`);
+        console.log(`[${requestId}] AI processing completed for message from ${phoneNumber}`);
       } catch (processingError) {
-        console.error("Error processing message with AI:", processingError);
+        console.error(`[${requestId}] Error processing message with AI:`, processingError);
         // Continue with the response even if AI processing fails
       }
+    } else {
+      console.log(`[${requestId}] Skipping AI processing - incomplete message data`);
     }
 
     return new Response(
       JSON.stringify({
         success: true,
         message: 'Webhook received and processed successfully',
+        requestId,
         timestamp: now
       }),
       {
