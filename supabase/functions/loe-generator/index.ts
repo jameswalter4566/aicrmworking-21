@@ -89,6 +89,9 @@ serve(async (req) => {
           .from('borrower-documents')
           .getPublicUrl(filePath);
         
+        // After generating the LOE, update the condition with the document URL
+        await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl);
+        
         return {
           conditionId: condition.id,
           loeType,
@@ -135,6 +138,69 @@ serve(async (req) => {
     );
   }
 });
+
+/**
+ * Updates a condition with the document URL in the conditions_data
+ */
+async function updateConditionWithDocumentUrl(leadId: string, conditionId: string, documentUrl: string) {
+  try {
+    // First, fetch the current conditions
+    const { data, error } = await supabase
+      .from('loan_conditions')
+      .select('conditions_data')
+      .eq('lead_id', leadId)
+      .single();
+    
+    if (error) {
+      console.error('Error fetching condition data:', error);
+      return;
+    }
+    
+    const conditionsData = data.conditions_data;
+    
+    // Find the condition in any of the condition groups and update it
+    const conditionCategories = [
+      'masterConditions', 
+      'generalConditions', 
+      'priorToFinalConditions', 
+      'complianceConditions'
+    ];
+    
+    let updated = false;
+    
+    for (const category of conditionCategories) {
+      if (!conditionsData[category]) continue;
+      
+      const conditions = conditionsData[category];
+      const conditionIndex = conditions.findIndex(c => c.id === conditionId);
+      
+      if (conditionIndex !== -1) {
+        // Update the condition with the document URL
+        conditionsData[category][conditionIndex].documentUrl = documentUrl;
+        updated = true;
+        break;
+      }
+    }
+    
+    if (updated) {
+      // Save the updated conditions back to the database
+      const { error: updateError } = await supabase
+        .from('loan_conditions')
+        .update({ conditions_data: conditionsData })
+        .eq('lead_id', leadId);
+      
+      if (updateError) {
+        console.error('Error updating condition with document URL:', updateError);
+      } else {
+        console.log(`Successfully updated condition ${conditionId} with document URL`);
+      }
+    } else {
+      console.log(`Could not find condition ${conditionId} in conditions data`);
+    }
+  } catch (err) {
+    console.error('Error in updateConditionWithDocumentUrl:', err);
+  }
+}
 
 /**
  * Determines the type of LOE from the condition text

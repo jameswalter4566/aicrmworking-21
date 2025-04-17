@@ -334,6 +334,29 @@ const ProcessorAssistViewer = () => {
               setParsedConditions(extractedConditions);
               
               try {
+                const allConditions = [
+                  ...(extractedConditions.masterConditions || []),
+                  ...(extractedConditions.generalConditions || []),
+                  ...(extractedConditions.priorToFinalConditions || []),
+                  ...(extractedConditions.complianceConditions || [])
+                ];
+                
+                if (allConditions.length > 0) {
+                  const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
+                    body: { 
+                      leadId: id,
+                      conditions: allConditions
+                    }
+                  });
+                  
+                  if (loeError) {
+                    console.error("Error generating LOEs:", loeError);
+                  } else if (loeData.success) {
+                    console.log("LOEs generated successfully:", loeData);
+                    await fetchLoanConditions(id);
+                  }
+                }
+                
                 const result = await updateLoanProgress(id, "approved", "Automatically set to Approved based on conditions detected in PDF");
                 
                 if (result.success) {

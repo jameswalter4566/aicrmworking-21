@@ -7,25 +7,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req: Request) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Get the leadId from the request
-    let leadId;
-    
-    // Check if it's GET or POST and extract leadId accordingly
-    if (req.method === 'GET') {
-      const url = new URL(req.url);
-      leadId = url.searchParams.get('leadId');
-    } else {
-      // For POST requests, get leadId from the body
-      const body = await req.json();
-      leadId = body.leadId;
-    }
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      {
+        global: {
+          headers: { Authorization: req.headers.get("Authorization")! },
+        },
+      }
+    );
+
+    const { leadId } = await req.json();
 
     if (!leadId) {
       return new Response(
@@ -36,19 +35,13 @@ serve(async (req: Request) => {
 
     console.log(`Retrieving conditions for lead ID: ${leadId}`);
 
-    // Initialize Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    // Get loan conditions data
+    // Fetch conditions from the database
     const { data, error } = await supabaseClient
       .from("loan_conditions")
       .select("*")
       .eq("lead_id", leadId)
       .maybeSingle();
-
+    
     if (error) {
       console.error("Error retrieving conditions:", error);
       return new Response(
@@ -57,14 +50,29 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log("Found conditions data:", data);
+    // If no conditions are found, return an empty structure
+    if (!data) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          conditions: {
+            masterConditions: [],
+            generalConditions: [],
+            priorToFinalConditions: [],
+            complianceConditions: []
+          }
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
-    // Return the conditions if found
+    console.log("Successfully retrieved conditions");
+    
     return new Response(
-      JSON.stringify({
-        success: true,
-        conditions: data ? data.conditions_data : null,
-        updatedAt: data ? data.updated_at : null
+      JSON.stringify({ 
+        success: true, 
+        conditions: data.conditions_data,
+        updatedAt: data.updated_at
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
