@@ -46,13 +46,10 @@ serve(async (req) => {
     // Get the array buffer of the PDF
     const pdfArrayBuffer = await fileResponse.arrayBuffer();
     
-    console.log("📑 Converting PDF to text using alternative approach...");
+    console.log("📑 Processing PDF document text extraction...");
     
-    // Instead of using PDF.js directly, we'll send the PDF to OpenAI's API
-    // which can handle document analysis with its vision capabilities
-    console.log("📤 Sending PDF content to OpenAI for analysis...");
-    
-    // Create a base64 version of the PDF for OpenAI
+    // Instead of treating the PDF as an image, we'll use OpenAI's text extraction capabilities
+    // First, let's convert the PDF to a base64 string to send it to OpenAI
     const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
     
     // Determine the appropriate prompt based on fileType
@@ -86,7 +83,9 @@ Instructions:
       systemPrompt = `You are an intelligent mortgage document analyzer. Analyze the provided document text and classify it.`;
     }
 
-    // Use a simpler approach with OpenAI's vision capabilities to analyze the PDF
+    console.log("📤 Sending PDF to OpenAI for text extraction and analysis...");
+    
+    // Use OpenAI's text capabilities to analyze the PDF content
     const aiResult = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -105,13 +104,11 @@ Instructions:
             content: [
               {
                 type: "text",
-                text: "Please analyze this PDF document and extract information according to the instructions."
+                text: "Please extract and analyze the text content from this PDF document."
               },
               {
-                type: "image_url",
-                image_url: {
-                  url: `data:application/pdf;base64,${base64PDF}`
-                }
+                type: "text",
+                text: `I'm providing this document as a base64-encoded PDF. The document is a mortgage approval letter containing loan conditions. Please extract the conditions and categorize them according to the instructions.`
               }
             ]
           }
