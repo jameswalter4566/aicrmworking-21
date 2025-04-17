@@ -2,21 +2,26 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { FileUp, CheckCircle, AlertCircle, Brain } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PDFDropZoneProps {
   onFileAccepted?: (file: File) => void;
   className?: string;
   disabled?: boolean;
+  leadId?: string;
 }
 
 const PDFDropZone: React.FC<PDFDropZoneProps> = ({ 
   onFileAccepted, 
   className = "", 
-  disabled = false 
+  disabled = false,
+  leadId
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -66,6 +71,9 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         setFile(droppedFile);
         if (onFileAccepted) {
           onFileAccepted(droppedFile);
+        } else if (leadId) {
+          // If no handler is provided but leadId is available, handle internally
+          processFile(droppedFile, leadId);
         }
       }
     }
@@ -82,7 +90,95 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       setFile(selectedFile);
       if (onFileAccepted) {
         onFileAccepted(selectedFile);
+      } else if (leadId) {
+        // If no handler is provided but leadId is available, handle internally
+        processFile(selectedFile, leadId);
       }
+    }
+  };
+
+  const processFile = async (file: File, leadId: string) => {
+    setIsProcessing(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const uniqueFileName = `${Date.now()}_${file.name}`;
+      const fileType = "conditions"; // Assuming we're processing conditions
+      
+      toast.info(`Analyzing conditions document...`);
+      
+      const { error: uploadError, data } = await supabase.storage
+        .from('borrower-documents')
+        .upload(`leads/${leadId}/${uniqueFileName}`, file);
+        
+      if (uploadError) {
+        throw new Error(`Error uploading document: ${uploadError.message}`);
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('borrower-documents')
+        .getPublicUrl(`leads/${leadId}/${uniqueFileName}`);
+      
+      // Call analyze-pdf-document edge function
+      const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-pdf-document', {
+        body: { 
+          fileUrl: publicUrl, 
+          fileType: "conditions",
+          leadId: leadId
+        }
+      });
+      
+      if (analysisError) {
+        throw new Error(`Error analyzing document: ${analysisError.message}`);
+      }
+      
+      // If document was analyzed successfully and contains conditions, run automation matcher
+      if (analysisData.success && analysisData.data) {
+        // Extract conditions from analysisData
+        const conditions = {
+          masterConditions: analysisData.data.masterConditions || [],
+          generalConditions: analysisData.data.generalConditions || [],
+          priorToFinalConditions: analysisData.data.priorToFinalConditions || [],
+          complianceConditions: analysisData.data.complianceConditions || []
+        };
+        
+        // Only call automation-matcher if we have conditions to process
+        const totalConditions = 
+          conditions.masterConditions.length + 
+          conditions.generalConditions.length + 
+          conditions.priorToFinalConditions.length + 
+          conditions.complianceConditions.length;
+        
+        if (totalConditions > 0) {
+          toast.info(`Processing ${totalConditions} conditions through automation...`);
+          
+          // Call automation-matcher with the extracted conditions
+          const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+            body: { 
+              leadId,
+              conditions
+            }
+          });
+          
+          if (automationError) {
+            console.error("Error from automation-matcher:", automationError);
+            toast.error("Failed to process conditions automatically");
+          } else if (automationData.success) {
+            const automatedCount = automationData.automationResults?.automatedConditionIds?.length || 0;
+            toast.success(`${automatedCount} conditions were processed automatically`);
+          }
+        }
+      }
+      
+      toast.success('Document successfully analyzed!');
+      
+    } catch (error: any) {
+      console.error('Error processing document:', error);
+      toast.error(`Failed to process document: ${error.message || 'Unknown error'}`);
+      setError(error.message || 'Failed to process document');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -107,6 +203,12 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
               <p className="text-gray-500 text-sm">
                 {(file.size / (1024 * 1024)).toFixed(2)}MB • PDF
               </p>
+              {isProcessing && (
+                <div className="mt-2 flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-mortgage-purple mr-2"></div>
+                  <span className="text-sm text-mortgage-purple">Processing...</span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex flex-col items-center">
