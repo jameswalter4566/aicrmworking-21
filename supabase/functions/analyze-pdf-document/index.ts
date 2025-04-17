@@ -51,8 +51,39 @@ serve(async (req) => {
     const fileBuffer = await fileResponse.arrayBuffer();
     const fileBase64 = btoa(String.fromCharCode(...new Uint8Array(fileBuffer)));
     
-    // Comprehensive prompt for mortgage document analysis
-    const systemPrompt = `You are an intelligent mortgage document analyzer. Your job is to:
+    // Determine the appropriate prompt based on fileType
+    let systemPrompt = "";
+    
+    if (fileType === "conditions") {
+      // Special prompt for loan condition documents
+      systemPrompt = `You are an expert mortgage loan condition analyzer. Your task is to extract loan conditions from underwriting approval letters and organize them into categories. 
+
+Instructions:
+1. Extract all conditions from the mortgage approval document.
+2. Categorize conditions into these standard sections:
+   - "masterConditions" - The most critical conditions that must be met
+   - "generalConditions" - Standard conditions that apply to most loans
+   - "priorToFinalConditions" - Conditions that must be satisfied before final approval
+   - "complianceConditions" - Regulatory and legal compliance requirements
+
+3. For each condition, provide:
+   - "text" - The full text of the condition
+   - "category" - Which category it belongs to
+   - "id" - A unique identifier (you can generate this)
+   - "status" - Default to "no_action" for all conditions
+
+4. Return the data in a structured JSON format with the following array fields:
+   - masterConditions
+   - generalConditions
+   - priorToFinalConditions
+   - complianceConditions
+
+5. If you find a condition but are unsure which category it belongs to, place it in generalConditions.
+
+6. Be comprehensive. Make sure to capture ALL conditions mentioned in the document.`;
+    } else {
+      // General mortgage document analysis prompt
+      systemPrompt = `You are an intelligent mortgage document analyzer. Your job is to:
 
 1. **Classify** the type of each uploaded document:
    - W-2
@@ -65,6 +96,7 @@ serve(async (req) => {
    - Employment Letter
    - Lease Agreement
    - Social Security Award Letter
+   - Loan Conditions or Approval Document
    - Other (label as 'Unrecognized')
 
 2. **Extract borrower data** from each document, including Personal Identifiable Information (PII), financial data, and employment information.
@@ -166,18 +198,26 @@ serve(async (req) => {
 - Race  
 - Chosen Not to Provide?
 
-4. **Matching Rules:**
+4. **If the document is a loan conditions or approval document**, extract the following information:
+   - Loan conditions organized by:
+     - Master conditions
+     - General conditions
+     - Prior to final conditions
+     - Compliance conditions
+
+5. **Matching Rules:**
    - If more than one borrower is listed, identify which document belongs to which person based on Name, DOB, SSN, or Address.
    - If values conflict across documents, flag as \`INCONSISTENT_DATA\`.
 
-5. **Output Format:**
-Return all extracted and classified data as structured **JSON**, organized by 1003 section headings.
+6. **Output Format:**
+Return all extracted and classified data as structured **JSON**, organized by section headings.
 
-6. **Fallbacks:**
+7. **Fallbacks:**
    - If a field is not present, label it as \`MISSING\`.
    - If a document is unrecognizable or corrupted, label as \`UNRECOGNIZED_DOCUMENT\`.
 
 You are acting as a trusted document processing agent in a mortgage underwriting pipeline. Ensure full security, privacy, and data integrity at all times.`;
+    }
     
     // Call OpenAI to analyze the PDF
     const openAiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -198,7 +238,9 @@ You are acting as a trusted document processing agent in a mortgage underwriting
             content: [
               {
                 type: "text",
-                text: "Please analyze this mortgage document and extract all relevant information according to the 1003 form structure. Please be as thorough as possible and classify the document type."
+                text: fileType === "conditions" 
+                  ? "Please analyze this mortgage approval document and extract all loan conditions according to the specified categories."
+                  : "Please analyze this mortgage document and extract all relevant information according to the 1003 form structure. Please be as thorough as possible and classify the document type."
               },
               {
                 type: "image_url",
@@ -224,85 +266,182 @@ You are acting as a trusted document processing agent in a mortgage underwriting
     
     console.log("Successfully extracted data from document");
     
-    // Update lead's mortgage data if leadId is provided
-    if (leadId) {
-      try {
-        // Get existing mortgage data
-        const { data: leadData, error: fetchError } = await supabase
-          .from('leads')
-          .select('mortgage_data')
-          .eq('id', leadId)
-          .single();
-          
-        if (fetchError) {
-          console.error("Error fetching lead data:", fetchError);
-        } else {
-          // NEW APPROACH: Store documents in an array rather than merging
-          // This avoids stack overflow issues completely
-          const existingMortgageData = leadData?.mortgage_data || {};
-          
-          // Initialize documents array if it doesn't exist
-          if (!existingMortgageData.documents) {
-            existingMortgageData.documents = [];
-          }
-          
-          // Add new document with metadata
-          const documentEntry = {
-            id: crypto.randomUUID(),
-            timestamp: new Date().toISOString(),
-            documentType: extractedData.documentType || "Unknown",
-            extractedData: extractedData
-          };
-          
-          existingMortgageData.documents.push(documentEntry);
-          
-          // Create or update basic info for convenient access
-          // Only a minimal, flat structure with non-nested properties
-          if (!existingMortgageData.basicInfo) {
-            existingMortgageData.basicInfo = {};
-          }
-          
-          // Update basic info if available from this document
-          const borrowerInfo = extractedData.borrower || extractedData["SECTION I"] || {};
-          if (borrowerInfo.firstName) existingMortgageData.basicInfo.firstName = borrowerInfo.firstName;
-          if (borrowerInfo.lastName) existingMortgageData.basicInfo.lastName = borrowerInfo.lastName;
-          if (borrowerInfo["Borrower First Name"]) existingMortgageData.basicInfo.firstName = borrowerInfo["Borrower First Name"];
-          if (borrowerInfo["Borrower Last Name"]) existingMortgageData.basicInfo.lastName = borrowerInfo["Borrower Last Name"];
-          
-          // Store income info in a simple format if available
-          const incomeInfo = extractedData.income || extractedData["SECTION V"] || {};
-          if (incomeInfo.monthlyBase || incomeInfo["Total Monthly Base Income"] || incomeInfo.base) {
-            existingMortgageData.basicInfo.income = {
-              monthlyBase: incomeInfo.monthlyBase || incomeInfo["Total Monthly Base Income"] || incomeInfo.base || 0
-            };
-          }
-          
-          // Store document count for convenience
-          existingMortgageData.documentCount = (existingMortgageData.documents || []).length;
-          
-          // Update the lead with new data (no complex merging)
-          const { error: updateError } = await supabase
-            .from('leads')
-            .update({ mortgage_data: existingMortgageData })
-            .eq('id', leadId);
+    // Process data based on document type
+    let processedData = extractedData;
+    
+    if (fileType === "conditions") {
+      // Enhance condition data with status, notes, etc.
+      processedData = {
+        masterConditions: (extractedData.masterConditions || []).map(condition => ({
+          ...condition,
+          id: condition.id || crypto.randomUUID(),
+          conditionStatus: condition.status || "no_action",
+          text: condition.text || condition.description || "",
+          notes: ""
+        })),
+        generalConditions: (extractedData.generalConditions || []).map(condition => ({
+          ...condition,
+          id: condition.id || crypto.randomUUID(),
+          conditionStatus: condition.status || "no_action",
+          text: condition.text || condition.description || "",
+          notes: ""
+        })),
+        priorToFinalConditions: (extractedData.priorToFinalConditions || []).map(condition => ({
+          ...condition,
+          id: condition.id || crypto.randomUUID(),
+          conditionStatus: condition.status || "no_action",
+          text: condition.text || condition.description || "",
+          notes: ""
+        })),
+        complianceConditions: (extractedData.complianceConditions || []).map(condition => ({
+          ...condition,
+          id: condition.id || crypto.randomUUID(),
+          conditionStatus: condition.status || "no_action",
+          text: condition.text || condition.description || "",
+          notes: ""
+        }))
+      };
+      
+      // Save conditions if leadId is provided
+      if (leadId && (
+        processedData.masterConditions.length > 0 ||
+        processedData.generalConditions.length > 0 ||
+        processedData.priorToFinalConditions.length > 0 ||
+        processedData.complianceConditions.length > 0
+      )) {
+        try {
+          // Get existing mortgage data
+          const { error: saveError } = await supabase
+            .from('loan_conditions')
+            .upsert({
+              lead_id: leadId,
+              conditions_data: processedData,
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: "lead_id"
+            });
             
-          if (updateError) {
-            console.error("Error updating lead data:", updateError);
+          if (saveError) {
+            console.error("Error saving conditions data:", saveError);
           } else {
-            console.log("Successfully updated lead mortgage data");
+            console.log("Successfully saved conditions data");
+            
+            // Check if this is the first time conditions are being added
+            const { data: existingConditions, error: fetchError } = await supabase
+              .from("loan_conditions")
+              .select("created_at, updated_at")
+              .eq("lead_id", leadId)
+              .single();
+              
+            const isFirstConditionUpdate = !fetchError && existingConditions && 
+              existingConditions.created_at === existingConditions.updated_at;
+              
+            if (isFirstConditionUpdate) {
+              console.log(`First time conditions detected for lead ${leadId}. Updating loan status to Approved`);
+              
+              try {
+                const { data: progressData, error: progressError } = await supabase.functions.invoke('update-loan-progress', {
+                  body: { 
+                    leadId, 
+                    currentStep: "approved",
+                    notes: "Automatically set to Approved based on conditions detected in PDF"
+                  }
+                });
+                
+                if (progressError) {
+                  console.error("Error updating loan progress:", progressError);
+                } else {
+                  console.log("Successfully updated loan status to Approved");
+                }
+              } catch (progressErr) {
+                console.error("Exception during status update:", progressErr);
+              }
+            }
           }
+        } catch (err) {
+          console.error("Error in data storage process:", err);
         }
-      } catch (err) {
-        console.error("Error in data storage process:", err);
-        // Continue execution to return the extracted data even if storing fails
+      }
+    } else {
+      // Update lead's mortgage data if leadId is provided (same as existing code)
+      if (leadId) {
+        try {
+          // Get existing mortgage data
+          const { data: leadData, error: fetchError } = await supabase
+            .from('leads')
+            .select('mortgage_data')
+            .eq('id', leadId)
+            .single();
+            
+          if (fetchError) {
+            console.error("Error fetching lead data:", fetchError);
+          } else {
+            // NEW APPROACH: Store documents in an array rather than merging
+            const existingMortgageData = leadData?.mortgage_data || {};
+            
+            // Initialize documents array if it doesn't exist
+            if (!existingMortgageData.documents) {
+              existingMortgageData.documents = [];
+            }
+            
+            // Add new document with metadata
+            const documentEntry = {
+              id: crypto.randomUUID(),
+              timestamp: new Date().toISOString(),
+              documentType: extractedData.documentType || "Unknown",
+              extractedData: extractedData
+            };
+            
+            existingMortgageData.documents.push(documentEntry);
+            
+            // Create or update basic info for convenient access
+            // Only a minimal, flat structure with non-nested properties
+            if (!existingMortgageData.basicInfo) {
+              existingMortgageData.basicInfo = {};
+            }
+            
+            // Update basic info if available from this document
+            const borrowerInfo = extractedData.borrower || extractedData["SECTION I"] || {};
+            if (borrowerInfo.firstName) existingMortgageData.basicInfo.firstName = borrowerInfo.firstName;
+            if (borrowerInfo.lastName) existingMortgageData.basicInfo.lastName = borrowerInfo.lastName;
+            if (borrowerInfo["Borrower First Name"]) existingMortgageData.basicInfo.firstName = borrowerInfo["Borrower First Name"];
+            if (borrowerInfo["Borrower Last Name"]) existingMortgageData.basicInfo.lastName = borrowerInfo["Borrower Last Name"];
+            
+            // Store income info in a simple format if available
+            const incomeInfo = extractedData.income || extractedData["SECTION V"] || {};
+            if (incomeInfo.monthlyBase || incomeInfo["Total Monthly Base Income"] || incomeInfo.base) {
+              existingMortgageData.basicInfo.income = {
+                monthlyBase: incomeInfo.monthlyBase || incomeInfo["Total Monthly Base Income"] || incomeInfo.base || 0
+              };
+            }
+            
+            // Store document count for convenience
+            existingMortgageData.documentCount = (existingMortgageData.documents || []).length;
+            
+            // Update the lead with new data (no complex merging)
+            const { error: updateError } = await supabase
+              .from('leads')
+              .update({ mortgage_data: existingMortgageData })
+              .eq('id', leadId);
+              
+            if (updateError) {
+              console.error("Error updating lead data:", updateError);
+            } else {
+              console.log("Successfully updated lead mortgage data");
+            }
+          }
+        } catch (err) {
+          console.error("Error in data storage process:", err);
+          // Continue execution to return the extracted data even if storing fails
+        }
       }
     }
     
     return new Response(
       JSON.stringify({
         success: true,
-        data: extractedData,
-        documentType: extractedData.documentType || "Unknown",
+        data: processedData,
+        documentType: extractedData.documentType || (fileType === "conditions" ? "Conditions" : "Unknown"),
         message: "Document successfully analyzed"
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

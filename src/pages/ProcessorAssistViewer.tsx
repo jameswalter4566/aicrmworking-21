@@ -169,71 +169,103 @@ const ProcessorAssistViewer = () => {
     setActiveSection(section);
   };
 
-  const tasks: Record<string, ProcessorTask[]> = {
-    employment: [
-      {
-        id: "employment-verification",
-        name: "Employment Verification",
-        description: "Verify borrower's employment and income information",
-        status: "pending",
-        icon: <Briefcase className="h-5 w-5" />
-      },
-      {
-        id: "income-documentation",
-        name: "Income Documentation",
-        description: "Collect and organize income documentation",
-        status: "pending",
-        icon: <FileText className="h-5 w-5" />
+  const handlePDFUpload = async (file: File) => {
+    if (!id) return;
+    
+    try {
+      toast.info(`Analyzing conditions from ${file.name}. This might take a moment...`);
+      
+      const uniqueFileName = `conditions_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      
+      const { error: uploadError, data } = await supabase.storage
+        .from('borrower-documents')
+        .upload(`leads/${id}/conditions/${uniqueFileName}`, file);
+        
+      if (uploadError) {
+        throw new Error(`Error uploading document: ${uploadError.message}`);
       }
-    ],
-    title: [
-      {
-        id: "title-search",
-        name: "Order Title Search",
-        description: "Request title search from title company",
-        status: "pending",
-        icon: <FileText className="h-5 w-5" />
-      },
-      {
-        id: "title-insurance",
-        name: "Title Insurance",
-        description: "Process title insurance requirements",
-        status: "pending",
-        icon: <ClipboardCheck className="h-5 w-5" />
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('borrower-documents')
+        .getPublicUrl(`leads/${id}/conditions/${uniqueFileName}`);
+      
+      const { data: analysisData, error } = await supabase.functions.invoke('analyze-pdf-document', {
+        body: { 
+          fileUrl: publicUrl, 
+          fileType: "conditions",
+          leadId: id
+        }
+      });
+      
+      if (error) {
+        throw new Error(`Error analyzing document: ${error.message}`);
       }
-    ],
-    appraisal: [
-      {
-        id: "order-appraisal",
-        name: "Order Appraisal",
-        description: "Request property appraisal from approved vendor",
-        status: "pending",
-        icon: <HomeIcon className="h-5 w-5" />
-      },
-      {
-        id: "appraisal-followup",
-        name: "Appraisal Follow-up",
-        description: "Track and follow up on appraisal status",
-        status: "pending",
-        icon: <ClipboardCheck className="h-5 w-5" />
+      
+      if (analysisData.success && analysisData.data) {
+        let extractedConditions: ParsedConditions = {
+          masterConditions: [],
+          generalConditions: [],
+          priorToFinalConditions: [],
+          complianceConditions: []
+        };
+        
+        if (analysisData.data.conditions) {
+          extractedConditions = analysisData.data.conditions;
+        } else {
+          const docData = analysisData.data;
+          
+          if (docData.masterConditions || docData.master_conditions) {
+            extractedConditions.masterConditions = docData.masterConditions || docData.master_conditions || [];
+          }
+          
+          if (docData.generalConditions || docData.general_conditions) {
+            extractedConditions.generalConditions = docData.generalConditions || docData.general_conditions || [];
+          }
+          
+          if (docData.priorToFinalConditions || docData.prior_to_final_conditions || docData.ptc || docData.ptfConditions) {
+            extractedConditions.priorToFinalConditions = docData.priorToFinalConditions || 
+              docData.prior_to_final_conditions || docData.ptc || docData.ptfConditions || [];
+          }
+          
+          if (docData.complianceConditions || docData.compliance_conditions) {
+            extractedConditions.complianceConditions = docData.complianceConditions || docData.compliance_conditions || [];
+          }
+        }
+        
+        if (Object.values(extractedConditions).some(arr => arr && arr.length > 0)) {
+          try {
+            const { data: saveData, error: saveError } = await supabase.functions.invoke('update-conditions', {
+              body: { 
+                leadId: id,
+                conditions: extractedConditions
+              }
+            });
+            
+            if (saveError) {
+              console.error("Error saving extracted conditions:", saveError);
+              toast.error("Failed to save extracted conditions");
+            } else {
+              setParsedConditions(extractedConditions);
+              toast.success("Successfully extracted and saved conditions from PDF");
+              
+              if (saveData.statusUpdated) {
+                toast.info("Loan status automatically updated to Approved based on conditions");
+              }
+            }
+          } catch (saveErr) {
+            console.error("Exception saving conditions:", saveErr);
+            toast.error("Failed to save conditions");
+          }
+        } else {
+          toast.warning("No conditions were found in the uploaded PDF");
+        }
+      } else {
+        toast.warning("Could not extract conditions from the PDF. Try using the Email Parser instead.");
       }
-    ],
-    documents: [
-      {
-        id: "document-collection",
-        name: "Document Collection",
-        description: "Track required documentation from borrower",
-        status: "pending",
-        icon: <FileText className="h-5 w-5" />
-      },
-      {
-        id: "document-organization",
-        name: "Document Organization",
-        description: "Organize and classify loan documentation",
-        status: "pending",
-        icon: <ClipboardCheck className="h-5 w-5" />
-      }
-    ]
+    } catch (error: any) {
+      console.error('Error processing document:', error);
+      toast.error(`Failed to process document: ${error.message || 'Unknown error'}`);
+    }
   };
 
   const renderTaskSection = (taskCategory: string) => {
@@ -301,14 +333,13 @@ const ProcessorAssistViewer = () => {
             
             <TabsContent value="pdf" className="bg-white">
               <PDFDropZone 
-                onFileAccepted={(file) => {
-                  toast.info(`Processing ${file.name}. This might take a moment...`);
-                  
-                  setTimeout(() => {
-                    toast.success("PDF processed successfully!");
-                  }, 2000);
-                }}
+                onFileAccepted={handlePDFUpload}
+                className="border-blue-200 hover:border-blue-300"
               />
+              <div className="mt-4 p-4 bg-blue-50 rounded-md text-blue-700 text-sm">
+                <p className="font-medium">Upload your underwriting approval PDF document</p>
+                <p className="mt-1">Our AI will automatically extract loan conditions from standard approval documents.</p>
+              </div>
             </TabsContent>
           </Tabs>
         </div>
