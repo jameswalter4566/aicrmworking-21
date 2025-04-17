@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -23,238 +22,6 @@ const AUTOMATION_TYPES = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    console.log('Automation matcher function started');
-    
-    // Parse request body
-    const { leadId, conditions } = await req.json();
-    
-    if (!leadId || !conditions) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Missing required parameters: leadId and conditions" 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-
-    console.log(`Processing conditions for lead ID: ${leadId}`);
-    console.log(`Received conditions:`, JSON.stringify(conditions).substring(0, 200) + '...');
-    
-    // Process all condition categories
-    const allConditions = [
-      ...(conditions.masterConditions || []).map(c => ({...c, category: 'masterConditions'})),
-      ...(conditions.generalConditions || []).map(c => ({...c, category: 'generalConditions'})),
-      ...(conditions.priorToFinalConditions || []).map(c => ({...c, category: 'priorToFinalConditions'})),
-      ...(conditions.complianceConditions || []).map(c => ({...c, category: 'complianceConditions'}))
-    ];
-
-    console.log(`Total conditions to process: ${allConditions.length}`);
-    
-    if (allConditions.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "No conditions found to process" 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    }
-    
-    // Initialize results tracking
-    const automationResults = {
-      automatedConditionIds: [],
-      manualConditionIds: [],
-      pendingConditionIds: [],
-      automationSummary: {}
-    };
-    
-    // Process each condition with OpenAI to determine automation type
-    const processedConditions = await Promise.all(
-      allConditions.map(async (condition) => {
-        // Skip conditions without text
-        if (!condition.text && !condition.description) {
-          console.log(`Skipping condition with ID ${condition.id} - no text content`);
-          automationResults.manualConditionIds.push(condition.id);
-          return null;
-        }
-
-        const conditionText = condition.text || condition.description;
-        const automationType = await classifyConditionWithOpenAI(conditionText);
-        
-        console.log(`Classified condition "${conditionText.substring(0, 50)}..." as: ${automationType}`);
-        
-        // Track condition in the appropriate automation category
-        if (!automationResults.automationSummary[automationType]) {
-          automationResults.automationSummary[automationType] = {
-            conditionIds: [],
-            success: false,
-            details: []
-          };
-        }
-        
-        automationResults.automationSummary[automationType].conditionIds.push(condition.id);
-        
-        // If not manual processing, add to automated conditions
-        if (automationType !== AUTOMATION_TYPES.MANUAL) {
-          automationResults.automatedConditionIds.push(condition.id);
-        } else {
-          automationResults.manualConditionIds.push(condition.id);
-        }
-        
-        // Return processed condition with automation type
-        return {
-          ...condition,
-          automationType,
-          leadId
-        };
-      })
-    );
-    
-    // Filter out null entries
-    const validProcessedConditions = processedConditions.filter(c => c !== null);
-    
-    console.log(`Successfully classified ${validProcessedConditions.length} conditions`);
-    
-    // Route conditions to their respective automations
-    const automationPromises = [];
-    
-    // Group conditions by automation type
-    const conditionsByAutomationType = validProcessedConditions.reduce((acc, condition) => {
-      if (!condition) return acc;
-      
-      if (!acc[condition.automationType]) {
-        acc[condition.automationType] = [];
-      }
-      
-      acc[condition.automationType].push(condition);
-      return acc;
-    }, {});
-    
-    // Process each automation type
-    for (const [automationType, conditions] of Object.entries(conditionsByAutomationType)) {
-      if (automationType === AUTOMATION_TYPES.MANUAL) {
-        console.log(`Skipping ${conditions.length} conditions marked for manual processing`);
-        continue;
-      }
-      
-      console.log(`Routing ${conditions.length} conditions to ${automationType}`);
-      
-      try {
-        // Process based on automation type
-        let result;
-        
-        // Handle LOE generator specifically - now using our new edge function
-        if (automationType === AUTOMATION_TYPES.LOE) {
-          console.log(`Processing ${conditions.length} conditions with LOE generator`);
-          try {
-            // Call our LOE generator function
-            const { data: loeResult, error: loeError } = await supabase.functions.invoke('loe-generator', {
-              body: { 
-                leadId, 
-                conditions 
-              }
-            });
-            
-            if (loeError) {
-              console.error("Error from LOE generator:", loeError);
-              throw new Error(`LOE generation failed: ${loeError.message || "Unknown error"}`);
-            }
-            
-            console.log("LOE generator completed successfully:", JSON.stringify(loeResult).substring(0, 200) + '...');
-            result = {
-              success: loeResult.success,
-              details: loeResult
-            };
-          } catch (loeExcept) {
-            console.error("Exception in LOE generator:", loeExcept);
-            throw loeExcept;
-          }
-        } else {
-          // For other automation types, use the mock function
-          result = await mockAutomationExecution(automationType, conditions, leadId);
-        }
-        
-        // Update the automation summary with results
-        automationResults.automationSummary[automationType].success = result.success;
-        automationResults.automationSummary[automationType].details = result.details;
-        
-        // Update condition statuses in the database
-        if (result.success) {
-          await updateConditionAutomationStatus(leadId, conditions, automationType, "completed");
-        } else {
-          await updateConditionAutomationStatus(leadId, conditions, automationType, "failed");
-          // Move failed automations to manual
-          conditions.forEach(c => {
-            const index = automationResults.automatedConditionIds.indexOf(c.id);
-            if (index !== -1) {
-              automationResults.automatedConditionIds.splice(index, 1);
-              automationResults.manualConditionIds.push(c.id);
-            }
-          });
-        }
-      } catch (error) {
-        console.error(`Error executing ${automationType}:`, error);
-        
-        // Mark automation as failed
-        automationResults.automationSummary[automationType].success = false;
-        automationResults.automationSummary[automationType].details = { error: error.message };
-        
-        // Update condition statuses in the database
-        await updateConditionAutomationStatus(leadId, conditions, automationType, "failed");
-        
-        // Move failed automations to manual
-        conditions.forEach(c => {
-          const index = automationResults.automatedConditionIds.indexOf(c.id);
-          if (index !== -1) {
-            automationResults.automatedConditionIds.splice(index, 1);
-            automationResults.manualConditionIds.push(c.id);
-          }
-        });
-      }
-    }
-    
-    console.log('Automation matcher completed successfully');
-    console.log(`Summary: ${automationResults.automatedConditionIds.length} automated, ${automationResults.manualConditionIds.length} manual`);
-    
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        automationResults 
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  } catch (error) {
-    console.error('Error in automation-matcher function:', error);
-    
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message || "An unknown error occurred" 
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
-});
 
 /**
  * Classifies a condition text using OpenAI to determine the appropriate automation
@@ -508,3 +275,233 @@ async function updateConditionAutomationStatus(leadId, conditions, automationTyp
     console.error('Error updating condition automation status:', error);
   }
 }
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    console.log('Automation matcher function started');
+    
+    // Parse request body
+    const { leadId, conditions } = await req.json();
+    
+    if (!leadId || !conditions) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Missing required parameters: leadId and conditions" 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    console.log(`Processing conditions for lead ID: ${leadId}`);
+    console.log(`Received conditions:`, JSON.stringify(conditions).substring(0, 200) + '...');
+
+    // Process all condition categories
+    const allConditions = [
+      ...(conditions.masterConditions || []).map(c => ({...c, category: 'masterConditions'})),
+      ...(conditions.generalConditions || []).map(c => ({...c, category: 'generalConditions'})),
+      ...(conditions.priorToFinalConditions || []).map(c => ({...c, category: 'priorToFinalConditions'})),
+      ...(conditions.complianceConditions || []).map(c => ({...c, category: 'complianceConditions'}))
+    ];
+
+    console.log(`Total conditions to process: ${allConditions.length}`);
+    
+    if (allConditions.length === 0) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "No conditions found to process" 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+    
+    // Initialize results tracking
+    const automationResults = {
+      automatedConditionIds: [],
+      manualConditionIds: [],
+      pendingConditionIds: [],
+      automationSummary: {}
+    };
+    
+    // Process each condition with OpenAI to determine automation type
+    const processedConditions = await Promise.all(
+      allConditions.map(async (condition) => {
+        // Skip conditions without text
+        if (!condition.text && !condition.description) {
+          console.log(`Skipping condition with ID ${condition.id} - no text content`);
+          automationResults.manualConditionIds.push(condition.id);
+          return null;
+        }
+
+        const conditionText = condition.text || condition.description;
+        const automationType = await classifyConditionWithOpenAI(conditionText);
+        
+        console.log(`Classified condition "${conditionText.substring(0, 50)}..." as: ${automationType}`);
+        
+        // Track condition in the appropriate automation category
+        if (!automationResults.automationSummary[automationType]) {
+          automationResults.automationSummary[automationType] = {
+            conditionIds: [],
+            success: false,
+            details: []
+          };
+        }
+        
+        automationResults.automationSummary[automationType].conditionIds.push(condition.id);
+        
+        // If not manual processing, add to automated conditions
+        if (automationType !== AUTOMATION_TYPES.MANUAL) {
+          automationResults.automatedConditionIds.push(condition.id);
+        } else {
+          automationResults.manualConditionIds.push(condition.id);
+        }
+        
+        // Return processed condition with automation type
+        return {
+          ...condition,
+          automationType,
+          leadId
+        };
+      })
+    );
+    
+    // Filter out null entries
+    const validProcessedConditions = processedConditions.filter(c => c !== null);
+    
+    console.log(`Successfully classified ${validProcessedConditions.length} conditions`);
+    
+    // Route conditions to their respective automations
+    const automationPromises = [];
+    
+    // Group conditions by automation type
+    const conditionsByAutomationType = validProcessedConditions.reduce((acc, condition) => {
+      if (!condition) return acc;
+      
+      if (!acc[condition.automationType]) {
+        acc[condition.automationType] = [];
+      }
+      
+      acc[condition.automationType].push(condition);
+      return acc;
+    }, {});
+    
+    // Process each automation type
+    for (const [automationType, conditions] of Object.entries(conditionsByAutomationType)) {
+      if (automationType === AUTOMATION_TYPES.MANUAL) {
+        console.log(`Skipping ${conditions.length} conditions marked for manual processing`);
+        continue;
+      }
+      
+      console.log(`Routing ${conditions.length} conditions to ${automationType}`);
+      
+      try {
+        // Process based on automation type
+        let result;
+        
+        // Handle LOE generator specifically - now using our new edge function
+        if (automationType === AUTOMATION_TYPES.LOE) {
+          console.log(`Processing ${conditions.length} conditions with LOE generator`);
+          try {
+            // Call our LOE generator function
+            const { data: loeResult, error: loeError } = await supabase.functions.invoke('loe-generator', {
+              body: { 
+                leadId, 
+                conditions 
+              }
+            });
+            
+            if (loeError) {
+              console.error("Error from LOE generator:", loeError);
+              throw new Error(`LOE generation failed: ${loeError.message || "Unknown error"}`);
+            }
+            
+            console.log("LOE generator completed successfully:", JSON.stringify(loeResult).substring(0, 200) + '...');
+            result = {
+              success: loeResult.success,
+              details: loeResult
+            };
+          } catch (loeExcept) {
+            console.error("Exception in LOE generator:", loeExcept);
+            throw loeExcept;
+          }
+        } else {
+          // For other automation types, use the mock function
+          result = await mockAutomationExecution(automationType, conditions, leadId);
+        }
+        
+        // Update the automation summary with results
+        automationResults.automationSummary[automationType].success = result.success;
+        automationResults.automationSummary[automationType].details = result.details;
+        
+        // Update condition statuses in the database
+        if (result.success) {
+          await updateConditionAutomationStatus(leadId, conditions, automationType, "completed");
+        } else {
+          await updateConditionAutomationStatus(leadId, conditions, automationType, "failed");
+          // Move failed automations to manual
+          conditions.forEach(c => {
+            const index = automationResults.automatedConditionIds.indexOf(c.id);
+            if (index !== -1) {
+              automationResults.automatedConditionIds.splice(index, 1);
+              automationResults.manualConditionIds.push(c.id);
+            }
+          });
+        }
+      } catch (error) {
+        console.error(`Error executing ${automationType}:`, error);
+        
+        // Mark automation as failed
+        automationResults.automationSummary[automationType].success = false;
+        automationResults.automationSummary[automationType].details = { error: error.message };
+        
+        // Update condition statuses in the database
+        await updateConditionAutomationStatus(leadId, conditions, automationType, "failed");
+        
+        // Move failed automations to manual
+        conditions.forEach(c => {
+          const index = automationResults.automatedConditionIds.indexOf(c.id);
+          if (index !== -1) {
+            automationResults.automatedConditionIds.splice(index, 1);
+            automationResults.manualConditionIds.push(c.id);
+          }
+        });
+      }
+    }
+    
+    console.log('Automation matcher completed successfully');
+    console.log(`Summary: ${automationResults.automatedConditionIds.length} automated, ${automationResults.manualConditionIds.length} manual`);
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        automationResults 
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  } catch (error) {
+    console.error('Error in automation-matcher function:', error);
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: error.message || "An unknown error occurred" 
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+});

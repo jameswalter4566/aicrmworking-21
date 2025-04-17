@@ -508,8 +508,6 @@ serve(async (req) => {
     } catch (adobeError) {
       console.error("❌ Adobe PDF extraction failed:", adobeError);
       console.log("⚠️ Falling back to OpenAI for direct analysis...");
-      
-      // Fallback to use OpenAI directly if Adobe extraction fails
       extractedContent = null;
     }
     
@@ -691,6 +689,28 @@ Instructions:
         console.error("❌ Error saving conditions:", saveError);
       } else {
         console.log("✅ Conditions saved successfully");
+
+        // ENHANCEMENT: Automatically trigger automation matcher
+        console.log("🤖 Triggering automation matcher...");
+        try {
+          const { data: automationResult, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+            body: { 
+              leadId,
+              conditions: extractedData
+            }
+          });
+
+          if (automationError) {
+            console.error("❌ Error triggering automation matcher:", automationError);
+          } else {
+            console.log("✅ Automation matcher completed successfully:", automationResult);
+            
+            // Add automation results to our response
+            extractedData.automationResults = automationResult.automationResults;
+          }
+        } catch (automationErr) {
+          console.error("❌ Exception triggering automation matcher:", automationErr);
+        }
       }
     }
 
