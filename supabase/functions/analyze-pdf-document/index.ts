@@ -224,15 +224,27 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
         
         if (status === "done") {
           // Look for downloadUri in outputs array (preferred) or output array (older accounts)
-          console.log("Job completed, looking for downloadUri in outputs...");
+          console.log("Job completed, looking for downloadUri...");
           
-          // Log the entire response structure for debugging
+          // Debug log the full response structure
           console.log("Response structure:", JSON.stringify(statusData, null, 2));
           
           let downloadUri = null;
           
+          // Check if downloadUri is in the content object (based on the log this is the most likely location)
+          if (statusData.content && statusData.content.downloadUri) {
+            console.log("Found downloadUri in content object");
+            downloadUri = statusData.content.downloadUri;
+          }
+          
+          // Check if downloadUri is in the resource object
+          else if (statusData.resource && statusData.resource.downloadUri) {
+            console.log("Found downloadUri in resource object");
+            downloadUri = statusData.resource.downloadUri;
+          }
+          
           // Search in outputs array (newer API response format)
-          if (statusData.outputs && Array.isArray(statusData.outputs)) {
+          else if (statusData.outputs && Array.isArray(statusData.outputs)) {
             console.log(`Found ${statusData.outputs.length} outputs`);
             
             // First try to find JSON output type (more efficient if we only need text)
@@ -251,21 +263,15 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
           }
           
           // Search in output property (older API response format)
-          if (!downloadUri && statusData.output) {
+          else if (statusData.output) {
             console.log("Checking older 'output' format");
             if (typeof statusData.output === 'object' && statusData.output.downloadUri) {
               downloadUri = statusData.output.downloadUri;
             }
           }
           
-          // Check if downloadUri is in the content object
-          if (!downloadUri && statusData.content && statusData.content.downloadUri) {
-            console.log("Found downloadUri in content object");
-            downloadUri = statusData.content.downloadUri;
-          }
-          
           // Check if downloadUri is directly on the statusData object
-          if (!downloadUri && statusData.downloadUri) {
+          else if (statusData.downloadUri) {
             console.log("Found downloadUri directly on status object");
             downloadUri = statusData.downloadUri;
           }
