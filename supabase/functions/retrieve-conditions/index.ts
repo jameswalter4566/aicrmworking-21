@@ -14,37 +14,33 @@ serve(async (req: Request) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
-    );
-    
-    // Get the leadId from URL query parameter
+    // Get the leadId from the URL query parameter
     const url = new URL(req.url);
-    const leadId = url.searchParams.get("leadId");
+    const leadId = url.searchParams.get('leadId');
 
     if (!leadId) {
       return new Response(
-        JSON.stringify({ success: false, error: "Missing lead ID parameter" }),
+        JSON.stringify({ success: false, error: "Missing leadId parameter" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
       );
     }
 
     console.log(`Retrieving conditions for lead ID: ${leadId}`);
 
-    // Fetch conditions from the database
+    // Initialize Supabase client
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
+
+    // Get loan conditions data
     const { data, error } = await supabaseClient
       .from("loan_conditions")
       .select("*")
       .eq("lead_id", leadId)
-      .single();
+      .maybeSingle();
 
-    if (error && error.code !== "PGRST116") { // PGRST116 is "not found" error
+    if (error) {
       console.error("Error retrieving conditions:", error);
       return new Response(
         JSON.stringify({ success: false, error: error.message }),
@@ -52,23 +48,12 @@ serve(async (req: Request) => {
       );
     }
 
-    // If no conditions found, return empty structure
-    if (!data) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          data: null,
-          conditions: null
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // Return the conditions if found
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        data: data,
-        conditions: data.conditions_data 
+      JSON.stringify({
+        success: true,
+        conditions: data ? data.conditions_data : null,
+        updatedAt: data ? data.updated_at : null
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

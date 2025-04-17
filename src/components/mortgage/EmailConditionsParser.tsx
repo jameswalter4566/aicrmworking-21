@@ -40,6 +40,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   const [lastError, setLastError] = useState<{code: string, message: string, details?: any} | null>(null);
   const [loanNumber, setLoanNumber] = useState(initialLoanNumber || '');
   const [emailSender, setEmailSender] = useState<string>('');
+  const [parsedConditions, setParsedConditions] = useState<ParsedConditions>({masterConditions: [], generalConditions: [], priorToFinalConditions: [], complianceConditions: []});
 
   useEffect(() => {
     if (leadId) {
@@ -114,7 +115,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       const { data, error } = await supabase.functions.invoke('update-conditions', {
         body: { 
           leadId,
-          conditions: onConditionsFound
+          conditions: parsedConditions
         }
       });
       
@@ -132,6 +133,10 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       if (data.success) {
         toast.success("Successfully saved loan conditions");
         console.log("Saved conditions:", data);
+        
+        if (data.statusUpdated) {
+          toast.info("Loan status automatically updated to Approved based on conditions");
+        }
       } else {
         const errorMessage = data.error || "Failed to save loan conditions";
         toast.error(errorMessage);
@@ -249,8 +254,29 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       if (data.success && data.conditions) {
         const enhancedConditions = processConditionsWithStatus(data.conditions);
         
+        setParsedConditions(enhancedConditions);
+        
         if (onConditionsFound) {
           onConditionsFound(enhancedConditions);
+        }
+        
+        if (leadId) {
+          try {
+            const { data: saveData, error: saveError } = await supabase.functions.invoke('update-conditions', {
+              body: { 
+                leadId,
+                conditions: enhancedConditions
+              }
+            });
+            
+            if (saveError) {
+              console.error("Error saving parsed conditions:", saveError);
+            } else if (saveData.statusUpdated) {
+              toast.info("Loan status automatically updated to Approved based on conditions");
+            }
+          } catch (saveErr) {
+            console.error("Exception saving conditions:", saveErr);
+          }
         }
         
         toast.success("Successfully extracted conditions from document");

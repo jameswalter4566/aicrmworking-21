@@ -35,6 +35,25 @@ serve(async (req: Request) => {
 
     console.log(`Updating conditions for lead ID: ${leadId}`);
 
+    // Check if this is the first time conditions are being added
+    const { data: existingConditions, error: fetchError } = await supabaseClient
+      .from("loan_conditions")
+      .select("*")
+      .eq("lead_id", leadId)
+      .maybeSingle();
+    
+    const isFirstConditionUpdate = !existingConditions || 
+      !existingConditions.conditions_data || 
+      Object.keys(existingConditions.conditions_data).length === 0;
+    
+    // Check if the incoming conditions have any actual conditions
+    const hasConditions = conditions && (
+      (conditions.masterConditions && conditions.masterConditions.length > 0) ||
+      (conditions.generalConditions && conditions.generalConditions.length > 0) ||
+      (conditions.priorToFinalConditions && conditions.priorToFinalConditions.length > 0) ||
+      (conditions.complianceConditions && conditions.complianceConditions.length > 0)
+    );
+
     // Store conditions in the database
     const { data, error } = await supabaseClient
       .from("loan_conditions")
@@ -54,8 +73,38 @@ serve(async (req: Request) => {
       );
     }
 
+    // If this is the first time conditions are added and there are actual conditions, update loan status to Approved
+    if (isFirstConditionUpdate && hasConditions) {
+      console.log(`First time conditions detected for lead ${leadId}. Updating loan status to Approved`);
+      
+      try {
+        // Call the update-loan-progress function to set status to "approved"
+        const { data: progressData, error: progressError } = await supabaseClient.functions.invoke('update-loan-progress', {
+          body: { 
+            leadId, 
+            currentStep: "approved",
+            notes: "Automatically set to Approved based on conditions detected"
+          }
+        });
+        
+        if (progressError) {
+          console.error("Error updating loan progress:", progressError);
+          // Continue with the response even if status update failed
+        } else {
+          console.log("Successfully updated loan status to Approved");
+        }
+      } catch (progressErr) {
+        console.error("Exception during status update:", progressErr);
+        // Continue with the response even if status update failed
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, data }),
+      JSON.stringify({ 
+        success: true, 
+        data,
+        statusUpdated: isFirstConditionUpdate && hasConditions
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
