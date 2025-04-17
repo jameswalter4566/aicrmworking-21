@@ -129,9 +129,11 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   let status = "in progress";
   let downloadUri = null;
+  let attempt = 0;
+  const maxAttempts = 20; // 40 seconds total wait time
   
   // Poll every 2 seconds until done or failed
-  while (status === "in progress") {
+  while (status === "in progress" && attempt < maxAttempts) {
     const statusResponse = await fetch(jobLocation, {
       method: 'GET',
       headers: {
@@ -157,10 +159,11 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
     
     // Wait 2 seconds before polling again
     await new Promise(resolve => setTimeout(resolve, 2000));
+    attempt++;
   }
   
   if (!downloadUri) {
-    throw new Error("No download URI available");
+    throw new Error("PDF extraction timed out or no download URI available");
   }
   
   return downloadUri;
