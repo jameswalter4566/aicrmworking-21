@@ -16,6 +16,7 @@ import OrderServiceSection from "@/components/mortgage/OrderServiceSection";
 import AILoanOfficerAssist from "@/components/mortgage/AILoanOfficerAssist";
 import PDFDropZone from "@/components/mortgage/PDFDropZone";
 import { ProcessorActionHeader } from "@/components/mortgage/ProcessorActionHeader";
+import { useLoanProgress } from "@/hooks/use-loan-progress";
 
 interface LoanApplication {
   id: string;
@@ -113,6 +114,7 @@ const ProcessorAssistViewer = () => {
   const [activeSection, setActiveSection] = useState("conditions");
   const [parsedConditions, setParsedConditions] = useState<ParsedConditions | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const { updateLoanProgress } = useLoanProgress();
   
   useEffect(() => {
     if (id) {
@@ -306,10 +308,27 @@ const ProcessorAssistViewer = () => {
               toast.error("Failed to save extracted conditions");
             } else {
               setParsedConditions(extractedConditions);
-              toast.success("Successfully extracted and saved conditions from PDF");
               
-              if (saveData.statusUpdated) {
-                toast.info("Loan status automatically updated to Approved based on conditions");
+              try {
+                const result = await updateLoanProgress(id, "approved", "Automatically set to Approved based on conditions detected in PDF");
+                
+                if (result.success) {
+                  toast.success("Successfully extracted conditions and updated loan status to Approved");
+                  
+                  if (loanApplication) {
+                    setLoanApplication({
+                      ...loanApplication,
+                      loanStatus: "Approved",
+                      currentStep: "approved"
+                    });
+                  }
+                } else {
+                  console.error("Error updating loan status:", result.error);
+                  toast.warning("Conditions extracted but failed to update loan status to Approved");
+                }
+              } catch (updateErr: any) {
+                console.error("Exception updating loan status:", updateErr);
+                toast.warning("Conditions extracted but could not update loan status");
               }
             }
           } catch (saveErr) {

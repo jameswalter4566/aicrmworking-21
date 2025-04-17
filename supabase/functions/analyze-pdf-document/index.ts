@@ -210,7 +210,7 @@ Return all extracted and classified data as structured **JSON**, organized by se
           processedData.complianceConditions.length > 0
         )) {
           try {
-            // Get existing mortgage data
+            // Save the conditions data
             const { error: saveError } = await supabase
               .from('loan_conditions')
               .upsert({
@@ -226,36 +226,25 @@ Return all extracted and classified data as structured **JSON**, organized by se
             } else {
               console.log("Successfully saved conditions data");
               
-              // Check if this is the first time conditions are being added
-              const { data: existingConditions, error: fetchError } = await supabase
-                .from("loan_conditions")
-                .select("created_at, updated_at")
-                .eq("lead_id", leadId)
-                .single();
+              // Always update the loan status to Approved when conditions are detected
+              console.log(`Updating loan status for lead ${leadId} to Approved`);
                 
-              const isFirstConditionUpdate = !fetchError && existingConditions && 
-                existingConditions.created_at === existingConditions.updated_at;
-                
-              if (isFirstConditionUpdate) {
-                console.log(`First time conditions detected for lead ${leadId}. Updating loan status to Approved`);
-                
-                try {
-                  const { data: progressData, error: progressError } = await supabase.functions.invoke('update-loan-progress', {
-                    body: { 
-                      leadId, 
-                      currentStep: "approved",
-                      notes: "Automatically set to Approved based on conditions detected in PDF"
-                    }
-                  });
-                  
-                  if (progressError) {
-                    console.error("Error updating loan progress:", progressError);
-                  } else {
-                    console.log("Successfully updated loan status to Approved");
+              try {
+                const { data: progressData, error: progressError } = await supabase.functions.invoke('update-loan-progress', {
+                  body: { 
+                    leadId, 
+                    currentStep: "approved",
+                    notes: "Automatically set to Approved based on conditions detected in PDF"
                   }
-                } catch (progressErr) {
-                  console.error("Exception during status update:", progressErr);
+                });
+                
+                if (progressError) {
+                  console.error("Error updating loan progress:", progressError);
+                } else {
+                  console.log("Successfully updated loan status to Approved");
                 }
+              } catch (progressErr) {
+                console.error("Exception during status update:", progressErr);
               }
             }
           } catch (err) {
@@ -437,7 +426,7 @@ Return all extracted and classified data as structured **JSON**, organized by se
           processedData.complianceConditions.length > 0
         )) {
           try {
-            // Get existing mortgage data
+            // Save the conditions data
             const { error: saveError } = await supabase
               .from('loan_conditions')
               .upsert({
@@ -453,36 +442,25 @@ Return all extracted and classified data as structured **JSON**, organized by se
             } else {
               console.log("Successfully saved conditions data");
               
-              // Check if this is the first time conditions are being added
-              const { data: existingConditions, error: fetchError } = await supabase
-                .from("loan_conditions")
-                .select("created_at, updated_at")
-                .eq("lead_id", leadId)
-                .single();
+              // Always update the loan status to Approved when conditions are detected
+              console.log(`Updating loan status for lead ${leadId} to Approved`);
                 
-              const isFirstConditionUpdate = !fetchError && existingConditions && 
-                existingConditions.created_at === existingConditions.updated_at;
-                
-              if (isFirstConditionUpdate) {
-                console.log(`First time conditions detected for lead ${leadId}. Updating loan status to Approved`);
-                
-                try {
-                  const { data: progressData, error: progressError } = await supabase.functions.invoke('update-loan-progress', {
-                    body: { 
-                      leadId, 
-                      currentStep: "approved",
-                      notes: "Automatically set to Approved based on conditions detected in PDF"
-                    }
-                  });
-                  
-                  if (progressError) {
-                    console.error("Error updating loan progress:", progressError);
-                  } else {
-                    console.log("Successfully updated loan status to Approved");
+              try {
+                const { data: progressData, error: progressError } = await supabase.functions.invoke('update-loan-progress', {
+                  body: { 
+                    leadId, 
+                    currentStep: "approved",
+                    notes: "Automatically set to Approved based on conditions detected in PDF"
                   }
-                } catch (progressErr) {
-                  console.error("Exception during status update:", progressErr);
+                });
+                
+                if (progressError) {
+                  console.error("Error updating loan progress:", progressError);
+                } else {
+                  console.log("Successfully updated loan status to Approved");
                 }
+              } catch (progressErr) {
+                console.error("Exception during status update:", progressErr);
               }
             }
           } catch (err) {
