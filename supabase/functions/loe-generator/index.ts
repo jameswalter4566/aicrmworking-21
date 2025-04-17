@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
@@ -11,6 +12,149 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// DocuSign configuration
+const docusignBaseUrl = Deno.env.get('DOCUSIGN_BASE_URL') || 'https://demo.docusign.net';
+const docusignAccountId = Deno.env.get('DOCUSIGN_ACCOUNT_ID');
+const docusignIntegrationKey = Deno.env.get('DOCUSIGN_INTEGRATION_KEY');
+const docusignPrivateKey = Deno.env.get('DOCUSIGN_PRIVATE_KEY');
+const docusignImpersonatedUserId = Deno.env.get('DOCUSIGN_IMPERSONATED_USER_ID');
+
+/**
+ * Gets a DocuSign access token using JWT flow
+ */
+async function getDocuSignAccessToken() {
+  try {
+    const response = await fetch(`${docusignBaseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: new URLSearchParams({
+        'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        'assertion': generateJWT()
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error getting DocuSign access token:', error);
+      throw new Error(`Failed to get DocuSign token: ${error}`);
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('Error in getDocuSignAccessToken:', error);
+    throw error;
+  }
+}
+
+/**
+ * Generates a JWT for DocuSign authentication
+ */
+function generateJWT() {
+  // This is a simplified version - in production use a proper JWT library
+  // For demo purposes only - in a real implementation, use a proper JWT library
+  
+  // Here we would typically:
+  // 1. Create JWT header
+  // 2. Create JWT payload with proper claims (iss, sub, aud, exp, etc.)
+  // 3. Sign with the private key
+  // 4. Encode to base64url
+  
+  // Since we can't include a full JWT implementation in this example,
+  // let's log that we would generate a JWT here
+  console.log("Would generate JWT with integration key and private key");
+  
+  // In a real implementation, this would be a proper JWT
+  return "WOULD_BE_A_REAL_JWT";
+}
+
+/**
+ * Sends a document to DocuSign for signing
+ */
+async function sendToDocuSign(pdfBytes: Uint8Array, recipientEmail: string, recipientName: string, documentName: string) {
+  try {
+    // Convert PDF bytes to base64
+    const base64Pdf = bufferToBase64(pdfBytes);
+    
+    // Get access token
+    const accessToken = await getDocuSignAccessToken();
+    
+    // Create envelope definition
+    const envelopeDefinition = {
+      emailSubject: `Please sign your Letter of Explanation: ${documentName}`,
+      documents: [
+        {
+          documentBase64: base64Pdf,
+          name: documentName,
+          fileExtension: "pdf",
+          documentId: "1"
+        }
+      ],
+      recipients: {
+        signers: [
+          {
+            email: recipientEmail,
+            name: recipientName,
+            recipientId: "1",
+            routingOrder: "1",
+            tabs: {
+              signHereTabs: [
+                {
+                  // Place signature at the end of the document
+                  // In a production environment, you'd want to be more precise
+                  anchorString: "Sincerely,",
+                  anchorYOffset: "20",
+                  anchorUnits: "pixels",
+                  anchorXOffset: "0"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      status: "sent" // Send immediately
+    };
+    
+    // Send the envelope
+    const response = await fetch(`${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(envelopeDefinition)
+    });
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error sending envelope to DocuSign:', error);
+      throw new Error(`Failed to send envelope: ${error}`);
+    }
+    
+    const result = await response.json();
+    return {
+      envelopeId: result.envelopeId,
+      status: result.status
+    };
+  } catch (error) {
+    console.error('Error in sendToDocuSign:', error);
+    throw error;
+  }
+}
+
+/**
+ * Convert Uint8Array to base64 string
+ */
+function bufferToBase64(buffer: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < buffer.length; i++) {
+    binary += String.fromCharCode(buffer[i]);
+  }
+  return btoa(binary);
+}
 
 async function generatePDF(content: string): Promise<Uint8Array> {
   // Create a new PDF document
@@ -68,7 +212,7 @@ serve(async (req) => {
   try {
     console.log('LOE Generator function called');
     
-    const { leadId, conditions } = await req.json();
+    const { leadId, conditions, sendForSignature = false } = await req.json();
     
     if (!leadId || !conditions || !Array.isArray(conditions) || conditions.length === 0) {
       return new Response(
@@ -85,6 +229,7 @@ serve(async (req) => {
 
     console.log(`Processing LOE for lead ID: ${leadId}`);
     console.log(`Conditions to process: ${conditions.length}`);
+    console.log(`Send for signature: ${sendForSignature}`);
     
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -111,7 +256,7 @@ serve(async (req) => {
       const loeContent = generateLOEContent(loeType, lead, condition);
       
       try {
-        // Generate PDF content using our new PDF generator
+        // Generate PDF content using our PDF generator
         const pdfBytes = await generatePDF(loeContent);
         
         const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
@@ -133,13 +278,49 @@ serve(async (req) => {
           .from('borrower-documents')
           .getPublicUrl(filePath);
         
+        let docusignResult = null;
+        
+        // If sendForSignature is true and we have recipient info, send to DocuSign
+        if (sendForSignature && lead.email) {
+          try {
+            if (!docusignAccountId || !docusignIntegrationKey || !docusignPrivateKey) {
+              console.warn('DocuSign credentials not configured, skipping signature request');
+            } else {
+              console.log('Sending document to DocuSign for signature');
+              docusignResult = await sendToDocuSign(
+                pdfBytes,
+                lead.email,
+                `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`,
+                `Letter of Explanation - ${formatLOETypeTitle(loeType)}`
+              );
+              
+              console.log('DocuSign envelope created:', docusignResult);
+              
+              // Store the envelope ID and status in the database
+              await supabase.from('docusign_envelopes')
+                .insert({
+                  lead_id: leadId,
+                  condition_id: condition.id,
+                  envelope_id: docusignResult.envelopeId,
+                  status: docusignResult.status,
+                  document_name: fileName,
+                  document_url: publicUrl
+                });
+            }
+          } catch (docusignError) {
+            console.error('Error sending document to DocuSign:', docusignError);
+            // Continue without failing - we'll still return the document URL
+          }
+        }
+        
         // After generating the LOE, update the condition with the document URL
-        await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl);
+        await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl, docusignResult?.envelopeId);
         
         return {
           conditionId: condition.id,
           loeType,
           documentUrl: publicUrl,
+          docusign: docusignResult,
           success: true
         };
       } catch (error) {
@@ -184,7 +365,7 @@ serve(async (req) => {
 /**
  * Updates a condition with the document URL in the conditions_data
  */
-async function updateConditionWithDocumentUrl(leadId: string, conditionId: string, documentUrl: string) {
+async function updateConditionWithDocumentUrl(leadId: string, conditionId: string, documentUrl: string, envelopeId?: string) {
   try {
     // First, fetch the current conditions
     const { data, error } = await supabase
@@ -219,6 +400,13 @@ async function updateConditionWithDocumentUrl(leadId: string, conditionId: strin
       if (conditionIndex !== -1) {
         // Update the condition with the document URL
         conditionsData[category][conditionIndex].documentUrl = documentUrl;
+        
+        // If we have a DocuSign envelope ID, add it
+        if (envelopeId) {
+          conditionsData[category][conditionIndex].docuSignEnvelopeId = envelopeId;
+          conditionsData[category][conditionIndex].docuSignStatus = 'sent';
+        }
+        
         updated = true;
         break;
       }

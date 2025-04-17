@@ -4,26 +4,63 @@ project_id = "imrmboyczebjlbnkgjns"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage"]
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
 port = 54322
+shadow_port = 54320
+major_version = 15
 
-[studio]
-port = 54323
-
-[inbucket]
-port = 54324
-
-[auth]
-enabled = true
-
-[storage]
-enabled = true
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
 
 [realtime]
 enabled = true
 
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[auth.email]
+enable_confirmations = false
+
+[auth.sms]
+enabled = false
+
 [functions]
-  [functions.loe-generator]
-  verify_jwt = true
+enabled = true
+port = 54325
+
+[vector]
+enabled = false
+port = 54327
+
+[observability.metrics]
+enabled = false
+port = 54326
+
+[observability.traces]
+enabled = false
+port = 54328
+
+[ai]
+enabled = false
+port = 54330

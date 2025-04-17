@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,20 @@ interface EmailConditionsParserProps {
   loanNumber: string;
   leadId: string;
   onConditionsFound: (conditions: any) => void;
+}
+
+interface ConditionType {
+  id: string;
+  text: string;
+  [key: string]: any;
+}
+
+interface ConditionsData {
+  masterConditions?: ConditionType[];
+  generalConditions?: ConditionType[];
+  priorToFinalConditions?: ConditionType[];
+  complianceConditions?: ConditionType[];
+  [key: string]: ConditionType[] | undefined;
 }
 
 const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({ 
@@ -76,7 +91,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       updateStepStatus("parse", "completed");
       updateStepStatus("extract", "processing");
       
-      const conditions = data?.conditions || {};
+      const conditions = data?.conditions as ConditionsData || {};
       const totalConditionsCount = Object.values(conditions).reduce((sum: number, arr: any[]) => {
         return sum + (Array.isArray(arr) ? arr.length : 0);
       }, 0);
