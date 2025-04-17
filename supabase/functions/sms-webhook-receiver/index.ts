@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
 import * as base64 from "https://deno.land/std@0.177.0/encoding/base64.ts";
@@ -25,6 +26,7 @@ serve(async (req) => {
     
     console.log(`[${requestId}] SMS Webhook Received at ${requestTimestamp}`);
     console.log(`[${requestId}] Request Method: ${req.method}`);
+    console.log(`[${requestId}] Request URL: ${req.url}`);
     console.log(`[${requestId}] Request Headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
 
     // Get SMS Gateway API key for signature verification
@@ -254,50 +256,40 @@ serve(async (req) => {
 
     // Immediately process the message with AI agent
     try {
-      // Just store the message but don't process it automatically
-      // We'll process it manually through the admin UI to avoid overloading during testing
-      console.log(`[${requestId}] Message stored successfully with ID: ${webhookId}`);
+      // Process message with OpenAI directly here
+      console.log(`[${requestId}] Processing message with OpenAI directly`);
       
-      console.log(`[${requestId}] Webhook Processing Status: Completed Successfully`);
-      console.log(`[${requestId}] Stored Webhook ID: ${webhookId}`);
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: 'Webhook received and stored successfully',
-          webhookId,
-          requestId,
-          note: 'Message can be processed manually from the admin interface'
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-      
-      /* Commenting out automatic processing until we debug the issue
-      // Call AI processor function
-      console.log(`[${requestId}] Calling AI processor for webhook ${webhookId}`);
-      const processorResponse = await supabase.functions.invoke('ai-sms-agent', {
-        body: {
-          mode: 'process-specific',
-          messageId: webhookId
-        }
-      });
-      
-      console.log(`[${requestId}] AI processor response:`, JSON.stringify(processorResponse));
-      
-      if (!processorResponse.data?.success) {
-        throw new Error(processorResponse.data?.error || 'Unknown error processing message');
+      // Get OpenAI API key from environment variables
+      const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+      if (!openAiApiKey) {
+        throw new Error("OpenAI API key is not configured");
       }
       
-      console.log(`[${requestId}] AI processing completed successfully for webhook ${webhookId}`);
+      // Generate AI response using OpenAI
+      const responseMessage = await generateAIResponse(message, openAiApiKey, requestId);
+      
+      // Send the SMS response
+      console.log(`[${requestId}] Sending SMS response to ${phoneNumber}`);
+      const sendResult = await sendSMSResponse(phoneNumber, responseMessage, supabase, requestId);
+      
+      // Mark the webhook as processed
+      await supabase
+        .from('sms_webhooks')
+        .update({
+          processed: true,
+          ai_response: responseMessage,
+          processed_at: new Date().toISOString()
+        })
+        .eq('id', webhookId);
+      
+      console.log(`[${requestId}] Webhook Processing Complete: Message processed and response sent`);
       
       return new Response(
         JSON.stringify({
           success: true,
           message: 'Webhook received and processed successfully',
           webhookId,
+          aiResponse: responseMessage,
           requestId
         }),
         {
@@ -305,7 +297,6 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
-      */
     } catch (processingError) {
       console.error(`[${requestId}] Error processing message with AI:`, processingError);
       
@@ -337,3 +328,78 @@ serve(async (req) => {
     );
   }
 });
+
+// Generate an AI response using OpenAI
+async function generateAIResponse(messageContent: string, openAiApiKey: string, requestId: string): Promise<string> {
+  try {
+    console.log(`[${requestId}] Generating AI response for message: "${messageContent.substring(0, 50)}${messageContent.length > 50 ? '...' : ''}"`);
+    
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAiApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', // Using the most efficient model for quick responses
+        messages: [
+          {
+            role: 'system',
+            content: `You are an AI assistant for a mortgage company. 
+            Your primary role is to provide helpful, professional responses to client inquiries about their mortgage applications.
+            Keep responses concise (under 160 characters when possible), professional, and helpful.
+            If someone asks a question that requires specific details about their loan that you don't have, politely let them know that you'll forward their query to their loan officer.
+            Never make up information about specific loan details, rates, or timelines.
+            Always maintain a helpful, reassuring tone.`
+          },
+          {
+            role: 'user',
+            content: messageContent
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 300
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`[${requestId}] OpenAI API Error:`, errorData);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log(`[${requestId}] AI response generated successfully`);
+    return data.choices[0].message.content.trim();
+    
+  } catch (error) {
+    console.error(`[${requestId}] Error generating AI response:`, error);
+    return "Thank you for your message. A loan officer will review your request and get back to you shortly.";
+  }
+}
+
+// Send an SMS response using the SMS Gateway API
+async function sendSMSResponse(phoneNumber: string, message: string, supabase: any, requestId: string): Promise<void> {
+  try {
+    console.log(`[${requestId}] Sending SMS response to ${phoneNumber}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+    
+    // Call our existing SMS send function
+    const { data, error } = await supabase.functions.invoke('sms-send-single', {
+      body: { 
+        phoneNumber, 
+        message,
+        prioritize: true 
+      }
+    });
+    
+    if (error || !data?.success) {
+      throw new Error(error?.message || data?.error || 'SMS send failed');
+    }
+    
+    console.log(`[${requestId}] SMS response sent successfully to ${phoneNumber} with ID: ${data?.messageId}`);
+    
+  } catch (error) {
+    console.error(`[${requestId}] Error sending SMS response:`, error);
+    throw new Error(`Failed to send SMS response: ${error.message}`);
+  }
+}
