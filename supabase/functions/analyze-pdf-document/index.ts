@@ -3,8 +3,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import * as pdfLib from "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/+esm";
 
-// Get the pdfjs object properly for Deno
-const pdfjs = pdfLib.default;
+// Configure PDF.js for a Node.js/Deno environment
+// IMPORTANT: PDF.js needs to be configured for headless environments
+const pdfjsLib = pdfLib.default;
+
+// Required for Deno environment
+// @ts-ignore - Deno doesn't have a global 'window' or 'document'
+globalThis.navigator = { userAgent: "deno" };
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,11 +57,11 @@ serve(async (req) => {
     
     console.log("🔍 Loading PDF document...");
     
-    // Set worker source for PDF.js
-    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+    // Set up the worker for PDF.js in Deno environment
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
     
     // Load the PDF document with enhanced options
-    const loadingTask = pdfjs.getDocument({
+    const loadingTask = pdfjsLib.getDocument({
       data: new Uint8Array(pdfArrayBuffer),
       // Enable all features to ensure maximum content extraction
       disableFontFace: false,
@@ -64,6 +69,7 @@ serve(async (req) => {
       cMapPacked: true,
       standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/"
     });
+    
     const pdfDocument = await loadingTask.promise;
     
     console.log(`📄 PDF loaded successfully. Pages: ${pdfDocument.numPages}`);
@@ -81,12 +87,57 @@ serve(async (req) => {
       // Get text content with more options
       const textContent = await page.getTextContent({
         normalizeWhitespace: false,  // Don't normalize whitespace to preserve exact content
-        disableCombineTextItems: true // Don't combine text items to maintain verbatim content
+        disableCombineTextItems: false // Combining items helps with better flow in headless environment
       });
       
       // Process text items with positioning to maintain proper order and spacing
       const textItems = textContent.items;
-      const pageText = buildTextFromItems(textItems, viewport);
+      let lastY = null;
+      let lastX = null;
+      let pageText = '';
+      
+      // Sort items by vertical position first, then by horizontal position
+      const sortedItems = [...textItems].sort((a, b) => {
+        // Get y-coordinate in page space
+        const yDiff = b.transform[5] - a.transform[5];
+        
+        // If items are on different lines (using a small threshold)
+        if (Math.abs(yDiff) > 5) {
+          return yDiff; // Sort by y-coordinate (top to bottom)
+        } else {
+          // If on same line, sort by x-coordinate (left to right)
+          return a.transform[4] - b.transform[4];
+        }
+      });
+      
+      // Process each text item
+      for (const item of sortedItems) {
+        if (!item.str) continue; // Skip empty items
+        
+        // Get coordinates
+        const x = item.transform[4];
+        const y = item.transform[5];
+        
+        // Insert appropriate spacing
+        if (lastY !== null) {
+          // If significant change in y-position, add a new line
+          if (Math.abs(y - lastY) > 5) {
+            pageText += '\n';
+            lastX = null; // Reset x position after line break
+          } 
+          // If on the same line but with significant horizontal gap, add space
+          else if (lastX !== null && (x - lastX) > (item.width || 10)) {
+            pageText += ' ';
+          }
+        }
+        
+        // Add the text
+        pageText += item.str;
+        
+        // Update last positions
+        lastX = x + (item.width || 0);
+        lastY = y;
+      }
       
       pageTexts.push({
         pageNumber: pageNum,
@@ -219,59 +270,3 @@ Instructions:
     );
   }
 });
-
-/**
- * Build text from PDF.js text items, preserving their order and spacing
- * This function maintains the correct reading order of text
- */
-function buildTextFromItems(textItems: any[], viewport: any): string {
-  // Sort items by vertical position first, then by horizontal position
-  // This helps to maintain reading order (top to bottom, left to right)
-  const sortedItems = [...textItems].sort((a, b) => {
-    // Get y-coordinate in page space
-    const yDiff = b.transform[5] - a.transform[5];
-    
-    // If items are on different lines (using a small threshold)
-    if (Math.abs(yDiff) > 5) {
-      return yDiff; // Sort by y-coordinate (top to bottom)
-    } else {
-      // If on same line, sort by x-coordinate (left to right)
-      return a.transform[4] - b.transform[4];
-    }
-  });
-  
-  let lastY: number | null = null;
-  let lastX: number | null = null;
-  let text = '';
-  
-  // Process each text item
-  for (const item of sortedItems) {
-    if (!item.str) continue; // Skip empty items
-    
-    // Get coordinates
-    const x = item.transform[4];
-    const y = item.transform[5];
-    
-    // Insert appropriate spacing
-    if (lastY !== null) {
-      // If significant change in y-position, add a new line
-      if (Math.abs(y - lastY) > 5) {
-        text += '\n';
-        lastX = null; // Reset x position after line break
-      } 
-      // If on the same line but with significant horizontal gap, add space
-      else if (lastX !== null && (x - lastX) > (item.width || 10)) {
-        text += ' ';
-      }
-    }
-    
-    // Add the text
-    text += item.str;
-    
-    // Update last positions
-    lastX = x + (item.width || 0);
-    lastY = y;
-  }
-  
-  return text;
-}

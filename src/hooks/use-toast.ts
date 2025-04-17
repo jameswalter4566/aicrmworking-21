@@ -2,71 +2,83 @@
 import { toast as sonnerToast } from "sonner";
 
 export type Toast = {
+  id?: string;
   title?: string;
   description?: string;
+  action?: React.ReactNode;
   variant?: "default" | "destructive";
 };
 
 // Define a more comprehensive toast function interface
 interface ToastFunction {
   (message: string): void;
-  (options: { title: string; description?: string; variant?: "default" | "destructive" }): void;
-  success: (message: string | { title: string; description?: string }) => void;
-  error: (message: string | { title: string; description?: string }) => void;
-  info: (message: string | { title: string; description?: string }) => void;
-  warning: (message: string | { title: string; description?: string }) => void;
+  (options: { title: string; description?: string; variant?: "default" | "destructive"; duration?: number }): void;
+  success: (message: string | { title: string; description?: string; duration?: number }) => void;
+  error: (message: string | { title: string; description?: string; duration?: number }) => void;
+  info: (message: string | { title: string; description?: string; duration?: number }) => void;
+  warning: (message: string | { title: string; description?: string; duration?: number }) => void;
   custom: (title: string, description?: string, variant?: "default" | "destructive") => string;
   dismiss: (toastId?: string) => void;
 }
 
-const toast = ((messageOrOptions: string | { title: string; description?: string; variant?: "default" | "destructive" }) => {
+const toast = ((messageOrOptions: string | { title: string; description?: string; variant?: "default" | "destructive"; duration?: number }) => {
   if (typeof messageOrOptions === 'string') {
     sonnerToast(messageOrOptions);
   } else {
-    sonnerToast(messageOrOptions.title, {
-      description: messageOrOptions.description,
+    const { title, description, variant, duration } = messageOrOptions;
+    sonnerToast(title, {
+      description,
+      duration,
       // Use default variant if not specified
-      ...(messageOrOptions.variant && { className: `toast-${messageOrOptions.variant}` }),
+      ...(variant && { className: `toast-${variant}` }),
     });
   }
 }) as ToastFunction;
 
-toast.success = (messageOrOptions: string | { title: string; description?: string }) => {
+toast.success = (messageOrOptions: string | { title: string; description?: string; duration?: number }) => {
   if (typeof messageOrOptions === 'string') {
     sonnerToast.success(messageOrOptions);
   } else {
-    sonnerToast.success(messageOrOptions.title, {
-      description: messageOrOptions.description,
+    const { title, description, duration } = messageOrOptions;
+    sonnerToast.success(title, {
+      description,
+      duration,
     });
   }
 };
 
-toast.error = (messageOrOptions: string | { title: string; description?: string }) => {
+toast.error = (messageOrOptions: string | { title: string; description?: string; duration?: number }) => {
   if (typeof messageOrOptions === 'string') {
     sonnerToast.error(messageOrOptions);
   } else {
-    sonnerToast.error(messageOrOptions.title, {
-      description: messageOrOptions.description,
+    const { title, description, duration } = messageOrOptions;
+    sonnerToast.error(title, {
+      description,
+      duration,
     });
   }
 };
 
-toast.info = (messageOrOptions: string | { title: string; description?: string }) => {
+toast.info = (messageOrOptions: string | { title: string; description?: string; duration?: number }) => {
   if (typeof messageOrOptions === 'string') {
     sonnerToast.info(messageOrOptions);
   } else {
-    sonnerToast.info(messageOrOptions.title, {
-      description: messageOrOptions.description,
+    const { title, description, duration } = messageOrOptions;
+    sonnerToast.info(title, {
+      description,
+      duration,
     });
   }
 };
 
-toast.warning = (messageOrOptions: string | { title: string; description?: string }) => {
+toast.warning = (messageOrOptions: string | { title: string; description?: string; duration?: number }) => {
   if (typeof messageOrOptions === 'string') {
     sonnerToast.warning(messageOrOptions);
   } else {
-    sonnerToast.warning(messageOrOptions.title, {
-      description: messageOrOptions.description,
+    const { title, description, duration } = messageOrOptions;
+    sonnerToast.warning(title, {
+      description,
+      duration,
     });
   }
 };
@@ -74,7 +86,7 @@ toast.warning = (messageOrOptions: string | { title: string; description?: strin
 toast.custom = (title: string, description?: string, variant: "default" | "destructive" = "default"): string => {
   return sonnerToast(title, {
     description,
-  });
+  }) as string;
 };
 
 toast.dismiss = (toastId?: string) => {
