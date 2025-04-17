@@ -67,8 +67,8 @@ serve(async (req) => {
     console.log(`[${requestId}] Retrieving loan progress for lead ${leadId}`);
 
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get current mortgage data
@@ -118,7 +118,8 @@ serve(async (req) => {
     const stepIndex = LOAN_PROGRESS_STEPS.indexOf(currentStep);
     const normalizedIndex = stepIndex !== -1 ? stepIndex : 0;
     
-    // Calculate progress percentage
+    // Calculate progress percentage - make sure the current step is fully covered
+    // by adding 1 to the index and dividing by total steps
     const progressPercentage = ((normalizedIndex + 1) / LOAN_PROGRESS_STEPS.length) * 100;
 
     console.log(`[${requestId}] Retrieved loan progress for lead ${leadId}: ${currentStep} (${progressPercentage.toFixed(1)}%)`);

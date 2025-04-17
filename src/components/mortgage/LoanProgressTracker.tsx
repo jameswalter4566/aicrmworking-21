@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -107,14 +108,25 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
           return;
         }
 
+        // Calculate progress percentage correctly - we want the FULL current step to be covered
+        const currentStepIndex = data.data.stepIndex;
+        const totalSteps = checkpoints.length;
+        
+        // Calculate progress to include the entire current step
+        // Add 1 to currentStepIndex to make sure the current checkpoint is fully covered
+        const progressPercentage = ((currentStepIndex + 1) / totalSteps) * 100;
+        
         setProgressData({
           currentStep: data.data.currentStep,
-          progressPercentage: data.data.progressPercentage
+          progressPercentage: progressPercentage
         });
         
         // Notify parent component if callback provided
         if (onProgressLoaded) {
-          onProgressLoaded(data.data);
+          onProgressLoaded({
+            ...data.data,
+            progressPercentage: progressPercentage
+          });
         }
       } catch (err) {
         console.error("Unexpected error fetching loan progress:", err);
