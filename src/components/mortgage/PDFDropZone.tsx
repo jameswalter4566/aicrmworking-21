@@ -120,6 +120,8 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         .from('borrower-documents')
         .getPublicUrl(`leads/${leadId}/${uniqueFileName}`);
       
+      console.log(`Document uploaded successfully. Starting analysis...`);
+      
       // Call analyze-pdf-document edge function
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-pdf-document', {
         body: { 
@@ -130,56 +132,21 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       });
       
       if (analysisError) {
+        console.error("Error analyzing document:", analysisError);
         throw new Error(`Error analyzing document: ${analysisError.message}`);
       }
       
-      // If document was analyzed successfully and contains conditions, run automation matcher
-      if (analysisData.success && analysisData.data) {
-        // Extract conditions from analysisData
-        const conditions = {
-          masterConditions: analysisData.data.masterConditions || [],
-          generalConditions: analysisData.data.generalConditions || [],
-          priorToFinalConditions: analysisData.data.priorToFinalConditions || [],
-          complianceConditions: analysisData.data.complianceConditions || []
-        };
-        
-        // Only call automation-matcher if we have conditions to process
-        const totalConditions = 
-          conditions.masterConditions.length + 
-          conditions.generalConditions.length + 
-          conditions.priorToFinalConditions.length + 
-          conditions.complianceConditions.length;
-        
-        if (totalConditions > 0) {
-          toast.info(`Processing ${totalConditions} conditions through automation...`);
-          
-          console.log("Calling automation-matcher with conditions:", conditions);
-          
-          // Call automation-matcher with the extracted conditions
-          try {
-            const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
-              body: { 
-                leadId,
-                conditions
-              }
-            });
-            
-            if (automationError) {
-              console.error("Error from automation-matcher:", automationError);
-              toast.error("Failed to process conditions automatically");
-            } else if (automationData.success) {
-              const automatedCount = automationData.automationResults?.automatedConditionIds?.length || 0;
-              toast.success(`${automatedCount} conditions were processed automatically`);
-              console.log("Automation results:", automationData);
-            }
-          } catch (autoError) {
-            console.error("Error calling automation-matcher:", autoError);
-            toast.error("Failed to run automation process");
-          }
-        }
-      }
+      console.log("Document analysis complete:", analysisData);
       
-      toast.success('Document successfully analyzed!');
+      // The automation-matcher should now be triggered automatically within the analyze-pdf-document function
+      // We just need to check if it was successful
+      
+      if (analysisData && analysisData.success) {
+        toast.success('Document successfully analyzed and conditions processed!');
+      } else {
+        console.warn("Document analysis returned unexpected response:", analysisData);
+        toast.warning('Document processed but with warnings. Check the conditions.');
+      }
       
     } catch (error: any) {
       console.error('Error processing document:', error);

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
@@ -243,6 +244,25 @@ Return all extracted and classified data as structured **JSON**, organized by se
                 } else {
                   console.log("Successfully updated loan status to Approved");
                 }
+                
+                // NEW: Call the automation-matcher after conditions are saved
+                console.log("Calling automation-matcher with conditions");
+                try {
+                  const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+                    body: { 
+                      leadId,
+                      conditions: processedData
+                    }
+                  });
+                  
+                  if (automationError) {
+                    console.error("Error from automation-matcher:", automationError);
+                  } else {
+                    console.log("Automation matcher completed successfully:", automationData);
+                  }
+                } catch (autoError) {
+                  console.error("Exception in automation-matcher call:", autoError);
+                }
               } catch (progressErr) {
                 console.error("Exception during status update:", progressErr);
               }
@@ -459,6 +479,25 @@ Return all extracted and classified data as structured **JSON**, organized by se
                 } else {
                   console.log("Successfully updated loan status to Approved");
                 }
+                
+                // NEW: Call the automation-matcher after conditions are saved
+                console.log("Calling automation-matcher with conditions");
+                try {
+                  const { data: automationData, error: automationError } = await supabase.functions.invoke('automation-matcher', {
+                    body: { 
+                      leadId,
+                      conditions: processedData
+                    }
+                  });
+                  
+                  if (automationError) {
+                    console.error("Error from automation-matcher:", automationError);
+                  } else {
+                    console.log("Automation matcher completed successfully:", automationData);
+                  }
+                } catch (autoError) {
+                  console.error("Exception in automation-matcher call:", autoError);
+                }
               } catch (progressErr) {
                 console.error("Exception during status update:", progressErr);
               }
@@ -560,7 +599,8 @@ Return all extracted and classified data as structured **JSON**, organized by se
           success: true,
           data: processedData,
           documentType: extractedData.documentType || (fileType === "conditions" ? "Conditions" : "Unknown"),
-          message: "Document successfully analyzed"
+          message: "Document successfully analyzed",
+          automationTriggered: true // Indicate that automation was triggered
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
