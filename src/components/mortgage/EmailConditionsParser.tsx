@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,8 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       updateStepStatus("parse", "completed");
       updateStepStatus("extract", "processing");
       
-      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: any[]) => {
+      // Fix the type issue by properly handling the unknown type
+      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: any) => {
         return sum + (Array.isArray(arr) ? arr.length : 0);
       }, 0);
     
