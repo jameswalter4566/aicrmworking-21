@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 import JSZip from "https://esm.sh/jszip@3.10.1";
@@ -155,13 +156,14 @@ async function createExtractionJob(accessToken: string, apiBase: string, assetID
     
     console.log(`Extract response status: ${extractResponse.status}`);
     
-    // Fix #1: Accept both 201 and 202 status codes as successful responses
+    // Accept both 201 (Created) and 202 (Accepted) status codes as successful responses
     if (![201, 202].includes(extractResponse.status)) {
       const errorBody = await extractResponse.text();
       console.error(`Extract request failed: ${extractResponse.status} ${extractResponse.statusText}`, errorBody);
       throw new Error(`Failed to create extraction job: ${errorBody}`);
     }
     
+    // Get location header which contains the job status URL
     const location = extractResponse.headers.get('location');
     if (!location) {
       throw new Error("No location header returned for extraction job");
@@ -181,11 +183,12 @@ async function createExtractionJob(accessToken: string, apiBase: string, assetID
 async function pollJobStatus(accessToken: string, jobLocation: string) {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
   let status = "in progress";
-  let downloadUri = null;
   let attempt = 0;
-  // Fix #2: Increase polling attempts and respect Adobe's retry interval
-  const maxAttempts = 120; // 4 minutes at 2 second intervals
-  const defaultPollingInterval = 2000; // 2 seconds between each attempt
+  
+  // Increase polling attempts to respect Adobe's longer processing times
+  // 120 attempts at 2-second intervals = 4 minutes max wait time
+  const maxAttempts = 120;
+  const defaultPollingInterval = 2000; // 2 seconds between each attempt by default
   
   console.log("Starting to poll job status...");
   
@@ -220,9 +223,14 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
         console.log(`Job status: ${status}`);
         
         if (status === "done") {
-          downloadUri = statusData.downloadUri;
+          // Ensure downloadUri is present before continuing
+          if (!statusData.downloadUri) {
+            console.error("Job completed but no downloadUri was provided:", statusData);
+            throw new Error("PDF extraction completed but no download URI was provided");
+          }
+          
           console.log("Job completed successfully, download URI available");
-          break;
+          return statusData.downloadUri;
         } else if (status === "failed") {
           const errorDetails = JSON.stringify(statusData.error || {});
           console.error("Job failed:", errorDetails);
@@ -230,6 +238,7 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
         }
         
         // Check if Adobe recommends a specific retry interval
+        // This respects Adobe's server-recommended polling intervals
         if (statusData.retryIn) {
           // Adobe returns retryIn in seconds, convert to ms
           await delay(statusData.retryIn * 1000);
@@ -241,7 +250,9 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
       console.error(`Error during poll attempt ${attempt}:`, error);
       
       // If this is a fatal error, stop polling
-      if (error.message.includes("token may have expired") || error.message.includes("PDF extraction job failed")) {
+      if (error.message.includes("token may have expired") || 
+          error.message.includes("PDF extraction job failed") ||
+          error.message.includes("but no download URI was provided")) {
         throw error;
       }
       
@@ -254,11 +265,8 @@ async function pollJobStatus(accessToken: string, jobLocation: string) {
     throw new Error(`PDF extraction timed out after ${maxAttempts} polling attempts (${maxAttempts * 2} seconds)`);
   }
   
-  if (!downloadUri) {
-    throw new Error(`PDF extraction completed but no download URI available`);
-  }
-  
-  return downloadUri;
+  // This should never happen as we either return from the function or throw an error above
+  throw new Error("PDF extraction completed but no download URI available");
 }
 
 /**
@@ -275,14 +283,19 @@ async function downloadExtractedContent(downloadUri: string) {
       throw new Error(`Failed to download extracted content: ${errorText}`);
     }
     
-    // Fix #3: Handle the ZIP file returned by Adobe
+    console.log("Processing ZIP file result...");
     try {
       // Get the response as an array buffer for JSZip
       const zipArray = new Uint8Array(await downloadResponse.arrayBuffer());
       console.log(`Downloaded ZIP file size: ${zipArray.length} bytes`);
       
-      // Load the ZIP file
+      // Load the ZIP file 
       const jszip = await JSZip.loadAsync(zipArray);
+      console.log("Successfully loaded ZIP file, looking for structuredData.json");
+      
+      // List all files in the ZIP for debugging
+      const fileNames = Object.keys(jszip.files);
+      console.log("Files in ZIP:", fileNames);
       
       // Extract structuredData.json from the ZIP
       const structuredDataFile = jszip.file('structuredData.json');
