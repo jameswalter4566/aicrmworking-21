@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { FileUp, CheckCircle, AlertCircle, Brain, Download } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import ProcessingStatusContainer from "./ProcessingStatusContainer";
 
 interface PDFDropZoneProps {
   onFileAccepted?: (file: File) => void;
@@ -24,6 +24,24 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [generatedLoeUrl, setGeneratedLoeUrl] = useState<string | null>(null);
+  const [processingSteps, setProcessingSteps] = useState<Array<{
+    id: string;
+    label: string;
+    status: "pending" | "processing" | "completed";
+  }>>([
+    { id: "upload", label: "Uploading document", status: "pending" },
+    { id: "analysis", label: "Analyzing conditions", status: "pending" },
+    { id: "automation", label: "Running automations", status: "pending" },
+    { id: "loe", label: "Generating LOE documents", status: "pending" }
+  ]);
+
+  const updateStepStatus = (stepId: string, status: "pending" | "processing" | "completed") => {
+    setProcessingSteps(steps => 
+      steps.map(step => 
+        step.id === stepId ? { ...step, status } : step
+      )
+    );
+  };
 
   const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -75,7 +93,6 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         if (onFileAccepted) {
           onFileAccepted(droppedFile);
         } else if (leadId) {
-          // If no handler is provided but leadId is available, handle internally
           processFile(droppedFile, leadId);
         }
       }
@@ -95,7 +112,6 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       if (onFileAccepted) {
         onFileAccepted(selectedFile);
       } else if (leadId) {
-        // If no handler is provided but leadId is available, handle internally
         processFile(selectedFile, leadId);
       }
     }
@@ -106,11 +122,12 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
     setGeneratedLoeUrl(null);
     
     try {
+      updateStepStatus("upload", "processing");
       const formData = new FormData();
       formData.append('file', file);
       
       const uniqueFileName = `${Date.now()}_${file.name}`;
-      const fileType = "conditions"; // Assuming we're processing conditions
+      const fileType = "conditions";
       
       toast({
         title: "Analyzing Document",
@@ -120,7 +137,6 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       console.log("Starting PDF analysis process...");
       console.log(`Processing file: ${file.name} (${file.size} bytes)`);
       
-      // Step 1: Upload the document to Supabase Storage
       console.log("Uploading PDF to Supabase storage...");
       const { error: uploadError, data } = await supabase.storage
         .from('borrower-documents')
@@ -131,20 +147,22 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         throw new Error(`Error uploading document: ${uploadError.message}`);
       }
       
+      updateStepStatus("upload", "completed");
+      updateStepStatus("analysis", "processing");
+
       const { data: { publicUrl } } = supabase.storage
         .from('borrower-documents')
         .getPublicUrl(`leads/${leadId}/conditions/${uniqueFileName}`);
       
       console.log(`Document uploaded successfully at: ${publicUrl}`);
       
-      // Step 2: Call analyze-pdf-document edge function with explicit fileType
       console.log(`Starting analysis with analyze-pdf-document function. File URL: ${publicUrl}`);
       const analysisStartTime = Date.now();
       
       const { data: analysisData, error: analysisError } = await supabase.functions.invoke('analyze-pdf-document', {
         body: { 
           fileUrl: publicUrl, 
-          fileType: "conditions", // Explicitly stating this is a conditions document
+          fileType: "conditions",
           leadId
         }
       });
@@ -159,10 +177,8 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       console.log("Document analysis complete:", analysisData);
       
-      // Count the number of conditions found
       const conditionsData = analysisData.data || {};
       
-      // Log raw text for verification
       if (conditionsData.rawExtractedText) {
         console.log("Raw extracted text sample:", 
           conditionsData.rawExtractedText.fullText.substring(0, 500) + "...");
@@ -177,11 +193,9 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       toast.success(`Found ${totalConditions} conditions in the document.`);
       
-      // Step 3: Explicitly call the LOE generator function with the conditions data
       if (analysisData && analysisData.data) {
         console.log("Starting LOE generation process...");
         
-        // Find conditions that need a letter of explanation
         const allConditions = [
           ...(analysisData.data.masterConditions || []),
           ...(analysisData.data.generalConditions || []),
@@ -222,7 +236,6 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
             } else {
               console.log("LOE generation completed successfully:", loeData);
               
-              // If we have a document URL from the LOE generator, save it
               if (loeData?.results && loeData.results.length > 0 && loeData.results[0].generatedDocumentUrl) {
                 setGeneratedLoeUrl(loeData.results[0].generatedDocumentUrl);
                 toast.success(`Generated ${loeData?.results.length} LOE document(s)!`);
@@ -243,7 +256,6 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         }
       }
       
-      // Step 4: Call automation-matcher if not already triggered
       if (!analysisData.automationTriggered) {
         console.log("Calling automation-matcher with conditions data");
         try {
@@ -291,6 +303,13 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
   return (
     <Card className={`${className} ${disabled ? 'opacity-60 cursor-not-allowed' : ''}`}>
       <CardContent>
+        {isProcessing && (
+          <ProcessingStatusContainer 
+            steps={processingSteps}
+            className="mb-4"
+          />
+        )}
+        
         <div
           className={`
             border-2 border-dashed rounded-md p-8 text-center transition-colors

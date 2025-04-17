@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from "sonner";
 import { Copy, Check, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import ProcessingStatusContainer from "./ProcessingStatusContainer";
+import { Progress } from "@/components/ui/progress";
 
 interface EmailConditionsParserProps {
   clientLastName: string;
@@ -23,11 +25,28 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
   const [emailContent, setEmailContent] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [copied, setCopied] = useState(false);
-  
+  const [processingSteps, setProcessingSteps] = useState<Array<{
+    id: string;
+    label: string;
+    status: "pending" | "processing" | "completed";
+  }>>([
+    { id: "parse", label: "Parsing email content", status: "pending" },
+    { id: "extract", label: "Extracting conditions", status: "pending" },
+    { id: "loe", label: "Generating LOE documents", status: "pending" }
+  ]);
+
   const handleCopyClick = () => {
     navigator.clipboard.writeText(emailContent);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+  
+  const updateStepStatus = (stepId: string, status: "pending" | "processing" | "completed") => {
+    setProcessingSteps(steps => 
+      steps.map(step => 
+        step.id === stepId ? { ...step, status } : step
+      )
+    );
   };
   
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,6 +58,7 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
     }
     
     setIsProcessing(true);
+    updateStepStatus("parse", "processing");
     
     try {
       const { data, error } = await supabase.functions.invoke('parse-underwriting-email', {
@@ -50,67 +70,63 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
       });
       
       if (error) {
-        console.error("Error parsing email:", error);
-        toast.error("Failed to parse email content");
-        setIsProcessing(false);
-        return;
+        throw new Error(error.message);
       }
+
+      updateStepStatus("parse", "completed");
+      updateStepStatus("extract", "processing");
       
-      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: any) => {
+      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: any[]) => {
         return sum + (Array.isArray(arr) ? arr.length : 0);
       }, 0);
     
-      if (data.success) {
-        if (data.conditions) {
-          onConditionsFound(data.conditions);
+      if (data.success && data.conditions) {
+        onConditionsFound(data.conditions);
+        toast.success(`${totalConditionsCount} conditions extracted from email`);
+        
+        updateStepStatus("extract", "completed");
+        
+        if (leadId && totalConditionsCount > 0) {
+          updateStepStatus("loe", "processing");
           
-          toast.success(`${totalConditionsCount} conditions extracted from email`);
-          setIsProcessing(false);
-          
-          if (leadId && totalConditionsCount > 0) {
-            toast.info(`Generating Letters of Explanation for conditions...`);
+          try {
+            const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
+              body: { 
+                leadId,
+                conditions: [
+                  ...(data.conditions.masterConditions || []),
+                  ...(data.conditions.generalConditions || []),
+                  ...(data.conditions.priorToFinalConditions || []),
+                  ...(data.conditions.complianceConditions || [])
+                ]
+              }
+            });
             
-            const allConditions = [
-              ...(data.conditions.masterConditions || []),
-              ...(data.conditions.generalConditions || []),
-              ...(data.conditions.priorToFinalConditions || []),
-              ...(data.conditions.complianceConditions || [])
-            ];
-            
-            try {
-              const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
-                body: { 
-                  leadId,
-                  conditions: allConditions
-                }
+            if (loeError) {
+              toast.error("Failed to generate Letters of Explanation");
+            } else if (loeData.success) {
+              toast.success(`Generated ${loeData.processedCount} Letters of Explanation`);
+              const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
+                body: { leadId }
               });
               
-              if (loeError) {
-                toast.error("Failed to generate Letters of Explanation");
-              } else if (loeData.success) {
-                toast.success(`Generated ${loeData.processedCount} Letters of Explanation`);
-                const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-                  body: { leadId }
-                });
-                
-                if (refreshData?.success && refreshData?.conditions) {
-                  onConditionsFound(refreshData.conditions);
-                }
+              if (refreshData?.success && refreshData?.conditions) {
+                onConditionsFound(refreshData.conditions);
               }
-            } catch (loeErr) {
-              console.error("Error generating LOEs:", loeErr);
-              toast.error("An error occurred while generating Letters of Explanation");
             }
+          } catch (loeErr) {
+            console.error("Error generating LOEs:", loeErr);
+            toast.error("An error occurred while generating Letters of Explanation");
           }
-        } else {
-          toast.warning("No conditions found in the email content");
+          
+          updateStepStatus("loe", "completed");
         }
       } else {
-        toast.error(data.error || "Failed to parse email content");
+        toast.warning(data.error || "No conditions found in the email content");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error in handleSubmit:", error);
-      toast.error("An unexpected error occurred");
+      toast.error(error.message || "An unexpected error occurred");
     } finally {
       setIsProcessing(false);
     }
@@ -125,6 +141,13 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {isProcessing && (
+          <ProcessingStatusContainer 
+            steps={processingSteps}
+            className="mb-4"
+          />
+        )}
+        
         <Textarea
           placeholder="Paste email content here..."
           value={emailContent}
