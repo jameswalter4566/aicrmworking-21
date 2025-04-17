@@ -56,7 +56,9 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
         return;
       }
       
-      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: any) => sum + (arr?.length || 0), 0);
+      const totalConditionsCount = Object.values(data?.conditions || {}).reduce((sum: number, arr: any) => {
+        return sum + (Array.isArray(arr) ? arr.length : 0);
+      }, 0);
     
       if (data.success) {
         if (data.conditions) {
@@ -65,7 +67,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
           toast.success(`${totalConditionsCount} conditions extracted from email`);
           setIsProcessing(false);
           
-          // Generate LOEs for the extracted conditions
           if (leadId && totalConditionsCount > 0) {
             toast.info(`Generating Letters of Explanation for conditions...`);
             
@@ -88,7 +89,6 @@ const EmailConditionsParser: React.FC<EmailConditionsParserProps> = ({
                 toast.error("Failed to generate Letters of Explanation");
               } else if (loeData.success) {
                 toast.success(`Generated ${loeData.processedCount} Letters of Explanation`);
-                // Refresh conditions to see the updated documentUrls
                 const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
                   body: { leadId }
                 });
