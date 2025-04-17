@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { CheckCircle, Clock, HelpCircle, ChevronDown, ChevronUp, Info, FileUp, Download } from "lucide-react";
 import { 
@@ -19,13 +18,14 @@ export type ConditionStatus = "in_review" | "no_action" | "waiting_borrower" | "
 
 export interface LoanCondition {
   id?: string;
-  text?: string;  // Added to support the text field from the API response
+  text?: string;
   description?: string;
   status: "pending" | "cleared" | "waived";
   conditionStatus?: ConditionStatus;
   notes?: string;
-  fileUrl?: string; // URL to the file if available
-  fileName?: string; // Name of the attached file
+  fileUrl?: string;
+  fileName?: string;
+  documentUrl?: string;
 }
 
 interface ConditionItemProps {
@@ -43,15 +43,12 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
-  // Set default condition status if not available
   const conditionStatus = condition.conditionStatus || 
     (condition.status === "cleared" ? "cleared" : 
      condition.status === "waived" ? "waived" : "in_review");
 
-  // Get the condition text/description (use text if available, otherwise fall back to description)
   const conditionText = condition.text || condition.description || "";
 
-  // Generate notes based on condition status
   const defaultNotes = () => {
     switch (conditionStatus) {
       case "in_review":
@@ -71,10 +68,8 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
     }
   };
 
-  // Use provided notes or default based on status
   const notes = condition.notes || defaultNotes();
   
-  // Handle file upload
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0] && onUploadFile) {
       const file = event.target.files[0];
@@ -83,15 +78,19 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
     }
   };
 
-  // Handle file download
   const handleDownload = () => {
     if (condition.fileUrl && onDownloadFile) {
       onDownloadFile(condition.id, condition.fileUrl);
       toast.success("Downloading document...");
     }
   };
-  
-  // Get status information
+
+  const handleDownloadLOE = () => {
+    if (condition.documentUrl) {
+      window.open(condition.documentUrl, '_blank');
+    }
+  };
+
   const getStatusInfo = () => {
     switch (conditionStatus) {
       case "in_review":
@@ -145,7 +144,7 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
         };
     }
   };
-  
+
   const statusInfo = getStatusInfo();
 
   return (
@@ -160,6 +159,18 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
           <span className="text-gray-800">{conditionText}</span>
         </div>
         <div className="flex items-center space-x-2">
+          {condition.documentUrl && (
+            <button 
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDownloadLOE();
+              }}
+              className="p-1 rounded-full hover:bg-gray-100"
+              title="Download Letter of Explanation"
+            >
+              <Download className="h-4 w-4 text-blue-600" />
+            </button>
+          )}
           <HoverCard>
             <HoverCardTrigger asChild>
               <div className={cn("px-2 py-1 rounded-full text-xs font-medium", statusInfo.color)}>
@@ -170,18 +181,6 @@ export const ConditionItem: React.FC<ConditionItemProps> = ({
               <p className="text-sm">{statusInfo.description}</p>
             </HoverCardContent>
           </HoverCard>
-          {conditionStatus === "ready_for_download" && condition.fileUrl && (
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
-                handleDownload(); 
-              }}
-              className="p-1 rounded-full hover:bg-gray-100"
-              title="Download document"
-            >
-              <Download className="h-4 w-4 text-green-600" />
-            </button>
-          )}
           {isOpen ? 
             <ChevronUp className="h-4 w-4" /> : 
             <ChevronDown className="h-4 w-4" />

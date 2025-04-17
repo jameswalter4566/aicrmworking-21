@@ -1,6 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import * as PDFDocument from 'https://esm.sh/pdfkit@0.13.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,8 +12,34 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+async function generatePDF(content: string): Promise<Uint8Array> {
+  const doc = new PDFDocument();
+  const chunks: Uint8Array[] = [];
+
+  return new Promise((resolve, reject) => {
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => {
+      const result = new Uint8Array(Buffer.concat(chunks));
+      resolve(result);
+    });
+    
+    try {
+      // Add content to PDF
+      doc.fontSize(12);
+      const paragraphs = content.split('\n\n');
+      paragraphs.forEach(paragraph => {
+        doc.text(paragraph.trim());
+        doc.moveDown();
+      });
+      
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,7 +47,6 @@ serve(async (req) => {
   try {
     console.log('LOE Generator function called');
     
-    // Parse request body
     const { leadId, conditions } = await req.json();
     
     if (!leadId || !conditions || !Array.isArray(conditions) || conditions.length === 0) {
@@ -40,7 +65,6 @@ serve(async (req) => {
     console.log(`Processing LOE for lead ID: ${leadId}`);
     console.log(`Conditions to process: ${conditions.length}`);
     
-    // Get lead information from database
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select('*')
@@ -61,31 +85,36 @@ serve(async (req) => {
       );
     }
     
-    // Process each LOE condition
     const results = await Promise.all(conditions.map(async (condition) => {
-      // Determine LOE type from condition text
       const loeType = determineLOEType(condition.text || condition.description);
-      
-      // Generate appropriate LOE content
       const loeContent = generateLOEContent(loeType, lead, condition);
       
-      // In a production environment, we would:
-      // 1. Generate a PDF with the content
-      // 2. Upload to DocuSign
-      // 3. Create envelope and send to borrower
-      // 4. Update condition status
-
-      // For now, we'll mock these operations
-      const docuSignResult = await mockDocuSignProcess(lead, condition, loeType, loeContent);
+      const pdfBytes = await generatePDF(loeContent);
+      
+      const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
+      const filePath = `leads/${leadId}/loe/${fileName}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('borrower-documents')
+        .upload(filePath, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true
+        });
+        
+      if (uploadError) {
+        console.error('Error uploading PDF:', uploadError);
+        throw new Error('Failed to upload LOE PDF');
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('borrower-documents')
+        .getPublicUrl(filePath);
       
       return {
         conditionId: condition.id,
         loeType,
         loeContent,
-        generatedDocumentUrl: docuSignResult.documentUrl,
-        envelopeId: docuSignResult.envelopeId,
-        recipientEmail: docuSignResult.recipientEmail,
-        sentTimestamp: docuSignResult.sentTimestamp,
+        documentUrl: publicUrl,
         success: true
       };
     }));
@@ -164,17 +193,14 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
   const borrowerName = `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`;
   const propertyAddress = lead.property_address || 'Subject Property';
   
-  // Header
   let content = `${currentDate}\n\n`;
   content += `To: Loan Underwriter\n`;
   content += `Subject: Letter of Explanation - ${formatLOETypeTitle(loeType)}\n\n`;
   content += `Dear Underwriter,\n\n`;
   
-  // Include the FULL condition text verbatim
   content += `I am writing in response to the following condition from underwriting:\n\n`;
   content += `"${condition.text || condition.description}"\n\n`;
   
-  // Type-specific content
   switch (loeType) {
     case 'credit_inquiry':
       content += `I am writing to explain the recent credit inquiries on my credit report. `;
@@ -223,7 +249,6 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
       content += `I am committed to providing any additional information or documentation required to process my mortgage application.\n\n`;
   }
   
-  // Closing
   content += `Please let me know if you require any additional information or documentation to support this explanation.\n\n`;
   content += `Sincerely,\n\n\n`;
   content += `${borrowerName}\n`;
@@ -253,17 +278,10 @@ function formatLOETypeTitle(loeType: string): string {
  * In a production environment, this would be replaced with actual DocuSign API calls
  */
 async function mockDocuSignProcess(lead: any, condition: any, loeType: string, loeContent: string) {
-  // Add a delay to simulate processing
   await new Promise(resolve => setTimeout(resolve, 1000));
   
   const mockDocumentId = `LOE-${loeType}-${Date.now()}`;
   const mockEnvelopeId = `env-${Date.now()}`;
-  
-  // In a real implementation, this would:
-  // 1. Generate a PDF using a library like pdf-lib or pdfkit
-  // 2. Upload to DocuSign
-  // 3. Create envelope and add signer (borrower)
-  // 4. Send for signature
   
   return {
     documentUrl: `https://example.com/documents/${mockDocumentId}.pdf`,
