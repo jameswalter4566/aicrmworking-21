@@ -44,6 +44,66 @@ interface ParsedConditions {
   complianceConditions: LoanCondition[];
 }
 
+const tasks: Record<string, ProcessorTask[]> = {
+  employment: [
+    {
+      id: "emp-voe",
+      name: "Verification of Employment",
+      description: "Request employment verification from borrower's employer",
+      status: "pending",
+      icon: <Briefcase className="h-4 w-4 text-mortgage-purple" />
+    },
+    {
+      id: "emp-income",
+      name: "Income Verification",
+      description: "Verify income sources and documentation",
+      status: "pending",
+      icon: <FileText className="h-4 w-4 text-mortgage-purple" />
+    }
+  ],
+  title: [
+    {
+      id: "title-search",
+      name: "Title Search",
+      description: "Order preliminary title report",
+      status: "pending",
+      icon: <HomeIcon className="h-4 w-4 text-mortgage-purple" />
+    },
+    {
+      id: "title-insurance",
+      name: "Title Insurance",
+      description: "Request title insurance quote",
+      status: "pending",
+      icon: <ClipboardCheck className="h-4 w-4 text-mortgage-purple" />
+    }
+  ],
+  appraisal: [
+    {
+      id: "app-order",
+      name: "Order Appraisal",
+      description: "Request property appraisal",
+      status: "pending",
+      icon: <HomeIcon className="h-4 w-4 text-mortgage-purple" />
+    }
+  ],
+  documents: [
+    {
+      id: "doc-checklist",
+      name: "Document Checklist",
+      description: "Prepare borrower document checklist",
+      status: "pending",
+      icon: <FileText className="h-4 w-4 text-mortgage-purple" />
+    },
+    {
+      id: "doc-review",
+      name: "Document Review",
+      description: "Review submitted borrower documents",
+      status: "pending",
+      icon: <ClipboardCheck className="h-4 w-4 text-mortgage-purple" />
+    }
+  ]
+};
+
 const ProcessorAssistViewer = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
