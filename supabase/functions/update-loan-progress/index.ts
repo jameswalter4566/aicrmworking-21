@@ -76,7 +76,7 @@ serve(async (req) => {
     // Get current mortgage data
     const { data: leadData, error: fetchError } = await supabase
       .from("leads")
-      .select("mortgage_data")
+      .select("mortgage_data, first_name, last_name, phone1")
       .eq("id", leadId)
       .single();
 
@@ -91,6 +91,9 @@ serve(async (req) => {
       );
     }
 
+    // Get previous step
+    const previousStep = leadData?.mortgage_data?.loan?.progress?.currentStep;
+    
     // Create or update mortgage_data with loan progress
     const currentMortgageData = leadData?.mortgage_data || {};
     const updatedMortgageData = {
@@ -140,6 +143,28 @@ serve(async (req) => {
     if (activityError) {
       console.error(`[${requestId}] Error logging activity:`, activityError);
       // We continue even if activity logging fails
+    }
+
+    // If the current step is "submitted" and it's different from the previous step,
+    // trigger the loan-submitted-sms function
+    if (currentStep === "submitted" && previousStep !== "submitted") {
+      console.log(`[${requestId}] Triggering loan-submitted-sms function for lead ${leadId}`);
+      
+      // Invoke the loan-submitted-sms function
+      supabase.functions.invoke('loan-submitted-sms', {
+        body: { 
+          leadId,
+          currentStep,
+          previousStep,
+          firstName: leadData?.first_name,
+          lastName: leadData?.last_name,
+          phoneNumber: leadData?.phone1
+        }
+      })
+      .catch(error => {
+        // Log the error but don't fail the request
+        console.error(`[${requestId}] Error triggering loan-submitted-sms:`, error);
+      });
     }
 
     console.log(`[${requestId}] Successfully updated loan progress for lead ${leadId}`);
