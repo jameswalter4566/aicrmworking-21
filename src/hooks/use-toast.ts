@@ -12,9 +12,9 @@ interface ToastFunction {
   (message: string): void;
   (options: { title: string; description?: string; variant?: "default" | "destructive" }): void;
   success: (message: string | { title: string; description?: string }) => void;
-  error: (message: string | { title: string; description?: string; variant?: string }) => void;
+  error: (message: string | { title: string; description?: string }) => void;
   info: (message: string | { title: string; description?: string }) => void;
-  warning: (message: string | { title: string; description?: string; variant?: string }) => void;
+  warning: (message: string | { title: string; description?: string }) => void;
   custom: (title: string, description?: string, variant?: "default" | "destructive") => string;
   dismiss: (toastId?: string) => void;
 }
@@ -41,7 +41,7 @@ toast.success = (messageOrOptions: string | { title: string; description?: strin
   }
 };
 
-toast.error = (messageOrOptions: string | { title: string; description?: string; variant?: string }) => {
+toast.error = (messageOrOptions: string | { title: string; description?: string }) => {
   if (typeof messageOrOptions === 'string') {
     sonnerToast.error(messageOrOptions);
   } else {
@@ -61,7 +61,7 @@ toast.info = (messageOrOptions: string | { title: string; description?: string }
   }
 };
 
-toast.warning = (messageOrOptions: string | { title: string; description?: string; variant?: string }) => {
+toast.warning = (messageOrOptions: string | { title: string; description?: string }) => {
   if (typeof messageOrOptions === 'string') {
     sonnerToast.error(messageOrOptions);
   } else {

@@ -161,6 +161,13 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       // Count the number of conditions found
       const conditionsData = analysisData.data || {};
+      
+      // Log raw text for verification
+      if (conditionsData.rawExtractedText) {
+        console.log("Raw extracted text sample:", 
+          conditionsData.rawExtractedText.fullText.substring(0, 500) + "...");
+      }
+      
       const totalConditions = (
         (conditionsData.masterConditions || []).length +
         (conditionsData.generalConditions || []).length +
@@ -175,12 +182,16 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
         console.log("Starting LOE generation process...");
         
         // Find conditions that need a letter of explanation
-        const loeConditions = [
+        const allConditions = [
           ...(analysisData.data.masterConditions || []),
           ...(analysisData.data.generalConditions || []),
           ...(analysisData.data.priorToFinalConditions || []),
           ...(analysisData.data.complianceConditions || [])
-        ].filter(c => 
+        ];
+        
+        console.log(`Found ${allConditions.length} total conditions`);
+        
+        const loeConditions = allConditions.filter(c => 
           c.text && (
             c.text.toLowerCase().includes('explanation') || 
             c.text.toLowerCase().includes('loe') ||
@@ -214,9 +225,10 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
               // If we have a document URL from the LOE generator, save it
               if (loeData?.results && loeData.results.length > 0 && loeData.results[0].generatedDocumentUrl) {
                 setGeneratedLoeUrl(loeData.results[0].generatedDocumentUrl);
+                toast.success(`Generated ${loeData?.results.length} LOE document(s)!`);
+              } else {
+                toast.success(`Successfully processed ${loeData?.processedCount || 0} LOE document(s)!`);
               }
-              
-              toast.success(`Successfully generated ${loeData?.processedCount || 0} LOE document(s)!`);
             }
           } catch (loeGenError: any) {
             console.error("Exception in LOE generator call:", loeGenError);
@@ -227,6 +239,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
           }
         } else {
           console.log("No conditions requiring letters of explanation were found");
+          toast.info("No conditions requiring letters of explanation were found");
         }
       }
       

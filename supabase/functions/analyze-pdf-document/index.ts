@@ -49,21 +49,45 @@ serve(async (req) => {
     
     console.log("🔍 Loading PDF document...");
     
-    // Load the PDF document
-    const loadingTask = pdfjs.getDocument({ data: new Uint8Array(pdfArrayBuffer) });
+    // Load the PDF document with enhanced options
+    const loadingTask = pdfjs.getDocument({
+      data: new Uint8Array(pdfArrayBuffer),
+      // Enable all features to ensure maximum content extraction
+      disableFontFace: false,
+      cMapUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/",
+      cMapPacked: true,
+      standardFontDataUrl: "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/standard_fonts/"
+    });
     const pdfDocument = await loadingTask.promise;
     
     console.log(`📄 PDF loaded successfully. Pages: ${pdfDocument.numPages}`);
     
-    // Extract text from all pages
+    // Extract text from all pages with improved extraction
     let fullText = '';
+    let pageTexts = []; // Array to store text from each page
+    
     for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+      console.log(`Processing page ${pageNum} of ${pdfDocument.numPages}`);
+      
       const page = await pdfDocument.getPage(pageNum);
-      const content = await page.getTextContent();
-      const pageText = content.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + '\n';
+      const viewport = page.getViewport({ scale: 1.0 });
+      
+      // Get text content with more options
+      const textContent = await page.getTextContent({
+        normalizeWhitespace: false,  // Don't normalize whitespace to preserve exact content
+        disableCombineTextItems: true // Don't combine text items to maintain verbatim content
+      });
+      
+      // Process text items with positioning to maintain proper order and spacing
+      const textItems = textContent.items;
+      const pageText = buildTextFromItems(textItems, viewport);
+      
+      pageTexts.push({
+        pageNumber: pageNum,
+        text: pageText
+      });
+      
+      fullText += pageText + '\n\n--- PAGE BREAK ---\n\n';
     }
     
     console.log("📝 Extracted text from PDF, sending to OpenAI for analysis...");
@@ -115,7 +139,7 @@ Instructions:
           },
           {
             role: "user",
-            content: `Here is the full text extracted from the document. Please analyze it according to the instructions:\n\n${fullText}`
+            content: `Here is the full text extracted from the document. Please analyze it according to the instructions. The text has been extracted VERBATIM, with page breaks indicated:\n\n${fullText}`
           }
         ],
         temperature: 0.2, // Lower temperature for more consistent results
@@ -134,6 +158,12 @@ Instructions:
     
     // Parse the analysis result
     const extractedData = JSON.parse(analysisResult.choices[0].message.content);
+    
+    // Add the raw extracted text to the response for verification
+    extractedData.rawExtractedText = {
+      fullText: fullText,
+      pageByPage: pageTexts
+    };
     
     // Process conditions if this is a conditions document
     if (fileType === "conditions" && leadId) {
@@ -183,3 +213,59 @@ Instructions:
     );
   }
 });
+
+/**
+ * Build text from PDF.js text items, preserving their order and spacing
+ * This function maintains the correct reading order of text
+ */
+function buildTextFromItems(textItems: any[], viewport: any): string {
+  // Sort items by vertical position first, then by horizontal position
+  // This helps to maintain reading order (top to bottom, left to right)
+  const sortedItems = [...textItems].sort((a, b) => {
+    // Get y-coordinate in page space
+    const yDiff = b.transform[5] - a.transform[5];
+    
+    // If items are on different lines (using a small threshold)
+    if (Math.abs(yDiff) > 5) {
+      return yDiff; // Sort by y-coordinate (top to bottom)
+    } else {
+      // If on same line, sort by x-coordinate (left to right)
+      return a.transform[4] - b.transform[4];
+    }
+  });
+  
+  let lastY: number | null = null;
+  let lastX: number | null = null;
+  let text = '';
+  
+  // Process each text item
+  for (const item of sortedItems) {
+    if (!item.str) continue; // Skip empty items
+    
+    // Get coordinates
+    const x = item.transform[4];
+    const y = item.transform[5];
+    
+    // Insert appropriate spacing
+    if (lastY !== null) {
+      // If significant change in y-position, add a new line
+      if (Math.abs(y - lastY) > 5) {
+        text += '\n';
+        lastX = null; // Reset x position after line break
+      } 
+      // If on the same line but with significant horizontal gap, add space
+      else if (lastX !== null && (x - lastX) > (item.width || 10)) {
+        text += ' ';
+      }
+    }
+    
+    // Add the text
+    text += item.str;
+    
+    // Update last positions
+    lastX = x + (item.width || 0);
+    lastY = y;
+  }
+  
+  return text;
+}
