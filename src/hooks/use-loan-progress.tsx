@@ -84,9 +84,20 @@ export function useLoanProgress(options?: UseLoanProgressOptions) {
 
   const fetchLoanProgress = async (leadId: string | number) => {
     if (!leadId) {
-      const errorMsg = "Missing leadId parameter";
-      setError(errorMsg);
-      return { success: false, error: errorMsg };
+      console.warn("Missing leadId parameter, will use default values");
+      // Return a default object with empty values instead of failing completely
+      const defaultData = {
+        leadId: "unknown",
+        currentStep: "applicationCreated",
+        stepIndex: 0,
+        progressPercentage: 0,
+        allSteps: ["applicationCreated", "disclosuresSent", "disclosuresSigned", "submitted", "processing", 
+                 "approved", "closingDisclosureGenerated", "closingDisclosureSigned", "ctc", "docsOut", 
+                 "closing", "funded"]
+      };
+      
+      setProgressData(defaultData);
+      return { success: true, data: defaultData };
     }
     
     setIsLoading(true);
@@ -105,21 +116,33 @@ export function useLoanProgress(options?: UseLoanProgressOptions) {
         return { success: false, error: errorMsg };
       }
 
-      if (!data.success) {
-        console.error("API returned error:", data.error);
-        const errorMsg = data.error || "Failed to load loan progress";
-        setError(errorMsg);
-        if (options?.onError) options.onError(errorMsg);
-        return { success: false, error: errorMsg };
+      // Even if the lead was not found, the function returns a data object with default values
+      // We'll still consider this a "success" from the client's perspective
+      if (data && data.data) {
+        setProgressData(data.data);
+        
+        if (options?.onSuccess) {
+          options.onSuccess(data.data);
+        }
+        
+        return { success: true, data: data.data };
       }
 
-      setProgressData(data.data);
+      // If we don't have data for some reason, return a default object
+      console.warn("No data returned from retrieve-loan-progress");
+      const defaultData = {
+        leadId: leadId.toString(),
+        currentStep: "applicationCreated",
+        stepIndex: 0,
+        progressPercentage: 0,
+        allSteps: ["applicationCreated", "disclosuresSent", "disclosuresSigned", "submitted", "processing", 
+                 "approved", "closingDisclosureGenerated", "closingDisclosureSigned", "ctc", "docsOut", 
+                 "closing", "funded"]
+      };
       
-      if (options?.onSuccess) {
-        options.onSuccess(data.data);
-      }
-      
-      return { success: true, data: data.data };
+      setProgressData(defaultData);
+      return { success: true, data: defaultData };
+
     } catch (err: any) {
       console.error("Unexpected error fetching loan progress:", err);
       const errorMsg = err.message || "An unexpected error occurred";

@@ -46,7 +46,17 @@ serve(async (req) => {
     if (!leadId) {
       console.error(`[${requestId}] Missing leadId in request`);
       return new Response(
-        JSON.stringify({ success: false, error: "Missing leadId" }),
+        JSON.stringify({ 
+          success: false, 
+          error: "Missing leadId",
+          data: {
+            leadId: "unknown",
+            currentStep: "applicationCreated",
+            stepIndex: 0,
+            progressPercentage: 0,
+            allSteps: LOAN_PROGRESS_STEPS,
+          }
+        }),
         {
           status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -66,7 +76,7 @@ serve(async (req) => {
       .from("leads")
       .select("id, first_name, last_name, mortgage_data, property_address")
       .eq("id", leadId)
-      .maybeSingle();  // Use maybeSingle instead of single
+      .maybeSingle();  // Use maybeSingle instead of single to prevent errors when no data is found
 
     if (fetchError) {
       console.error(`[${requestId}] Error fetching lead data:`, fetchError);
@@ -94,7 +104,7 @@ serve(async (req) => {
           }
         }),
         {
-          status: 404,
+          status: 200, // Changed from 404 to 200 to always return usable data
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );

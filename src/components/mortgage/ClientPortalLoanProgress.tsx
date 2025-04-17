@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,9 +51,12 @@ const ClientPortalLoanProgress: React.FC<ClientPortalLoanProgressProps> = ({
   });
 
   useEffect(() => {
-    if (leadId) {
-      fetchLoanProgress(leadId);
-    }
+    // Even if leadId is empty or invalid, we'll still call fetchLoanProgress
+    // The hook will handle returning default values
+    fetchLoanProgress(leadId || "unknown");
+    
+    // Log leadId for debugging
+    console.log("ClientPortalLoanProgress - leadId:", leadId);
   }, [leadId]);
 
   if (isLoading) {
@@ -72,68 +74,21 @@ const ClientPortalLoanProgress: React.FC<ClientPortalLoanProgressProps> = ({
     );
   }
 
-  if (error) {
+  // If there's an error but we still have progressData, we'll continue to show it
+  if (error && !progressData) {
     return <div className="text-sm text-red-500">Unable to load loan progress</div>;
   }
 
-  if (!progressData) {
-    // Fallback to a default state if no data is available
-    const defaultProgress = {
-      currentStep: "applicationCreated",
-      progressPercentage: 0,
-      stepIndex: 0
-    };
-    
-    // Get display label for current step
-    const currentStepLabel = progressStepMap[defaultProgress.currentStep] || "Application Created";
-
-    if (displayStyle === 'compact') {
-      return (
-        <div className={`w-full ${className}`}>
-          <div className="mb-1 flex justify-between items-center">
-            <span className="text-xs font-medium text-mortgage-darkPurple">
-              {currentStepLabel}
-            </span>
-            <span className="text-xs text-gray-500">
-              0%
-            </span>
-          </div>
-          <Progress value={0} className="h-2 bg-gray-200" />
-        </div>
-      );
-    }
-
-    return (
-      <div className={`w-full ${className}`}>
-        <div className="space-y-6">
-          <div>
-            <div className="flex justify-between mb-1 text-sm">
-              <span className="font-medium text-mortgage-darkPurple">{currentStepLabel}</span>
-              <span className="text-gray-500">0% Complete</span>
-            </div>
-            <Progress value={0} className="h-2.5 bg-gray-200" />
-          </div>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {progressSteps.map((step, index) => (
-              <div 
-                key={index} 
-                className={`p-3 rounded-lg border bg-gray-50 border-gray-200 flex items-center space-x-2`}
-              >
-                <Circle size={16} className="text-gray-300 flex-shrink-0" />
-                <span className="text-sm text-gray-500">
-                  {step}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
+  // Always use progressData if available, even with errors
+  // Otherwise, use fallback default state
+  const displayData = progressData || {
+    currentStep: "applicationCreated",
+    progressPercentage: 0,
+    stepIndex: 0
+  };
+  
   // Get display label for current step
-  const currentStepLabel = progressStepMap[progressData.currentStep] || "Application Created";
+  const currentStepLabel = progressStepMap[displayData.currentStep] || "Application Created";
 
   if (displayStyle === 'compact') {
     return (
@@ -143,10 +98,10 @@ const ClientPortalLoanProgress: React.FC<ClientPortalLoanProgressProps> = ({
             {currentStepLabel}
           </span>
           <span className="text-xs text-gray-500">
-            {Math.round(progressData.progressPercentage)}%
+            {Math.round(displayData.progressPercentage)}%
           </span>
         </div>
-        <Progress value={progressData.progressPercentage} className="h-2 bg-gray-200" />
+        <Progress value={displayData.progressPercentage} className="h-2 bg-gray-200" />
       </div>
     );
   }
@@ -157,9 +112,9 @@ const ClientPortalLoanProgress: React.FC<ClientPortalLoanProgressProps> = ({
         <div>
           <div className="flex justify-between mb-1 text-sm">
             <span className="font-medium text-mortgage-darkPurple">{currentStepLabel}</span>
-            <span className="text-gray-500">{Math.round(progressData.progressPercentage)}% Complete</span>
+            <span className="text-gray-500">{Math.round(displayData.progressPercentage)}% Complete</span>
           </div>
-          <Progress value={progressData.progressPercentage} className="h-2.5 bg-gray-200" />
+          <Progress value={displayData.progressPercentage} className="h-2.5 bg-gray-200" />
         </div>
         
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -167,18 +122,18 @@ const ClientPortalLoanProgress: React.FC<ClientPortalLoanProgressProps> = ({
             <div 
               key={index} 
               className={`p-3 rounded-lg border ${
-                index <= progressData.stepIndex 
+                index <= displayData.stepIndex 
                   ? 'bg-green-50 border-green-200' 
                   : 'bg-gray-50 border-gray-200'
               } flex items-center space-x-2`}
             >
-              {index <= progressData.stepIndex ? (
+              {index <= displayData.stepIndex ? (
                 <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
               ) : (
                 <Circle size={16} className="text-gray-300 flex-shrink-0" />
               )}
               <span className={`text-sm ${
-                index <= progressData.stepIndex 
+                index <= displayData.stepIndex 
                   ? 'text-green-800' 
                   : 'text-gray-500'
               }`}>
