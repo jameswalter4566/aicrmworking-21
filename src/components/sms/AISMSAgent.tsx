@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,14 +26,13 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
   const [testingWebhook, setTestingWebhook] = useState<boolean>(false);
   const [registeringWebhook, setRegisteringWebhook] = useState<boolean>(false);
   const [webhookRegistered, setWebhookRegistered] = useState<boolean>(false);
+  const [testingGatewayFormat, setTestingGatewayFormat] = useState<boolean>(false);
   
-  // Get the webhook URL - typically this would be configured in your SMS gateway
   useEffect(() => {
     const projectRef = 'imrmboyczebjlbnkgjns';
     setWebhookUrl(`https://${projectRef}.supabase.co/functions/v1/sms-webhook-receiver`);
   }, []);
 
-  // Process unprocessed messages (manual trigger for any backlog)
   const handleProcessUnprocessed = async () => {
     try {
       setProcessing(true);
@@ -59,7 +57,6 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
     }
   };
   
-  // Test the AI response with a custom message
   const handleTestAIResponse = async () => {
     if (!testPhoneNumber || !testMessage) {
       toast.error('Phone number and message are required');
@@ -95,7 +92,6 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
     }
   };
 
-  // Test the webhook directly
   const handleTestWebhook = async () => {
     if (!testPhoneNumber || !testMessage) {
       toast.error('Phone number and message are required');
@@ -125,11 +121,9 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
       
       toast.success('Webhook test successful');
       
-      // If there's a response from the AI, show it
       if (data.webhookResponse?.success) {
         setTimeout(async () => {
           try {
-            // Try to fetch the processed message
             if (data.webhookResponse.webhookId) {
               const { data: webhookData, error: fetchError } = await supabase
                 .from('sms_webhooks')
@@ -153,7 +147,7 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
           } catch (fetchError) {
             console.error('Error fetching AI response:', fetchError);
           }
-        }, 2000); // Wait a bit for processing to complete
+        }, 2000);
       }
       
     } catch (error) {
@@ -164,7 +158,72 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
     }
   };
 
-  // Register webhook with SMS Gateway
+  const handleTestGatewayWebhook = async () => {
+    if (!testPhoneNumber || !testMessage) {
+      toast.error('Phone number and message are required');
+      return;
+    }
+    
+    try {
+      setTestingGatewayFormat(true);
+      
+      const { data, error } = await supabase.functions.invoke('sms-test-gateway-webhook', {
+        body: { 
+          phoneNumber: testPhoneNumber, 
+          message: testMessage,
+          includeSignature: true
+        }
+      });
+      
+      if (error) {
+        throw new Error(`Error testing gateway webhook: ${error.message}`);
+      }
+      
+      console.log('Gateway webhook test response:', data);
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Failed to test gateway webhook');
+      }
+      
+      toast.success('Gateway webhook test successful');
+      
+      if (data.webhookResponse?.success || data.webhookResponse?.webhookId) {
+        setTimeout(async () => {
+          try {
+            if (data.webhookResponse.webhookId) {
+              const { data: webhookData, error: fetchError } = await supabase
+                .from('sms_webhooks')
+                .select('*')
+                .eq('id', data.webhookResponse.webhookId)
+                .single();
+              
+              if (fetchError) {
+                console.error('Error fetching webhook data:', fetchError);
+                return;
+              }
+              
+              if (webhookData?.ai_response) {
+                setTestResponse(webhookData.ai_response);
+              } else if (webhookData?.processed) {
+                setTestResponse("Message was processed but no AI response was stored.");
+              } else {
+                setTestResponse("Message received but not yet processed by AI.");
+              }
+            }
+          } catch (fetchError) {
+            console.error('Error fetching AI response:', fetchError);
+          }
+        }, 2000);
+      }
+      
+    } catch (error) {
+      console.error('Failed to test gateway webhook:', error);
+      toast.error(`Failed to test gateway webhook: ${error.message}`);
+    } finally {
+      setTestingGatewayFormat(false);
+    }
+  };
+
   const handleRegisterWebhook = async () => {
     if (!webhookUrl) {
       toast.error('Webhook URL is required');
@@ -202,7 +261,6 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
     }
   };
 
-  // Copy webhook URL to clipboard
   const copyWebhookUrl = () => {
     navigator.clipboard.writeText(webhookUrl);
     toast.success('Webhook URL copied to clipboard');
@@ -389,7 +447,26 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
                     ) : (
                       <>
                         <TestTube2 className="mr-2 h-4 w-4" />
-                        Test Full Webhook
+                        Test Simple Webhook
+                      </>
+                    )}
+                  </Button>
+                  
+                  <Button
+                    onClick={handleTestGatewayWebhook}
+                    disabled={testingGatewayFormat || !testPhoneNumber || !testMessage}
+                    variant="outline"
+                    className="border-green-300 text-green-700 hover:bg-green-50"
+                  >
+                    {testingGatewayFormat ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Testing Gateway Format...
+                      </>
+                    ) : (
+                      <>
+                        <TestTube2 className="mr-2 h-4 w-4" />
+                        Test Gateway Format
                       </>
                     )}
                   </Button>
@@ -411,7 +488,8 @@ const AISMSAgent = ({ enabled = false }: AISMSAgentProps) => {
         <div className="text-xs text-gray-500 mt-4">
           <p>The AI SMS Agent processes incoming messages in real-time via webhook and stores responses in the database.</p>
           <p className="mt-1">Use the "Process Backlog" button to manually process any older unprocessed messages.</p>
-          <p className="mt-1">Use the "Test Full Webhook" button to simulate an incoming SMS from your gateway.</p>
+          <p className="mt-1">Use the "Test Simple Webhook" button to simulate a basic incoming SMS.</p>
+          <p className="mt-1">Use the "Test Gateway Format" button to simulate an SMS in the gateway's specific format, including signature verification.</p>
           <p className="mt-1">Use the "Register with SMS Gateway" button to automatically register your webhook URL with the SMS gateway.</p>
         </div>
       </CardContent>

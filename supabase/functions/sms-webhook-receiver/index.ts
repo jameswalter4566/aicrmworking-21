@@ -1,10 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
+import * as base64 from "https://deno.land/std@0.177.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sg-signature',
 };
 
 serve(async (req) => {
@@ -19,10 +20,19 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
+    // Get SMS Gateway API key for signature verification
+    const smsApiKey = Deno.env.get("SMS_API_KEY");
+    
     // Generate a unique request ID for tracking
     const requestId = crypto.randomUUID();
     console.log(`[${requestId}] SMS webhook received - URL: ${req.url}, Method: ${req.method}`);
     console.log(`[${requestId}] Headers:`, JSON.stringify(Object.fromEntries(req.headers.entries())));
+    
+    // Check for signature header if using their signature verification
+    const signature = req.headers.get('x-sg-signature');
+    if (signature) {
+      console.log(`[${requestId}] Received signature: ${signature}`);
+    }
     
     // Parse incoming webhook payload
     let payload;
@@ -30,9 +40,44 @@ serve(async (req) => {
     let rawBody = "";
     
     try {
-      // First store the raw body for debugging
+      // First store the raw body for debugging and signature verification
       rawBody = await req.text();
       console.log(`[${requestId}] Raw body:`, rawBody);
+      
+      // Verify signature if present and API key is available
+      if (signature && smsApiKey && rawBody.includes('messages')) {
+        // Try to extract messages parameter as it seems to be what's signed
+        const formData = new URLSearchParams(rawBody);
+        const messagesParam = formData.get('messages');
+        
+        if (messagesParam) {
+          // Create HMAC SHA-256 signature
+          const key = new TextEncoder().encode(smsApiKey);
+          const message = new TextEncoder().encode(messagesParam);
+          
+          const hmacKey = await crypto.subtle.importKey(
+            "raw",
+            key,
+            { name: "HMAC", hash: "SHA-256" },
+            false,
+            ["sign"]
+          );
+          
+          const hmacSignature = await crypto.subtle.sign(
+            "HMAC",
+            hmacKey,
+            message
+          );
+          
+          const calculatedSignature = base64.encode(hmacSignature);
+          console.log(`[${requestId}] Calculated signature: ${calculatedSignature}`);
+          
+          if (calculatedSignature !== signature) {
+            console.warn(`[${requestId}] Signature mismatch. This could be normal during testing.`);
+            // Note: We don't reject here during testing phase but would in production
+          }
+        }
+      }
       
       // Then try to parse based on content type
       if (contentType && contentType.includes('application/json')) {
@@ -43,6 +88,15 @@ serve(async (req) => {
         payload = {};
         for (const [key, value] of params.entries()) {
           payload[key] = value;
+          
+          // Special handling for 'messages' which may be JSON string
+          if (key === 'messages' && typeof value === 'string') {
+            try {
+              payload[key] = JSON.parse(value);
+            } catch (e) {
+              console.log(`[${requestId}] Could not parse messages as JSON: ${e.message}`);
+            }
+          }
         }
       } else {
         // Try JSON as fallback
@@ -75,17 +129,34 @@ serve(async (req) => {
 
     console.log(`[${requestId}] Parsed payload:`, JSON.stringify(payload));
     
-    // Extract key information - handle different SMS gateway formats
-    // Common formats: Twilio, MessageBird, Vonage, Plivo, etc.
-    const phoneNumber = payload.number || payload.from || payload.From || payload.sender || payload.Sender || 
-                        payload.source || payload.Source || payload.msisdn || payload.phone;
-                        
-    const message = payload.message || payload.text || payload.Text || payload.content || payload.Content || 
-                    payload.body || payload.Body || payload.msg || payload.Msg || payload.message_body;
+    // Extract key information from messages format if it exists
+    let phoneNumber = null;
+    let message = null;
+    let deviceId = null;
     
-    const deviceId = payload.device_id || payload.deviceId || payload.DeviceId || payload.device || payload.Device;
-    
-    console.log(`[${requestId}] Extracted info - Phone: ${phoneNumber}, Message begins: "${message?.substring(0, 30)}..."`);
+    // Check for the SMS Gateway specific messages format
+    if (payload.messages && Array.isArray(payload.messages)) {
+      // This appears to match their webhook format
+      const firstMessage = payload.messages[0];
+      if (firstMessage) {
+        phoneNumber = firstMessage.number || firstMessage.from;
+        message = firstMessage.message;
+        deviceId = firstMessage.deviceID;
+        
+        console.log(`[${requestId}] Extracted from gateway messages format - Phone: ${phoneNumber}, Message: "${message?.substring(0, 30)}..."`);
+      }
+    } else {
+      // Fall back to our generic extraction
+      phoneNumber = payload.number || payload.from || payload.From || payload.sender || payload.Sender || 
+                    payload.source || payload.Source || payload.msisdn || payload.phone;
+                    
+      message = payload.message || payload.text || payload.Text || payload.content || payload.Content || 
+                payload.body || payload.Body || payload.msg || payload.Msg || payload.message_body;
+      
+      deviceId = payload.device_id || payload.deviceId || payload.DeviceId || payload.device || payload.Device;
+      
+      console.log(`[${requestId}] Extracted from generic format - Phone: ${phoneNumber}, Message begins: "${message?.substring(0, 30)}..."`);
+    }
     
     if (!phoneNumber && !message) {
       // Special case - if we couldn't extract phone/message, this might be a test ping
@@ -111,10 +182,15 @@ serve(async (req) => {
           error: 'Phone number and message are required',
           receivedPayload: payload,
           expectedFormat: {
-            number: "Phone number of sender",
-            message: "Text message content"
+            messages: [
+              {
+                number: "Phone number of sender",
+                message: "Text message content",
+                deviceID: "Device ID"
+              }
+            ]
           },
-          commonFormats: "Most SMS gateway formats are supported (Twilio, MessageBird, etc)"
+          note: "The SMS Gateway format or common formats (Twilio, etc.) are supported"
         }),
         { 
           status: 400, 

@@ -40,50 +40,82 @@ serve(async (req) => {
     
     console.log(`Registering webhook URL: ${webhookUrl} for event: ${eventType}`);
     
-    // Call the SMS Gateway API to register the webhook - updated to use the correct endpoint
-    // Typically for SMS gateways, webhook registration would be at a path like 'webhook' or 'settings/webhook'
-    const response = await fetch(`${smsServerUrl}/services/webhook-register.php`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        key: smsApiKey,
-        url: webhookUrl,
-        event: eventType
-      }).toString()
-    });
+    // Try different potential endpoint paths
+    // Based on the PHP example, let's try different potential endpoints
+    const potentialEndpoints = [
+      "services/register-webhook.php",
+      "services/webhook-register.php",
+      "services/webhook.php", 
+      "services/webhooks.php",
+      "services/settings/webhook.php"
+    ];
     
-    // Log the actual response for debugging
-    const responseText = await response.text();
-    console.log(`API Response Status: ${response.status}`);
-    console.log(`API Response Body: ${responseText}`);
+    let successful = false;
+    let responseData = null;
+    let responseError = null;
     
-    // Try to parse the response as JSON, but handle cases where it's not valid JSON
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      throw new Error(`SMS Gateway API returned invalid JSON: ${responseText}`);
-    }
-    
-    if (!response.ok || !data.success) {
-      throw new Error(data.error?.message || `API Error: ${response.status} - ${responseText}`);
-    }
-    
-    console.log("Webhook registered successfully");
-    
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "Webhook registered successfully",
-        data: data
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // Try each endpoint until we find one that works
+    for (const endpoint of potentialEndpoints) {
+      try {
+        console.log(`Trying endpoint: ${smsServerUrl}/${endpoint}`);
+        
+        const response = await fetch(`${smsServerUrl}/${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            key: smsApiKey,
+            url: webhookUrl,
+            event: eventType
+          }).toString()
+        });
+        
+        // Log the actual response for debugging
+        const responseText = await response.text();
+        console.log(`API Response Status (${endpoint}): ${response.status}`);
+        console.log(`API Response Body (${endpoint}): ${responseText}`);
+        
+        // Try to parse the response as JSON, but handle cases where it's not valid JSON
+        try {
+          const data = JSON.parse(responseText);
+          
+          if (response.ok && data.success) {
+            successful = true;
+            responseData = data;
+            console.log(`Successful registration with endpoint: ${endpoint}`);
+            break;
+          }
+          
+          // Store the error in case all endpoints fail
+          responseError = data.error?.message || `API Error with ${endpoint}: ${response.status}`;
+        } catch (e) {
+          console.log(`Response from ${endpoint} is not valid JSON: ${responseText}`);
+          responseError = `Invalid JSON response from ${endpoint}: ${responseText.substring(0, 100)}...`;
+        }
+      } catch (fetchError) {
+        console.error(`Error with endpoint ${endpoint}:`, fetchError);
+        responseError = `Fetch error with ${endpoint}: ${fetchError.message}`;
       }
-    );
+    }
+    
+    if (successful) {
+      console.log("Webhook registered successfully");
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: "Webhook registered successfully",
+          data: responseData
+        }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    } else {
+      throw new Error(responseError || "Failed to register webhook with any endpoint");
+    }
   } catch (error) {
     console.error("Error registering webhook:", error);
     return new Response(
