@@ -5,3 +5,15 @@ app_settings.streaming.minimum_version = "1.23.0"
 
 [functions."twilio-token"]
 verify_jwt = false
+
+[functions."automation-matcher"]
+verify_jwt = false
+
+[functions."loe-generator"]
+verify_jwt = false
+
+[functions."income-verification"]
+verify_jwt = false
+
+[functions."asset-verification"]
+verify_jwt = false
