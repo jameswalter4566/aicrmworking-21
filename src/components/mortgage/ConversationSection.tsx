@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { leadProfileService } from "@/services/leadProfile";
+import AISMSAgent from "@/components/sms/AISMSAgent";
 
 interface Message {
   id: string;
@@ -239,6 +239,8 @@ const ConversationSection = ({ leadId }: ConversationSectionProps) => {
           </Button>
         </div>
       </div>
+      
+      <AISMSAgent enabled={true} />
       
       <Tabs defaultValue="all" value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
         <TabsList className="bg-white border border-blue-100 mb-4">

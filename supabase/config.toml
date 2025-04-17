@@ -87,3 +87,8 @@ invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
 [functions.sms-webhook-handler]
 verify_jwt = false
 invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
+
+# AI SMS Agent function
+[functions.ai-sms-agent]
+verify_jwt = false
+invoker_roles = ["anon", "service_role", "authenticated", "postgres"]
