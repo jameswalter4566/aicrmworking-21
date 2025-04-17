@@ -66,7 +66,7 @@ serve(async (req) => {
       .from("leads")
       .select("id, first_name, last_name, mortgage_data, property_address")
       .eq("id", leadId)
-      .single();
+      .maybeSingle();  // Use maybeSingle instead of single
 
     if (fetchError) {
       console.error(`[${requestId}] Error fetching lead data:`, fetchError);
@@ -82,7 +82,17 @@ serve(async (req) => {
     if (!leadData) {
       console.error(`[${requestId}] Lead not found: ${leadId}`);
       return new Response(
-        JSON.stringify({ success: false, error: "Lead not found" }),
+        JSON.stringify({ 
+          success: false, 
+          error: "Lead not found",
+          data: {
+            leadId,
+            currentStep: "applicationCreated",
+            stepIndex: 0,
+            progressPercentage: 0,
+            allSteps: LOAN_PROGRESS_STEPS,
+          }
+        }),
         {
           status: 404,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
