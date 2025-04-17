@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
@@ -21,7 +20,6 @@ const ConditionAutomationTester: React.FC<Props> = ({ leadId, conditions }) => {
   const runAutomation = async () => {
     setIsProcessing(true);
     try {
-      // Call the automation-matcher function
       const { data, error } = await supabase.functions.invoke('automation-matcher', {
         body: { 
           leadId,
@@ -56,7 +54,7 @@ const ConditionAutomationTester: React.FC<Props> = ({ leadId, conditions }) => {
       <CardContent>
         <div className="space-y-4">
           {!results ? (
-            <Alert variant="outline" className="bg-blue-50 border-blue-200">
+            <Alert variant="default" className="bg-blue-50 border-blue-200">
               <AlertTitle className="text-blue-800">Test Automation</AlertTitle>
               <AlertDescription className="text-blue-700">
                 Click the button below to test the condition automation system. This will analyze all conditions
