@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -6,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useLoanProgress } from "@/hooks/use-loan-progress";
+import { Progress } from "@/components/ui/progress";
 
 interface EmailParserProps {
   clientLastName: string;
@@ -22,6 +22,7 @@ const EmailConditionsParser: React.FC<EmailParserProps> = ({
 }) => {
   const [emailContent, setEmailContent] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [progress, setProgress] = useState<number>(0);
   const { updateLoanProgress } = useLoanProgress();
   
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -35,8 +36,10 @@ const EmailConditionsParser: React.FC<EmailParserProps> = ({
     }
     
     setIsAnalyzing(true);
+    setProgress(10); // Start progress
     
     try {
+      setProgress(30); // Incremental progress
       // Call the OpenAI API to analyze the content
       const { data, error } = await supabase.functions.invoke('parse-approval-document', {
         body: { 
@@ -46,6 +49,8 @@ const EmailConditionsParser: React.FC<EmailParserProps> = ({
         }
       });
       
+      setProgress(50); // More progress
+      
       if (error) {
         throw new Error(`API Error: ${error.message}`);
       }
@@ -53,6 +58,8 @@ const EmailConditionsParser: React.FC<EmailParserProps> = ({
       if (!data.success) {
         throw new Error(data.error || "Failed to parse conditions");
       }
+      
+      setProgress(70); // More progress
       
       // Extract the conditions
       const conditions = data.conditions;
@@ -66,6 +73,8 @@ const EmailConditionsParser: React.FC<EmailParserProps> = ({
       )) {
         throw new Error("No conditions could be extracted from the email content");
       }
+      
+      setProgress(85); // Almost done
       
       // Save the conditions to the database
       if (leadId) {
@@ -99,6 +108,8 @@ const EmailConditionsParser: React.FC<EmailParserProps> = ({
         }
       }
       
+      setProgress(100); // Complete!
+      
       // Notify parent component about the conditions
       onConditionsFound(conditions);
       
@@ -109,12 +120,30 @@ const EmailConditionsParser: React.FC<EmailParserProps> = ({
       console.error("Error analyzing conditions:", error);
       toast.error(error.message || "Failed to analyze conditions");
     } finally {
-      setIsAnalyzing(false);
+      // Reset progress after a short delay to show completion
+      setTimeout(() => {
+        setProgress(0);
+        setIsAnalyzing(false);
+      }, 500);
     }
   };
   
   return (
     <div className="space-y-4">
+      {isAnalyzing && (
+        <div className="space-y-2">
+          <Progress value={progress} className="w-full h-2" />
+          <p className="text-sm text-gray-500 text-center">
+            {progress < 30 && "Initializing analysis..."}
+            {progress >= 30 && progress < 50 && "Processing content..."}
+            {progress >= 50 && progress < 70 && "Extracting conditions..."}
+            {progress >= 70 && progress < 85 && "Validating data..."}
+            {progress >= 85 && progress < 100 && "Saving conditions..."}
+            {progress === 100 && "Complete!"}
+          </p>
+        </div>
+      )}
+      
       <div>
         <p className="text-sm text-gray-600 mb-2">
           Paste the approval email content here. Our AI will automatically extract the loan conditions.
