@@ -268,90 +268,9 @@ serve(async (req) => {
       // Generate AI response using OpenAI
       const responseMessage = await generateAIResponse(message, openAiApiKey, requestId);
       
-      // Send the SMS response - DIRECT IMPLEMENTATION WITHOUT USING SUPABASE INVOKE
+      // Send the SMS response
       console.log(`[${requestId}] Sending SMS response to ${phoneNumber}`);
-      
-      // Get SMS API credentials
-      const smsApiKey = Deno.env.get("SMS_API_KEY");
-      const smsApiUrl = Deno.env.get("SMS_API_URL") || "https://app.smsgatewayhub.com/api/v2/SendSMS";
-      
-      if (!smsApiKey) {
-        throw new Error("SMS API key is not configured");
-      }
-      
-      // Prepare the request
-      const formData = new URLSearchParams();
-      formData.append('APIKey', smsApiKey);
-      formData.append('number', phoneNumber);
-      formData.append('message', responseMessage);
-      formData.append('prioritize', '1');
-      
-      // Send the SMS via the gateway API directly with browser-like headers
-      const smsResponse = await fetch(smsApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Origin': 'https://app.smsgatewayhub.com',
-          'Referer': 'https://app.smsgatewayhub.com/'
-        },
-        body: formData.toString()
-      });
-      
-      console.log(`[${requestId}] SMS Gateway direct response status: ${smsResponse.status}`);
-      
-      if (!smsResponse.ok) {
-        let errorBody;
-        try {
-          errorBody = await smsResponse.text();
-          console.log(`[${requestId}] Full error response body: ${errorBody.substring(0, 500)}...`);
-
-          if (errorBody.includes('<html>') || errorBody.includes('<!DOCTYPE')) {
-            console.error(`[${requestId}] Gateway returned HTML instead of API response. Possible Cloudflare challenge or incorrect URL.`);
-            // Mark as processed but with error
-            await supabase
-              .from('sms_webhooks')
-              .update({
-                processed: true,
-                ai_response: responseMessage,
-                processed_at: new Date().toISOString(),
-                processing_error: "SMS Gateway returned Cloudflare challenge. Response not sent."
-              })
-              .eq('id', webhookId);
-              
-            return new Response(
-              JSON.stringify({
-                success: true,
-                message: 'Webhook received and AI processed, but SMS response could not be sent due to Cloudflare protection',
-                webhookId,
-                aiResponse: responseMessage,
-                requestId,
-                error: "SMS Gateway returned Cloudflare challenge. Consider changing providers."
-              }),
-              {
-                status: 202, // Accepted with partial processing
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              }
-            );
-          }
-        } catch (e) {
-          errorBody = "Could not read response";
-        }
-        
-        throw new Error(`SMS Gateway returned status ${smsResponse.status}: ${errorBody}`);
-      }
-      
-      // Parse the response
-      let gatewayResponse;
-      try {
-        const responseText = await smsResponse.text();
-        console.log(`[${requestId}] SMS Gateway raw response:`, responseText);
-        gatewayResponse = JSON.parse(responseText);
-      } catch (e) {
-        throw new Error(`Could not parse SMS Gateway response: ${e.message}`);
-      }
+      const sendResult = await sendSMSResponse(phoneNumber, responseMessage, supabase, requestId);
       
       // Mark the webhook as processed
       await supabase
@@ -380,20 +299,6 @@ serve(async (req) => {
       );
     } catch (processingError) {
       console.error(`[${requestId}] Error processing message with AI:`, processingError);
-      
-      // Mark webhook as processed but with error
-      try {
-        await supabase
-          .from('sms_webhooks')
-          .update({
-            processed: true,
-            processing_error: processingError.message,
-            processed_at: new Date().toISOString()
-          })
-          .eq('id', webhookId);
-      } catch (updateError) {
-        console.error(`[${requestId}] Failed to update webhook status:`, updateError);
-      }
       
       return new Response(
         JSON.stringify({
@@ -470,5 +375,31 @@ async function generateAIResponse(messageContent: string, openAiApiKey: string, 
   } catch (error) {
     console.error(`[${requestId}] Error generating AI response:`, error);
     return "Thank you for your message. A loan officer will review your request and get back to you shortly.";
+  }
+}
+
+// Send an SMS response using the SMS Gateway API
+async function sendSMSResponse(phoneNumber: string, message: string, supabase: any, requestId: string): Promise<void> {
+  try {
+    console.log(`[${requestId}] Sending SMS response to ${phoneNumber}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
+    
+    // Call our existing SMS send function
+    const { data, error } = await supabase.functions.invoke('sms-send-single', {
+      body: { 
+        phoneNumber, 
+        message,
+        prioritize: true 
+      }
+    });
+    
+    if (error || !data?.success) {
+      throw new Error(error?.message || data?.error || 'SMS send failed');
+    }
+    
+    console.log(`[${requestId}] SMS response sent successfully to ${phoneNumber} with ID: ${data?.messageId}`);
+    
+  } catch (error) {
+    console.error(`[${requestId}] Error sending SMS response:`, error);
+    throw new Error(`Failed to send SMS response: ${error.message}`);
   }
 }
