@@ -29,12 +29,18 @@ export async function createTwilioClient() {
     throw new Error("Twilio credentials are not configured");
   }
   
-  // Use dynamic import to load Twilio dependency with proper error handling
   try {
-    const twilio = await import("https://esm.sh/twilio@4.20.1");
-    return twilio.default(accountSid, authToken);
+    // Import Twilio with explicit namespace
+    const twilioModule = await import("https://esm.sh/twilio@4.20.1");
+    
+    // Access the constructor properly (ensure it's not undefined)
+    if (!twilioModule || !twilioModule.default) {
+      throw new Error("Twilio module import failed - default export is missing");
+    }
+    
+    return twilioModule.default(accountSid, authToken);
   } catch (error) {
-    console.error("Error importing Twilio module:", error);
+    console.error("Error creating Twilio client:", error);
     throw new Error(`Failed to initialize Twilio client: ${error.message}`);
   }
 }
@@ -56,6 +62,8 @@ export async function sendSMS(
     const fromNumber = options.from || Deno.env.get("TWILIO_PHONE_NUMBER") || "+18336575981";
     
     const formattedFrom = formatPhoneNumber(fromNumber);
+    
+    console.debug(`Using Twilio to send from ${formattedFrom} to ${formattedTo}`);
     
     const messageParams: any = {
       to: formattedTo,
