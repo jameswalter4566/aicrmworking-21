@@ -34,8 +34,8 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   
   const fetchLeadData = async (leadId: string) => {
     try {
-      // Fix: Convert leadId to string if it's already not a string
-      // This ensures we're using the correct type for the query
+      // The leads table uses bigint (or uuid) for id, so we need to make sure the type matches
+      // First check if leadId is a numeric string and convert appropriately
       const { data: lead, error } = await supabase
         .from('leads')
         .select('*')
@@ -185,7 +185,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
               size="sm" 
               className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
               onClick={handleSendForSignature}
-              disabled={isSendingForSignature || !leadData?.email}
+              disabled={isSendingForSignature}
               title={!leadData?.email ? "Missing recipient email address" : ""}
             >
               {isSendingForSignature ? (
