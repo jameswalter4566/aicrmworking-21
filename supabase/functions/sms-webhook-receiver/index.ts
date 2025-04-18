@@ -1,11 +1,10 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
-import * as base64 from "https://deno.land/std@0.177.0/encoding/base64.ts";
+import { validateTwilioWebhook, parseTwilioWebhook } from "../_shared/twilio-sms.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sg-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-sg-signature, x-twilio-signature',
 };
 
 serve(async (req) => {
@@ -29,13 +28,17 @@ serve(async (req) => {
     console.log(`[${requestId}] Request URL: ${req.url}`);
     console.log(`[${requestId}] Request Headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
 
-    // Get SMS Gateway API key for signature verification
-    const smsApiKey = Deno.env.get("SMS_API_KEY");
-    
-    // Check for signature header if using their signature verification
-    const signature = req.headers.get('x-sg-signature');
-    if (signature) {
-      console.log(`[${requestId}] Received signature: ${signature}`);
+    // Check for Twilio signature
+    const twilioSignature = req.headers.get('x-twilio-signature');
+    if (twilioSignature) {
+      console.log(`[${requestId}] Received Twilio signature: ${twilioSignature}`);
+      
+      // In a production environment, you should validate the signature
+      const isValid = validateTwilioWebhook(req);
+      if (!isValid) {
+        console.warn(`[${requestId}] Invalid Twilio signature`);
+        // We're still accepting it for now, but in production you'd want to reject invalid signatures
+      }
     }
     
     // Parse incoming webhook payload
@@ -44,84 +47,35 @@ serve(async (req) => {
     let rawBody = "";
     
     try {
-      // First store the raw body for debugging and signature verification
+      // Store the raw body for debugging
       rawBody = await req.text();
       console.log(`[${requestId}] Raw body:`, rawBody);
       
-      // Verify signature if present and API key is available
-      if (signature && smsApiKey && rawBody.includes('messages')) {
-        // Try to extract messages parameter as it seems to be what's signed
-        const formData = new URLSearchParams(rawBody);
-        const messagesParam = formData.get('messages');
+      if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
+        // This is the typical Twilio webhook format
+        const formData = new FormData();
+        new URLSearchParams(rawBody).forEach((value, key) => {
+          formData.append(key, value);
+        });
         
-        if (messagesParam) {
-          // Create HMAC SHA-256 signature
-          const key = new TextEncoder().encode(smsApiKey);
-          const message = new TextEncoder().encode(messagesParam);
-          
-          const hmacKey = await crypto.subtle.importKey(
-            "raw",
-            key,
-            { name: "HMAC", hash: "SHA-256" },
-            false,
-            ["sign"]
-          );
-          
-          const hmacSignature = await crypto.subtle.sign(
-            "HMAC",
-            hmacKey,
-            message
-          );
-          
-          const calculatedSignature = base64.encode(hmacSignature);
-          console.log(`[${requestId}] Calculated signature: ${calculatedSignature}`);
-          
-          if (calculatedSignature !== signature) {
-            console.warn(`[${requestId}] Signature mismatch. This could be normal during testing.`);
-            // Note: We don't reject here during testing phase but would in production
-          }
-        }
-      }
-      
-      // Then try to parse based on content type
-      if (contentType && contentType.includes('application/json')) {
+        // Parse the Twilio webhook data
+        payload = parseTwilioWebhook(formData);
+      } else if (contentType && contentType.includes('application/json')) {
+        // Handle JSON if sent
         payload = JSON.parse(rawBody);
-      } else if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
-        // Parse URL-encoded form data
-        const params = new URLSearchParams(rawBody);
-        payload = {};
-        for (const [key, value] of params.entries()) {
-          payload[key] = value;
-          
-          // Special handling for 'messages' which may be JSON string
-          if (key === 'messages' && typeof value === 'string') {
-            try {
-              payload[key] = JSON.parse(value);
-              console.log(`[${requestId}] Successfully parsed messages JSON:`, JSON.stringify(payload[key]));
-            } catch (e) {
-              console.log(`[${requestId}] Could not parse messages as JSON: ${e.message}`);
-            }
-          }
-        }
       } else {
-        // Try JSON as fallback
+        // Try to handle as form data anyway
         try {
-          payload = JSON.parse(rawBody);
-        } catch (e) {
-          // If not JSON, try form-urlencoded as fallback
-          try {
-            const params = new URLSearchParams(rawBody);
-            payload = {};
-            for (const [key, value] of params.entries()) {
-              payload[key] = value;
-            }
-          } catch (formError) {
-            // If still fails, create a payload with the raw body for debugging
-            payload = { 
-              _raw: rawBody,
-              _parseError: "Could not parse as JSON or form data"
-            };
-          }
+          const formData = new FormData();
+          new URLSearchParams(rawBody).forEach((value, key) => {
+            formData.append(key, value);
+          });
+          payload = parseTwilioWebhook(formData);
+        } catch (formError) {
+          payload = { 
+            _raw: rawBody,
+            _parseError: "Could not parse as form data"
+          };
         }
       }
     } catch (parseError) {
@@ -134,31 +88,30 @@ serve(async (req) => {
 
     console.log(`[${requestId}] Parsed payload:`, JSON.stringify(payload));
     
-    // Extract key information from messages format if it exists
+    // Extract key information from the message
     let phoneNumber = null;
     let message = null;
-    let deviceId = null;
+    let messageSid = null;
     
-    // Check for the SMS Gateway specific messages format
-    if (payload.messages && Array.isArray(payload.messages)) {
-      // This appears to match their webhook format
-      const firstMessage = payload.messages[0];
-      if (firstMessage) {
-        phoneNumber = firstMessage.number || firstMessage.from;
-        message = firstMessage.message;
-        deviceId = firstMessage.deviceID;
-        
-        console.log(`[${requestId}] Extracted from gateway messages format - Phone: ${phoneNumber}, Message: "${message?.substring(0, 30)}..."`);
-      }
-    } else {
-      // Fall back to our generic extraction
-      phoneNumber = payload.number || payload.from || payload.From || payload.sender || payload.Sender || 
-                    payload.source || payload.Source || payload.msisdn || payload.phone;
-                    
-      message = payload.message || payload.text || payload.Text || payload.content || payload.Content || 
-                payload.body || payload.Body || payload.msg || payload.Msg || payload.message_body;
+    // Extract from Twilio format
+    if (payload.from) {
+      phoneNumber = payload.from;
+      message = payload.body;
+      messageSid = payload.messageSid;
       
-      deviceId = payload.device_id || payload.deviceId || payload.DeviceId || payload.device || payload.Device;
+      console.log(`[${requestId}] Extracted from Twilio format - Phone: ${phoneNumber}, Message: "${message?.substring(0, 30)}..."`);
+    } else {
+      // Fall back to generic extraction (backward compatibility)
+      phoneNumber = payload.From || payload.from || payload.number || 
+                   payload.sender || payload.Sender || payload.source || 
+                   payload.Source || payload.msisdn || payload.phone;
+                   
+      message = payload.Body || payload.body || payload.message || 
+               payload.text || payload.Text || payload.content || 
+               payload.Content || payload.msg || payload.Msg || 
+               payload.message_body;
+      
+      messageSid = payload.MessageSid || payload.messageSid || payload.id;
       
       console.log(`[${requestId}] Extracted from generic format - Phone: ${phoneNumber}, Message begins: "${message?.substring(0, 30)}..."`);
     }
@@ -187,15 +140,11 @@ serve(async (req) => {
           error: 'Phone number and message are required',
           receivedPayload: payload,
           expectedFormat: {
-            messages: [
-              {
-                number: "Phone number of sender",
-                message: "Text message content",
-                deviceID: "Device ID"
-              }
-            ]
+            From: "Sender phone number",
+            Body: "Message text content",
+            MessageSid: "Unique message identifier"
           },
-          note: "The SMS Gateway format or common formats (Twilio, etc.) are supported"
+          note: "Twilio webhook format or common SMS gateway formats are supported"
         }),
         { 
           status: 400, 
@@ -209,8 +158,8 @@ serve(async (req) => {
       .from('sms_webhooks')
       .select('id, processed')
       .eq('processed', false)
-      .or(`webhook_data->number.eq.${phoneNumber},webhook_data->from.eq.${phoneNumber}`)
-      .or(`webhook_data->message.eq."${message}",webhook_data->text.eq."${message}",webhook_data->body.eq."${message}"`)
+      .or(`webhook_data->from.eq.${phoneNumber},webhook_data->From.eq.${phoneNumber}`)
+      .or(`webhook_data->body.eq."${message}",webhook_data->Body.eq."${message}",webhook_data->message.eq."${message}"`)
       .order('received_at', { ascending: false })
       .limit(1);
     
@@ -270,7 +219,13 @@ serve(async (req) => {
       
       // Send the SMS response
       console.log(`[${requestId}] Sending SMS response to ${phoneNumber}`);
-      const sendResult = await sendSMSResponse(phoneNumber, responseMessage, supabase, requestId);
+      const sendResult = await supabase.functions.invoke('sms-send-single', {
+        body: { 
+          phoneNumber, 
+          message: responseMessage,
+          prioritize: true 
+        }
+      });
       
       // Mark the webhook as processed
       await supabase
@@ -375,31 +330,5 @@ async function generateAIResponse(messageContent: string, openAiApiKey: string, 
   } catch (error) {
     console.error(`[${requestId}] Error generating AI response:`, error);
     return "Thank you for your message. A loan officer will review your request and get back to you shortly.";
-  }
-}
-
-// Send an SMS response using the SMS Gateway API
-async function sendSMSResponse(phoneNumber: string, message: string, supabase: any, requestId: string): Promise<void> {
-  try {
-    console.log(`[${requestId}] Sending SMS response to ${phoneNumber}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
-    
-    // Call our existing SMS send function
-    const { data, error } = await supabase.functions.invoke('sms-send-single', {
-      body: { 
-        phoneNumber, 
-        message,
-        prioritize: true 
-      }
-    });
-    
-    if (error || !data?.success) {
-      throw new Error(error?.message || data?.error || 'SMS send failed');
-    }
-    
-    console.log(`[${requestId}] SMS response sent successfully to ${phoneNumber} with ID: ${data?.messageId}`);
-    
-  } catch (error) {
-    console.error(`[${requestId}] Error sending SMS response:`, error);
-    throw new Error(`Failed to send SMS response: ${error.message}`);
   }
 }

@@ -1,90 +1,26 @@
 
+# This is an example to get you started
+# A Deno project for Supabase Edge Functions
 project_id = "imrmboyczebjlbnkgjns"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
+[build]
+include = ["src/pages/**", "supabase/functions/**"]
+exclude = ["**/node_modules"]
 
-[db]
-port = 54322
-shadow_port = 54320
-major_version = 15
-
-[db.pooler]
-enabled = false
-port = 54329
-pool_mode = "transaction"
-default_pool_size = 20
-max_client_conn = 100
-
-[realtime]
-enabled = true
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://localhost"
-
-[inbucket]
-enabled = true
-port = 54324
-
-[storage]
-enabled = true
-
-[auth]
-enabled = true
-site_url = "http://localhost:3000"
-
-[auth.email]
-enable_confirmations = false
-
-[auth.sms]
-enabled = false
-
-[functions]
-enabled = true
-port = 54325
-
-# Add public access for the twilio-token function
 [functions.twilio-token]
 verify_jwt = false
 
-# Add public access for the twilio-voice function
 [functions.twilio-voice]
 verify_jwt = false
 
-# Add public access for the sms-webhook-receiver function
 [functions.sms-webhook-receiver]
 verify_jwt = false
 
-# Add public access for the sms-webhook-handler function
-[functions.sms-webhook-handler]
+[functions.sms-test-webhook]
 verify_jwt = false
 
-# Add public access for the sms-send-single function
-[functions.sms-send-single]
+[functions.sms-test-gateway-webhook]
 verify_jwt = false
 
-# Add public access for the sms-test function
-[functions.sms-test]
+[functions.sms-webhook-test]
 verify_jwt = false
-
-[vector]
-enabled = false
-port = 54327
-
-[observability.metrics]
-enabled = false
-port = 54326
-
-[observability.traces]
-enabled = false
-port = 54328
-
-[ai]
-enabled = false
-port = 54330

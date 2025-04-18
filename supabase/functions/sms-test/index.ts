@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { corsHeaders } from '../_shared/cors.ts';
+import { sendSMS, formatPhoneNumber } from '../_shared/twilio-sms.ts';
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -28,20 +29,25 @@ serve(async (req) => {
       );
     }
     
-    const testMessage = message || "This is a comprehensive test message from the SMS Gateway API";
+    const testMessage = message || "This is a test message from Twilio SMS API";
     
     console.log(`[${requestId}] Sending test SMS to ${phoneNumber}: "${testMessage}"`);
     
-    // Get SMS API credentials from environment variables
-    const smsApiKey = Deno.env.get("SMS_API_KEY");
-    const smsApiUrl = Deno.env.get("SMS_API_URL") || "https://app.smsgatewayhub.com/api/v2/SendSMS";
+    // Format phone number for Twilio
+    const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
+    console.log(`[${requestId}] Formatted phone number: ${formattedPhoneNumber}`);
     
-    if (!smsApiKey) {
-      console.error(`[${requestId}] SMS API key is not configured`);
+    // Send test SMS using Twilio
+    const twilioResponse = await sendSMS(formattedPhoneNumber, testMessage);
+    
+    if (!twilioResponse.success) {
+      console.error(`[${requestId}] Twilio Error:`, twilioResponse.error);
+      
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'SMS API key is missing. Please configure it in Supabase secrets.',
+          error: `Failed to send SMS: ${twilioResponse.error}`,
+          details: twilioResponse.details,
           requestId
         }),
         { 
@@ -51,149 +57,22 @@ serve(async (req) => {
       );
     }
     
-    console.log(`[${requestId}] Using SMS API URL: ${smsApiUrl}`);
-
-    // Log the API key (partially masked)
-    const maskedKey = smsApiKey ? `${smsApiKey.substring(0, 3)}...${smsApiKey.substring(smsApiKey.length - 3)}` : 'undefined';
-    console.log(`[${requestId}] Using API key: ${maskedKey}`);
+    // Success response
+    console.log(`[${requestId}] SMS test sent successfully to ${phoneNumber}`);
     
-    // Validate URL before sending
-    let validatedUrl;
-    try {
-      validatedUrl = new URL(smsApiUrl);
-      console.log(`[${requestId}] Gateway URL validated: ${validatedUrl.origin}${validatedUrl.pathname}`);
-    } catch (e) {
-      console.error(`[${requestId}] Invalid SMS gateway URL: ${smsApiUrl}`, e);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Invalid SMS gateway URL configuration',
-          details: e.message,
-          requestId
-        }),
-        { 
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
-    // Prepare the request to the SMS Gateway
-    const formData = new URLSearchParams();
-    formData.append('APIKey', smsApiKey);
-    formData.append('number', phoneNumber);
-    formData.append('message', testMessage);
-    formData.append('prioritize', '1');
-    
-    try {
-      console.log(`[${requestId}] Request prepared, sending to SMS gateway`);
-      
-      // Send the SMS via the gateway API with comprehensive headers
-      const smsResponse = await fetch(smsApiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-          'Accept': 'application/json, text/plain, */*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Origin': 'https://app.smsgatewayhub.com',
-          'Referer': 'https://app.smsgatewayhub.com/'
-        },
-        body: formData.toString()
-      });
-      
-      console.log(`[${requestId}] SMS Gateway response status: ${smsResponse.status}`);
-      
-      // Check for HTML or unexpected response
-      const responseText = await smsResponse.text();
-      console.log(`[${requestId}] Raw response: ${responseText.substring(0, 500)}`);
-      
-      // Check if response is HTML (indicating a Cloudflare challenge or other issue)
-      if (responseText.includes('<html>') || responseText.includes('<!DOCTYPE')) {
-        console.error(`[${requestId}] Gateway returned HTML instead of API response. Possible Cloudflare challenge.`);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Received HTML response from SMS gateway. Possible Cloudflare challenge.',
-            details: 'Check API URL, key permissions, and network configuration',
-            requestId
-          }),
-          { 
-            status: 403,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: "Test SMS sent successfully via Twilio",
+        messageId: twilioResponse.messageId,
+        status: twilioResponse.status,
+        requestId
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-      
-      // Try to parse JSON response
-      let gatewayResponse;
-      try {
-        gatewayResponse = JSON.parse(responseText);
-        console.log(`[${requestId}] Parsed gateway response:`, JSON.stringify(gatewayResponse));
-      } catch (parseError) {
-        console.error(`[${requestId}] Failed to parse gateway response:`, parseError);
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Could not parse SMS gateway response',
-            rawResponse: responseText,
-            requestId
-          }),
-          { 
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-      
-      // Validate gateway response
-      if (!gatewayResponse.success) {
-        console.error(`[${requestId}] Gateway reported failure:`, JSON.stringify(gatewayResponse));
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: gatewayResponse.error || 'SMS Gateway reported failure',
-            gatewayResponse,
-            requestId
-          }),
-          { 
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-      
-      // Success response
-      console.log(`[${requestId}] SMS test sent successfully to ${phoneNumber}`);
-      
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Test SMS sent successfully",
-          messageId: gatewayResponse.id || gatewayResponse.messageId || requestId,
-          gatewayResponse,
-          requestId
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    } catch (error) {
-      console.error(`[${requestId}] Error sending SMS:`, error);
-      
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: error.message || "Unknown error",
-          requestId
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+    );
   } catch (error) {
     console.error("Error in SMS test function:", error);
     return new Response(
