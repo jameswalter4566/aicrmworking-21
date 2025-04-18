@@ -16,6 +16,7 @@ serve(async (req) => {
     const { phoneNumber, message, prioritize = false } = await req.json();
     
     if (!phoneNumber || !message) {
+      console.error(`[${requestId}] Missing required parameters: phoneNumber=${phoneNumber}, message=${message ? 'provided' : 'missing'}`);
       return new Response(
         JSON.stringify({
           success: false,
@@ -35,8 +36,11 @@ serve(async (req) => {
     const smsApiUrl = Deno.env.get("SMS_API_URL") || "https://app.smsgatewayhub.com/api/v2/SendSMS";
     
     if (!smsApiKey) {
+      console.error(`[${requestId}] SMS API key is not configured`);
       throw new Error("SMS API key is not configured");
     }
+    
+    console.log(`[${requestId}] Using SMS API URL: ${smsApiUrl}`);
     
     // Prepare the request to the SMS Gateway
     const formData = new URLSearchParams();
@@ -44,6 +48,8 @@ serve(async (req) => {
     formData.append('number', phoneNumber);
     formData.append('message', message);
     formData.append('prioritize', prioritize ? '1' : '0');
+    
+    console.log(`[${requestId}] Request prepared, sending to SMS gateway`);
     
     // Send the SMS via the gateway API
     const smsResponse = await fetch(smsApiUrl, {
@@ -54,6 +60,8 @@ serve(async (req) => {
       body: formData.toString()
     });
     
+    console.log(`[${requestId}] SMS Gateway response status: ${smsResponse.status}`);
+    
     if (!smsResponse.ok) {
       let errorBody;
       try {
@@ -63,12 +71,14 @@ serve(async (req) => {
       }
       
       console.error(`[${requestId}] SMS Gateway error: Status ${smsResponse.status}, Body: ${errorBody}`);
+      console.error(`[${requestId}] Request data: phoneNumber=${phoneNumber.substring(0, 6)}***, message length=${message.length}`);
       
       return new Response(
         JSON.stringify({
           success: false,
           error: `SMS Gateway returned status ${smsResponse.status}`,
-          details: errorBody
+          details: errorBody,
+          requestId
         }),
         { 
           status: 502, // Bad Gateway
@@ -78,15 +88,36 @@ serve(async (req) => {
     }
     
     // Parse the SMS gateway response
-    const gatewayResponse = await smsResponse.json();
-    console.log(`[${requestId}] SMS Gateway response:`, JSON.stringify(gatewayResponse));
+    let gatewayResponse;
+    try {
+      const responseText = await smsResponse.text();
+      console.log(`[${requestId}] SMS Gateway raw response:`, responseText);
+      gatewayResponse = JSON.parse(responseText);
+    } catch (e) {
+      console.error(`[${requestId}] Error parsing gateway response:`, e);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Could not parse SMS Gateway response",
+          details: e.message
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    console.log(`[${requestId}] SMS Gateway parsed response:`, JSON.stringify(gatewayResponse));
     
     if (!gatewayResponse.success) {
+      console.error(`[${requestId}] Gateway reported failure:`, JSON.stringify(gatewayResponse));
       return new Response(
         JSON.stringify({
           success: false,
           error: gatewayResponse.error || "SMS Gateway reported failure",
-          gatewayResponse
+          gatewayResponse,
+          requestId
         }),
         { 
           status: 400,
@@ -102,7 +133,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         messageId: gatewayResponse.id || gatewayResponse.messageId || requestId,
-        gatewayResponse
+        gatewayResponse,
+        requestId
       }),
       {
         status: 200,
@@ -110,12 +142,14 @@ serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error("Error sending SMS:", error);
+    const requestId = crypto.randomUUID();
+    console.error(`[${requestId}] Error sending SMS:`, error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || "Unknown error"
+        error: error.message || "Unknown error",
+        requestId
       }),
       {
         status: 500,

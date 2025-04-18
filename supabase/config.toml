@@ -69,6 +69,10 @@ verify_jwt = false
 [functions.sms-send-single]
 verify_jwt = false
 
+# Add public access for the sms-test function
+[functions.sms-test]
+verify_jwt = false
+
 [vector]
 enabled = false
 port = 54327
