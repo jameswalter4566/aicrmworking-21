@@ -1,9 +1,7 @@
-
-import React, { useState, useEffect } from "react";
-import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck, Mail } from "lucide-react";
+import React, { useState } from "react";
+import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -19,40 +17,12 @@ export interface LoanCondition {
   signedDocumentUrl?: string;
 }
 
-export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string | number }> = ({ 
+export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string }> = ({ 
   condition,
   leadId 
 }) => {
   const [isSendingForSignature, setIsSendingForSignature] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
-  const [leadData, setLeadData] = useState<any>(null);
-  const [signerEmail, setSignerEmail] = useState("");
-  const [docuSignError, setDocuSignError] = useState<string | null>(null);
-  
-  useEffect(() => {
-    if (leadId) {
-      // Always convert leadId to string when using it in API calls or queries
-      fetchLeadData(String(leadId));
-    }
-  }, [leadId]);
-  
-  const fetchLeadData = async (leadIdString: string) => {
-    try {
-      const { data: lead, error } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', leadIdString)
-        .maybeSingle();
-        
-      if (error) {
-        console.error("Error fetching lead data:", error);
-      } else if (lead) {
-        setLeadData(lead);
-      }
-    } catch (err) {
-      console.error("Error in fetchLeadData:", err);
-    }
-  };
   
   const handleDownload = (url: string) => {
     const link = document.createElement('a');
@@ -64,68 +34,23 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   };
   
   const handleSendForSignature = async () => {
-    if (!condition.id || !condition.documentUrl) {
-      toast.error("Missing required information to send for signature");
-      console.error("Missing conditionId or documentUrl", {
-        leadId,
-        conditionId: condition.id,
-        documentUrl: condition.documentUrl
-      });
-      return;
-    }
-    
-    if (!signerEmail) {
-      toast.error("Please enter a recipient email address");
-      return;
-    }
+    if (!leadId || !condition.id || !condition.documentUrl) return;
     
     setIsSendingForSignature(true);
-    setDocuSignError(null);
-    
     try {
-      console.log("Sending condition for signature:", condition.id);
-      console.log("Using recipient email:", signerEmail);
-      console.log("Lead ID being used:", leadId);
-      
-      // Create a safe recipient name based on lead data
-      const recipientName = leadData ? 
-        `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Borrower' : 
-        'Borrower';
-      
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
-          leadId: leadId ? String(leadId) : undefined,
+          leadId,
           conditions: [condition],
-          sendForSignature: true,
-          recipientEmail: signerEmail,
-          recipientName: recipientName
+          sendForSignature: true
         }
       });
       
       if (error) {
         toast.error("Failed to send document for signature");
         console.error('Error sending for signature:', error);
-      } else if (data?.success) {
-        toast.success(`Document sent for signature successfully`);
-        const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-          body: { leadId: leadId ? String(leadId) : undefined }
-        });
-        
-        if (refreshData?.success && refreshData?.conditions) {
-          console.log("Conditions refreshed after sending for signature");
-        }
-      } else {
-        // Check if there's a DocuSign-specific error
-        const docusignError = data?.results?.[0]?.error;
-        if (docusignError && docusignError.includes("DocuSign error")) {
-          // Store the DocuSign error message for display in the UI
-          setDocuSignError("DocuSign connection error. The document was generated successfully but couldn't be sent for signature.");
-          // Show a more user-friendly error message
-          toast.error("DocuSign connection error. You can still download the document.");
-        } else {
-          toast.error(data?.error || "Unknown error sending document for signature");
-          console.error('Unknown error in loe-generator:', data);
-        }
+      } else if (data.success) {
+        toast.success(`Document sent for signature`);
       }
     } catch (err) {
       console.error("Error in handleSendForSignature:", err);
@@ -136,44 +61,34 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   };
   
   const handleCheckStatus = async () => {
-    if (!condition.id || !condition.docuSignEnvelopeId) {
-      toast.error("Missing required information to check signature status");
-      return;
-    }
+    if (!leadId || !condition.id || !condition.docuSignEnvelopeId) return;
     
     setIsCheckingStatus(true);
     try {
-      console.log("Checking signature status for envelope:", condition.docuSignEnvelopeId);
-      
       const { data, error } = await supabase.functions.invoke('docusign-status-check', {
         body: {
           envelopeId: condition.docuSignEnvelopeId,
-          leadId: leadId ? String(leadId) : undefined,
+          leadId,
           conditionId: condition.id,
-          checkOnly: false
+          checkOnly: false // Download if completed
         }
       });
       
       if (error) {
         toast.error("Failed to check signature status");
         console.error('Error checking signature status:', error);
-      } else if (data?.success) {
+      } else if (data.success) {
         toast.success(`Signature status: ${data.status}`);
         
         if (data.signedDocumentUrl) {
-          toast.success("Signed document retrieved successfully!");
-          
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-            body: { leadId: leadId ? String(leadId) : undefined }
+            body: { leadId }
           });
           
           if (refreshData?.success && refreshData?.conditions) {
-            console.log("Conditions refreshed with signed document");
+            toast.success("Signed document retrieved successfully!");
           }
         }
-      } else {
-        toast.error(data?.error || "Unknown error checking signature status");
-        console.error('Unknown error in docusign-status-check:', data);
       }
     } catch (err) {
       console.error("Error in handleCheckStatus:", err);
@@ -201,62 +116,26 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
             </Button>
           )}
           
-          {condition.documentUrl && !condition.docuSignEnvelopeId && !docuSignError && (
-            <div className="flex items-center gap-2">
-              <Input
-                type="email"
-                placeholder="Enter signer email"
-                value={signerEmail}
-                onChange={(e) => setSignerEmail(e.target.value)}
-                className="h-7 text-xs w-[200px]"
-                size="sm"
-              />
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
-                onClick={handleSendForSignature}
-                disabled={isSendingForSignature || !signerEmail}
-              >
-                {isSendingForSignature ? (
-                  <>
-                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <SendToBack className="h-3 w-3 mr-1" />
-                    Send for Signature
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
-
-          {docuSignError && (
-            <div className="flex flex-col w-full">
-              <p className="text-xs text-amber-600 mb-1">{docuSignError}</p>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="email"
-                  placeholder="Update signer email"
-                  value={signerEmail}
-                  onChange={(e) => setSignerEmail(e.target.value)}
-                  className="h-7 text-xs w-[200px]"
-                  size="sm"
-                />
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-7 px-2 text-xs bg-amber-50 text-amber-700 hover:bg-amber-100"
-                  onClick={handleSendForSignature}
-                  disabled={isSendingForSignature || !signerEmail}
-                >
+          {condition.documentUrl && !condition.docuSignEnvelopeId && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
+              onClick={handleSendForSignature}
+              disabled={isSendingForSignature}
+            >
+              {isSendingForSignature ? (
+                <>
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
                   <SendToBack className="h-3 w-3 mr-1" />
-                  Retry Signature
-                </Button>
-              </div>
-            </div>
+                  Send for Signature
+                </>
+              )}
+            </Button>
           )}
           
           {condition.docuSignEnvelopeId && !condition.signedDocumentUrl && (

@@ -1,7 +1,6 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
-import { create, verify, getNumericDate } from "https://deno.land/x/djwt@v2.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,8 +12,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// DocuSign configuration - updated base URL to correct endpoint
-const docusignBaseUrl = Deno.env.get('DOCUSIGN_BASE_URL') || 'https://account-d.docusign.com';
+// DocuSign configuration
+const docusignBaseUrl = Deno.env.get('DOCUSIGN_BASE_URL') || 'https://demo.docusign.net';
 const docusignAccountId = Deno.env.get('DOCUSIGN_ACCOUNT_ID');
 const docusignIntegrationKey = Deno.env.get('DOCUSIGN_INTEGRATION_KEY');
 const docusignPrivateKey = Deno.env.get('DOCUSIGN_PRIVATE_KEY');
@@ -25,11 +24,6 @@ const docusignImpersonatedUserId = Deno.env.get('DOCUSIGN_IMPERSONATED_USER_ID')
  */
 async function getDocuSignAccessToken() {
   try {
-    // Generate proper JWT token
-    const jwt = await generateJWT();
-    
-    console.log(`Requesting token from ${docusignBaseUrl}/oauth/token`);
-    
     const response = await fetch(`${docusignBaseUrl}/oauth/token`, {
       method: 'POST',
       headers: {
@@ -37,15 +31,13 @@ async function getDocuSignAccessToken() {
       },
       body: new URLSearchParams({
         'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        'assertion': jwt
+        'assertion': generateJWT()
       })
     });
 
     if (!response.ok) {
       const error = await response.text();
       console.error('Error getting DocuSign access token:', error);
-      console.error('Response status:', response.status);
-      console.error('Response status text:', response.statusText);
       throw new Error(`Failed to get DocuSign token: ${error}`);
     }
 
@@ -58,89 +50,24 @@ async function getDocuSignAccessToken() {
 }
 
 /**
- * Properly generates a JWT for DocuSign authentication
+ * Generates a JWT for DocuSign authentication
  */
-async function generateJWT() {
-  try {
-    // Check if we have all required credentials
-    if (!docusignIntegrationKey || !docusignPrivateKey || !docusignImpersonatedUserId) {
-      console.error('Missing required DocuSign credentials');
-      throw new Error('Missing required DocuSign credentials');
-    }
-    
-    console.log('Generating JWT token for DocuSign authentication');
-    
-    // Convert PEM to key object for signing
-    const privateKey = await importPrivateKey(docusignPrivateKey);
-    
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iss: docusignIntegrationKey,
-      sub: docusignImpersonatedUserId,
-      iat: now,
-      exp: now + (60 * 60), // Token valid for 1 hour
-      aud: docusignBaseUrl,
-      scope: "signature impersonation"
-    };
-    
-    // Create the JWT
-    return await create({ alg: "RS256", typ: "JWT" }, payload, privateKey);
-  } catch (error) {
-    console.error("Error generating JWT:", error);
-    throw new Error(`JWT generation failed: ${error.message}`);
-  }
-}
-
-/**
- * Import private key from PEM format with robust error handling
- * Expects PKCS#8 format key
- */
-async function importPrivateKey(pemRaw: string) {
-  try {
-    if (!pemRaw) {
-      throw new Error("Private key is empty or not provided");
-    }
-    
-    // 1. Restore real line-breaks that were escaped as \n
-    const pem = pemRaw.replace(/\\n/g, '\n').trim();
-    
-    // 2. Strip header/footer and whitespace
-    const body = pem
-      .replace(/-----BEGIN PRIVATE KEY-----/, '')
-      .replace(/-----END PRIVATE KEY-----/, '')
-      .replace(/\s+/g, '');
-    
-    if (!body) {
-      throw new Error("Private key content is empty after formatting");
-    }
-    
-    console.log("Private key format processed, length:", body.length);
-    
-    // 3. Convert to ArrayBuffer
-    const der = Uint8Array.from(atob(body), c => c.charCodeAt(0)).buffer;
-    
-    // 4. Import as PKCS#8
-    return await crypto.subtle.importKey(
-      "pkcs8",
-      der,
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
-  } catch (error) {
-    console.error("Error importing private key:", error);
-    
-    // Add more specific error info to help debug
-    if (error.message && error.message.includes("decode base64")) {
-      console.error("This appears to be a base64 decoding issue. Make sure your private key is properly formatted.");
-      console.error("Verify your key is properly escaped in the environment variable.");
-    } else if (error.message && error.message.includes("expected SEQUENCE")) {
-      console.error("This appears to be a DER format issue. Your key might be in PKCS#1 format but needs to be in PKCS#8.");
-      console.error("Run this command to convert your key to PKCS#8: openssl pkcs8 -topk8 -nocrypt -in docusign_private_key.pem -out docusign_private_key_pkcs8.pem");
-    }
-    
-    throw error;
-  }
+function generateJWT() {
+  // This is a simplified version - in production use a proper JWT library
+  // For demo purposes only - in a real implementation, use a proper JWT library
+  
+  // Here we would typically:
+  // 1. Create JWT header
+  // 2. Create JWT payload with proper claims (iss, sub, aud, exp, etc.)
+  // 3. Sign with the private key
+  // 4. Encode to base64url
+  
+  // Since we can't include a full JWT implementation in this example,
+  // let's log that we would generate a JWT here
+  console.log("Would generate JWT with integration key and private key");
+  
+  // In a real implementation, this would be a proper JWT
+  return "WOULD_BE_A_REAL_JWT";
 }
 
 /**
@@ -190,13 +117,8 @@ async function sendToDocuSign(pdfBytes: Uint8Array, recipientEmail: string, reci
       status: "sent" // Send immediately
     };
     
-    console.log("Preparing DocuSign envelope for recipient:", recipientEmail);
-    
-    const apiUrl = `${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes`;
-    console.log(`Sending envelope to DocuSign API: ${apiUrl}`);
-    
     // Send the envelope
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -208,8 +130,6 @@ async function sendToDocuSign(pdfBytes: Uint8Array, recipientEmail: string, reci
     if (!response.ok) {
       const error = await response.text();
       console.error('Error sending envelope to DocuSign:', error);
-      console.error('Response status:', response.status);
-      console.error('Response status text:', response.statusText);
       throw new Error(`Failed to send envelope: ${error}`);
     }
     
@@ -291,13 +211,13 @@ serve(async (req) => {
   try {
     console.log('LOE Generator function called');
     
-    const { leadId, conditions, sendForSignature = false, recipientEmail, recipientName } = await req.json();
+    const { leadId, conditions, sendForSignature = false } = await req.json();
     
-    if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
+    if (!leadId || !conditions || !Array.isArray(conditions) || conditions.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Missing conditions parameter" 
+          error: "Invalid request parameters" 
         }),
         { 
           status: 400, 
@@ -306,40 +226,40 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing LOE for lead ID: ${leadId || 'not provided'}`);
+    console.log(`Processing LOE for lead ID: ${leadId}`);
     console.log(`Conditions to process: ${conditions.length}`);
     console.log(`Send for signature: ${sendForSignature}`);
     
-    let lead = null;
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('id', leadId)
+      .single();
     
-    if (leadId) {
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .eq('id', leadId)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching lead data:', error);
-        // Continue without lead data - we'll use provided recipient info if available
-      } else {
-        lead = data;
-      }
+    if (leadError) {
+      console.error('Error fetching lead data:', leadError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Failed to fetch lead data" 
+        }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
     
     const results = await Promise.all(conditions.map(async (condition) => {
       const loeType = determineLOEType(condition.text || condition.description);
-      
-      // Create a safe version of lead data with default values for required fields
-      const safeLead = lead || {};
-      const loeContent = generateLOEContent(loeType, safeLead, condition);
+      const loeContent = generateLOEContent(loeType, lead, condition);
       
       try {
         // Generate PDF content using our PDF generator
         const pdfBytes = await generatePDF(loeContent);
         
         const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
-        const filePath = leadId ? `leads/${leadId}/loe/${fileName}` : `loe/${fileName}`;
+        const filePath = `leads/${leadId}/loe/${fileName}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('borrower-documents')
@@ -358,75 +278,49 @@ serve(async (req) => {
           .getPublicUrl(filePath);
         
         let docusignResult = null;
-        let docusignError = null;
         
         // If sendForSignature is true and we have recipient info, send to DocuSign
-        if (sendForSignature) {
+        if (sendForSignature && lead.email) {
           try {
             if (!docusignAccountId || !docusignIntegrationKey || !docusignPrivateKey) {
               console.warn('DocuSign credentials not configured, skipping signature request');
-              docusignError = "DocuSign credentials not configured";
             } else {
-              // Use explicitly provided recipient email/name, or fallback safely
-              const signerEmail = recipientEmail || '';
+              console.log('Sending document to DocuSign for signature');
+              docusignResult = await sendToDocuSign(
+                pdfBytes,
+                lead.email,
+                `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`,
+                `Letter of Explanation - ${formatLOETypeTitle(loeType)}`
+              );
               
-              // Create a safe recipient name, ensuring we don't try to access properties of undefined
-              const signerName = recipientName || 'Borrower';
-                
-              if (!signerEmail) {
-                throw new Error("Missing recipient email address for DocuSign");
-              }
+              console.log('DocuSign envelope created:', docusignResult);
               
-              console.log('Sending document to DocuSign for signature to:', signerEmail);
-              
-              try {
-                docusignResult = await sendToDocuSign(
-                  pdfBytes,
-                  signerEmail,
-                  signerName,
-                  `Letter of Explanation - ${formatLOETypeTitle(loeType)}`
-                );
-                
-                console.log('DocuSign envelope created:', docusignResult);
-                
-                // Store the envelope ID and status in the database
-                if (leadId) {
-                  await supabase.from('docusign_envelopes')
-                    .insert({
-                      lead_id: leadId,
-                      condition_id: condition.id,
-                      envelope_id: docusignResult.envelopeId,
-                      status: docusignResult.status,
-                      document_name: fileName,
-                      document_url: publicUrl
-                    });
-                }
-              } catch (docuSignSendError) {
-                // Capture the DocuSign error but still return the document URL
-                docusignError = `DocuSign error: ${docuSignSendError.message}`;
-                console.error('Error sending document to DocuSign:', docuSignSendError);
-              }
+              // Store the envelope ID and status in the database
+              await supabase.from('docusign_envelopes')
+                .insert({
+                  lead_id: leadId,
+                  condition_id: condition.id,
+                  envelope_id: docusignResult.envelopeId,
+                  status: docusignResult.status,
+                  document_name: fileName,
+                  document_url: publicUrl
+                });
             }
           } catch (docusignError) {
             console.error('Error sending document to DocuSign:', docusignError);
-            // Don't rethrow - we want to return the generated document URL even if DocuSign fails
+            // Continue without failing - we'll still return the document URL
           }
         }
         
         // After generating the LOE, update the condition with the document URL
-        if (leadId) {
-          await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl, docusignResult?.envelopeId);
-        }
+        await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl, docusignResult?.envelopeId);
         
-        // We still return success:true even if DocuSign failed
-        // The client can handle the DocuSign error and still show the generated document
         return {
           conditionId: condition.id,
           loeType,
           documentUrl: publicUrl,
           docusign: docusignResult,
-          error: docusignError, // Include the DocuSign error if any
-          success: !docusignError // Success is true if there's no DocuSign error
+          success: true
         };
       } catch (error) {
         console.error(`Error generating PDF for condition ${condition.id}:`, error);
@@ -439,19 +333,16 @@ serve(async (req) => {
       }
     }));
     
-    // We consider the overall operation successful if we at least generated documents
-    const isOverallSuccess = results.some(result => result.documentUrl);
-    
     console.log('LOE processing completed successfully');
     
     return new Response(
       JSON.stringify({ 
-        success: isOverallSuccess, 
+        success: true, 
         processedCount: results.length,
         results
       }),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   } catch (error) {
@@ -464,7 +355,7 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     );
   }
@@ -583,11 +474,7 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
     day: 'numeric'
   });
   
-  // Safely construct borrower name with fallbacks
-  const firstName = lead.first_name || 'Borrower';
-  const lastName = lead.last_name || '';
-  const borrowerName = `${firstName} ${lastName}`.trim();
-  
+  const borrowerName = `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`;
   const propertyAddress = lead.property_address || 'Subject Property';
   
   let content = `${currentDate}\n\n`;
@@ -598,7 +485,7 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
   content += `I am writing in response to the following condition from underwriting:\n\n`;
   content += `"${condition.text || condition.description}"\n\n`;
   
-  switch(loeType) {
+  switch (loeType) {
     case 'credit_inquiry':
       content += `I am writing to explain the recent credit inquiries on my credit report. `;
       content += `These inquiries were made as part of my research to find the best rates for ${getRandomCreditInquiryReason()}. `;
@@ -636,7 +523,7 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
     case 'name_variation':
       content += `I am writing to explain the variation in my name that appears on some documents. `;
       content += `The name "${getRandomNameVariation(lead.first_name, lead.last_name)}" appears due to ${getRandomNameVariationReason()}. `;
-      content += `My legal name is ${borrowerName || 'the name on my government-issued ID'}, which appears on my government-issued ID `;
+      content += `My legal name is ${borrowerName}, which appears on my government-issued ID `;
       content += `and should be used for all official loan documentation.\n\n`;
       break;
       
@@ -648,7 +535,7 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
   
   content += `Please let me know if you require any additional information or documentation to support this explanation.\n\n`;
   content += `Sincerely,\n\n\n`;
-  content += `${borrowerName || 'Borrower'}\n`;
+  content += `${borrowerName}\n`;
   content += `${lead.phone1 || ''}\n`;
   content += `${lead.email || ''}`;
   
@@ -671,6 +558,7 @@ function formatLOETypeTitle(loeType: string): string {
 }
 
 // Helper functions for generating realistic mock content
+
 function getRandomCreditInquiryReason(): string {
   const reasons = [
     'a new auto loan',
@@ -785,7 +673,7 @@ function getRandomNameVariation(firstName?: string, lastName?: string): string {
     `${first.charAt(0)}. ${last}`,
     `${first} ${last.charAt(0)}.`,
     `${first.substring(0, first.length-1)}y ${last}`,
-    `${first} ${last?.charAt(0)}-${last?.charAt(1) || ''}`,
+    `${first} ${lastName?.charAt(0)}-${lastName?.charAt(1)}`,
     `${firstName || 'Jane'} ${lastName || 'Smith'} (née ${randomLastName()})`,
     `${firstName || 'J.'} ${lastName || 'D.'}`
   ];

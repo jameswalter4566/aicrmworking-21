@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { create, verify, getNumericDate } from "https://deno.land/x/djwt@v2.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,8 +11,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// DocuSign configuration - updated base URL to correct endpoint
-const docusignBaseUrl = Deno.env.get('DOCUSIGN_BASE_URL') || 'https://account-d.docusign.com';
+// DocuSign configuration
+const docusignBaseUrl = Deno.env.get('DOCUSIGN_BASE_URL') || 'https://demo.docusign.net';
 const docusignAccountId = Deno.env.get('DOCUSIGN_ACCOUNT_ID');
 const docusignIntegrationKey = Deno.env.get('DOCUSIGN_INTEGRATION_KEY');
 const docusignPrivateKey = Deno.env.get('DOCUSIGN_PRIVATE_KEY');
@@ -24,11 +23,6 @@ const docusignImpersonatedUserId = Deno.env.get('DOCUSIGN_IMPERSONATED_USER_ID')
  */
 async function getDocuSignAccessToken() {
   try {
-    // Generate proper JWT token
-    const jwt = await generateJWT();
-    
-    console.log(`Requesting token from ${docusignBaseUrl}/oauth/token`);
-    
     const response = await fetch(`${docusignBaseUrl}/oauth/token`, {
       method: 'POST',
       headers: {
@@ -36,15 +30,13 @@ async function getDocuSignAccessToken() {
       },
       body: new URLSearchParams({
         'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        'assertion': jwt
+        'assertion': generateJWT()
       })
     });
 
     if (!response.ok) {
       const error = await response.text();
       console.error('Error getting DocuSign access token:', error);
-      console.error('Response status:', response.status);
-      console.error('Response status text:', response.statusText);
       throw new Error(`Failed to get DocuSign token: ${error}`);
     }
 
@@ -57,89 +49,12 @@ async function getDocuSignAccessToken() {
 }
 
 /**
- * Properly generates a JWT for DocuSign authentication
+ * Generates a JWT for DocuSign authentication
  */
-async function generateJWT() {
-  try {
-    // Check if we have all required credentials
-    if (!docusignIntegrationKey || !docusignPrivateKey || !docusignImpersonatedUserId) {
-      console.error('Missing required DocuSign credentials');
-      throw new Error('Missing required DocuSign credentials');
-    }
-    
-    console.log('Generating JWT token for DocuSign authentication');
-    
-    // Convert PEM to key object for signing
-    const privateKey = await importPrivateKey(docusignPrivateKey);
-    
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iss: docusignIntegrationKey,
-      sub: docusignImpersonatedUserId,
-      iat: now,
-      exp: now + (60 * 60), // Token valid for 1 hour
-      aud: docusignBaseUrl,
-      scope: "signature impersonation"
-    };
-    
-    // Create the JWT
-    return await create({ alg: "RS256", typ: "JWT" }, payload, privateKey);
-  } catch (error) {
-    console.error("Error generating JWT:", error);
-    throw new Error(`JWT generation failed: ${error.message}`);
-  }
-}
-
-/**
- * Import private key from PEM format with robust error handling
- * Expects PKCS#8 format key
- */
-async function importPrivateKey(pemRaw: string) {
-  try {
-    if (!pemRaw) {
-      throw new Error("Private key is empty or not provided");
-    }
-    
-    // 1. Restore real line-breaks that were escaped as \n
-    const pem = pemRaw.replace(/\\n/g, '\n').trim();
-    
-    // 2. Strip header/footer and whitespace
-    const body = pem
-      .replace(/-----BEGIN PRIVATE KEY-----/, '')
-      .replace(/-----END PRIVATE KEY-----/, '')
-      .replace(/\s+/g, '');
-    
-    if (!body) {
-      throw new Error("Private key content is empty after formatting");
-    }
-    
-    console.log("Private key format processed, length:", body.length);
-    
-    // 3. Convert to ArrayBuffer
-    const der = Uint8Array.from(atob(body), c => c.charCodeAt(0)).buffer;
-    
-    // 4. Import as PKCS#8
-    return await crypto.subtle.importKey(
-      "pkcs8",
-      der,
-      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
-  } catch (error) {
-    console.error("Error importing private key:", error);
-    
-    // Add more specific error info to help debug
-    if (error.message && error.message.includes("decode base64")) {
-      console.error("This appears to be a base64 decoding issue. Make sure your private key is properly formatted.");
-      console.error("Verify your key is properly escaped in the environment variable.");
-    } else if (error.message && error.message.includes("expected SEQUENCE")) {
-      console.error("This appears to be a DER format issue. Your key might be in PKCS#1 format but needs to be in PKCS#8.");
-      console.error("Run this command to convert your key to PKCS#8: openssl pkcs8 -topk8 -nocrypt -in docusign_private_key.pem -out docusign_private_key_pkcs8.pem");
-    }
-    
-    throw error;
-  }
+function generateJWT() {
+  // This is a simplified version - in production use a proper JWT library
+  console.log("Would generate JWT with integration key and private key");
+  return "WOULD_BE_A_REAL_JWT";
 }
 
 /**
@@ -149,10 +64,7 @@ async function getEnvelopeStatus(envelopeId: string) {
   try {
     const accessToken = await getDocuSignAccessToken();
     
-    const apiUrl = `${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes/${envelopeId}`;
-    console.log(`Getting envelope status from: ${apiUrl}`);
-    
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes/${envelopeId}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -180,10 +92,7 @@ async function downloadSignedDocument(envelopeId: string) {
   try {
     const accessToken = await getDocuSignAccessToken();
     
-    const apiUrl = `${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes/${envelopeId}/documents/combined`;
-    console.log(`Downloading signed document from: ${apiUrl}`);
-    
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes/${envelopeId}/documents/combined`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${accessToken}`
@@ -266,9 +175,7 @@ serve(async (req) => {
               .getPublicUrl(filePath);
             
             // Update the condition with the signed document URL
-            if (leadId) {
-              await updateSignedDocumentUrl(leadId, conditionId, publicUrl);
-            }
+            await updateSignedDocumentUrl(leadId, conditionId, publicUrl);
             
             return new Response(
               JSON.stringify({
