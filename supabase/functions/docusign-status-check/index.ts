@@ -91,91 +91,50 @@ async function generateJWT() {
 }
 
 /**
- * Import private key from PEM format with improved error handling
+ * Import private key from PEM format with robust error handling
  */
-async function importPrivateKey(pemPrivateKey: string) {
+async function importPrivateKey(pemRaw: string) {
   try {
-    if (!pemPrivateKey) {
+    if (!pemRaw) {
       throw new Error("Private key is empty or not provided");
     }
     
-    // Add header and footer if they're not present
-    let formattedKey = pemPrivateKey;
-    if (!formattedKey.includes("-----BEGIN PRIVATE KEY-----")) {
-      formattedKey = `-----BEGIN PRIVATE KEY-----\n${formattedKey}\n-----END PRIVATE KEY-----`;
-    }
+    // 1. Restore real line-breaks that were escaped as \n
+    const pem = pemRaw.replace(/\\n/g, '\n').trim();
     
-    // Clean the private key - remove headers, footers, and newlines
-    const pemContent = formattedKey
-      .replace(/-----BEGIN PRIVATE KEY-----/, "")
-      .replace(/-----END PRIVATE KEY-----/, "")
-      .replace(/[\r\n\t ]/g, "")
-      .trim();
+    // 2. Accept either PKCS#1 or PKCS#8 header format
+    const body = pem
+      .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, '')
+      .replace(/-----END (RSA )?PRIVATE KEY-----/, '')
+      .replace(/\s+/g, '');
     
-    if (!pemContent) {
+    if (!body) {
       throw new Error("Private key content is empty after formatting");
     }
     
-    console.log("PEM content length:", pemContent.length);
+    console.log("Private key format processed, length:", body.length);
     
-    // Decode the base64 string with improved handling
-    const binaryDer = base64ToArrayBuffer(pemContent);
+    // 3. Convert to ArrayBuffer directly
+    const der = Uint8Array.from(atob(body), c => c.charCodeAt(0)).buffer;
     
-    // Import the key
+    // 4. Import - PKCS#8 only!
     return await crypto.subtle.importKey(
-      "pkcs8",
-      binaryDer,
-      {
-        name: "RSASSA-PKCS1-v1_5",
-        hash: "SHA-256",
-      },
+      'pkcs8',
+      der,
+      { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
       false,
-      ["sign"]
+      ['sign']
     );
   } catch (error) {
     console.error("Error importing private key:", error);
-    throw error;
-  }
-}
-
-/**
- * Convert base64 to ArrayBuffer - with improved error handling
- */
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  try {
-    // Ensure the base64 string is properly padded
-    const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
     
-    // Try standard approach first
-    try {
-      const binary = atob(paddedBase64);
-      const len = binary.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes.buffer;
-    } catch (e) {
-      console.error("First attempt at base64 decoding failed:", e);
-      
-      // Try alternative approach with more aggressive cleaning
-      const cleanedBase64 = paddedBase64
-        .replace(/[^A-Za-z0-9+/=]/g, '') // Remove any non-base64 chars
-        .padEnd(paddedBase64.length + (4 - paddedBase64.length % 4) % 4, '=');
-      
-      console.log("Attempting with cleaned base64 string");
-      
-      const binary = atob(cleanedBase64);
-      const len = binary.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binary.charCodeAt(i);
-      }
-      return bytes.buffer;
+    // Add more specific error info to help debug
+    if (error.message && error.message.includes("decode base64")) {
+      console.error("This appears to be a base64 decoding issue. Make sure your private key is properly formatted.");
+      console.error("Verify your key is in PKCS#8 format and properly escaped in the environment variable.");
     }
-  } catch (error) {
-    console.error("All base64 decoding attempts failed:", error);
-    throw new Error(`Base64 decoding failed: ${error.message}`);
+    
+    throw error;
   }
 }
 
