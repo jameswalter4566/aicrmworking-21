@@ -28,7 +28,7 @@ serve(async (req) => {
       );
     }
     
-    const testMessage = message || "This is a test message from the SMS Gateway API";
+    const testMessage = message || "This is a comprehensive test message from the SMS Gateway API";
     
     console.log(`[${requestId}] Sending test SMS to ${phoneNumber}: "${testMessage}"`);
     
@@ -38,7 +38,17 @@ serve(async (req) => {
     
     if (!smsApiKey) {
       console.error(`[${requestId}] SMS API key is not configured`);
-      throw new Error("SMS API key is not configured");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'SMS API key is missing. Please configure it in Supabase secrets.',
+          requestId
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
     
     console.log(`[${requestId}] Using SMS API URL: ${smsApiUrl}`);
@@ -77,9 +87,8 @@ serve(async (req) => {
     
     try {
       console.log(`[${requestId}] Request prepared, sending to SMS gateway`);
-      console.log(`[${requestId}] Request parameters: phoneNumber=${phoneNumber}, messageLength=${testMessage.length}`);
       
-      // Send the SMS via the gateway API with proper browser-like headers
+      // Send the SMS via the gateway API with comprehensive headers
       const smsResponse = await fetch(smsApiUrl, {
         method: 'POST',
         headers: {
@@ -95,68 +104,40 @@ serve(async (req) => {
       
       console.log(`[${requestId}] SMS Gateway response status: ${smsResponse.status}`);
       
-      // Handle response
-      if (!smsResponse.ok) {
-        // Handle error response
-        let errorBody;
-        try {
-          errorBody = await smsResponse.text();
-          console.log(`[${requestId}] Full error response body: ${errorBody.substring(0, 500)}...`);
-
-          // Check for Cloudflare or other challenge pages
-          if (errorBody.includes('<html>') || errorBody.includes('<!DOCTYPE')) {
-            console.error(`[${requestId}] Gateway returned HTML instead of API response. Possible Cloudflare challenge or incorrect URL.`);
-            
-            return new Response(
-              JSON.stringify({
-                success: false,
-                error: 'SMS Gateway returned a Cloudflare challenge. Please verify your API credentials and URL.',
-                alternativeSolutions: [
-                  "Verify your SMS API URL is correct",
-                  "Contact your SMS gateway provider to allow your IP addresses",
-                  "Use an alternative SMS provider that doesn't use Cloudflare protection"
-                ],
-                requestId
-              }),
-              { 
-                status: 403, // Forbidden
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              }
-            );
-          }
-        } catch (e) {
-          errorBody = "Could not read response";
-        }
-        
-        console.error(`[${requestId}] SMS Gateway error: Status ${smsResponse.status}, Body: ${errorBody}`);
-        
+      // Check for HTML or unexpected response
+      const responseText = await smsResponse.text();
+      console.log(`[${requestId}] Raw response: ${responseText.substring(0, 500)}`);
+      
+      // Check if response is HTML (indicating a Cloudflare challenge or other issue)
+      if (responseText.includes('<html>') || responseText.includes('<!DOCTYPE')) {
+        console.error(`[${requestId}] Gateway returned HTML instead of API response. Possible Cloudflare challenge.`);
         return new Response(
           JSON.stringify({
             success: false,
-            error: `SMS Gateway returned status ${smsResponse.status}`,
-            details: errorBody,
+            error: 'Received HTML response from SMS gateway. Possible Cloudflare challenge.',
+            details: 'Check API URL, key permissions, and network configuration',
             requestId
           }),
           { 
-            status: 502, // Bad Gateway
+            status: 403,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
           }
         );
       }
       
-      // Parse the SMS gateway response
+      // Try to parse JSON response
       let gatewayResponse;
       try {
-        const responseText = await smsResponse.text();
-        console.log(`[${requestId}] SMS Gateway raw response:`, responseText);
         gatewayResponse = JSON.parse(responseText);
-      } catch (e) {
-        console.error(`[${requestId}] Error parsing gateway response:`, e);
+        console.log(`[${requestId}] Parsed gateway response:`, JSON.stringify(gatewayResponse));
+      } catch (parseError) {
+        console.error(`[${requestId}] Failed to parse gateway response:`, parseError);
         return new Response(
           JSON.stringify({
             success: false,
-            error: "Could not parse SMS Gateway response",
-            details: e.message
+            error: 'Could not parse SMS gateway response',
+            rawResponse: responseText,
+            requestId
           }),
           { 
             status: 500,
@@ -165,14 +146,13 @@ serve(async (req) => {
         );
       }
       
-      console.log(`[${requestId}] SMS Gateway parsed response:`, JSON.stringify(gatewayResponse));
-      
+      // Validate gateway response
       if (!gatewayResponse.success) {
         console.error(`[${requestId}] Gateway reported failure:`, JSON.stringify(gatewayResponse));
         return new Response(
           JSON.stringify({
             success: false,
-            error: gatewayResponse.error || "SMS Gateway reported failure",
+            error: gatewayResponse.error || 'SMS Gateway reported failure',
             gatewayResponse,
             requestId
           }),
