@@ -92,7 +92,7 @@ async function generateJWT() {
 }
 
 /**
- * Import private key from PEM format
+ * Import private key from PEM format with improved error handling
  */
 async function importPrivateKey(pemPrivateKey: string) {
   try {
@@ -119,7 +119,7 @@ async function importPrivateKey(pemPrivateKey: string) {
     
     console.log("PEM content length:", pemContent.length);
     
-    // Decode the base64 string
+    // Decode the base64 string with improved handling
     const binaryDer = base64ToArrayBuffer(pemContent);
     
     // Import the key
@@ -147,15 +147,35 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
     // Ensure the base64 string is properly padded
     const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
     
-    const binary = atob(paddedBase64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binary.charCodeAt(i);
+    // Try standard approach first
+    try {
+      const binary = atob(paddedBase64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
+    } catch (e) {
+      console.error("First attempt at base64 decoding failed:", e);
+      
+      // Try alternative approach with more aggressive cleaning
+      const cleanedBase64 = paddedBase64
+        .replace(/[^A-Za-z0-9+/=]/g, '') // Remove any non-base64 chars
+        .padEnd(paddedBase64.length + (4 - paddedBase64.length % 4) % 4, '=');
+      
+      console.log("Attempting with cleaned base64 string");
+      
+      const binary = atob(cleanedBase64);
+      const len = binary.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
     }
-    return bytes.buffer;
   } catch (error) {
-    console.error("Failed to decode base64 string:", error);
+    console.error("All base64 decoding attempts failed:", error);
     throw new Error(`Base64 decoding failed: ${error.message}`);
   }
 }
