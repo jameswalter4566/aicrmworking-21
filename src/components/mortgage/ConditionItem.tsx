@@ -27,6 +27,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [leadData, setLeadData] = useState<any>(null);
   const [signerEmail, setSignerEmail] = useState("");
+  const [docuSignError, setDocuSignError] = useState<string | null>(null);
   
   useEffect(() => {
     if (leadId) {
@@ -40,7 +41,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
         .from('leads')
         .select('*')
         .eq('id', leadId)
-        .single();
+        .maybeSingle();
         
       if (error) {
         console.error("Error fetching lead data:", error);
@@ -78,6 +79,8 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
     }
     
     setIsSendingForSignature(true);
+    setDocuSignError(null);
+    
     try {
       console.log("Sending condition for signature:", condition.id);
       console.log("Using recipient email:", signerEmail);
@@ -111,8 +114,17 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
           console.log("Conditions refreshed after sending for signature");
         }
       } else {
-        toast.error(data?.error || "Unknown error sending document for signature");
-        console.error('Unknown error in loe-generator:', data);
+        // Check if there's a DocuSign-specific error
+        const docusignError = data?.results?.[0]?.error;
+        if (docusignError && docusignError.includes("DocuSign error")) {
+          // Store the DocuSign error message for display in the UI
+          setDocuSignError("DocuSign connection error. The document was generated successfully but couldn't be sent for signature.");
+          // Show a more user-friendly error message
+          toast.error("DocuSign connection error. You can still download the document.");
+        } else {
+          toast.error(data?.error || "Unknown error sending document for signature");
+          console.error('Unknown error in loe-generator:', data);
+        }
       }
     } catch (err) {
       console.error("Error in handleSendForSignature:", err);
@@ -188,7 +200,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
             </Button>
           )}
           
-          {condition.documentUrl && !condition.docuSignEnvelopeId && (
+          {condition.documentUrl && !condition.docuSignEnvelopeId && !docuSignError && (
             <div className="flex items-center gap-2">
               <Input
                 type="email"
@@ -217,6 +229,32 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
                   </>
                 )}
               </Button>
+            </div>
+          )}
+
+          {docuSignError && (
+            <div className="flex flex-col w-full">
+              <p className="text-xs text-amber-600 mb-1">{docuSignError}</p>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="email"
+                  placeholder="Update signer email"
+                  value={signerEmail}
+                  onChange={(e) => setSignerEmail(e.target.value)}
+                  className="h-7 text-xs w-[200px]"
+                  size="sm"
+                />
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-7 px-2 text-xs bg-amber-50 text-amber-700 hover:bg-amber-100"
+                  onClick={handleSendForSignature}
+                  disabled={isSendingForSignature || !signerEmail}
+                >
+                  <SendToBack className="h-3 w-3 mr-1" />
+                  Retry Signature
+                </Button>
+              </div>
             </div>
           )}
           

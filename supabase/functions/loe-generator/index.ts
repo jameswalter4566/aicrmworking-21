@@ -240,7 +240,7 @@ serve(async (req) => {
         .from('leads')
         .select('*')
         .eq('id', leadId)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching lead data:', error);
@@ -281,12 +281,14 @@ serve(async (req) => {
           .getPublicUrl(filePath);
         
         let docusignResult = null;
+        let docusignError = null;
         
         // If sendForSignature is true and we have recipient info, send to DocuSign
         if (sendForSignature) {
           try {
             if (!docusignAccountId || !docusignIntegrationKey || !docusignPrivateKey) {
               console.warn('DocuSign credentials not configured, skipping signature request');
+              docusignError = "DocuSign credentials not configured";
             } else {
               // Use explicitly provided recipient email/name, or fallback safely
               const signerEmail = recipientEmail || '';
@@ -299,37 +301,38 @@ serve(async (req) => {
               }
               
               console.log('Sending document to DocuSign for signature to:', signerEmail);
-              docusignResult = await sendToDocuSign(
-                pdfBytes,
-                signerEmail,
-                signerName,
-                `Letter of Explanation - ${formatLOETypeTitle(loeType)}`
-              );
               
-              console.log('DocuSign envelope created:', docusignResult);
-              
-              // Store the envelope ID and status in the database
-              if (leadId) {
-                await supabase.from('docusign_envelopes')
-                  .insert({
-                    lead_id: leadId,
-                    condition_id: condition.id,
-                    envelope_id: docusignResult.envelopeId,
-                    status: docusignResult.status,
-                    document_name: fileName,
-                    document_url: publicUrl
-                  });
+              try {
+                docusignResult = await sendToDocuSign(
+                  pdfBytes,
+                  signerEmail,
+                  signerName,
+                  `Letter of Explanation - ${formatLOETypeTitle(loeType)}`
+                );
+                
+                console.log('DocuSign envelope created:', docusignResult);
+                
+                // Store the envelope ID and status in the database
+                if (leadId) {
+                  await supabase.from('docusign_envelopes')
+                    .insert({
+                      lead_id: leadId,
+                      condition_id: condition.id,
+                      envelope_id: docusignResult.envelopeId,
+                      status: docusignResult.status,
+                      document_name: fileName,
+                      document_url: publicUrl
+                    });
+                }
+              } catch (docuSignSendError) {
+                // Capture the DocuSign error but still return the document URL
+                docusignError = `DocuSign error: ${docuSignSendError.message}`;
+                console.error('Error sending document to DocuSign:', docuSignSendError);
               }
             }
           } catch (docusignError) {
             console.error('Error sending document to DocuSign:', docusignError);
-            return {
-              conditionId: condition.id,
-              loeType,
-              documentUrl: publicUrl,
-              success: false,
-              error: `DocuSign error: ${docusignError.message}`
-            };
+            // Don't rethrow - we want to return the generated document URL even if DocuSign fails
           }
         }
         
@@ -338,12 +341,15 @@ serve(async (req) => {
           await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl, docusignResult?.envelopeId);
         }
         
+        // We still return success:true even if DocuSign failed
+        // The client can handle the DocuSign error and still show the generated document
         return {
           conditionId: condition.id,
           loeType,
           documentUrl: publicUrl,
           docusign: docusignResult,
-          success: true
+          error: docusignError, // Include the DocuSign error if any
+          success: !docusignError // Success is true if there's no DocuSign error
         };
       } catch (error) {
         console.error(`Error generating PDF for condition ${condition.id}:`, error);
@@ -356,11 +362,14 @@ serve(async (req) => {
       }
     }));
     
+    // We consider the overall operation successful if we at least generated documents
+    const isOverallSuccess = results.some(result => result.documentUrl);
+    
     console.log('LOE processing completed successfully');
     
     return new Response(
       JSON.stringify({ 
-        success: true, 
+        success: isOverallSuccess, 
         processedCount: results.length,
         results
       }),
