@@ -1,5 +1,5 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 
 // Define CORS headers for browser requests
 const corsHeaders = {
@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log("Twilio voice function loaded");
+  console.log("Twilio Voice function loaded");
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -16,50 +16,113 @@ serve(async (req) => {
   }
   
   try {
-    // Import twilio as a module with proper ESM syntax
+    // Import Twilio as a module with proper ESM syntax
     const twilioModule = await import('npm:twilio@4.10.0');
     const twilio = twilioModule.default;
     
-    // Create TwiML response
-    const VoiceResponse = twilio.twiml.VoiceResponse;
-    const twiml = new VoiceResponse();
+    // Get our variables from the request body or query params
+    let params;
     
-    // Get request body
-    const body = await req.json().catch(() => ({}));
-    console.log("Received request body:", JSON.stringify(body));
+    if (req.method === 'POST') {
+      const contentType = req.headers.get('content-type') || '';
+      
+      if (contentType.includes('application/json')) {
+        params = await req.json();
+      } else {
+        const formData = await req.formData();
+        params = Object.fromEntries(formData.entries());
+      }
+    } else {
+      const url = new URL(req.url);
+      params = Object.fromEntries(url.searchParams.entries());
+    }
     
-    // Default response if no specific parameters are provided
-    twiml.say({
-      voice: 'Polly.Matthew-Neural',
-    }, 'Thank you for calling. This is a response from the Twilio Voice Edge Function.');
+    console.log("Received params:", params);
     
-    // Outputting the generated TwiML as a string
-    const twimlString = twiml.toString();
-    console.log("Generated TwiML response:", twimlString);
+    // Create a TwiML response
+    const twiml = new twilio.twiml.VoiceResponse();
     
-    // Return TwiML response to Twilio
-    return new Response(twimlString, {
+    // Check what the user wants to do based on the request parameters
+    if (params.To) {
+      // If there's a "To" parameter, the user is making an outgoing call
+      console.log(`Outbound call to: ${params.To}`);
+      
+      // Create a <Dial> action to connect the call
+      const dial = twiml.dial({
+        callerId: params.From || Deno.env.get('TWILIO_PHONE_NUMBER'),
+        // Add recording, timeLimit, or other options here if needed
+      });
+      
+      if (params.To.startsWith('client:')) {
+        // Call to another browser client
+        dial.client(params.To.replace('client:', ''));
+      } else {
+        // Call to a phone number
+        dial.number(params.To);
+      }
+    } else {
+      // Handle incoming calls
+      console.log("Incoming call received");
+      
+      // Answer with a welcome message
+      twiml.say(
+        { voice: 'alice' },
+        'Welcome to my Twilio app. This call is being handled by a Supabase Edge Function.'
+      );
+      
+      // Play some DTMF tones for effect
+      twiml.play({ digits: '5' });
+      
+      // Add a short pause
+      twiml.pause({ length: 1 });
+      
+      // Add more TwiML elements as needed
+      twiml.say(
+        { voice: 'alice' },
+        'Have a nice day!'
+      );
+    }
+    
+    console.log("Generated TwiML:", twiml.toString());
+    
+    // Return the TwiML response
+    return new Response(twiml.toString(), {
       headers: {
         ...corsHeaders,
         'Content-Type': 'text/xml'
       }
     });
-  } catch (error) {
-    console.error('Error in Twilio voice function:', error);
     
-    // Return a properly formatted error response for Twilio
-    return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?>
-      <Response>
-        <Say>Sorry, an error occurred processing your request. Please try again later.</Say>
-      </Response>`,
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'text/xml' 
+  } catch (error) {
+    console.error('Error in Twilio Voice function:', error);
+    
+    // Create a simple error response in TwiML format
+    // Import Twilio if we need to create TwiML
+    try {
+      const twilioModule = await import('npm:twilio@4.10.0');
+      const twilio = twilioModule.default;
+      
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say(
+        { voice: 'alice' },
+        'Sorry, there was an error processing your request.'
+      );
+      
+      return new Response(twiml.toString(), {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'text/xml'
         },
-        status: 500 
-      }
-    );
+        status: 500,
+      });
+    } catch (twimlError) {
+      // If even creating TwiML fails, return a plain error response
+      return new Response(JSON.stringify({ 
+        error: error.message || 'An unknown error occurred' 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
+    }
   }
 });
