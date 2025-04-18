@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,8 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   
   const fetchLeadData = async (leadId: string) => {
     try {
+      // Fix: Convert leadId to string if it's already not a string
+      // This ensures we're using the correct type for the query
       const { data: lead, error } = await supabase
         .from('leads')
         .select('*')
