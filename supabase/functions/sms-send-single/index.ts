@@ -42,7 +42,7 @@ serve(async (req) => {
                      "https://ba480dba-df9a-497b-8dad-ad3edcc6e9d9.lovableproject.com";
     
     // Format: https://{domain}/functions/v1/{function-name}
-    const statusCallbackUrl = `${publicUrl}/functions/v1/sms-webhook-receiver`;
+    const statusCallbackUrl = `${publicUrl}/supabase/functions/v1/sms-webhook-receiver`;
     
     console.log(`[${requestId}] Using status callback URL: ${statusCallbackUrl}`);
     

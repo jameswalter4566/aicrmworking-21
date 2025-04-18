@@ -54,7 +54,12 @@ export async function sendSMS(
 ) {
   try {
     const formattedTo = formatPhoneNumber(to);
-    const fromNumber = options.from || Deno.env.get("TWILIO_PHONE_NUMBER") || "+18336575981";
+    
+    // Use the dedicated SMS phone number if available, otherwise fall back to the general Twilio number
+    const fromNumber = options.from || 
+                      Deno.env.get("TWILIO_NUMBER_SMS") || 
+                      Deno.env.get("TWILIO_PHONE_NUMBER") || 
+                      "+18336575981";
     const formattedFrom = formatPhoneNumber(fromNumber);
     
     console.log(`Creating Twilio client to send SMS from ${formattedFrom} to ${formattedTo}`);
@@ -141,7 +146,7 @@ export function parseTwilioWebhook(formData: FormData) {
       data[`MediaUrl${i}`]
     ).filter(Boolean),
     status: data.SmsStatus || data.MessageStatus,
-    direction: data.Direction || (data.From && data.From !== Deno.env.get("TWILIO_PHONE_NUMBER") ? "inbound" : "outbound"),
+    direction: data.Direction || (data.From && data.From !== Deno.env.get("TWILIO_NUMBER_SMS") ? "inbound" : "outbound"),
     timestamp: new Date().toISOString(),
     raw: data
   };

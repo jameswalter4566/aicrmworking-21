@@ -37,8 +37,17 @@ serve(async (req) => {
     const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
     console.log(`[${requestId}] Formatted phone number: ${formattedPhoneNumber}`);
     
+    // Define a proper webhook URL for Twilio callbacks
+    const publicUrl = Deno.env.get("PUBLIC_URL") || 
+                    "https://ba480dba-df9a-497b-8dad-ad3edcc6e9d9.lovableproject.com";
+    
+    // Format: https://{domain}/supabase/functions/v1/{function-name}
+    const statusCallbackUrl = `${publicUrl}/supabase/functions/v1/sms-webhook-receiver`;
+    
     // Send test SMS using Twilio
-    const twilioResponse = await sendSMS(formattedPhoneNumber, testMessage);
+    const twilioResponse = await sendSMS(formattedPhoneNumber, testMessage, {
+      statusCallback: statusCallbackUrl
+    });
     
     if (!twilioResponse.success) {
       console.error(`[${requestId}] Twilio Error:`, twilioResponse.error);
