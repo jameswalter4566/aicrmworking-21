@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -93,7 +92,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
-          leadId: leadId ? String(leadId) : undefined,
+          leadId: String(leadId),
           conditions: [condition],
           sendForSignature: true,
           recipientEmail: signerEmail,
@@ -107,7 +106,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       } else if (data?.success) {
         toast.success(`Document sent for signature successfully`);
         const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-          body: { leadId: leadId ? String(leadId) : undefined }
+          body: { leadId: String(leadId) }
         });
         
         if (refreshData?.success && refreshData?.conditions) {
@@ -147,7 +146,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       const { data, error } = await supabase.functions.invoke('docusign-status-check', {
         body: {
           envelopeId: condition.docuSignEnvelopeId,
-          leadId: leadId ? String(leadId) : undefined,
+          leadId: String(leadId),
           conditionId: condition.id,
           checkOnly: false
         }
@@ -163,7 +162,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
           toast.success("Signed document retrieved successfully!");
           
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-            body: { leadId: leadId ? String(leadId) : undefined }
+            body: { leadId: String(leadId) }
           });
           
           if (refreshData?.success && refreshData?.conditions) {

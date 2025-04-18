@@ -95,12 +95,28 @@ async function generateJWT() {
  */
 async function importPrivateKey(pemPrivateKey: string) {
   try {
+    if (!pemPrivateKey) {
+      throw new Error("Private key is empty or not provided");
+    }
+    
+    // Add header and footer if they're not present
+    let formattedKey = pemPrivateKey;
+    if (!formattedKey.includes("-----BEGIN PRIVATE KEY-----")) {
+      formattedKey = `-----BEGIN PRIVATE KEY-----\n${formattedKey}\n-----END PRIVATE KEY-----`;
+    }
+    
     // Clean the private key - remove headers, footers, and newlines
-    const pemContent = pemPrivateKey
+    const pemContent = formattedKey
       .replace(/-----BEGIN PRIVATE KEY-----/, "")
       .replace(/-----END PRIVATE KEY-----/, "")
-      .replace(/\n/g, "")
+      .replace(/[\r\n\t ]/g, "")
       .trim();
+    
+    if (!pemContent) {
+      throw new Error("Private key content is empty after formatting");
+    }
+    
+    console.log("PEM content length:", pemContent.length);
     
     // Decode the base64 string
     const binaryDer = base64ToArrayBuffer(pemContent);
@@ -123,16 +139,24 @@ async function importPrivateKey(pemPrivateKey: string) {
 }
 
 /**
- * Convert base64 to ArrayBuffer
+ * Convert base64 to ArrayBuffer - with improved error handling
  */
 function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64);
-  const len = binary.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binary.charCodeAt(i);
+  try {
+    // Ensure the base64 string is properly padded
+    const paddedBase64 = base64.padEnd(base64.length + (4 - base64.length % 4) % 4, '=');
+    
+    const binary = atob(paddedBase64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return bytes.buffer;
+  } catch (error) {
+    console.error("Failed to decode base64 string:", error);
+    throw new Error(`Base64 decoding failed: ${error.message}`);
   }
-  return bytes.buffer;
 }
 
 /**
