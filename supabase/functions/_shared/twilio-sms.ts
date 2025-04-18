@@ -1,3 +1,4 @@
+
 // Twilio SMS Utility Module
 // This provides common functionality for Twilio SMS operations
 
@@ -28,9 +29,14 @@ export async function createTwilioClient() {
     throw new Error("Twilio credentials are not configured");
   }
   
-  // Use dynamic import to load Twilio dependency
-  const twilio = await import("https://esm.sh/twilio@4.20.1");
-  return twilio.default(accountSid, authToken);
+  // Use dynamic import to load Twilio dependency with proper error handling
+  try {
+    const twilio = await import("https://esm.sh/twilio@4.20.1");
+    return twilio.default(accountSid, authToken);
+  } catch (error) {
+    console.error("Error importing Twilio module:", error);
+    throw new Error(`Failed to initialize Twilio client: ${error.message}`);
+  }
 }
 
 // Send a single SMS message using Twilio
