@@ -1,7 +1,7 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
+import { create, verify, getNumericDate } from "https://deno.land/x/djwt@v2.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,8 +13,8 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// DocuSign configuration
-const docusignBaseUrl = Deno.env.get('DOCUSIGN_BASE_URL') || 'https://demo.docusign.net';
+// DocuSign configuration - updated base URL to correct endpoint
+const docusignBaseUrl = Deno.env.get('DOCUSIGN_BASE_URL') || 'https://account-d.docusign.com';
 const docusignAccountId = Deno.env.get('DOCUSIGN_ACCOUNT_ID');
 const docusignIntegrationKey = Deno.env.get('DOCUSIGN_INTEGRATION_KEY');
 const docusignPrivateKey = Deno.env.get('DOCUSIGN_PRIVATE_KEY');
@@ -25,6 +25,11 @@ const docusignImpersonatedUserId = Deno.env.get('DOCUSIGN_IMPERSONATED_USER_ID')
  */
 async function getDocuSignAccessToken() {
   try {
+    // Generate proper JWT token
+    const jwt = await generateJWT();
+    
+    console.log(`Requesting token from ${docusignBaseUrl}/oauth/token`);
+    
     const response = await fetch(`${docusignBaseUrl}/oauth/token`, {
       method: 'POST',
       headers: {
@@ -32,13 +37,15 @@ async function getDocuSignAccessToken() {
       },
       body: new URLSearchParams({
         'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        'assertion': generateJWT()
+        'assertion': jwt
       })
     });
 
     if (!response.ok) {
       const error = await response.text();
       console.error('Error getting DocuSign access token:', error);
+      console.error('Response status:', response.status);
+      console.error('Response status text:', response.statusText);
       throw new Error(`Failed to get DocuSign token: ${error}`);
     }
 
@@ -51,24 +58,82 @@ async function getDocuSignAccessToken() {
 }
 
 /**
- * Generates a JWT for DocuSign authentication
+ * Properly generates a JWT for DocuSign authentication
  */
-function generateJWT() {
-  // This is a simplified version - in production use a proper JWT library
-  // For demo purposes only - in a real implementation, use a proper JWT library
-  
-  // Here we would typically:
-  // 1. Create JWT header
-  // 2. Create JWT payload with proper claims (iss, sub, aud, exp, etc.)
-  // 3. Sign with the private key
-  // 4. Encode to base64url
-  
-  // Since we can't include a full JWT implementation in this example,
-  // let's log that we would generate a JWT here
-  console.log("Would generate JWT with integration key and private key");
-  
-  // In a real implementation, this would be a proper JWT
-  return "WOULD_BE_A_REAL_JWT";
+async function generateJWT() {
+  try {
+    // Check if we have all required credentials
+    if (!docusignIntegrationKey || !docusignPrivateKey || !docusignImpersonatedUserId) {
+      console.error('Missing required DocuSign credentials');
+      throw new Error('Missing required DocuSign credentials');
+    }
+    
+    console.log('Generating JWT token for DocuSign authentication');
+    
+    // Convert PEM to key object for signing
+    const privateKey = await importPrivateKey(docusignPrivateKey);
+    
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iss: docusignIntegrationKey,
+      sub: docusignImpersonatedUserId,
+      iat: now,
+      exp: now + (60 * 60), // Token valid for 1 hour
+      aud: docusignBaseUrl,
+      scope: "signature impersonation"
+    };
+    
+    // Create the JWT
+    return await create({ alg: "RS256", typ: "JWT" }, payload, privateKey);
+  } catch (error) {
+    console.error("Error generating JWT:", error);
+    throw new Error(`JWT generation failed: ${error.message}`);
+  }
+}
+
+/**
+ * Import private key from PEM format
+ */
+async function importPrivateKey(pemPrivateKey: string) {
+  try {
+    // Clean the private key - remove headers, footers, and newlines
+    const pemContent = pemPrivateKey
+      .replace(/-----BEGIN PRIVATE KEY-----/, "")
+      .replace(/-----END PRIVATE KEY-----/, "")
+      .replace(/\n/g, "")
+      .trim();
+    
+    // Decode the base64 string
+    const binaryDer = base64ToArrayBuffer(pemContent);
+    
+    // Import the key
+    return await crypto.subtle.importKey(
+      "pkcs8",
+      binaryDer,
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256",
+      },
+      false,
+      ["sign"]
+    );
+  } catch (error) {
+    console.error("Error importing private key:", error);
+    throw error;
+  }
+}
+
+/**
+ * Convert base64 to ArrayBuffer
+ */
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes.buffer;
 }
 
 /**
@@ -120,8 +185,11 @@ async function sendToDocuSign(pdfBytes: Uint8Array, recipientEmail: string, reci
     
     console.log("Preparing DocuSign envelope for recipient:", recipientEmail);
     
+    const apiUrl = `${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes`;
+    console.log(`Sending envelope to DocuSign API: ${apiUrl}`);
+    
     // Send the envelope
-    const response = await fetch(`${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes`, {
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
@@ -133,6 +201,8 @@ async function sendToDocuSign(pdfBytes: Uint8Array, recipientEmail: string, reci
     if (!response.ok) {
       const error = await response.text();
       console.error('Error sending envelope to DocuSign:', error);
+      console.error('Response status:', response.status);
+      console.error('Response status text:', response.statusText);
       throw new Error(`Failed to send envelope: ${error}`);
     }
     
