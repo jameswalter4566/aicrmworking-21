@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,12 +35,10 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   
   const fetchLeadData = async (leadId: string) => {
     try {
-      // Convert the leadId to a number if the table expects a number
-      // Or keep it as a string if that's what the table expects
       const { data: lead, error } = await supabase
         .from('leads')
         .select('*')
-        .eq('id', leadId) // Using string leadId directly, Supabase will handle the conversion
+        .eq('id', leadId)
         .single();
         
       if (error) {
