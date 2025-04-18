@@ -30,17 +30,11 @@ export async function createTwilioClient() {
   }
   
   try {
-    // Direct approach without using default export
-    const twilio = await import("https://esm.sh/twilio@4.20.1?dts");
+    // Import Twilio using a simple direct import without additional parameters
+    const twilio = await import("npm:twilio@4.20.1");
     
     // Create client using the Twilio constructor directly
-    const client = new twilio.Twilio(accountSid, authToken);
-    
-    if (!client) {
-      throw new Error("Failed to create Twilio client instance");
-    }
-    
-    return client;
+    return twilio.default(accountSid, authToken);
   } catch (error) {
     console.error("Error creating Twilio client:", error);
     throw new Error(`Failed to initialize Twilio client: ${error.message}`);
@@ -64,6 +58,8 @@ export async function sendSMS(
     const formattedFrom = formatPhoneNumber(fromNumber);
     
     console.log(`Creating Twilio client to send SMS from ${formattedFrom} to ${formattedTo}`);
+    
+    // Create the Twilio client
     const client = await createTwilioClient();
     
     if (!client || !client.messages) {
@@ -72,7 +68,7 @@ export async function sendSMS(
     
     console.log("Twilio client created successfully, preparing message parameters");
     
-    const messageParams: Record<string, any> = {
+    const messageParams = {
       to: formattedTo,
       from: formattedFrom,
       body: message
@@ -91,8 +87,8 @@ export async function sendSMS(
       to: formattedTo,
       from: formattedFrom,
       bodyLength: message.length,
-      hasMediaUrl: !!options.mediaUrl,
-      hasStatusCallback: !!options.statusCallback
+      hasMediaUrl: Boolean(options.mediaUrl),
+      hasStatusCallback: Boolean(options.statusCallback)
     }));
     
     const twilioMessage = await client.messages.create(messageParams);
