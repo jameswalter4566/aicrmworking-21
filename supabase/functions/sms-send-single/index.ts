@@ -41,6 +41,10 @@ serve(async (req) => {
     }
     
     console.log(`[${requestId}] Using SMS API URL: ${smsApiUrl}`);
+
+    // Log the API key (partially masked)
+    const maskedKey = smsApiKey ? `${smsApiKey.substring(0, 3)}...${smsApiKey.substring(smsApiKey.length - 3)}` : 'undefined';
+    console.log(`[${requestId}] Using API key: ${maskedKey}`);
     
     // Prepare the request to the SMS Gateway
     const formData = new URLSearchParams();
@@ -50,6 +54,27 @@ serve(async (req) => {
     formData.append('prioritize', prioritize ? '1' : '0');
     
     console.log(`[${requestId}] Request prepared, sending to SMS gateway`);
+    
+    // Validate URL before sending
+    let validatedUrl;
+    try {
+      validatedUrl = new URL(smsApiUrl);
+      console.log(`[${requestId}] Gateway URL validated: ${validatedUrl.origin}${validatedUrl.pathname}`);
+    } catch (e) {
+      console.error(`[${requestId}] Invalid SMS gateway URL: ${smsApiUrl}`, e);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid SMS gateway URL configuration',
+          details: e.message,
+          requestId
+        }),
+        { 
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
     
     // Send the SMS via the gateway API
     const smsResponse = await fetch(smsApiUrl, {
@@ -66,6 +91,12 @@ serve(async (req) => {
       let errorBody;
       try {
         errorBody = await smsResponse.text();
+        console.log(`[${requestId}] Full error response body: ${errorBody.substring(0, 500)}...`);
+
+        // Check for Cloudflare or other challenge pages
+        if (errorBody.includes('<html>') || errorBody.includes('<!DOCTYPE')) {
+          console.error(`[${requestId}] Gateway returned HTML instead of API response. Possible Cloudflare challenge or incorrect URL.`);
+        }
       } catch (e) {
         errorBody = "Could not read response";
       }
