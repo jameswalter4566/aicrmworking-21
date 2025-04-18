@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
@@ -251,7 +252,10 @@ serve(async (req) => {
     
     const results = await Promise.all(conditions.map(async (condition) => {
       const loeType = determineLOEType(condition.text || condition.description);
-      const loeContent = generateLOEContent(loeType, lead, condition);
+      
+      // Create a safe version of lead data with default values for required fields
+      const safeLead = lead || {};
+      const loeContent = generateLOEContent(loeType, safeLead, condition);
       
       try {
         // Generate PDF content using our PDF generator
@@ -284,10 +288,11 @@ serve(async (req) => {
             if (!docusignAccountId || !docusignIntegrationKey || !docusignPrivateKey) {
               console.warn('DocuSign credentials not configured, skipping signature request');
             } else {
-              // Prefer the explicitly passed recipient email/name over the lead data
-              const signerEmail = recipientEmail || (lead?.email || null);
-              const signerName = recipientName || 
-                (lead ? `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`.trim() : 'Borrower');
+              // Use explicitly provided recipient email/name, or fallback safely
+              const signerEmail = recipientEmail || '';
+              
+              // Create a safe recipient name, ensuring we don't try to access properties of undefined
+              const signerName = recipientName || 'Borrower';
                 
               if (!signerEmail) {
                 throw new Error("Missing recipient email address for DocuSign");
@@ -492,7 +497,11 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
     day: 'numeric'
   });
   
-  const borrowerName = `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`;
+  // Safely construct borrower name with fallbacks
+  const firstName = lead.first_name || 'Borrower';
+  const lastName = lead.last_name || '';
+  const borrowerName = `${firstName} ${lastName}`.trim();
+  
   const propertyAddress = lead.property_address || 'Subject Property';
   
   let content = `${currentDate}\n\n`;
@@ -503,7 +512,7 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
   content += `I am writing in response to the following condition from underwriting:\n\n`;
   content += `"${condition.text || condition.description}"\n\n`;
   
-  switch (loeType) {
+  switch(loeType) {
     case 'credit_inquiry':
       content += `I am writing to explain the recent credit inquiries on my credit report. `;
       content += `These inquiries were made as part of my research to find the best rates for ${getRandomCreditInquiryReason()}. `;
@@ -541,7 +550,7 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
     case 'name_variation':
       content += `I am writing to explain the variation in my name that appears on some documents. `;
       content += `The name "${getRandomNameVariation(lead.first_name, lead.last_name)}" appears due to ${getRandomNameVariationReason()}. `;
-      content += `My legal name is ${borrowerName}, which appears on my government-issued ID `;
+      content += `My legal name is ${borrowerName || 'the name on my government-issued ID'}, which appears on my government-issued ID `;
       content += `and should be used for all official loan documentation.\n\n`;
       break;
       
@@ -553,7 +562,7 @@ function generateLOEContent(loeType: string, lead: any, condition: any): string 
   
   content += `Please let me know if you require any additional information or documentation to support this explanation.\n\n`;
   content += `Sincerely,\n\n\n`;
-  content += `${borrowerName}\n`;
+  content += `${borrowerName || 'Borrower'}\n`;
   content += `${lead.phone1 || ''}\n`;
   content += `${lead.email || ''}`;
   
@@ -576,7 +585,6 @@ function formatLOETypeTitle(loeType: string): string {
 }
 
 // Helper functions for generating realistic mock content
-
 function getRandomCreditInquiryReason(): string {
   const reasons = [
     'a new auto loan',
@@ -691,7 +699,7 @@ function getRandomNameVariation(firstName?: string, lastName?: string): string {
     `${first.charAt(0)}. ${last}`,
     `${first} ${last.charAt(0)}.`,
     `${first.substring(0, first.length-1)}y ${last}`,
-    `${first} ${lastName?.charAt(0)}-${lastName?.charAt(1)}`,
+    `${first} ${last?.charAt(0)}-${last?.charAt(1) || ''}`,
     `${firstName || 'Jane'} ${lastName || 'Smith'} (née ${randomLastName()})`,
     `${firstName || 'J.'} ${lastName || 'D.'}`
   ];

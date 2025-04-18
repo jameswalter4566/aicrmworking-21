@@ -83,15 +83,18 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       console.log("Using recipient email:", signerEmail);
       console.log("Lead ID being used:", leadId);
       
+      // Create a safe recipient name based on lead data
+      const recipientName = leadData ? 
+        `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Borrower' : 
+        'Borrower';
+      
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
           leadId: leadId ? String(leadId) : undefined,
           conditions: [condition],
           sendForSignature: true,
           recipientEmail: signerEmail,
-          recipientName: leadData ? 
-            `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Borrower' : 
-            'Borrower'
+          recipientName: recipientName
         }
       });
       
