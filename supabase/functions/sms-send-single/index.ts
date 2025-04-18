@@ -36,10 +36,15 @@ serve(async (req) => {
     const formattedPhoneNumber = formatPhoneNumber(phoneNumber);
     console.log(`[${requestId}] Formatted phone number: ${formattedPhoneNumber}`);
     
-    // Define the webhook URL for status callbacks
-    // This can be used to track delivery status
-    const baseUrl = Deno.env.get("PUBLIC_URL") || req.url;
-    const statusCallbackUrl = new URL("/functions/sms-webhook-receiver", new URL(baseUrl).origin).toString();
+    // Define a proper public webhook URL for Twilio callbacks
+    // Instead of using the internal Supabase edge-runtime URL, we'll use the public URL
+    const publicUrl = Deno.env.get("PUBLIC_URL") || 
+                     "https://ba480dba-df9a-497b-8dad-ad3edcc6e9d9.lovableproject.com";
+    
+    // Format: https://{domain}/functions/v1/{function-name}
+    const statusCallbackUrl = `${publicUrl}/functions/v1/sms-webhook-receiver`;
+    
+    console.log(`[${requestId}] Using status callback URL: ${statusCallbackUrl}`);
     
     // Send SMS using Twilio
     const twilioResponse = await sendSMS(
