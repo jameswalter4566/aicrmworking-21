@@ -49,6 +49,10 @@ enabled = false
 enabled = true
 port = 54325
 
+# Add public access for the twilio-token function
+[functions.twilio-token]
+verify_jwt = false
+
 [vector]
 enabled = false
 port = 54327

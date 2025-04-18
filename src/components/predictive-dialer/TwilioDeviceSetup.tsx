@@ -26,12 +26,13 @@ const TwilioDeviceSetup: React.FC<TwilioDeviceSetupProps> = ({ onDeviceReady }) 
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({}) // Empty body is fine
+          }
+          // No authorization header needed since we've made the function public
         });
         
         if (!response.ok) {
-          throw new Error(`Failed to fetch Twilio token: ${response.status}`);
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch Twilio token: ${response.status} ${errorText}`);
         }
         
         const data = await response.json();
