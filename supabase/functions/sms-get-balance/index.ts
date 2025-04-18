@@ -1,10 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from "../_shared/cors.ts";
+import { createTwilioClient } from "../_shared/twilio-sms.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -13,95 +10,60 @@ serve(async (req) => {
   }
 
   try {
-    const smsApiKey = Deno.env.get("SMS_API_KEY");
-    const smsServerUrl = Deno.env.get("SMS_SERVER_URL");
+    const requestId = crypto.randomUUID();
+    console.log(`[${requestId}] SMS Get Balance invoked`);
+
+    // With Twilio, there's no specific API for getting balance
+    // Instead, we'll provide account details including the current account balance
     
-    if (!smsApiKey || !smsServerUrl) {
-      return new Response(
-        JSON.stringify({ error: 'SMS API credentials are not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
+    // Create Twilio client
+    const twilioClient = await createTwilioClient();
+    if (!twilioClient) {
+      throw new Error("Failed to initialize Twilio client");
     }
     
-    const payload = {
-      key: smsApiKey
+    // Get account details
+    const account = await twilioClient.api.accounts(Deno.env.get("TWILIO_ACCOUNT_SID")).fetch();
+    
+    // Format response
+    const response = {
+      accountSid: account.sid,
+      accountName: account.friendlyName,
+      accountStatus: account.status,
+      accountType: account.type,
+      balance: account.balance || "Unknown", // Balance in $ as a string
+      currency: "USD",
+      createdAt: account.dateCreated,
+      lastUpdated: account.dateUpdated,
+      owner: account.ownerAccountSid,
+      // Some additional properties for historical compatibility
+      units: "credits",
+      unlimited: false,
+      provider: "twilio",
+      requestId
     };
-
-    console.log("Checking SMS account balance");
-
-    try {
-      const response = await fetch(`${smsServerUrl}/services/send.php`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams(payload).toString()
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("SMS API error:", response.status, errorText);
-        return new Response(
-          JSON.stringify({ 
-            error: `SMS Gateway API error: ${response.status}`,
-            details: errorText
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
-      const responseData = await response.json();
-      console.log("SMS API balance response received");
-
-      if (!responseData.success) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'Failed to retrieve account balance', 
-            details: responseData.error?.message || 'Unknown error'
-          }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-
-      const credits = responseData.data.credits || "Unlimited";
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          balance: credits,
-          isUnlimited: credits === "Unlimited"
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    } catch (fetchError) {
-      console.error("Fetch error:", fetchError);
-      return new Response(
-        JSON.stringify({ 
-          error: 'Network error when connecting to SMS Gateway API',
-          details: fetchError.message
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-  } catch (error) {
-    console.error("Error in get balance function:", error);
+    
+    console.log(`[${requestId}] Retrieved account details for Twilio account`);
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
+      JSON.stringify({
+        success: true,
+        balance: response,
+        requestId
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    console.error("Error getting SMS balance:", error);
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Unknown error'
+      }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
