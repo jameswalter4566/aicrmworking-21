@@ -1,4 +1,3 @@
-
 // Twilio SMS Utility Module
 // This provides common functionality for Twilio SMS operations
 
@@ -48,11 +47,7 @@ export async function sendSMS(
   try {
     const client = await createTwilioClient();
     const formattedTo = formatPhoneNumber(to);
-    const fromNumber = options.from || Deno.env.get("TWILIO_PHONE_NUMBER");
-    
-    if (!fromNumber) {
-      throw new Error("No 'from' phone number provided");
-    }
+    const fromNumber = options.from || Deno.env.get("TWILIO_PHONE_NUMBER") || "+18336575981";
     
     const formattedFrom = formatPhoneNumber(fromNumber);
     
