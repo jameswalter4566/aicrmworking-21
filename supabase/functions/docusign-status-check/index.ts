@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -53,6 +54,7 @@ async function getDocuSignAccessToken() {
  */
 function generateJWT() {
   // This is a simplified version - in production use a proper JWT library
+  // For demo purposes only - in a real implementation, use a proper JWT library
   console.log("Would generate JWT with integration key and private key");
   return "WOULD_BE_A_REAL_JWT";
 }

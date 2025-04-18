@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [leadData, setLeadData] = useState<any>(null);
   
-  // Fetch the lead data to get email for DocuSign
   useEffect(() => {
     if (leadId) {
       fetchLeadData(leadId);
@@ -67,7 +65,6 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       return;
     }
     
-    // Ensure we have the lead's email address
     if (!leadData || !leadData.email) {
       toast.error("Missing recipient email address. Cannot send for signature.");
       console.error("Missing lead email address");
@@ -84,7 +81,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
           leadId,
           conditions: [condition],
           sendForSignature: true,
-          recipientEmail: leadData.email, // Explicitly pass the recipient email
+          recipientEmail: leadData.email,
           recipientName: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Borrower'
         }
       });
@@ -94,7 +91,6 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
         console.error('Error sending for signature:', error);
       } else if (data?.success) {
         toast.success(`Document sent for signature successfully`);
-        // Force a refresh of the condition data to get the updated DocuSign status
         const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
           body: { leadId }
         });
@@ -129,7 +125,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
           envelopeId: condition.docuSignEnvelopeId,
           leadId,
           conditionId: condition.id,
-          checkOnly: false // Download if completed
+          checkOnly: false
         }
       });
       
@@ -142,7 +138,6 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
         if (data.signedDocumentUrl) {
           toast.success("Signed document retrieved successfully!");
           
-          // Force a refresh of the condition data to get the updated DocuSign status
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
             body: { leadId }
           });
