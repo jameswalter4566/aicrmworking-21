@@ -31,6 +31,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   
   useEffect(() => {
     if (leadId) {
+      // Always convert leadId to string when using it in API calls or queries
       fetchLeadData(String(leadId));
     }
   }, [leadId]);

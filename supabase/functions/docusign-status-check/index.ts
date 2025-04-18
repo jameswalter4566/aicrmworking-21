@@ -102,7 +102,11 @@ async function importPrivateKey(pemRaw: string) {
     // 1. Restore real line-breaks that were escaped as \n
     const pem = pemRaw.replace(/\\n/g, '\n').trim();
     
-    // 2. Accept either PKCS#1 or PKCS#8 header format
+    // 2. Check key format to determine if it's PKCS#1 or PKCS#8
+    const isPkcs1 = /BEGIN RSA PRIVATE KEY/.test(pem);
+    console.log(`Detected key format: ${isPkcs1 ? 'PKCS#1' : 'PKCS#8'}`);
+    
+    // 3. Extract the body regardless of format
     const body = pem
       .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, '')
       .replace(/-----END (RSA )?PRIVATE KEY-----/, '')
@@ -114,12 +118,12 @@ async function importPrivateKey(pemRaw: string) {
     
     console.log("Private key format processed, length:", body.length);
     
-    // 3. Convert to ArrayBuffer directly
+    // 4. Convert to ArrayBuffer directly
     const der = Uint8Array.from(atob(body), c => c.charCodeAt(0)).buffer;
     
-    // 4. Import - PKCS#8 only!
+    // 5. Import with the correct format
     return await crypto.subtle.importKey(
-      'pkcs8',
+      isPkcs1 ? 'pkcs1' : 'pkcs8',
       der,
       { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
       false,
@@ -131,7 +135,9 @@ async function importPrivateKey(pemRaw: string) {
     // Add more specific error info to help debug
     if (error.message && error.message.includes("decode base64")) {
       console.error("This appears to be a base64 decoding issue. Make sure your private key is properly formatted.");
-      console.error("Verify your key is in PKCS#8 format and properly escaped in the environment variable.");
+      console.error("Verify your key is properly escaped in the environment variable.");
+    } else if (error.message && error.message.includes("expected SEQUENCE")) {
+      console.error("This appears to be a DER format issue. The key might be in PKCS#1 format but you're trying to import as PKCS#8.");
     }
     
     throw error;
