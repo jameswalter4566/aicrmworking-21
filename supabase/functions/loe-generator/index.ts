@@ -93,6 +93,7 @@ async function generateJWT() {
 
 /**
  * Import private key from PEM format with robust error handling
+ * Expects PKCS#8 format key
  */
 async function importPrivateKey(pemRaw: string) {
   try {
@@ -103,14 +104,10 @@ async function importPrivateKey(pemRaw: string) {
     // 1. Restore real line-breaks that were escaped as \n
     const pem = pemRaw.replace(/\\n/g, '\n').trim();
     
-    // 2. Check key format to determine if it's PKCS#1 or PKCS#8
-    const isPkcs1 = /BEGIN RSA PRIVATE KEY/.test(pem);
-    console.log(`Detected key format: ${isPkcs1 ? 'PKCS#1' : 'PKCS#8'}`);
-    
-    // 3. Extract the body regardless of format
+    // 2. Strip header/footer and whitespace
     const body = pem
-      .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/, '')
-      .replace(/-----END (RSA )?PRIVATE KEY-----/, '')
+      .replace(/-----BEGIN PRIVATE KEY-----/, '')
+      .replace(/-----END PRIVATE KEY-----/, '')
       .replace(/\s+/g, '');
     
     if (!body) {
@@ -119,12 +116,12 @@ async function importPrivateKey(pemRaw: string) {
     
     console.log("Private key format processed, length:", body.length);
     
-    // 4. Convert to ArrayBuffer directly
+    // 3. Convert to ArrayBuffer
     const der = Uint8Array.from(atob(body), c => c.charCodeAt(0)).buffer;
     
-    // 5. Import with the correct format
+    // 4. Import as PKCS#8
     return await crypto.subtle.importKey(
-      isPkcs1 ? 'pkcs1' : 'pkcs8',
+      "pkcs8",
       der,
       { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
       false,
@@ -138,7 +135,8 @@ async function importPrivateKey(pemRaw: string) {
       console.error("This appears to be a base64 decoding issue. Make sure your private key is properly formatted.");
       console.error("Verify your key is properly escaped in the environment variable.");
     } else if (error.message && error.message.includes("expected SEQUENCE")) {
-      console.error("This appears to be a DER format issue. The key might be in PKCS#1 format but you're trying to import as PKCS#8.");
+      console.error("This appears to be a DER format issue. Your key might be in PKCS#1 format but needs to be in PKCS#8.");
+      console.error("Run this command to convert your key to PKCS#8: openssl pkcs8 -topk8 -nocrypt -in docusign_private_key.pem -out docusign_private_key_pkcs8.pem");
     }
     
     throw error;
