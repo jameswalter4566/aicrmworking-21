@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,10 +35,16 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   };
   
   const handleSendForSignature = async () => {
-    if (!leadId || !condition.id || !condition.documentUrl) return;
+    if (!leadId || !condition.id || !condition.documentUrl) {
+      toast.error("Missing required information to send for signature");
+      console.error("Missing leadId, conditionId, or documentUrl");
+      return;
+    }
     
     setIsSendingForSignature(true);
     try {
+      console.log("Sending condition for signature:", condition.id);
+      
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
           leadId,
@@ -49,8 +56,19 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       if (error) {
         toast.error("Failed to send document for signature");
         console.error('Error sending for signature:', error);
-      } else if (data.success) {
-        toast.success(`Document sent for signature`);
+      } else if (data?.success) {
+        toast.success(`Document sent for signature successfully`);
+        // Force a refresh of the condition data to get the updated DocuSign status
+        const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
+          body: { leadId }
+        });
+        
+        if (refreshData?.success && refreshData?.conditions) {
+          console.log("Conditions refreshed after sending for signature");
+        }
+      } else {
+        toast.error(data?.error || "Unknown error sending document for signature");
+        console.error('Unknown error in loe-generator:', data);
       }
     } catch (err) {
       console.error("Error in handleSendForSignature:", err);
@@ -61,10 +79,15 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   };
   
   const handleCheckStatus = async () => {
-    if (!leadId || !condition.id || !condition.docuSignEnvelopeId) return;
+    if (!leadId || !condition.id || !condition.docuSignEnvelopeId) {
+      toast.error("Missing required information to check signature status");
+      return;
+    }
     
     setIsCheckingStatus(true);
     try {
+      console.log("Checking signature status for envelope:", condition.docuSignEnvelopeId);
+      
       const { data, error } = await supabase.functions.invoke('docusign-status-check', {
         body: {
           envelopeId: condition.docuSignEnvelopeId,
@@ -77,18 +100,24 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       if (error) {
         toast.error("Failed to check signature status");
         console.error('Error checking signature status:', error);
-      } else if (data.success) {
+      } else if (data?.success) {
         toast.success(`Signature status: ${data.status}`);
         
         if (data.signedDocumentUrl) {
+          toast.success("Signed document retrieved successfully!");
+          
+          // Force a refresh of the condition data to get the updated DocuSign status
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
             body: { leadId }
           });
           
           if (refreshData?.success && refreshData?.conditions) {
-            toast.success("Signed document retrieved successfully!");
+            console.log("Conditions refreshed with signed document");
           }
         }
+      } else {
+        toast.error(data?.error || "Unknown error checking signature status");
+        console.error('Unknown error in docusign-status-check:', data);
       }
     } catch (err) {
       console.error("Error in handleCheckStatus:", err);

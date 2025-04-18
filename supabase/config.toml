@@ -61,6 +61,14 @@ verify_jwt = false
 [functions.sms-webhook-receiver]
 verify_jwt = false
 
+# Add public access for docusign-status-check function
+[functions.docusign-status-check]
+verify_jwt = false
+
+# Add public access for loe-generator function
+[functions.loe-generator]
+verify_jwt = false
+
 [vector]
 enabled = false
 port = 54327
