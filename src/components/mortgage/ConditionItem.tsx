@@ -38,7 +38,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       const { data: lead, error } = await supabase
         .from('leads')
         .select('*')
-        .eq('id', leadId)
+        .eq('id', leadId) // The issue is here - using a string where a number is expected
         .single();
         
       if (error) {
