@@ -47,7 +47,7 @@ serve(async (req) => {
       message,
       {
         statusCallback: statusCallbackUrl,
-        prioritize // This won't be used by Twilio but kept for interface compatibility
+        prioritize
       }
     );
     

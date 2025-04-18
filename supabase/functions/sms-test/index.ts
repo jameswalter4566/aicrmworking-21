@@ -47,7 +47,7 @@ serve(async (req) => {
         JSON.stringify({
           success: false,
           error: `Failed to send SMS: ${twilioResponse.error}`,
-          details: twilioResponse.details,
+          details: twilioResponse.details || {},
           requestId
         }),
         { 

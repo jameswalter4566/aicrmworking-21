@@ -24,3 +24,7 @@ verify_jwt = false
 
 [functions.sms-webhook-test]
 verify_jwt = false
+
+[functions.sms-send-single]
+verify_jwt = false
+

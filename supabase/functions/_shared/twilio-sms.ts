@@ -30,15 +30,17 @@ export async function createTwilioClient() {
   }
   
   try {
-    // Import Twilio with explicit namespace
-    const twilioModule = await import("https://esm.sh/twilio@4.20.1");
+    // Direct approach without using default export
+    const twilio = await import("https://esm.sh/twilio@4.20.1?dts");
     
-    // Access the constructor properly (ensure it's not undefined)
-    if (!twilioModule || !twilioModule.default) {
-      throw new Error("Twilio module import failed - default export is missing");
+    // Create client using the Twilio constructor directly
+    const client = new twilio.Twilio(accountSid, authToken);
+    
+    if (!client) {
+      throw new Error("Failed to create Twilio client instance");
     }
     
-    return twilioModule.default(accountSid, authToken);
+    return client;
   } catch (error) {
     console.error("Error creating Twilio client:", error);
     throw new Error(`Failed to initialize Twilio client: ${error.message}`);
@@ -53,19 +55,24 @@ export async function sendSMS(
     from?: string, 
     mediaUrl?: string | string[],
     statusCallback?: string,
-    prioritize?: boolean // This won't be used for Twilio but kept for interface compatibility
+    prioritize?: boolean
   } = {}
 ) {
   try {
-    const client = await createTwilioClient();
     const formattedTo = formatPhoneNumber(to);
     const fromNumber = options.from || Deno.env.get("TWILIO_PHONE_NUMBER") || "+18336575981";
-    
     const formattedFrom = formatPhoneNumber(fromNumber);
     
-    console.debug(`Using Twilio to send from ${formattedFrom} to ${formattedTo}`);
+    console.log(`Creating Twilio client to send SMS from ${formattedFrom} to ${formattedTo}`);
+    const client = await createTwilioClient();
     
-    const messageParams: any = {
+    if (!client || !client.messages) {
+      throw new Error("Invalid Twilio client or messages API not available");
+    }
+    
+    console.log("Twilio client created successfully, preparing message parameters");
+    
+    const messageParams: Record<string, any> = {
       to: formattedTo,
       from: formattedFrom,
       body: message
@@ -80,7 +87,17 @@ export async function sendSMS(
       messageParams.statusCallback = options.statusCallback;
     }
     
+    console.log("Sending SMS via Twilio with parameters:", JSON.stringify({
+      to: formattedTo,
+      from: formattedFrom,
+      bodyLength: message.length,
+      hasMediaUrl: !!options.mediaUrl,
+      hasStatusCallback: !!options.statusCallback
+    }));
+    
     const twilioMessage = await client.messages.create(messageParams);
+    
+    console.log(`SMS sent successfully with SID: ${twilioMessage.sid}, status: ${twilioMessage.status}`);
     
     return {
       success: true,
