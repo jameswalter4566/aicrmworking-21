@@ -18,7 +18,7 @@ export interface LoanCondition {
   signedDocumentUrl?: string;
 }
 
-export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string | number }> = ({ 
+export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string | number }> = ({ 
   condition,
   leadId 
 }) => {
@@ -27,9 +27,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   const [leadData, setLeadData] = useState<any>(null);
   
   useEffect(() => {
-    if (leadId) {
-      fetchLeadData(String(leadId));
-    }
+    fetchLeadData(String(leadId));
   }, [leadId]);
   
   const fetchLeadData = async (leadId: string) => {
@@ -68,9 +66,9 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       documentUrl: condition.documentUrl
     });
     
-    if (!leadId || !condition.id || !condition.documentUrl) {
+    if (!condition.id || !condition.documentUrl) {
       toast.error("Missing required information to send for signature");
-      console.error("Missing leadId, conditionId, or documentUrl", {
+      console.error("Missing conditionId or documentUrl", {
         leadId,
         conditionId: condition.id,
         documentUrl: condition.documentUrl
@@ -125,7 +123,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   };
   
   const handleCheckStatus = async () => {
-    if (!leadId || !condition.id || !condition.docuSignEnvelopeId) {
+    if (!condition.id || !condition.docuSignEnvelopeId) {
       toast.error("Missing required information to check signature status");
       return;
     }
@@ -196,7 +194,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
               size="sm" 
               className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
               onClick={handleSendForSignature}
-              disabled={isSendingForSignature}
+              disabled={isSendingForSignature || !leadData?.email}
               title={!leadData?.email ? "Missing recipient email address" : ""}
             >
               {isSendingForSignature ? (
