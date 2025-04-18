@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
     try {
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
-          leadId,
+          leadId: String(leadId), // Convert leadId to string
           conditions: [condition],
           sendForSignature: true
         }
@@ -68,7 +69,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       const { data, error } = await supabase.functions.invoke('docusign-status-check', {
         body: {
           envelopeId: condition.docuSignEnvelopeId,
-          leadId,
+          leadId: String(leadId), // Convert leadId to string
           conditionId: condition.id,
           checkOnly: false // Download if completed
         }
@@ -82,7 +83,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
         
         if (data.signedDocumentUrl) {
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-            body: { leadId }
+            body: { leadId: String(leadId) } // Convert leadId to string
           });
           
           if (refreshData?.success && refreshData?.conditions) {
