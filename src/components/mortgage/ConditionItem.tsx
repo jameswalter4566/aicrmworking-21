@@ -18,7 +18,7 @@ export interface LoanCondition {
   signedDocumentUrl?: string;
 }
 
-export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string }> = ({ 
+export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string | number }> = ({ 
   condition,
   leadId 
 }) => {
@@ -28,14 +28,13 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   
   useEffect(() => {
     if (leadId) {
-      fetchLeadData(leadId);
+      fetchLeadData(String(leadId));
     }
   }, [leadId]);
   
   const fetchLeadData = async (leadId: string) => {
     try {
       // The leads table uses bigint (or uuid) for id, so we need to make sure the type matches
-      // First check if leadId is a numeric string and convert appropriately
       const { data: lead, error } = await supabase
         .from('leads')
         .select('*')
@@ -62,9 +61,20 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   };
   
   const handleSendForSignature = async () => {
+    // Log the data being sent to help debug the issue
+    console.log("Sending for signature with data:", {
+      leadId: leadId,
+      conditionId: condition.id,
+      documentUrl: condition.documentUrl
+    });
+    
     if (!leadId || !condition.id || !condition.documentUrl) {
       toast.error("Missing required information to send for signature");
-      console.error("Missing leadId, conditionId, or documentUrl");
+      console.error("Missing leadId, conditionId, or documentUrl", {
+        leadId,
+        conditionId: condition.id,
+        documentUrl: condition.documentUrl
+      });
       return;
     }
     
@@ -78,10 +88,11 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
     try {
       console.log("Sending condition for signature:", condition.id);
       console.log("Using recipient email:", leadData.email);
+      console.log("Lead ID being used:", leadId);
       
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
-          leadId,
+          leadId: String(leadId),
           conditions: [condition],
           sendForSignature: true,
           recipientEmail: leadData.email,
@@ -95,7 +106,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       } else if (data?.success) {
         toast.success(`Document sent for signature successfully`);
         const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-          body: { leadId }
+          body: { leadId: String(leadId) }
         });
         
         if (refreshData?.success && refreshData?.conditions) {
@@ -126,7 +137,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       const { data, error } = await supabase.functions.invoke('docusign-status-check', {
         body: {
           envelopeId: condition.docuSignEnvelopeId,
-          leadId,
+          leadId: String(leadId),
           conditionId: condition.id,
           checkOnly: false
         }
@@ -142,7 +153,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
           toast.success("Signed document retrieved successfully!");
           
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-            body: { leadId }
+            body: { leadId: String(leadId) }
           });
           
           if (refreshData?.success && refreshData?.conditions) {

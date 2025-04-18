@@ -39,7 +39,7 @@ serve(async (req) => {
     const { data, error } = await supabaseClient
       .from("loan_conditions")
       .select("*")
-      .eq("lead_id", leadId)
+      .eq("lead_id", leadId.toString())
       .maybeSingle();
     
     if (error) {
