@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from "react";
-import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
+import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,6 +25,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   const [isSendingForSignature, setIsSendingForSignature] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   const [leadData, setLeadData] = useState<any>(null);
+  const [signerEmail, setSignerEmail] = useState("");
   
   useEffect(() => {
     if (leadId) {
@@ -34,7 +35,6 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   
   const fetchLeadData = async (leadId: string) => {
     try {
-      // The leads table uses bigint (or uuid) for id, so we need to make sure the type matches
       const { data: lead, error } = await supabase
         .from('leads')
         .select('*')
@@ -61,13 +61,6 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   };
   
   const handleSendForSignature = async () => {
-    // Log the data being sent to help debug the issue
-    console.log("Sending for signature with data:", {
-      leadId: leadId,
-      conditionId: condition.id,
-      documentUrl: condition.documentUrl
-    });
-    
     if (!condition.id || !condition.documentUrl) {
       toast.error("Missing required information to send for signature");
       console.error("Missing conditionId or documentUrl", {
@@ -78,16 +71,15 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       return;
     }
     
-    if (!leadData || !leadData.email) {
-      toast.error("Missing recipient email address. Cannot send for signature.");
-      console.error("Missing lead email address");
+    if (!signerEmail) {
+      toast.error("Please enter a recipient email address");
       return;
     }
     
     setIsSendingForSignature(true);
     try {
       console.log("Sending condition for signature:", condition.id);
-      console.log("Using recipient email:", leadData.email);
+      console.log("Using recipient email:", signerEmail);
       console.log("Lead ID being used:", leadId);
       
       const { data, error } = await supabase.functions.invoke('loe-generator', {
@@ -95,8 +87,10 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
           leadId: leadId ? String(leadId) : undefined,
           conditions: [condition],
           sendForSignature: true,
-          recipientEmail: leadData.email,
-          recipientName: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Borrower'
+          recipientEmail: signerEmail,
+          recipientName: leadData ? 
+            `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Borrower' : 
+            'Borrower'
         }
       });
       
@@ -191,26 +185,35 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
           )}
           
           {condition.documentUrl && !condition.docuSignEnvelopeId && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
-              onClick={handleSendForSignature}
-              disabled={isSendingForSignature}
-              title={!leadData?.email ? "Missing recipient email address" : ""}
-            >
-              {isSendingForSignature ? (
-                <>
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <SendToBack className="h-3 w-3 mr-1" />
-                  Send for Signature
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Input
+                type="email"
+                placeholder="Enter signer email"
+                value={signerEmail}
+                onChange={(e) => setSignerEmail(e.target.value)}
+                className="h-7 text-xs w-[200px]"
+                size="sm"
+              />
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
+                onClick={handleSendForSignature}
+                disabled={isSendingForSignature || !signerEmail}
+              >
+                {isSendingForSignature ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <SendToBack className="h-3 w-3 mr-1" />
+                    Send for Signature
+                  </>
+                )}
+              </Button>
+            </div>
           )}
           
           {condition.docuSignEnvelopeId && !condition.signedDocumentUrl && (
