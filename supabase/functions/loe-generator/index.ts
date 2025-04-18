@@ -117,6 +117,8 @@ async function sendToDocuSign(pdfBytes: Uint8Array, recipientEmail: string, reci
       status: "sent" // Send immediately
     };
     
+    console.log("Preparing DocuSign envelope for recipient:", recipientEmail);
+    
     // Send the envelope
     const response = await fetch(`${docusignBaseUrl}/restapi/v2.1/accounts/${docusignAccountId}/envelopes`, {
       method: 'POST',
@@ -211,7 +213,7 @@ serve(async (req) => {
   try {
     console.log('LOE Generator function called');
     
-    const { leadId, conditions, sendForSignature = false } = await req.json();
+    const { leadId, conditions, sendForSignature = false, recipientEmail, recipientName } = await req.json();
     
     if (!leadId || !conditions || !Array.isArray(conditions) || conditions.length === 0) {
       return new Response(
@@ -280,16 +282,25 @@ serve(async (req) => {
         let docusignResult = null;
         
         // If sendForSignature is true and we have recipient info, send to DocuSign
-        if (sendForSignature && lead.email) {
+        if (sendForSignature) {
           try {
             if (!docusignAccountId || !docusignIntegrationKey || !docusignPrivateKey) {
               console.warn('DocuSign credentials not configured, skipping signature request');
             } else {
-              console.log('Sending document to DocuSign for signature');
+              // Prefer the explicitly passed recipient email/name over the lead data
+              const signerEmail = recipientEmail || lead.email;
+              const signerName = recipientName || 
+                `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`.trim();
+                
+              if (!signerEmail) {
+                throw new Error("Missing recipient email address for DocuSign");
+              }
+              
+              console.log('Sending document to DocuSign for signature to:', signerEmail);
               docusignResult = await sendToDocuSign(
                 pdfBytes,
-                lead.email,
-                `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`,
+                signerEmail,
+                signerName,
                 `Letter of Explanation - ${formatLOETypeTitle(loeType)}`
               );
               
@@ -308,7 +319,13 @@ serve(async (req) => {
             }
           } catch (docusignError) {
             console.error('Error sending document to DocuSign:', docusignError);
-            // Continue without failing - we'll still return the document URL
+            return {
+              conditionId: condition.id,
+              loeType,
+              documentUrl: publicUrl,
+              success: false,
+              error: `DocuSign error: ${docusignError.message}`
+            };
           }
         }
         

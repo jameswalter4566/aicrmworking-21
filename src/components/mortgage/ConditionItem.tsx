@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -24,6 +24,32 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
 }) => {
   const [isSendingForSignature, setIsSendingForSignature] = useState(false);
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [leadData, setLeadData] = useState<any>(null);
+  
+  // Fetch the lead data to get email for DocuSign
+  useEffect(() => {
+    if (leadId) {
+      fetchLeadData(leadId);
+    }
+  }, [leadId]);
+  
+  const fetchLeadData = async (leadId: string) => {
+    try {
+      const { data: lead, error } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .single();
+        
+      if (error) {
+        console.error("Error fetching lead data:", error);
+      } else if (lead) {
+        setLeadData(lead);
+      }
+    } catch (err) {
+      console.error("Error in fetchLeadData:", err);
+    }
+  };
   
   const handleDownload = (url: string) => {
     const link = document.createElement('a');
@@ -41,15 +67,25 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       return;
     }
     
+    // Ensure we have the lead's email address
+    if (!leadData || !leadData.email) {
+      toast.error("Missing recipient email address. Cannot send for signature.");
+      console.error("Missing lead email address");
+      return;
+    }
+    
     setIsSendingForSignature(true);
     try {
       console.log("Sending condition for signature:", condition.id);
+      console.log("Using recipient email:", leadData.email);
       
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
           leadId,
           conditions: [condition],
-          sendForSignature: true
+          sendForSignature: true,
+          recipientEmail: leadData.email, // Explicitly pass the recipient email
+          recipientName: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Borrower'
         }
       });
       
@@ -151,7 +187,8 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
               size="sm" 
               className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
               onClick={handleSendForSignature}
-              disabled={isSendingForSignature}
+              disabled={isSendingForSignature || !leadData?.email}
+              title={!leadData?.email ? "Missing recipient email address" : ""}
             >
               {isSendingForSignature ? (
                 <>
