@@ -61,6 +61,14 @@ verify_jwt = false
 [functions.sms-webhook-receiver]
 verify_jwt = false
 
+# Add public access for the sms-webhook-handler function
+[functions.sms-webhook-handler]
+verify_jwt = false
+
+# Add public access for the sms-send-single function
+[functions.sms-send-single]
+verify_jwt = false
+
 [vector]
 enabled = false
 port = 54327

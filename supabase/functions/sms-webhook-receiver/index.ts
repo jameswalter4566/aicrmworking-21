@@ -379,7 +379,7 @@ async function generateAIResponse(messageContent: string, openAiApiKey: string, 
 }
 
 // Send an SMS response using the SMS Gateway API
-async function sendSMSResponse(phoneNumber: string, message: string, supabase: any, requestId: string): Promise<void> {
+async function sendSMSResponse(phoneNumber: string, message: string, supabase: any, requestId: string): Promise<any> {
   try {
     console.log(`[${requestId}] Sending SMS response to ${phoneNumber}: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
     
@@ -397,7 +397,7 @@ async function sendSMSResponse(phoneNumber: string, message: string, supabase: a
     }
     
     console.log(`[${requestId}] SMS response sent successfully to ${phoneNumber} with ID: ${data?.messageId}`);
-    
+    return data;
   } catch (error) {
     console.error(`[${requestId}] Error sending SMS response:`, error);
     throw new Error(`Failed to send SMS response: ${error.message}`);
