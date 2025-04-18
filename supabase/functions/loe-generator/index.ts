@@ -215,11 +215,11 @@ serve(async (req) => {
     
     const { leadId, conditions, sendForSignature = false, recipientEmail, recipientName } = await req.json();
     
-    if (!leadId || !conditions || !Array.isArray(conditions) || conditions.length === 0) {
+    if (!conditions || !Array.isArray(conditions) || conditions.length === 0) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Invalid request parameters" 
+          error: "Missing conditions parameter" 
         }),
         { 
           status: 400, 
@@ -228,28 +228,25 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Processing LOE for lead ID: ${leadId}`);
+    console.log(`Processing LOE for lead ID: ${leadId || 'not provided'}`);
     console.log(`Conditions to process: ${conditions.length}`);
     console.log(`Send for signature: ${sendForSignature}`);
     
-    const { data: lead, error: leadError } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('id', leadId)
-      .single();
+    let lead = null;
     
-    if (leadError) {
-      console.error('Error fetching lead data:', leadError);
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: "Failed to fetch lead data" 
-        }),
-        { 
-          status: 404, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+    if (leadId) {
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching lead data:', error);
+        // Continue without lead data - we'll use provided recipient info if available
+      } else {
+        lead = data;
+      }
     }
     
     const results = await Promise.all(conditions.map(async (condition) => {
@@ -261,7 +258,7 @@ serve(async (req) => {
         const pdfBytes = await generatePDF(loeContent);
         
         const fileName = `LOE_${condition.id}_${Date.now()}.pdf`;
-        const filePath = `leads/${leadId}/loe/${fileName}`;
+        const filePath = leadId ? `leads/${leadId}/loe/${fileName}` : `loe/${fileName}`;
         
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('borrower-documents')
@@ -288,9 +285,9 @@ serve(async (req) => {
               console.warn('DocuSign credentials not configured, skipping signature request');
             } else {
               // Prefer the explicitly passed recipient email/name over the lead data
-              const signerEmail = recipientEmail || lead.email;
+              const signerEmail = recipientEmail || (lead?.email || null);
               const signerName = recipientName || 
-                `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`.trim();
+                (lead ? `${lead.first_name || 'Borrower'} ${lead.last_name || ''}`.trim() : 'Borrower');
                 
               if (!signerEmail) {
                 throw new Error("Missing recipient email address for DocuSign");
@@ -307,15 +304,17 @@ serve(async (req) => {
               console.log('DocuSign envelope created:', docusignResult);
               
               // Store the envelope ID and status in the database
-              await supabase.from('docusign_envelopes')
-                .insert({
-                  lead_id: leadId,
-                  condition_id: condition.id,
-                  envelope_id: docusignResult.envelopeId,
-                  status: docusignResult.status,
-                  document_name: fileName,
-                  document_url: publicUrl
-                });
+              if (leadId) {
+                await supabase.from('docusign_envelopes')
+                  .insert({
+                    lead_id: leadId,
+                    condition_id: condition.id,
+                    envelope_id: docusignResult.envelopeId,
+                    status: docusignResult.status,
+                    document_name: fileName,
+                    document_url: publicUrl
+                  });
+              }
             }
           } catch (docusignError) {
             console.error('Error sending document to DocuSign:', docusignError);
@@ -330,7 +329,9 @@ serve(async (req) => {
         }
         
         // After generating the LOE, update the condition with the document URL
-        await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl, docusignResult?.envelopeId);
+        if (leadId) {
+          await updateConditionWithDocumentUrl(leadId, condition.id, publicUrl, docusignResult?.envelopeId);
+        }
         
         return {
           conditionId: condition.id,
@@ -359,7 +360,7 @@ serve(async (req) => {
         results
       }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   } catch (error) {
@@ -372,7 +373,7 @@ serve(async (req) => {
       }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
   }

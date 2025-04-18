@@ -27,9 +27,18 @@ serve(async (req) => {
     const { leadId } = await req.json();
 
     if (!leadId) {
+      console.log("No leadId provided, returning empty conditions");
       return new Response(
-        JSON.stringify({ success: false, error: "Missing leadId parameter" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+        JSON.stringify({ 
+          success: true, 
+          conditions: {
+            masterConditions: [],
+            generalConditions: [],
+            priorToFinalConditions: [],
+            complianceConditions: []
+          }
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

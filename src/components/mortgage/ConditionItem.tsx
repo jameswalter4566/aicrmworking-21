@@ -18,7 +18,7 @@ export interface LoanCondition {
   signedDocumentUrl?: string;
 }
 
-export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string | number }> = ({ 
+export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string | number }> = ({ 
   condition,
   leadId 
 }) => {
@@ -27,7 +27,9 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string 
   const [leadData, setLeadData] = useState<any>(null);
   
   useEffect(() => {
-    fetchLeadData(String(leadId));
+    if (leadId) {
+      fetchLeadData(String(leadId));
+    }
   }, [leadId]);
   
   const fetchLeadData = async (leadId: string) => {
@@ -90,7 +92,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string 
       
       const { data, error } = await supabase.functions.invoke('loe-generator', {
         body: { 
-          leadId: String(leadId),
+          leadId: leadId ? String(leadId) : undefined,
           conditions: [condition],
           sendForSignature: true,
           recipientEmail: leadData.email,
@@ -104,7 +106,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string 
       } else if (data?.success) {
         toast.success(`Document sent for signature successfully`);
         const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-          body: { leadId: String(leadId) }
+          body: { leadId: leadId ? String(leadId) : undefined }
         });
         
         if (refreshData?.success && refreshData?.conditions) {
@@ -135,7 +137,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string 
       const { data, error } = await supabase.functions.invoke('docusign-status-check', {
         body: {
           envelopeId: condition.docuSignEnvelopeId,
-          leadId: String(leadId),
+          leadId: leadId ? String(leadId) : undefined,
           conditionId: condition.id,
           checkOnly: false
         }
@@ -151,7 +153,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string 
           toast.success("Signed document retrieved successfully!");
           
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
-            body: { leadId: String(leadId) }
+            body: { leadId: leadId ? String(leadId) : undefined }
           });
           
           if (refreshData?.success && refreshData?.conditions) {
@@ -194,7 +196,7 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId: string 
               size="sm" 
               className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
               onClick={handleSendForSignature}
-              disabled={isSendingForSignature || !leadData?.email}
+              disabled={isSendingForSignature}
               title={!leadData?.email ? "Missing recipient email address" : ""}
             >
               {isSendingForSignature ? (
