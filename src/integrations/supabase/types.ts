@@ -207,6 +207,45 @@ export type Database = {
           },
         ]
       }
+      docusign_envelopes: {
+        Row: {
+          condition_id: string
+          created_at: string | null
+          document_name: string | null
+          document_url: string | null
+          envelope_id: string
+          id: string
+          lead_id: string
+          signed_document_url: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          condition_id: string
+          created_at?: string | null
+          document_name?: string | null
+          document_url?: string | null
+          envelope_id: string
+          id?: string
+          lead_id: string
+          signed_document_url?: string | null
+          status: string
+          updated_at?: string | null
+        }
+        Update: {
+          condition_id?: string
+          created_at?: string | null
+          document_name?: string | null
+          document_url?: string | null
+          envelope_id?: string
+          id?: string
+          lead_id?: string
+          signed_document_url?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       lead_activities: {
         Row: {
           description: string

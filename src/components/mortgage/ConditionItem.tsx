@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +25,6 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
   const [isCheckingStatus, setIsCheckingStatus] = useState(false);
   
   const handleDownload = (url: string) => {
-    // Create temporary link and trigger download
     const link = document.createElement('a');
     link.href = url;
     link.download = `LOE_${condition.id}.pdf`;
@@ -82,15 +80,12 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
       } else if (data.success) {
         toast.success(`Signature status: ${data.status}`);
         
-        // If we got a signed document URL, reload the conditions to show it
         if (data.signedDocumentUrl) {
           const { data: refreshData } = await supabase.functions.invoke('retrieve-conditions', {
             body: { leadId }
           });
           
           if (refreshData?.success && refreshData?.conditions) {
-            // In a real app, you would update the UI with the new conditions data
-            // For now, we'll just display a toast
             toast.success("Signed document retrieved successfully!");
           }
         }
