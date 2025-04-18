@@ -57,6 +57,10 @@ verify_jwt = false
 [functions.twilio-voice]
 verify_jwt = false
 
+# Add public access for the sms-webhook-receiver function
+[functions.sms-webhook-receiver]
+verify_jwt = false
+
 [vector]
 enabled = false
 port = 54327
