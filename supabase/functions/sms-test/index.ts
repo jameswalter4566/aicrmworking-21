@@ -79,11 +79,16 @@ serve(async (req) => {
       console.log(`[${requestId}] Request prepared, sending to SMS gateway`);
       console.log(`[${requestId}] Request parameters: phoneNumber=${phoneNumber}, messageLength=${testMessage.length}`);
       
-      // Send the SMS via the gateway API
+      // Send the SMS via the gateway API with proper browser-like headers
       const smsResponse = await fetch(smsApiUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Origin': 'https://app.smsgatewayhub.com',
+          'Referer': 'https://app.smsgatewayhub.com/'
         },
         body: formData.toString()
       });
@@ -101,6 +106,23 @@ serve(async (req) => {
           // Check for Cloudflare or other challenge pages
           if (errorBody.includes('<html>') || errorBody.includes('<!DOCTYPE')) {
             console.error(`[${requestId}] Gateway returned HTML instead of API response. Possible Cloudflare challenge or incorrect URL.`);
+            
+            return new Response(
+              JSON.stringify({
+                success: false,
+                error: 'SMS Gateway returned a Cloudflare challenge. Please verify your API credentials and URL.',
+                alternativeSolutions: [
+                  "Verify your SMS API URL is correct",
+                  "Contact your SMS gateway provider to allow your IP addresses",
+                  "Use an alternative SMS provider that doesn't use Cloudflare protection"
+                ],
+                requestId
+              }),
+              { 
+                status: 403, // Forbidden
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
           }
         } catch (e) {
           errorBody = "Could not read response";

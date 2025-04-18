@@ -286,11 +286,16 @@ serve(async (req) => {
       formData.append('message', responseMessage);
       formData.append('prioritize', '1');
       
-      // Send the SMS via the gateway API directly
+      // Send the SMS via the gateway API directly with browser-like headers
       const smsResponse = await fetch(smsApiUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          'Accept': 'application/json, text/plain, */*',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Origin': 'https://app.smsgatewayhub.com',
+          'Referer': 'https://app.smsgatewayhub.com/'
         },
         body: formData.toString()
       });
@@ -305,6 +310,31 @@ serve(async (req) => {
 
           if (errorBody.includes('<html>') || errorBody.includes('<!DOCTYPE')) {
             console.error(`[${requestId}] Gateway returned HTML instead of API response. Possible Cloudflare challenge or incorrect URL.`);
+            // Mark as processed but with error
+            await supabase
+              .from('sms_webhooks')
+              .update({
+                processed: true,
+                ai_response: responseMessage,
+                processed_at: new Date().toISOString(),
+                processing_error: "SMS Gateway returned Cloudflare challenge. Response not sent."
+              })
+              .eq('id', webhookId);
+              
+            return new Response(
+              JSON.stringify({
+                success: true,
+                message: 'Webhook received and AI processed, but SMS response could not be sent due to Cloudflare protection',
+                webhookId,
+                aiResponse: responseMessage,
+                requestId,
+                error: "SMS Gateway returned Cloudflare challenge. Consider changing providers."
+              }),
+              {
+                status: 202, // Accepted with partial processing
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
           }
         } catch (e) {
           errorBody = "Could not read response";
@@ -350,6 +380,20 @@ serve(async (req) => {
       );
     } catch (processingError) {
       console.error(`[${requestId}] Error processing message with AI:`, processingError);
+      
+      // Mark webhook as processed but with error
+      try {
+        await supabase
+          .from('sms_webhooks')
+          .update({
+            processed: true,
+            processing_error: processingError.message,
+            processed_at: new Date().toISOString()
+          })
+          .eq('id', webhookId);
+      } catch (updateError) {
+        console.error(`[${requestId}] Failed to update webhook status:`, updateError);
+      }
       
       return new Response(
         JSON.stringify({
