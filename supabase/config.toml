@@ -1,85 +1,46 @@
+
 project_id = "imrmboyczebjlbnkgjns"
 
 [api]
 enabled = true
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
 
 [db]
 port = 54322
-shadow_port = 54320
-major_version = 15
-
-[db.pooler]
-enabled = false
-port = 54329
-pool_mode = "transaction"
-default_pool_size = 20
-max_client_conn = 100
-
-[realtime]
-enabled = true
 
 [studio]
 enabled = true
 port = 54323
-api_url = "http://localhost"
 
 [inbucket]
 enabled = true
 port = 54324
 
-[storage]
-enabled = true
-
 [auth]
-enabled = true
-site_url = "http://localhost:3000"
-
-[auth.email]
-enable_confirmations = false
-
-[auth.sms]
-enabled = false
-
-[functions]
 enabled = true
 port = 54325
 
-# Add public access for the twilio-token function
-[functions.twilio-token]
-verify_jwt = false
-
-# Add public access for the twilio-voice function
-[functions.twilio-voice]
-verify_jwt = false
-
-# Add public access for the sms-webhook-receiver function
-[functions.sms-webhook-receiver]
-verify_jwt = false
-
-# Add public access for docusign-status-check function
-[functions.docusign-status-check]
-verify_jwt = false
-
-# Add public access for loe-generator function
-[functions.loe-generator]
-verify_jwt = false
-
-[vector]
-enabled = false
-port = 54327
-
-[observability.metrics]
-enabled = false
+[storage]
+enabled = true
 port = 54326
 
-[observability.traces]
+[realtime]
+enabled = true
+port = 54327
+
+[edge_runtime]
+enabled = true
+
+[analytics]
 enabled = false
 port = 54328
 
-[ai]
-enabled = false
-port = 54330
+[experimental]
+pubsub = true
+
+[functions.twilio-token]
+verify_jwt = false
+
+[functions.twilio-voice]
+verify_jwt = false
