@@ -552,6 +552,7 @@ const ClientPortal = () => {
       }
       
       try {
+        console.log("Verifying portal access for slug:", slug);
         const { data: portalData, error: portalError } = await supabase
           .from('client_portal_access')
           .select('*')
@@ -564,13 +565,20 @@ const ClientPortal = () => {
           setLoading(false);
           return;
         }
-        
+
+        console.log("Portal access verified, updating last accessed");
         await supabase
           .from('client_portal_access')
           .update({ last_accessed_at: new Date().toISOString() })
           .eq('id', portalData.id);
         
-        setClientData(mockClientData);
+        // Set client data with the lead ID from portal data
+        const clientDataWithLeadId = {
+          ...mockClientData,
+          leadId: portalData.lead_id
+        };
+        console.log("Setting client data with leadId:", clientDataWithLeadId);
+        setClientData(clientDataWithLeadId);
         setAuthenticated(true);
       } catch (error) {
         console.error("Error verifying access:", error);
@@ -581,7 +589,7 @@ const ClientPortal = () => {
     
     verifyAccess();
   }, [slug, token]);
-  
+
   const refreshData = async () => {
     if (clientData) {
       const updatedConditions = [...clientData.conditions];
@@ -595,7 +603,7 @@ const ClientPortal = () => {
       }
     }
   };
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -606,7 +614,7 @@ const ClientPortal = () => {
       </div>
     );
   }
-  
+
   if (!slug || slug === "login" || !token) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-mortgage-purple/20 to-white p-4">
@@ -630,7 +638,7 @@ const ClientPortal = () => {
       </div>
     );
   }
-  
+
   if (!authenticated || !clientData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-red-100 to-white p-4">
@@ -654,14 +662,16 @@ const ClientPortal = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-50">
       <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <div className="container mx-auto p-4 md:p-6 mt-2">
         {activeTab === "home" && <HomeTab clientData={clientData} />}
-        {activeTab === "conditions" && <ConditionsTab clientData={clientData} refreshData={refreshData} />}
+        {activeTab === "conditions" && clientData?.leadId && (
+          <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
+        )}
         {activeTab === "attention" && <AttentionTab clientData={clientData} />}
         {activeTab === "support" && <SupportTab />}
       </div>

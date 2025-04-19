@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,11 +30,13 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
   const [conditions, setConditions] = useState<ConditionsData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchConditions();
-  }, [leadId]);
-
   const fetchConditions = async () => {
+    if (!leadId) {
+      console.error("No leadId provided to ClientPortalConditions");
+      return;
+    }
+
+    console.log("Fetching conditions for leadId:", leadId);
     try {
       const { data, error } = await supabase.functions.invoke('retrieve-conditions', {
         body: { leadId }
@@ -47,16 +48,23 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
         return;
       }
 
-      if (data.success && data.conditions) {
+      if (data?.success && data?.conditions) {
+        console.log("Successfully retrieved conditions:", data.conditions);
         setConditions(data.conditions);
+      } else {
+        console.log("No conditions found or invalid response format:", data);
       }
     } catch (error) {
-      console.error("Error fetching conditions:", error);
+      console.error("Exception fetching conditions:", error);
       toast.error("Failed to load loan conditions");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchConditions();
+  }, [leadId]);
 
   const handleFileUpload = async (file: File) => {
     try {
