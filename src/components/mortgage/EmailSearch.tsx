@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail, Search } from "lucide-react";
@@ -50,7 +49,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
     try {
       console.log("Starting email search with parameters:", { clientLastName });
       
-      // Search for approval emails - simplified to just search by last name
+      // Search for approval emails
       const { data: searchData, error: searchError } = await supabase.functions.invoke('search-approval-emails', {
         body: { clientLastName }
       });
@@ -86,67 +85,45 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
       const pdfAttachment = emailWithPDF.attachments.find(att => att.mimeType === "application/pdf");
       console.log("Found PDF attachment:", pdfAttachment);
       
-      // Parse the PDF attachment
-      const { data: parseData, error: parseError } = await supabase.functions.invoke('parse-approval-document', {
+      // Get the download URL for the attachment
+      const { data: attachmentData, error: attachmentError } = await supabase.functions.invoke('search-approval-emails', {
         body: { 
           emailId: emailWithPDF.id,
           attachmentId: pdfAttachment.attachmentId,
+          action: 'download'
+        }
+      });
+
+      if (attachmentError || !attachmentData?.downloadUrl) {
+        console.error("Error getting attachment download URL:", attachmentError);
+        throw new Error("Could not get attachment download URL");
+      }
+
+      // Analyze the PDF using our analyze-pdf-document function
+      const { data: parseData, error: parseError } = await supabase.functions.invoke('analyze-pdf-document', {
+        body: { 
+          fileUrl: attachmentData.downloadUrl,
+          fileType: "conditions",
+          leadId
         }
       });
       
       if (parseError) {
-        console.error("Error parsing document:", parseError);
-        throw new Error(`Error parsing document: ${parseError.message}`);
+        console.error("Error analyzing document:", parseError);
+        throw new Error(`Error analyzing document: ${parseError.message}`);
       }
       
-      console.log("Parse response:", parseData);
+      console.log("PDF Analysis response:", parseData);
       
       updateStepStatus("analyze", "completed");
       updateStepStatus("extract", "processing");
       
-      if (parseData.success && parseData.conditions) {
-        // Save conditions
-        const { error: saveError } = await supabase.functions.invoke('update-conditions', {
-          body: { 
-            leadId,
-            conditions: parseData.conditions
-          }
-        });
-        
-        if (saveError) {
-          console.error("Error saving conditions:", saveError);
-          throw new Error(`Error saving conditions: ${saveError.message}`);
-        }
-        
-        onConditionsFound(parseData.conditions);
-        
-        // Generate LOEs
-        const allConditions = [
-          ...(parseData.conditions.masterConditions || []),
-          ...(parseData.conditions.generalConditions || []),
-          ...(parseData.conditions.priorToFinalConditions || []),
-          ...(parseData.conditions.complianceConditions || [])
-        ];
-        
-        if (allConditions.length > 0) {
-          const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
-            body: { 
-              leadId,
-              conditions: allConditions
-            }
-          });
-          
-          if (loeError) {
-            console.error("Error generating LOEs:", loeError);
-          } else if (loeData.success) {
-            toast.success("Successfully generated Letters of Explanation");
-          }
-        }
-        
+      if (parseData.success && parseData.data) {
+        onConditionsFound(parseData.data);
         updateStepStatus("extract", "completed");
         toast.success("Successfully extracted conditions from approval email");
       } else {
-        throw new Error("Failed to parse conditions from the document");
+        throw new Error("Failed to extract conditions from the document");
       }
     } catch (error: any) {
       console.error('Error during email search process:', error);
