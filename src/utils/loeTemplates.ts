@@ -1,3 +1,4 @@
+
 /**
  * Letter of Explanation (LOE) templates and utility functions
  * Used for generating structured content for different types of LOEs
@@ -90,6 +91,8 @@ export interface LOEParams {
   addressDiscrepancyReason?: string;
   nameVariation?: string;
   nameVariationReason?: string;
+  // Adding the missing property
+  conditionText?: string;
 }
 
 /**
