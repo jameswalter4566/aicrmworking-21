@@ -22,18 +22,20 @@ export function formatPhoneNumber(phoneNumber: string): string {
 
 // Function to create and configure a Twilio client
 export async function createTwilioClient() {
-  const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-  const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
-  
-  if (!accountSid || !authToken) {
-    throw new Error("Twilio credentials are not configured");
-  }
-  
   try {
-    // Import Twilio using a simple direct import without additional parameters
+    const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+    const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+    
+    if (!accountSid || !authToken) {
+      throw new Error("Twilio credentials are not configured");
+    }
+    
+    console.log("Creating Twilio client with credentials");
+    
+    // Import Twilio using dynamic import to work in Deno
     const twilio = await import("npm:twilio@4.20.1");
     
-    // Create client using the Twilio constructor directly
+    // Create client using the Twilio constructor
     return twilio.default(accountSid, authToken);
   } catch (error) {
     console.error("Error creating Twilio client:", error);
@@ -73,7 +75,7 @@ export async function sendSMS(
     
     console.log("Twilio client created successfully, preparing message parameters");
     
-    const messageParams = {
+    const messageParams: any = {
       to: formattedTo,
       from: formattedFrom,
       body: message
@@ -141,7 +143,7 @@ export function parseTwilioWebhook(formData: FormData) {
   }
   
   return {
-    messageSid: data.MessageSid,
+    messageSid: data.MessageSid || data.SmsSid,
     from: data.From,
     to: data.To,
     body: data.Body,
