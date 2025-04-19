@@ -19,6 +19,7 @@ import { ClientPortalConditions } from "@/components/mortgage/ClientPortalCondit
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProgress";
+import { ClientPortalContent } from "@/components/mortgage/ClientPortalContent";
 
 const progressSteps = [
   "Application Created",
@@ -543,6 +544,8 @@ const ClientPortal = () => {
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [activeTab, setActiveTab] = useState("home");
+  const [isInPipeline, setIsInPipeline] = useState(false);
+  const [createdBy, setCreatedBy] = useState<string | undefined>(undefined);
   
   useEffect(() => {
     const verifyAccess = async () => {
@@ -571,6 +574,24 @@ const ClientPortal = () => {
           .from('client_portal_access')
           .update({ last_accessed_at: new Date().toISOString() })
           .eq('id', portalData.id);
+        
+        // Check if the lead is in the mortgage pipeline
+        if (portalData.lead_id) {
+          const { data: leadData, error: leadError } = await supabase
+            .from('leads')
+            .select('is_mortgage_lead, added_to_pipeline_at')
+            .eq('id', portalData.lead_id)
+            .single();
+            
+          if (!leadError && leadData) {
+            setIsInPipeline(!!leadData.added_to_pipeline_at);
+          }
+        }
+        
+        // Save the creator ID if available
+        if (portalData.created_by) {
+          setCreatedBy(portalData.created_by);
+        }
         
         // Set client data with the lead ID from portal data
         const clientDataWithLeadId = {
@@ -668,7 +689,16 @@ const ClientPortal = () => {
       <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <div className="container mx-auto p-4 md:p-6 mt-2">
-        {activeTab === "home" && <HomeTab clientData={clientData} />}
+        {activeTab === "home" && clientData?.leadId && (
+          <div className="w-full">
+            {/* Pass the pipeline status and creator ID to ClientPortalContent */}
+            <ClientPortalContent 
+              leadId={clientData.leadId} 
+              isInPipeline={isInPipeline}
+              createdBy={createdBy}
+            />
+          </div>
+        )}
         {activeTab === "conditions" && clientData?.leadId && (
           <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
         )}

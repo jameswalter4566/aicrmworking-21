@@ -1,12 +1,14 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
 import ClientPortalLoanProgress from './ClientPortalLoanProgress';
 import { Upload, FileText, ClipboardCheck, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
+import { ClientPortalOnboarding } from './ClientPortalOnboarding';
+import { LeadProfile, leadProfileService } from '@/services/leadProfile';
 
 interface CompanySettings {
   company_name: string;
@@ -45,8 +47,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     secondary_color: '#8B5CF6',
     accent_color: '#EA384C',
   });
+  const [showOnboarding, setShowOnboarding] = useState(!isInPipeline);
+  const [leadData, setLeadData] = useState<LeadProfile | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // This effect will now fetch company settings based on the creator ID
+  // This effect will fetch company settings based on the creator ID
   useEffect(() => {
     const fetchCompanySettings = async () => {
       if (!createdBy) return;
@@ -70,6 +75,25 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
         }
       } catch (error) {
         console.error('Error in fetchCompanySettings:', error);
+      }
+    };
+
+    // Fetch lead data to check if the user has completed onboarding
+    const fetchLeadData = async () => {
+      setIsLoading(true);
+      try {
+        const leadProfile = await leadProfileService.getLeadById(leadId);
+        setLeadData(leadProfile);
+        
+        // Check if we should show onboarding
+        // If lead has completed onboarding or is in pipeline, don't show onboarding
+        const hasCompletedOnboarding = leadProfile.mortgageData?.onboardingCompleted === true;
+        setShowOnboarding(!isInPipeline && !hasCompletedOnboarding);
+        
+      } catch (error) {
+        console.error('Error fetching lead data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -122,11 +146,59 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
       getCreatorFromPortalAccess();
     }
-  }, [createdBy, leadId]);
+    
+    fetchLeadData();
+  }, [createdBy, leadId, isInPipeline]);
 
   const refreshData = () => {
     console.log("Refreshing data...");
   };
+
+  const handleOnboardingComplete = async () => {
+    try {
+      // Update the lead to mark onboarding as completed
+      await leadProfileService.updateLead(leadId, {
+        ...leadData,
+        mortgageData: {
+          ...leadData?.mortgageData,
+          onboardingCompleted: true
+        }
+      });
+      
+      // Hide the onboarding UI
+      setShowOnboarding(false);
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+    }
+  };
+
+  if (isLoading) {
+    return <div className="flex justify-center p-8">Loading...</div>;
+  }
+
+  // Show onboarding if the lead is not in the pipeline and hasn't completed onboarding
+  if (showOnboarding) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-white">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold" style={{ color: settings.primary_color }}>
+              Welcome to {settings.company_name}
+            </h2>
+            <p className="text-gray-600">
+              Let's get started with your mortgage application. Please complete the following steps to provide us with the information we need.
+            </p>
+          </div>
+        </Card>
+
+        <ClientPortalOnboarding 
+          leadId={leadId} 
+          onComplete={handleOnboardingComplete}
+          initialData={leadData || undefined}
+        />
+      </div>
+    );
+  }
 
   if (!isInPipeline) {
     return (

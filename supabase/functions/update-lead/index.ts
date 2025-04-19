@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 // Define CORS headers
@@ -51,7 +52,7 @@ Deno.serve(async (req) => {
     const addedToPipelineAt = isMortgageLead ? new Date().toISOString() : null;
 
     // Transform the lead data from camelCase to snake_case for database
-    const transformedData = {
+    const transformedData: any = {
       first_name: leadData.firstName,
       last_name: leadData.lastName,
       email: leadData.email,
@@ -66,6 +67,11 @@ Deno.serve(async (req) => {
     // Handle mortgage data if provided
     if (leadData.mortgageData) {
       transformedData.mortgage_data = leadData.mortgageData;
+      
+      // Check if onboarding was completed
+      if (leadData.mortgageData.onboardingCompleted) {
+        console.log('Onboarding completed for lead:', leadId);
+      }
     }
 
     // Update the lead in the database
@@ -121,6 +127,24 @@ Deno.serve(async (req) => {
       if (mortgageActivityError) {
         console.error('Error recording mortgage update activity:', mortgageActivityError.message);
       }
+      
+      // Record onboarding completion in activity log if completed
+      if (leadData.mortgageData.onboardingCompleted) {
+        const onboardingActivityData = {
+          lead_id: leadId,
+          type: 'Onboarding Completed',
+          description: `Client portal onboarding sequence completed`,
+          timestamp: new Date().toISOString()
+        };
+
+        const { error: onboardingActivityError } = await supabase
+          .from('lead_activities')
+          .insert(onboardingActivityData);
+
+        if (onboardingActivityError) {
+          console.error('Error recording onboarding activity:', onboardingActivityError.message);
+        }
+      }
     }
 
     // Transform the updated lead back to camelCase for the frontend
@@ -139,7 +163,9 @@ Deno.serve(async (req) => {
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       createdBy: data.created_by,
-      mortgageData: data.mortgage_data
+      mortgageData: data.mortgage_data,
+      isMortgageLead: data.is_mortgage_lead,
+      addedToPipelineAt: data.added_to_pipeline_at
     };
 
     // Return the updated lead
