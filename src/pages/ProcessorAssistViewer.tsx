@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, ArrowLeft, Briefcase, FileText, HomeIcon, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import EmailConditionsParser from "@/components/mortgage/EmailConditionsParser";
+import EmailSearch from "@/components/mortgage/EmailSearch";
 import { ConditionItem, LoanCondition } from "@/components/mortgage/ConditionItem";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import ProcessorSidebar from "@/components/mortgage/ProcessorSidebar";
@@ -438,7 +438,7 @@ const ProcessorAssistViewer = () => {
                 value="email" 
                 className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-900"
               >
-                Email Parser
+                AI Email Search
               </TabsTrigger>
               <TabsTrigger 
                 value="pdf" 
@@ -449,8 +449,8 @@ const ProcessorAssistViewer = () => {
             </TabsList>
             
             <TabsContent value="email" className="bg-white">
-              <EmailConditionsParser 
-                clientLastName={loanApplication?.lastName || ''} 
+              <EmailSearch
+                clientLastName={loanApplication?.lastName || ''}
                 loanNumber={loanApplication?.loanId || ''}
                 leadId={loanApplication?.id || ''}
                 onConditionsFound={handleConditionsFound}
