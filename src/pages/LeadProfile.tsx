@@ -32,6 +32,7 @@ import { Separator } from "@/components/ui/separator";
 import { format, formatDistanceToNow } from "date-fns";
 import DispositionSelector from "@/components/DispositionSelector";
 import Mortgage1003Form from "@/components/mortgage/Mortgage1003Form";
+import { LeadProfileClientPortal } from '@/components/mortgage/LeadProfileClientPortal';
 
 const LeadProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -673,6 +674,11 @@ const LeadProfile = () => {
           </CardContent>
         </Card>
       </div>
+
+      <LeadProfileClientPortal 
+        leadId={id || ''} 
+        isMortgageLead={lead?.isMortgageLead}
+      />
     </MainLayout>
   );
 };
