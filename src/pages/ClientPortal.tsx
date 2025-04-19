@@ -547,58 +547,48 @@ const ClientPortal = () => {
   const [isInPipeline, setIsInPipeline] = useState(false);
   const [createdBy, setCreatedBy] = useState<string | undefined>(undefined);
   
-  useEffect(() => {
-    const verifyAccess = async () => {
-      if (!slug || !token) {
+  const verifyAccess = async () => {
+    if (!slug || !token) {
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      console.log("Verifying portal access for slug:", slug);
+      const { data: portalData, error: portalError } = await supabase
+        .from('client_portal_access')
+        .select('*')
+        .eq('portal_slug', slug)
+        .eq('access_token', token)
+        .single();
+      
+      if (portalError || !portalData) {
+        console.error("Portal access error:", portalError);
         setLoading(false);
         return;
       }
-      
-      try {
-        console.log("Verifying portal access for slug:", slug);
-        const { data: portalData, error: portalError } = await supabase
-          .from('client_portal_access')
-          .select('*')
-          .eq('portal_slug', slug)
-          .eq('access_token', token)
-          .single();
-        
-        if (portalError || !portalData) {
-          console.error("Portal access error:", portalError);
-          setLoading(false);
-          return;
-        }
 
-        console.log("Portal access verified, updating last accessed");
-        await supabase
-          .from('client_portal_access')
-          .update({ last_accessed_at: new Date().toISOString() })
-          .eq('id', portalData.id);
-      
+      console.log("Portal access verified, updating last accessed");
+      await supabase
+        .from('client_portal_access')
+        .update({ last_accessed_at: new Date().toISOString() })
+        .eq('id', portalData.id);
+    
       // Check if the lead is in the mortgage pipeline
       if (portalData.lead_id) {
         const { data: leadData, error: leadError } = await supabase
           .from('leads')
-          .select('is_mortgage_lead, added_to_pipeline_at')
+          .select('is_mortgage_lead, added_to_pipeline_at, created_by')
           .eq('id', portalData.lead_id)
-          .single();
+          .maybeSingle();
           
         if (!leadError && leadData) {
           setIsInPipeline(!!leadData.added_to_pipeline_at);
-        }
-      }
-      
-      // Try to get creator ID from another field instead
-      // Since created_by doesn't exist, try to get it from another source
-      if (portalData.lead_id) {
-        const { data: leadData } = await supabase
-          .from('leads')
-          .select('created_by')
-          .eq('id', portalData.lead_id)
-          .single();
           
-        if (leadData && leadData.created_by) {
-          setCreatedBy(leadData.created_by);
+          // Set createdBy if available
+          if (leadData.created_by) {
+            setCreatedBy(leadData.created_by);
+          }
         }
       }
       
@@ -615,7 +605,7 @@ const ClientPortal = () => {
     } finally {
       setLoading(false);
     }
-  }, [slug, token]);
+  };
 
   const refreshData = async () => {
     if (clientData) {
@@ -697,7 +687,6 @@ const ClientPortal = () => {
       <div className="container mx-auto p-4 md:p-6 mt-2">
         {activeTab === "home" && clientData?.leadId && (
           <div className="w-full">
-            {/* Pass the pipeline status and creator ID to ClientPortalContent */}
             <ClientPortalContent 
               leadId={clientData.leadId} 
               isInPipeline={isInPipeline}
