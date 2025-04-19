@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -12,6 +11,7 @@ import {
   Upload,
   Download
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -58,7 +58,6 @@ const ProcessorSidebar = ({
   const [isLoanSubmitted, setIsLoanSubmitted] = useState(false);
   const { updateLoanProgress, isUpdating } = useLoanProgress();
 
-  // Check the current loan status when the component loads
   useEffect(() => {
     const checkLoanStatus = async () => {
       const loanLeadId = leadId || id;
@@ -70,7 +69,6 @@ const ProcessorSidebar = ({
         });
 
         if (!error && data?.data?.currentStep) {
-          // Check if the loan is already in submitted status or beyond
           const isSubmitted = data.data.currentStep === "submitted" || 
             data.data.stepIndex >= data.data.allSteps.indexOf("submitted");
           
@@ -92,9 +90,7 @@ const ProcessorSidebar = ({
       return;
     }
     
-    // If the loan is already submitted, we don't want to update the status again
     if (isLoanSubmitted) {
-      // Handle the download action instead
       handleDownload34();
       return;
     }
@@ -116,7 +112,6 @@ const ProcessorSidebar = ({
   };
 
   const handleDownload34 = () => {
-    // In a real implementation, this would download the 3.4 form
     toast.info("Downloading 3.4 form... This is a placeholder for the actual download functionality");
     setIsDialogOpen(false);
   };
@@ -134,7 +129,6 @@ const ProcessorSidebar = ({
       </SidebarHeader>
 
       <SidebarContent>
-        {/* Submit Loan Button or Download 3.4 Button */}
         <div className="p-2">
           <Button
             onClick={() => setIsDialogOpen(true)}
@@ -169,7 +163,11 @@ const ProcessorSidebar = ({
                   isActive={activeSection === "conditions"} 
                   onClick={() => onSectionChange("conditions")}
                   tooltip="Borrower's Conditions"
-                  className="text-blue-900 hover:bg-blue-100"
+                  className={cn(
+                    "text-blue-900 transition-colors",
+                    "hover:bg-blue-50",
+                    activeSection === "conditions" ? "bg-blue-100 font-medium" : "bg-blue-25"
+                  )}
                 >
                   <FileText className="h-5 w-5" />
                   <span>Conditions</span>
@@ -181,7 +179,11 @@ const ProcessorSidebar = ({
                   isActive={activeSection === "conversation"} 
                   onClick={() => onSectionChange("conversation")}
                   tooltip="Client Conversations"
-                  className="text-blue-900 hover:bg-blue-100"
+                  className={cn(
+                    "text-blue-900 transition-colors",
+                    "hover:bg-blue-50",
+                    activeSection === "conversation" ? "bg-blue-100 font-medium" : "bg-blue-25"
+                  )}
                 >
                   <MessageSquare className="h-5 w-5" />
                   <span>Conversation</span>
@@ -193,7 +195,11 @@ const ProcessorSidebar = ({
                   isActive={activeSection === "orderServices"}
                   onClick={() => onSectionChange("orderServices")}
                   tooltip="Order Services"
-                  className="text-blue-900 hover:bg-blue-100"
+                  className={cn(
+                    "text-blue-900 transition-colors",
+                    "hover:bg-blue-50",
+                    activeSection === "orderServices" ? "bg-blue-100 font-medium" : "bg-blue-25"
+                  )}
                 >
                   <Package className="h-5 w-5" />
                   <span>Order Services</span>
@@ -205,7 +211,11 @@ const ProcessorSidebar = ({
                   isActive={activeSection === "aiLoanOfficer"} 
                   onClick={() => onSectionChange("aiLoanOfficer")}
                   tooltip="AI Loan Officer Assist"
-                  className="text-blue-900 hover:bg-blue-100"
+                  className={cn(
+                    "text-blue-900 transition-colors",
+                    "hover:bg-blue-50",
+                    activeSection === "aiLoanOfficer" ? "bg-blue-100 font-medium" : "bg-blue-25"
+                  )}
                 >
                   <Brain className="h-5 w-5" />
                   <span>AI Loan Officer Assist</span>
@@ -256,7 +266,6 @@ const ProcessorSidebar = ({
         </Button>
       </SidebarFooter>
 
-      {/* Confirmation Dialog - Modified for both submit and download */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
