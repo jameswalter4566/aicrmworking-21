@@ -21,9 +21,12 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Search-approval-emails function called");
+    
     // Get authenticated user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error("No auth header found");
       return new Response(
         JSON.stringify({ success: false, error: "Not authenticated" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
@@ -34,16 +37,19 @@ serve(async (req) => {
     const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
     
     if (userError || !user) {
+      console.error("Auth error:", userError);
       return new Response(
         JSON.stringify({ success: false, error: "User not found" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 401 }
       );
     }
 
-    // Parse request body
-    const { clientLastName, loanNumber, emailSender } = await req.json();
+    console.log("User authenticated:", user.id);
 
-    console.log("Search parameters:", { clientLastName, loanNumber, emailSender });
+    // Parse request body
+    const { clientLastName } = await req.json();
+
+    console.log("Search parameters:", { clientLastName });
 
     // Get user's Gmail connection
     const { data: connection, error: connError } = await supabaseAdmin
@@ -54,6 +60,7 @@ serve(async (req) => {
       .single();
 
     if (connError || !connection) {
+      console.error("Gmail connection error:", connError);
       return new Response(
         JSON.stringify({
           success: false,
@@ -64,11 +71,14 @@ serve(async (req) => {
       );
     }
 
+    console.log("Found Gmail connection for user");
+
     // Check if token needs refresh
     if (new Date(connection.expires_at) < new Date()) {
       console.log("Token expired, refreshing...");
       
       if (!connection.refresh_token) {
+        console.error("No refresh token available");
         return new Response(
           JSON.stringify({
             success: false,
@@ -117,27 +127,21 @@ serve(async (req) => {
           expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
         })
         .eq('id', connection.id);
+      
+      console.log("Token refreshed successfully");
     }
 
-    // Build Gmail search query
+    // Build Gmail search query - SIMPLIFIED
     let searchQuery = "has:attachment filename:pdf ";
     
     if (clientLastName) {
       searchQuery += clientLastName + " ";
     }
     
-    if (loanNumber) {
-      searchQuery += loanNumber + " ";
-    }
-    
-    if (emailSender) {
-      searchQuery += `from:(${emailSender}) `;
-    }
-    
-    // Add a date filter to limit results to last 30 days
-    searchQuery += "newer_than:30d";
+    // Limit to recent emails
+    searchQuery += "newer_than:90d";
 
-    console.log(`Gmail search query: ${searchQuery}`);
+    console.log(`Gmail search query: "${searchQuery}"`);
 
     // Call Gmail API
     const searchResponse = await fetch(
@@ -167,12 +171,25 @@ serve(async (req) => {
     
     console.log(`Found ${messageIds.length} matching emails`);
     
-    // Fetch details for first 5 messages
+    if (messageIds.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          emails: [],
+          query: searchQuery
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Just get the most recent 3 emails
+    const limit = Math.min(3, messageIds.length);
     const emails = [];
-    const limit = Math.min(5, messageIds.length);
     
     for (let i = 0; i < limit; i++) {
       const messageId = messageIds[i].id;
+      console.log(`Fetching details for message ${i+1}/${limit} (ID: ${messageId})`);
+      
       const messageResponse = await fetch(
         `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
         {
@@ -222,6 +239,8 @@ serve(async (req) => {
       // Extract snippet (preview of email content)
       const snippet = messageData.snippet || "";
       
+      console.log(`Email: ${subject}, From: ${from}, Has ${attachments.length} PDF attachments`);
+      
       emails.push({
         id: messageId,
         subject,
@@ -231,6 +250,8 @@ serve(async (req) => {
         attachments
       });
     }
+
+    console.log(`Returning ${emails.length} emails`);
 
     return new Response(
       JSON.stringify({

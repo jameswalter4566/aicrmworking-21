@@ -39,8 +39,8 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
   };
 
   const handleSearch = async () => {
-    if (!clientLastName || !loanNumber) {
-      toast.warning("Client last name and loan number are required");
+    if (!clientLastName) {
+      toast.warning("Client last name is required for email search");
       return;
     }
     
@@ -48,22 +48,11 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
     updateStepStatus("search", "processing");
     
     try {
-      console.log("Starting email search with parameters:", { clientLastName, loanNumber });
+      console.log("Starting email search with parameters:", { clientLastName });
       
-      // Log the full request for debugging
-      console.log("Calling function: search-approval-emails with body:", { 
-        clientLastName,
-        loanNumber,
-        emailSender: "underwriting@" // This will match any underwriting domain
-      });
-      
-      // Search for approval emails
+      // Search for approval emails - simplified to just search by last name
       const { data: searchData, error: searchError } = await supabase.functions.invoke('search-approval-emails', {
-        body: { 
-          clientLastName,
-          loanNumber,
-          emailSender: "underwriting@" // This will match any underwriting domain
-        }
+        body: { clientLastName }
       });
       
       console.log("Search response:", searchData, searchError);
@@ -76,7 +65,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
       updateStepStatus("search", "completed");
       
       if (!searchData.success || !searchData.emails || searchData.emails.length === 0) {
-        toast.warning("No approval emails found. Try using the PDF upload option.");
+        toast.warning(`No matching emails found for "${clientLastName}". Try using the PDF upload option.`);
         setIsSearching(false);
         return;
       }
@@ -207,7 +196,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
         
         {!isSearching && (
           <div className="text-xs text-blue-500 italic mt-2">
-            We'll search your connected email account for approval letters
+            We'll search for emails containing "{clientLastName}" with PDF attachments
           </div>
         )}
       </div>
