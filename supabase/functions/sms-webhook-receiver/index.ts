@@ -14,6 +14,21 @@ serve(async (req) => {
   }
 
   try {
+    console.log('======= WEBHOOK RECEIVER STARTED =======');
+    console.log(`Received request method: ${req.method}`);
+    console.log(`Request headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
+    
+    // Log full request details for debugging
+    const rawBody = await req.text();
+    console.log('Raw Request Body:', rawBody);
+
+    // Detailed header logging for Twilio-specific headers
+    const twilioSignature = req.headers.get('x-twilio-signature');
+    console.log('Twilio Signature:', twilioSignature || 'No signature found');
+
+    const contentType = req.headers.get('content-type');
+    console.log('Content-Type:', contentType || 'No content-type specified');
+
     // Create Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -29,7 +44,6 @@ serve(async (req) => {
     console.log(`[${requestId}] Request Headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
 
     // Check for Twilio signature
-    const twilioSignature = req.headers.get('x-twilio-signature');
     if (twilioSignature) {
       console.log(`[${requestId}] Received Twilio signature: ${twilioSignature}`);
       
@@ -43,7 +57,7 @@ serve(async (req) => {
     
     // Parse incoming webhook payload
     let payload;
-    const contentType = req.headers.get('content-type');
+    
     let rawBody = "";
     
     try {
