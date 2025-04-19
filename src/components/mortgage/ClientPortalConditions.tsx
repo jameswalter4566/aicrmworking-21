@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -94,7 +95,7 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
               <ConditionItem 
                 key={condition.id || index}
                 condition={condition}
-                leadId={leadId}
+                leadId={String(leadId)} // Convert leadId to string
               />
             ))}
           </div>
