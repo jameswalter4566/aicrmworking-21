@@ -1,10 +1,10 @@
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Link } from 'react-router-dom';  // Replace with react-router-dom Link
 import ClientPortalGenerator from './ClientPortalGenerator';
 import { toast } from 'sonner';
 import { ExternalLink } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 interface LeadProfileClientPortalProps {
   leadId: string | number;
@@ -12,6 +12,8 @@ interface LeadProfileClientPortalProps {
 }
 
 export const LeadProfileClientPortal = ({ leadId, isMortgageLead }: LeadProfileClientPortalProps) => {
+  const { user } = useAuth();
+
   const handleLinkGenerated = (url: string) => {
     // Copy to clipboard
     navigator.clipboard.writeText(url);
@@ -33,9 +35,9 @@ export const LeadProfileClientPortal = ({ leadId, isMortgageLead }: LeadProfileC
         <ClientPortalGenerator 
           leadId={Number(leadId)} 
           onLinkGenerated={handleLinkGenerated}
+          createdBy={user?.id}
         />
       </CardContent>
     </Card>
   );
 };
-

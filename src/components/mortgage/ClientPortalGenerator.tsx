@@ -1,72 +1,52 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { generateClientPortal } from '@/utils/clientPortalUtils';
 import { toast } from 'sonner';
-import { generateClientPortal, PortalAccess } from '@/utils/clientPortalUtils';
 import { Loader2 } from 'lucide-react';
 
 interface ClientPortalGeneratorProps {
   leadId: number;
-  onLinkGenerated?: (url: string) => void;
+  onLinkGenerated: (url: string) => void;
+  createdBy?: string;
 }
 
-const ClientPortalGenerator = ({ leadId, onLinkGenerated }: ClientPortalGeneratorProps) => {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [portalData, setPortalData] = useState<{url: string, portal: PortalAccess | null} | null>(null);
-  
+const ClientPortalGenerator = ({ leadId, onLinkGenerated, createdBy }: ClientPortalGeneratorProps) => {
+  const [generating, setGenerating] = useState(false);
+
   const handleGeneratePortal = async () => {
-    if (isGenerating) return;
-    
-    setIsGenerating(true);
+    setGenerating(true);
     try {
-      const result = await generateClientPortal(leadId);
+      const { url, error } = await generateClientPortal(leadId);
       
-      if (result.error) {
-        toast.error(result.error);
-        return;
+      if (error) {
+        throw new Error(error);
       }
-      
-      setPortalData(result);
-      toast.success('Portal access generated successfully');
-      
-      // Notify parent component about the generated link
-      if (onLinkGenerated) {
-        onLinkGenerated(result.url);
-      }
+
+      onLinkGenerated(url);
     } catch (error) {
       console.error('Error generating portal:', error);
-      toast.error('Failed to generate portal access');
+      toast.error('Failed to generate portal link');
     } finally {
-      setIsGenerating(false);
+      setGenerating(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      {portalData ? (
-        <div className="bg-green-50 border border-green-200 rounded-md p-3 text-green-800">
-          <p className="text-sm font-medium">Portal access generated successfully!</p>
-          <p className="text-xs mt-1">You can now copy the link and share it with the borrower.</p>
-        </div>
+    <Button 
+      onClick={handleGeneratePortal} 
+      disabled={generating}
+      className="w-full"
+    >
+      {generating ? (
+        <>
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          Generating Portal Link...
+        </>
       ) : (
-        <div>
-          <Button 
-            onClick={handleGeneratePortal} 
-            disabled={isGenerating}
-            className="w-full bg-blue-600 hover:bg-blue-700"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generating...
-              </>
-            ) : (
-              'Generate Client Portal Access'
-            )}
-          </Button>
-        </div>
+        'Generate Portal Link'
       )}
-    </div>
+    </Button>
   );
 };
 
