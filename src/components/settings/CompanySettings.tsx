@@ -119,15 +119,17 @@ export const CompanySettingsCard = () => {
             <div className="space-y-2">
               <Label htmlFor="primary_color">Primary Color</Label>
               <div className="flex space-x-2">
-                <Input
-                  id="primary_color"
-                  type="color"
-                  value={settings.primary_color}
-                  onChange={(e) =>
-                    setSettings({ ...settings, primary_color: e.target.value })
-                  }
-                  className="w-16 p-1 h-10"
-                />
+                <div className="relative w-16 h-10 rounded-md overflow-hidden">
+                  <Input
+                    id="primary_color"
+                    type="color"
+                    value={settings.primary_color}
+                    onChange={(e) =>
+                      setSettings({ ...settings, primary_color: e.target.value })
+                    }
+                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer"
+                  />
+                </div>
                 <Input
                   value={settings.primary_color}
                   onChange={(e) =>
@@ -141,15 +143,17 @@ export const CompanySettingsCard = () => {
             <div className="space-y-2">
               <Label htmlFor="secondary_color">Secondary Color</Label>
               <div className="flex space-x-2">
-                <Input
-                  id="secondary_color"
-                  type="color"
-                  value={settings.secondary_color}
-                  onChange={(e) =>
-                    setSettings({ ...settings, secondary_color: e.target.value })
-                  }
-                  className="w-16 p-1 h-10"
-                />
+                <div className="relative w-16 h-10 rounded-md overflow-hidden">
+                  <Input
+                    id="secondary_color"
+                    type="color"
+                    value={settings.secondary_color}
+                    onChange={(e) =>
+                      setSettings({ ...settings, secondary_color: e.target.value })
+                    }
+                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer"
+                  />
+                </div>
                 <Input
                   value={settings.secondary_color}
                   onChange={(e) =>
@@ -163,15 +167,17 @@ export const CompanySettingsCard = () => {
             <div className="space-y-2">
               <Label htmlFor="accent_color">Accent Color</Label>
               <div className="flex space-x-2">
-                <Input
-                  id="accent_color"
-                  type="color"
-                  value={settings.accent_color}
-                  onChange={(e) =>
-                    setSettings({ ...settings, accent_color: e.target.value })
-                  }
-                  className="w-16 p-1 h-10"
-                />
+                <div className="relative w-16 h-10 rounded-md overflow-hidden">
+                  <Input
+                    id="accent_color"
+                    type="color"
+                    value={settings.accent_color}
+                    onChange={(e) =>
+                      setSettings({ ...settings, accent_color: e.target.value })
+                    }
+                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer"
+                  />
+                </div>
                 <Input
                   value={settings.accent_color}
                   onChange={(e) =>
