@@ -1,5 +1,4 @@
 
-# project configuration in supabase/config.toml
 project_id = "imrmboyczebjlbnkgjns"
 
 [api]
@@ -7,17 +6,27 @@ enabled = true
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
 
-[functions.sms-webhook-receiver]
-verify_jwt = false
+[db]
+port = 54322
 
-[functions.sms-webhook-handler]
-verify_jwt = false
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
 
-[functions.ai-sms-agent]
-verify_jwt = false
+[inbucket]
+enabled = true
+port = 54324
 
-[functions.conditions-update-sms]
-verify_jwt = false
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[realtime]
+enabled = true
 
 [functions.twilio-token]
 verify_jwt = false
@@ -25,3 +34,8 @@ verify_jwt = false
 [functions.twilio-voice]
 verify_jwt = false
 
+[functions.parse-underwriting-email]
+verify_jwt = false
+
+[functions.search-approval-emails]
+verify_jwt = false
