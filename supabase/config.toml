@@ -19,3 +19,8 @@ verify_jwt = false
 [functions.conditions-update-sms]
 verify_jwt = false
 
+[functions.twilio-token]
+verify_jwt = false
+
+[functions.twilio-voice]
+verify_jwt = false

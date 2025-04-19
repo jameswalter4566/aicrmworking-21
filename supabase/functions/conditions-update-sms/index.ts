@@ -15,14 +15,18 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Conditions update SMS function triggered");
     const { leadId } = await req.json();
 
     if (!leadId) {
+      console.error("No leadId provided");
       return new Response(
         JSON.stringify({ success: false, error: 'Lead ID is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+
+    console.log(`Processing SMS notification for lead ID: ${leadId}`);
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -50,8 +54,12 @@ serve(async (req) => {
       );
     }
 
+    console.log(`Retrieved lead data: ${lead.first_name}, phone: ${lead.phone1}`);
+
     // Check if the loan is already in approved status
     const currentStatus = lead.mortgage_data?.loan_status?.toLowerCase() || '';
+    console.log(`Current loan status: ${currentStatus}`);
+    
     if (currentStatus !== 'approved') {
       console.log(`Lead ${leadId} is not in approved status (current: ${currentStatus}). Skipping SMS.`);
       return new Response(
@@ -61,6 +69,7 @@ serve(async (req) => {
     }
 
     if (!lead.phone1) {
+      console.error(`No phone number available for lead ${leadId}`);
       return new Response(
         JSON.stringify({ success: false, error: 'No phone number available' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
@@ -69,6 +78,8 @@ serve(async (req) => {
 
     // Compose the message
     const message = `Hello! ${lead.first_name} Great news! Underwriting just cleared most of our conditions. Just a few more before we get you to the finish line. Please check your client portal and email for the remaining items. Thank you!`;
+
+    console.log(`Sending SMS to ${lead.phone1} with message: ${message}`);
 
     // Send the SMS
     const smsResult = await sendSMS(lead.phone1, message);
@@ -94,7 +105,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Unexpected error:', error);
+    console.error('Unexpected error in conditions-update-sms function:', error);
     return new Response(
       JSON.stringify({ success: false, error: 'Internal server error' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }

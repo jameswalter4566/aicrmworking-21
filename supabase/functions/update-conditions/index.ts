@@ -46,6 +46,8 @@ serve(async (req: Request) => {
       !existingConditions.conditions_data || 
       Object.keys(existingConditions.conditions_data).length === 0;
     
+    console.log(`Is first condition update: ${isFirstConditionUpdate}`);
+    
     // Check if the incoming conditions have any actual conditions
     const hasConditions = conditions && (
       (conditions.masterConditions && conditions.masterConditions.length > 0) ||
@@ -54,6 +56,16 @@ serve(async (req: Request) => {
       (conditions.complianceConditions && conditions.complianceConditions.length > 0)
     );
 
+    console.log(`Has actual conditions: ${hasConditions}`);
+    
+    // Log the conditions count for debugging
+    let totalConditionsCount = 0;
+    if (conditions.masterConditions) totalConditionsCount += conditions.masterConditions.length;
+    if (conditions.generalConditions) totalConditionsCount += conditions.generalConditions.length;
+    if (conditions.priorToFinalConditions) totalConditionsCount += conditions.priorToFinalConditions.length;
+    if (conditions.complianceConditions) totalConditionsCount += conditions.complianceConditions.length;
+    console.log(`Total conditions count: ${totalConditionsCount}`);
+    
     // Store conditions in the database
     const { data, error } = await supabaseClient
       .from("loan_conditions")
@@ -72,6 +84,8 @@ serve(async (req: Request) => {
         { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
       );
     }
+
+    console.log(`Successfully stored conditions for lead ${leadId}`);
 
     // If this is the first time conditions are added and there are actual conditions, update loan status to Approved
     if (isFirstConditionUpdate && hasConditions) {
@@ -102,23 +116,41 @@ serve(async (req: Request) => {
     // After successfully updating conditions, check if we should send an SMS
     // This should happen for any condition update AFTER the first one (when the loan is already approved)
     if (hasConditions && !isFirstConditionUpdate) {
-      console.log(`Conditions updated for lead ${leadId}. Checking if SMS notification should be sent...`);
+      console.log(`Conditions updated for lead ${leadId}. Sending SMS notification...`);
       
       try {
-        // Call the conditions-update-sms function
-        const { data: smsData, error: smsError } = await supabaseClient.functions.invoke(
-          'conditions-update-sms',
-          { body: { leadId } }
-        );
+        // Check loan status before calling SMS function
+        const { data: leadData, error: leadError } = await supabaseClient
+          .from("leads")
+          .select("mortgage_data")
+          .eq("id", leadId)
+          .single();
+        
+        const loanStatus = leadData?.mortgage_data?.loan_status?.toLowerCase() || '';
+        console.log(`Current loan status: ${loanStatus}`);
+        
+        if (loanStatus === "approved") {
+          console.log("Loan is in approved status, proceeding with SMS notification");
+          
+          // Call the conditions-update-sms function
+          const { data: smsData, error: smsError } = await supabaseClient.functions.invoke(
+            'conditions-update-sms',
+            { body: { leadId } }
+          );
 
-        if (smsError) {
-          console.error('Error sending conditions update SMS:', smsError);
+          if (smsError) {
+            console.error('Error sending conditions update SMS:', smsError);
+          } else {
+            console.log('Conditions update SMS sent successfully:', smsData);
+          }
         } else {
-          console.log('Conditions update SMS sent successfully:', smsData);
+          console.log(`Loan not in approved status (current: ${loanStatus}). Skipping SMS notification.`);
         }
       } catch (smsErr) {
         console.error('Exception sending conditions update SMS:', smsErr);
       }
+    } else {
+      console.log(`Skipping SMS notification. isFirstConditionUpdate=${isFirstConditionUpdate}, hasConditions=${hasConditions}`);
     }
 
     return new Response(
