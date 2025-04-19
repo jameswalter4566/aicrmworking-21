@@ -71,8 +71,10 @@ serve(async (req: Request) => {
     // Trigger the AI handler to process the message
     if (phoneNumber && message) {
       try {
+        console.log(`[${requestId}] Invoking ai-sms-agent with phoneNumber: ${phoneNumber}, message: ${message?.substring(0, 30)}...`);
+        
         // Process the message with AI handler
-        const aiResponse = await supabase.functions.invoke('sms-webhook-handler', {
+        const aiResponse = await supabase.functions.invoke('ai-sms-agent', {
           body: {
             phoneNumber,
             messageContent: message,

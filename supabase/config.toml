@@ -13,3 +13,5 @@ verify_jwt = false
 [functions.sms-webhook-handler]
 verify_jwt = false
 
+[functions.ai-sms-agent]
+verify_jwt = false
