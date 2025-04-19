@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -51,13 +50,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
   const [leadData, setLeadData] = useState<LeadProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // This effect will fetch company settings based on the creator ID
   useEffect(() => {
     const fetchCompanySettings = async () => {
       if (!createdBy) return;
 
       try {
-        // If we have a createdBy user ID, try to fetch their company settings
         const { data, error } = await supabase
           .from('company_settings')
           .select('*')
@@ -78,18 +75,15 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       }
     };
 
-    // Fetch lead data to check if the user has completed onboarding
     const fetchLeadData = async () => {
       setIsLoading(true);
       try {
         const leadProfile = await leadProfileService.getLeadById(leadId);
         setLeadData(leadProfile);
         
-        // Check if we should show onboarding
-        // If lead has completed onboarding or is in pipeline, don't show onboarding
-        const hasCompletedOnboarding = leadProfile.mortgageData?.onboardingCompleted === true;
+        const hasCompletedOnboarding = leadProfile.mortgageData && 
+                                     leadProfile.mortgageData.onboardingCompleted === true;
         setShowOnboarding(!isInPipeline && !hasCompletedOnboarding);
-        
       } catch (error) {
         console.error('Error fetching lead data:', error);
       } finally {
@@ -97,14 +91,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       }
     };
 
-    // If we already have a creator ID, fetch settings immediately
     if (createdBy) {
       fetchCompanySettings();
     } else {
-      // If we don't have a creator ID but we have a leadId, try to get it from portal access
       const getCreatorFromPortalAccess = async () => {
         try {
-          // Fix: Convert leadId to a number only for the query
           const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
           
           const { data, error } = await supabase
@@ -118,11 +109,9 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             return;
           }
 
-          // Fix: Check if data exists and has the created_by property, and ensure it's a string
           if (data && 'created_by' in data && data.created_by) {
-            const creatorId = String(data.created_by); // Explicit cast to string
+            const creatorId = String(data.created_by);
             
-            // Now fetch the company settings with this user ID
             const { data: companyData, error: companyError } = await supabase
               .from('company_settings')
               .select('*')
@@ -156,7 +145,6 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
   const handleOnboardingComplete = async () => {
     try {
-      // Update the lead to mark onboarding as completed
       await leadProfileService.updateLead(leadId, {
         ...leadData,
         mortgageData: {
@@ -165,7 +153,6 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
         }
       });
       
-      // Hide the onboarding UI
       setShowOnboarding(false);
     } catch (error) {
       console.error('Error completing onboarding:', error);
@@ -176,7 +163,6 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     return <div className="flex justify-center p-8">Loading...</div>;
   }
 
-  // Show onboarding if the lead is not in the pipeline and hasn't completed onboarding
   if (showOnboarding) {
     return (
       <div className="space-y-6">

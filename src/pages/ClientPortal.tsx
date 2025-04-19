@@ -574,41 +574,47 @@ const ClientPortal = () => {
           .from('client_portal_access')
           .update({ last_accessed_at: new Date().toISOString() })
           .eq('id', portalData.id);
-        
-        // Check if the lead is in the mortgage pipeline
-        if (portalData.lead_id) {
-          const { data: leadData, error: leadError } = await supabase
-            .from('leads')
-            .select('is_mortgage_lead, added_to_pipeline_at')
-            .eq('id', portalData.lead_id)
-            .single();
-            
-          if (!leadError && leadData) {
-            setIsInPipeline(!!leadData.added_to_pipeline_at);
-          }
+      
+      // Check if the lead is in the mortgage pipeline
+      if (portalData.lead_id) {
+        const { data: leadData, error: leadError } = await supabase
+          .from('leads')
+          .select('is_mortgage_lead, added_to_pipeline_at')
+          .eq('id', portalData.lead_id)
+          .single();
+          
+        if (!leadError && leadData) {
+          setIsInPipeline(!!leadData.added_to_pipeline_at);
         }
-        
-        // Save the creator ID if available
-        if (portalData.created_by) {
-          setCreatedBy(portalData.created_by);
-        }
-        
-        // Set client data with the lead ID from portal data
-        const clientDataWithLeadId = {
-          ...mockClientData,
-          leadId: portalData.lead_id
-        };
-        console.log("Setting client data with leadId:", clientDataWithLeadId);
-        setClientData(clientDataWithLeadId);
-        setAuthenticated(true);
-      } catch (error) {
-        console.error("Error verifying access:", error);
-      } finally {
-        setLoading(false);
       }
-    };
-    
-    verifyAccess();
+      
+      // Try to get creator ID from another field instead
+      // Since created_by doesn't exist, try to get it from another source
+      if (portalData.lead_id) {
+        const { data: leadData } = await supabase
+          .from('leads')
+          .select('created_by')
+          .eq('id', portalData.lead_id)
+          .single();
+          
+        if (leadData && leadData.created_by) {
+          setCreatedBy(leadData.created_by);
+        }
+      }
+      
+      // Set client data with the lead ID from portal data
+      const clientDataWithLeadId = {
+        ...mockClientData,
+        leadId: portalData.lead_id
+      };
+      console.log("Setting client data with leadId:", clientDataWithLeadId);
+      setClientData(clientDataWithLeadId);
+      setAuthenticated(true);
+    } catch (error) {
+      console.error("Error verifying access:", error);
+    } finally {
+      setLoading(false);
+    }
   }, [slug, token]);
 
   const refreshData = async () => {

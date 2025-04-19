@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,8 +26,7 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
   const [currentStep, setCurrentStep] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [leadData, setLeadData] = useState<LeadProfile>(initialData || {});
-  
-  // Step 1: Personal Information Confirmation
+
   const PersonalInfoStep = (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -44,17 +42,23 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
           <Label htmlFor="middleName">Middle Name (optional)</Label>
           <Input 
             id="middleName" 
-            value={leadData.mortgageData?.borrower?.middleName || ''}
-            onChange={(e) => setLeadData({
-              ...leadData, 
-              mortgageData: {
-                ...leadData.mortgageData,
-                borrower: {
-                  ...leadData.mortgageData?.borrower,
-                  middleName: e.target.value
+            value={(leadData.mortgageData?.borrower?.fullLegalName?.split(' ')[1]) || ''}
+            onChange={(e) => {
+              const firstName = leadData.mortgageData?.borrower?.fullLegalName?.split(' ')[0] || leadData.firstName || '';
+              const lastName = leadData.mortgageData?.borrower?.fullLegalName?.split(' ').slice(2).join(' ') || leadData.lastName || '';
+              const fullLegalName = `${firstName} ${e.target.value} ${lastName}`.trim();
+              
+              setLeadData({
+                ...leadData, 
+                mortgageData: {
+                  ...leadData.mortgageData,
+                  borrower: {
+                    ...leadData.mortgageData?.borrower,
+                    fullLegalName: fullLegalName
+                  }
                 }
-              }
-            })}
+              });
+            }}
           />
         </div>
         <div className="space-y-2">
@@ -87,7 +91,6 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
             id="confirmEmail" 
             value={leadData.email || ''} 
             onChange={(e) => {
-              // Validation will be done when moving to next step
               setLeadData({...leadData, email: e.target.value})
             }}
           />
@@ -96,7 +99,6 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
     </div>
   );
 
-  // Step 2: Property Information
   const PropertyInfoStep = (
     <div className="space-y-4">
       <div className="space-y-2">
@@ -155,20 +157,19 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
     </div>
   );
   
-  // Step 3: Current Mortgage Information
   const CurrentMortgageStep = (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>Do you currently have a mortgage?</Label>
         <RadioGroup 
-          value={leadData.mortgageData?.loan?.hasExistingMortgage ? 'yes' : 'no'} 
+          value={leadData.mortgageData?.loan?.loanType === 'Refinance' ? 'yes' : 'no'} 
           onValueChange={(value) => setLeadData({
             ...leadData, 
             mortgageData: {
               ...leadData.mortgageData,
               loan: {
                 ...leadData.mortgageData?.loan,
-                hasExistingMortgage: value === 'yes'
+                loanType: value === 'yes' ? 'Refinance' : 'Purchase'
               }
             }
           })}
@@ -184,7 +185,7 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
         </RadioGroup>
       </div>
       
-      {leadData.mortgageData?.loan?.hasExistingMortgage && (
+      {leadData.mortgageData?.loan?.loanType === 'Refinance' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -192,14 +193,14 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
               <Input 
                 id="loanBalance" 
                 type="number"
-                value={leadData.mortgageData?.loan?.currentBalance || ''} 
+                value={leadData.mortgageData?.loan?.interestRate || ''} 
                 onChange={(e) => setLeadData({
                   ...leadData, 
                   mortgageData: {
                     ...leadData.mortgageData,
                     loan: {
                       ...leadData.mortgageData?.loan,
-                      currentBalance: e.target.value
+                      interestRate: e.target.value
                     }
                   }
                 })}
@@ -229,18 +230,18 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="monthlyPayment">Current Monthly Payment ($)</Label>
+            <Label htmlFor="mortgageInsurance">Current Monthly Payment ($)</Label>
             <Input 
-              id="monthlyPayment" 
+              id="mortgageInsurance" 
               type="number"
-              value={leadData.mortgageData?.loan?.monthlyPayment || ''} 
+              value={leadData.mortgageData?.loan?.mortgageInsurance || ''} 
               onChange={(e) => setLeadData({
                 ...leadData, 
                 mortgageData: {
                   ...leadData.mortgageData,
                   loan: {
                     ...leadData.mortgageData?.loan,
-                    monthlyPayment: e.target.value
+                    mortgageInsurance: e.target.value
                   }
                 }
               })}
@@ -252,20 +253,19 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
     </div>
   );
   
-  // Step 4: Loan Preferences
   const LoanPreferencesStep = (
     <div className="space-y-4">
       <div className="space-y-2">
         <Label>What is your primary goal for this mortgage?</Label>
         <RadioGroup 
-          value={leadData.mortgageData?.loan?.purpose || 'Purchase'} 
+          value={leadData.mortgageData?.loan?.loanType || 'Purchase'} 
           onValueChange={(value) => setLeadData({
             ...leadData, 
             mortgageData: {
               ...leadData.mortgageData,
               loan: {
                 ...leadData.mortgageData?.loan,
-                purpose: value
+                loanType: value
               }
             }
           })}
@@ -344,23 +344,22 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
     </div>
   );
   
-  // Step 5: Financial Information
   const FinancialInfoStep = (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="annualIncome">Estimated Annual Income ($)</Label>
+          <Label htmlFor="baseIncome">Estimated Annual Income ($)</Label>
           <Input 
-            id="annualIncome" 
+            id="baseIncome" 
             type="number"
-            value={leadData.mortgageData?.income?.annualIncome || ''} 
+            value={leadData.mortgageData?.income?.baseIncome || ''} 
             onChange={(e) => setLeadData({
               ...leadData, 
               mortgageData: {
                 ...leadData.mortgageData,
                 income: {
                   ...leadData.mortgageData?.income,
-                  annualIncome: e.target.value
+                  baseIncome: e.target.value
                 }
               }
             })}
@@ -369,19 +368,25 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="creditScore">Estimated Credit Score</Label>
+          <Label htmlFor="creditScoreRange">Estimated Credit Score</Label>
           <Select 
-            value={leadData.mortgageData?.borrower?.creditScore || ''} 
-            onValueChange={(value) => setLeadData({
-              ...leadData, 
-              mortgageData: {
-                ...leadData.mortgageData,
-                borrower: {
-                  ...leadData.mortgageData?.borrower,
-                  creditScore: value
+            value={leadData.mortgageData?.borrower?.fullLegalName?.includes('credit:') ? 
+              leadData.mortgageData?.borrower?.fullLegalName.split('credit:')[1].trim() : ''} 
+            onValueChange={(value) => {
+              const currentName = leadData.mortgageData?.borrower?.fullLegalName?.split('credit:')[0] || 
+                `${leadData.firstName || ''} ${leadData.lastName || ''}`.trim();
+              
+              setLeadData({
+                ...leadData, 
+                mortgageData: {
+                  ...leadData.mortgageData,
+                  borrower: {
+                    ...leadData.mortgageData?.borrower,
+                    fullLegalName: `${currentName} credit:${value}`
+                  }
                 }
-              }
-            })}
+              });
+            }}
           >
             <SelectTrigger id="creditScore">
               <SelectValue placeholder="Select credit score range" />
@@ -400,14 +405,20 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
         <div className="space-y-2">
           <Label htmlFor="employmentStatus">Employment Status</Label>
           <Select 
-            value={leadData.mortgageData?.employment?.employmentStatus || ''} 
+            value={leadData.mortgageData?.employment?.isSelfEmployed ? 'SelfEmployed' : 
+                  (leadData.mortgageData?.employment?.employerName ? 'FullTime' : '')} 
             onValueChange={(value) => setLeadData({
               ...leadData, 
               mortgageData: {
                 ...leadData.mortgageData,
                 employment: {
                   ...leadData.mortgageData?.employment,
-                  employmentStatus: value
+                  isSelfEmployed: value === 'SelfEmployed',
+                  employerName: value === 'SelfEmployed' ? 'Self Employed' : 
+                               (value === 'FullTime' ? 'Full Time Employment' : 
+                               (value === 'PartTime' ? 'Part Time Employment' : 
+                               (value === 'Retired' ? 'Retired' : 
+                               (value === 'Unemployed' ? 'Unemployed' : ''))))
                 }
               }
             })}
@@ -428,7 +439,6 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
     </div>
   );
   
-  // Define all onboarding steps
   const steps: OnboardingStep[] = [
     {
       title: "Confirm Personal Information",
@@ -457,7 +467,6 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
     }
   ];
   
-  // Save data at each step
   const saveStepData = async () => {
     setIsLoading(true);
     try {
@@ -471,20 +480,16 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
     }
   };
   
-  // Handle next step
   const handleNext = async () => {
-    // Save current step data
     await saveStepData();
     
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
-      // Complete the onboarding process
       onComplete();
     }
   };
   
-  // Handle previous step
   const handlePrevious = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
@@ -498,7 +503,6 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
         <CardDescription>{steps[currentStep].description}</CardDescription>
       </CardHeader>
       <CardContent>
-        {/* Progress indicator */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-2">
             {steps.map((_, index) => (
@@ -518,7 +522,6 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
                   <span>{index + 1}</span>
                 )}
                 
-                {/* Connecting line */}
                 {index < steps.length - 1 && (
                   <div className={`absolute top-1/2 left-full h-0.5 w-full -translate-y-1/2 ${
                     index < currentStep ? 'bg-green-500' : 'bg-gray-200'
@@ -532,7 +535,6 @@ export const ClientPortalOnboarding = ({ leadId, onComplete, initialData }: Clie
           </div>
         </div>
         
-        {/* Step content */}
         {steps[currentStep].component}
       </CardContent>
       <CardFooter className="flex justify-between">

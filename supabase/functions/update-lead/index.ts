@@ -64,14 +64,17 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     };
 
-    // Handle mortgage data if provided
+    // Handle mortgage data if provided, ensuring we handle onboardingCompleted properly
     if (leadData.mortgageData) {
-      transformedData.mortgage_data = leadData.mortgageData;
+      // If we're updating mortgageData, ensure we include onboardingCompleted if it exists
+      let updatedMortgageData = {...leadData.mortgageData};
       
-      // Check if onboarding was completed
-      if (leadData.mortgageData.onboardingCompleted) {
-        console.log('Onboarding completed for lead:', leadId);
+      // Check if we're updating the onboardingCompleted flag
+      if (leadData.mortgageData.onboardingCompleted !== undefined) {
+        console.log('Updating onboarding completion status:', leadData.mortgageData.onboardingCompleted);
       }
+      
+      transformedData.mortgage_data = updatedMortgageData;
     }
 
     // Update the lead in the database
