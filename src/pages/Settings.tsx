@@ -1,6 +1,7 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
-import { Settings as SettingsIcon } from "lucide-react";
+import { Settings as SettingsIcon, UserRound, Home, Building, DollarSign, Mail, AlertCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { ColoredSwitch } from "@/components/ui/colored-switch";
