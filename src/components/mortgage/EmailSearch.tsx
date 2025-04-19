@@ -39,11 +39,23 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
   };
 
   const handleSearch = async () => {
+    if (!clientLastName || !loanNumber) {
+      toast.warning("Client last name and loan number are required");
+      return;
+    }
+    
     setIsSearching(true);
     updateStepStatus("search", "processing");
     
     try {
       console.log("Starting email search with parameters:", { clientLastName, loanNumber });
+      
+      // Log the full request for debugging
+      console.log("Calling function: search-approval-emails with body:", { 
+        clientLastName,
+        loanNumber,
+        emailSender: "underwriting@" // This will match any underwriting domain
+      });
       
       // Search for approval emails
       const { data: searchData, error: searchError } = await supabase.functions.invoke('search-approval-emails', {
