@@ -11,11 +11,9 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Create a supabase admin client
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 serve(async (req) => {
-  // Handle CORS preflight request
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders, status: 204 });
   }
@@ -23,7 +21,6 @@ serve(async (req) => {
   try {
     console.log("Search-approval-emails function called");
     
-    // Get authenticated user
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       console.error("No auth header found");
@@ -45,11 +42,6 @@ serve(async (req) => {
     }
 
     console.log("User authenticated:", user.id);
-
-    // Parse request body
-    const { clientLastName } = await req.json();
-
-    console.log("Search parameters:", { clientLastName });
 
     // Get user's Gmail connection
     const { data: connection, error: connError } = await supabaseAdmin
@@ -89,7 +81,6 @@ serve(async (req) => {
         );
       }
       
-      // Refresh the access token
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: {
@@ -119,7 +110,6 @@ serve(async (req) => {
       const tokenData = await tokenResponse.json();
       connection.access_token = tokenData.access_token;
       
-      // Update stored token
       await supabaseAdmin
         .from('user_email_connections')
         .update({
@@ -131,21 +121,13 @@ serve(async (req) => {
       console.log("Token refreshed successfully");
     }
 
-    // Build Gmail search query - SIMPLIFIED
-    let searchQuery = "has:attachment filename:pdf ";
-    
-    if (clientLastName) {
-      searchQuery += clientLastName + " ";
-    }
-    
-    // Limit to recent emails
-    searchQuery += "newer_than:90d";
-
+    // Simplified search query - just search for any emails with attachments
+    const searchQuery = "has:attachment";
     console.log(`Gmail search query: "${searchQuery}"`);
 
     // Call Gmail API
     const searchResponse = await fetch(
-      `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}`,
+      `https://www.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=1`,
       {
         headers: {
           'Authorization': `Bearer ${connection.access_token}`
@@ -182,81 +164,78 @@ serve(async (req) => {
       );
     }
     
-    // Just get the most recent 3 emails
-    const limit = Math.min(3, messageIds.length);
-    const emails = [];
+    // Just get the single most recent email
+    const messageId = messageIds[0].id;
+    console.log(`Fetching details for message (ID: ${messageId})`);
     
-    for (let i = 0; i < limit; i++) {
-      const messageId = messageIds[i].id;
-      console.log(`Fetching details for message ${i+1}/${limit} (ID: ${messageId})`);
-      
-      const messageResponse = await fetch(
-        `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
-        {
-          headers: {
-            'Authorization': `Bearer ${connection.access_token}`
-          }
+    const messageResponse = await fetch(
+      `https://www.googleapis.com/gmail/v1/users/me/messages/${messageId}?format=full`,
+      {
+        headers: {
+          'Authorization': `Bearer ${connection.access_token}`
         }
+      }
+    );
+
+    if (!messageResponse.ok) {
+      console.warn(`Failed to fetch message ${messageId}`);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          emails: [],
+          query: searchQuery
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-
-      if (!messageResponse.ok) {
-        console.warn(`Failed to fetch message ${messageId}`);
-        continue;
-      }
-
-      const messageData = await messageResponse.json();
-      
-      // Process email
-      const headers = messageData.payload.headers;
-      const subject = headers.find(h => h.name === "Subject")?.value || "No Subject";
-      const from = headers.find(h => h.name === "From")?.value || "Unknown";
-      const date = headers.find(h => h.name === "Date")?.value || "";
-      
-      // Find PDF attachments
-      const attachments = [];
-      
-      // Function to recursively search for attachments in parts
-      const findAttachments = (part) => {
-        if (part.mimeType === "application/pdf" && part.body && part.body.attachmentId) {
-          attachments.push({
-            filename: part.filename,
-            attachmentId: part.body.attachmentId,
-            mimeType: part.mimeType,
-            size: part.body.size
-          });
-        } 
-        
-        if (part.parts) {
-          part.parts.forEach(subpart => findAttachments(subpart));
-        }
-      };
-      
-      // Check all parts for attachments
-      if (messageData.payload.parts) {
-        messageData.payload.parts.forEach(part => findAttachments(part));
-      }
-      
-      // Extract snippet (preview of email content)
-      const snippet = messageData.snippet || "";
-      
-      console.log(`Email: ${subject}, From: ${from}, Has ${attachments.length} PDF attachments`);
-      
-      emails.push({
-        id: messageId,
-        subject,
-        from,
-        date,
-        snippet,
-        attachments
-      });
     }
 
-    console.log(`Returning ${emails.length} emails`);
+    const messageData = await messageResponse.json();
+    
+    // Process email
+    const headers = messageData.payload.headers;
+    const subject = headers.find(h => h.name === "Subject")?.value || "No Subject";
+    const from = headers.find(h => h.name === "From")?.value || "Unknown";
+    const date = headers.find(h => h.name === "Date")?.value || "";
+    
+    // Find attachments
+    const attachments = [];
+    
+    const findAttachments = (part) => {
+      if (part.mimeType === "application/pdf" && part.body && part.body.attachmentId) {
+        attachments.push({
+          filename: part.filename,
+          attachmentId: part.body.attachmentId,
+          mimeType: part.mimeType,
+          size: part.body.size
+        });
+      } 
+      
+      if (part.parts) {
+        part.parts.forEach(subpart => findAttachments(subpart));
+      }
+    };
+    
+    if (messageData.payload.parts) {
+      messageData.payload.parts.forEach(part => findAttachments(part));
+    }
+    
+    console.log(`Email: ${subject}, From: ${from}, Has ${attachments.length} PDF attachments`);
+    
+    const email = {
+      id: messageId,
+      subject,
+      from,
+      date,
+      snippet: messageData.snippet || "",
+      attachments
+    };
+
+    console.log(`Returning email details`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        emails,
+        emails: [email],
         query: searchQuery
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
