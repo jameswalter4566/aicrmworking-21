@@ -543,6 +543,7 @@ const ClientPortal = () => {
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [activeTab, setActiveTab] = useState("home");
+  const [leadId, setLeadId] = useState<string | null>(null);
   
   useEffect(() => {
     const verifyAccess = async () => {
@@ -571,6 +572,7 @@ const ClientPortal = () => {
           .eq('id', portalData.id);
         
         setClientData(mockClientData);
+        setLeadId(portalData.lead_id?.toString() || null);
         setAuthenticated(true);
       } catch (error) {
         console.error("Error verifying access:", error);
@@ -661,7 +663,12 @@ const ClientPortal = () => {
       
       <div className="container mx-auto p-4 md:p-6 mt-2">
         {activeTab === "home" && <HomeTab clientData={clientData} />}
-        {activeTab === "conditions" && <ConditionsTab clientData={clientData} refreshData={refreshData} />}
+        {activeTab === "conditions" && leadId && (
+          <ClientPortalConditions 
+            leadId={leadId} 
+            refreshData={refreshData} 
+          />
+        )}
         {activeTab === "attention" && <AttentionTab clientData={clientData} />}
         {activeTab === "support" && <SupportTab />}
       </div>
