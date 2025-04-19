@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -96,6 +95,25 @@ serve(async (req: Request) => {
       } catch (progressErr) {
         console.error("Exception during status update:", progressErr);
         // Continue with the response even if status update failed
+      }
+    }
+
+    // After successfully updating conditions, check if we should send an SMS
+    if (hasConditions) {
+      try {
+        // Call the conditions-update-sms function
+        const { data: smsData, error: smsError } = await supabaseClient.functions.invoke(
+          'conditions-update-sms',
+          { body: { leadId } }
+        );
+
+        if (smsError) {
+          console.error('Error sending conditions update SMS:', smsError);
+        } else {
+          console.log('Conditions update SMS sent successfully:', smsData);
+        }
+      } catch (smsErr) {
+        console.error('Exception sending conditions update SMS:', smsErr);
       }
     }
 
