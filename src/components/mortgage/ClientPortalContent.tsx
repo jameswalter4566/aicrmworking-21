@@ -80,10 +80,13 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       // If we don't have a creator ID but we have a leadId, try to get it from portal access
       const getCreatorFromPortalAccess = async () => {
         try {
+          // Fix: Convert leadId to a number only for the query
+          const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+          
           const { data, error } = await supabase
             .from('client_portal_access')
             .select('created_by')
-            .eq('lead_id', leadId)
+            .eq('lead_id', numericLeadId)
             .single();
 
           if (error) {
@@ -91,7 +94,8 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             return;
           }
 
-          if (data?.created_by) {
+          // Fix: Check if data exists and has the created_by property
+          if (data && data.created_by) {
             // Now fetch the company settings with this user ID
             const { data: companyData, error: companyError } = await supabase
               .from('company_settings')
