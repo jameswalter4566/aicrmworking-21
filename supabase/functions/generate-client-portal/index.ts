@@ -44,7 +44,7 @@ serve(async (req) => {
     )
 
     // Get request data
-    const { leadId } = await req.json()
+    const { leadId, createdBy } = await req.json()
 
     if (!leadId) {
       return new Response(
@@ -81,6 +81,14 @@ serve(async (req) => {
       .single()
 
     if (existingPortal) {
+      // Update the created_by field if it's not set and we have a creator now
+      if (createdBy && !existingPortal.created_by) {
+        await supabaseClient
+          .from('client_portal_access')
+          .update({ created_by: createdBy })
+          .eq('id', existingPortal.id)
+      }
+      
       // Return the existing portal info
       return new Response(
         JSON.stringify({ 
@@ -98,13 +106,14 @@ serve(async (req) => {
     const portalSlug = generateSlug(10)
     const accessToken = generateAccessToken()
 
-    // Store in the database
+    // Store in the database with creator information
     const { data: newPortal, error: portalError } = await supabaseClient
       .from('client_portal_access')
       .insert({
         lead_id: leadId,
         portal_slug: portalSlug,
-        access_token: accessToken
+        access_token: accessToken,
+        created_by: createdBy || null
       })
       .select()
       .single()

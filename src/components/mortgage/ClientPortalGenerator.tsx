@@ -17,7 +17,7 @@ const ClientPortalGenerator = ({ leadId, onLinkGenerated, createdBy }: ClientPor
   const handleGeneratePortal = async () => {
     setGenerating(true);
     try {
-      const { url, error } = await generateClientPortal(leadId);
+      const { url, error } = await generateClientPortal(leadId, createdBy);
       
       if (error) {
         throw new Error(error);

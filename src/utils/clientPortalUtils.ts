@@ -8,9 +8,10 @@ export interface PortalAccess {
   access_token: string;
   created_at: string;
   last_accessed_at?: string;
+  created_by?: string;
 }
 
-export const generateClientPortal = async (leadId: number): Promise<{
+export const generateClientPortal = async (leadId: number, createdBy?: string): Promise<{
   url: string;
   portal: PortalAccess | null;
   error?: string;
@@ -29,7 +30,7 @@ export const generateClientPortal = async (leadId: number): Promise<{
     
     // Call the edge function to generate the portal
     const { data, error } = await supabase.functions.invoke('generate-client-portal', {
-      body: { leadId }
+      body: { leadId, createdBy }
     });
     
     if (error) {

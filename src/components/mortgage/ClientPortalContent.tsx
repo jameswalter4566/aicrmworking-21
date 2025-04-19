@@ -21,14 +21,7 @@ interface ClientPortalContentProps {
   createdBy?: string;
 }
 
-const PrePipelineMessage = ({ title, description }: { title: string; description: string }) => {
-  const [settings, setSettings] = useState<CompanySettings>({
-    company_name: 'Your Mortgage Company',
-    primary_color: '#33C3F0',
-    secondary_color: '#8B5CF6',
-    accent_color: '#EA384C',
-  });
-
+const PrePipelineMessage = ({ title, description, settings }: { title: string; description: string; settings: CompanySettings }) => {
   return (
     <Card className="p-6">
       <div className="text-center space-y-4">
@@ -53,29 +46,77 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     accent_color: '#EA384C',
   });
 
+  // This effect will now fetch company settings based on the creator ID
   useEffect(() => {
     const fetchCompanySettings = async () => {
       if (!createdBy) return;
 
       try {
+        // If we have a createdBy user ID, try to fetch their company settings
         const { data, error } = await supabase
           .from('company_settings')
           .select('*')
           .eq('user_id', createdBy)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching company settings:', error);
+          return;
+        }
 
         if (data) {
           setSettings(data);
+          console.log('Company settings loaded:', data);
         }
       } catch (error) {
-        console.error('Error fetching company settings:', error);
+        console.error('Error in fetchCompanySettings:', error);
       }
     };
 
-    fetchCompanySettings();
-  }, [createdBy]);
+    // If we already have a creator ID, fetch settings immediately
+    if (createdBy) {
+      fetchCompanySettings();
+    } else {
+      // If we don't have a creator ID but we have a leadId, try to get it from portal access
+      const getCreatorFromPortalAccess = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('client_portal_access')
+            .select('created_by')
+            .eq('lead_id', leadId)
+            .single();
+
+          if (error) {
+            console.error('Error fetching portal creator:', error);
+            return;
+          }
+
+          if (data?.created_by) {
+            // Now fetch the company settings with this user ID
+            const { data: companyData, error: companyError } = await supabase
+              .from('company_settings')
+              .select('*')
+              .eq('user_id', data.created_by)
+              .single();
+
+            if (companyError) {
+              console.error('Error fetching company settings:', companyError);
+              return;
+            }
+
+            if (companyData) {
+              setSettings(companyData);
+              console.log('Company settings loaded from portal access:', companyData);
+            }
+          }
+        } catch (error) {
+          console.error('Error in getCreatorFromPortalAccess:', error);
+        }
+      };
+
+      getCreatorFromPortalAccess();
+    }
+  }, [createdBy, leadId]);
 
   const refreshData = () => {
     console.log("Refreshing data...");
@@ -100,11 +141,13 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           <PrePipelineMessage 
             title="Loan Progress"
             description="After submitting your application, you'll be able to track your loan progress here."
+            settings={settings}
           />
           
           <PrePipelineMessage
             title="Loan Conditions"
             description="Once your application is in process, you'll see your required conditions here."
+            settings={settings}
           />
         </div>
 
