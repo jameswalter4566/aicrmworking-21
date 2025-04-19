@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, StandardFonts, rgb } from 'https://cdn.skypack.dev/pdf-lib@1.17.1';
@@ -160,7 +161,7 @@ async function generatePDF(content: string): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   
   // Add a new page
-  const page = pdfDoc.addPage([612, 792]); // Letter size
+  let page = pdfDoc.addPage([612, 792]); // Letter size
   
   // Get the font
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -174,29 +175,71 @@ async function generatePDF(content: string): Promise<Uint8Array> {
     right: 50,
     bottom: 50
   };
+  
+  // Calculate maximum line width
+  const maxWidth = page.getWidth() - margin.left - margin.right;
 
-  // Split content into lines
-  const lines = content.split('\n');
+  // Split content into paragraphs
+  const paragraphs = content.split('\n');
   let y = page.getHeight() - margin.top;
 
-  // Draw content
-  for (const line of lines) {
-    if (y < margin.bottom) {
-      // Add new page if we run out of space
-      y = page.getHeight() - margin.top;
-      page = pdfDoc.addPage([612, 792]);
-    }
+  // Function to wrap text to fit width
+  function getWrappedLines(text: string, maxWidth: number): string[] {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = words[0] || '';
 
-    if (line.trim()) {
-      page.drawText(line.trim(), {
+    for (let i = 1; i < words.length; i++) {
+      const word = words[i];
+      const width = font.widthOfTextAtSize(currentLine + ' ' + word, fontSize);
+      
+      if (width < maxWidth) {
+        currentLine += ' ' + word;
+      } else {
+        lines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+    
+    return lines;
+  }
+
+  // Draw content with line wrapping
+  for (const paragraph of paragraphs) {
+    if (paragraph.trim() === '') {
+      // Handle empty lines
+      y -= lineHeight;
+      continue;
+    }
+    
+    // Wrap text to fit page width
+    const wrappedLines = getWrappedLines(paragraph.trim(), maxWidth);
+    
+    for (const line of wrappedLines) {
+      // Check if we need a new page
+      if (y < margin.bottom + fontSize) {
+        page = pdfDoc.addPage([612, 792]);
+        y = page.getHeight() - margin.top;
+      }
+      
+      // Draw text
+      page.drawText(line, {
         x: margin.left,
         y,
         size: fontSize,
         font,
         color: rgb(0, 0, 0),
       });
+      
+      y -= lineHeight;
     }
-    y -= lineHeight;
+    
+    // Add extra space between paragraphs
+    y -= 4;
   }
 
   // Save the PDF
