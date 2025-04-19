@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
+import { Settings as SettingsIcon } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { Settings as SettingsIcon, Home, Building, DollarSign, UserRound, Mail, AlertCircle } from "lucide-react";
 import { ColoredSwitch } from "@/components/ui/colored-switch";
 import { useIndustry, IndustryType } from "@/context/IndustryContext";
 import { useAuth } from "@/context/AuthContext";
@@ -10,9 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { customSupabase } from "@/utils/supabase-custom-client";
+import { CompanySettingsCard } from "@/components/settings/CompanySettings";
 
 const SUPABASE_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
-// Update the redirect URL to the specified preview URL
 const REDIRECT_URL = "https://preview--aicrmworking.lovable.app/settings";
 
 const Settings = () => {
@@ -29,10 +29,8 @@ const Settings = () => {
       const url = new URL(window.location.href);
       const code = url.searchParams.get("code");
       
-      // Clear the URL parameters to avoid issues on page refresh
       if (code) {
         setProcessingOAuth(true);
-        // Remove the code from URL without triggering a navigation
         window.history.replaceState({}, document.title, REDIRECT_URL);
         
         try {
@@ -43,7 +41,6 @@ const Settings = () => {
           
           console.log("Processing OAuth callback with code:", code.substring(0, 10) + "...");
           
-          // Make API call to the Supabase Edge Function with the code
           const response = await fetch(`${SUPABASE_URL}/functions/v1/connect-google-email?action=callback&code=${encodeURIComponent(code)}`, {
             headers: {
               'Authorization': `Bearer ${token}`,
@@ -57,7 +54,6 @@ const Settings = () => {
             throw new Error(`HTTP error! Status: ${response.status}`);
           }
           
-          // Validate response is JSON
           const contentType = response.headers.get("content-type");
           if (!contentType || !contentType.includes("application/json")) {
             const textResponse = await response.text();
@@ -127,10 +123,7 @@ const Settings = () => {
       }
     };
     
-    // First check for existing connections
     checkExistingConnections();
-    
-    // Then process any OAuth callback if present
     processOAuthCallback();
   }, [user, getAuthToken]);
 
@@ -310,6 +303,8 @@ const Settings = () => {
           <SettingsIcon className="h-6 w-6 text-gray-500" />
           <h1 className="text-2xl font-bold">Settings</h1>
         </div>
+
+        <CompanySettingsCard />
 
         <Card>
           <CardHeader>

@@ -104,6 +104,39 @@ export type Database = {
           },
         ]
       }
+      company_settings: {
+        Row: {
+          accent_color: string | null
+          company_name: string | null
+          created_at: string | null
+          id: string
+          primary_color: string | null
+          secondary_color: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          accent_color?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          id?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          accent_color?: string | null
+          company_name?: string | null
+          created_at?: string | null
+          id?: string
+          primary_color?: string | null
+          secondary_color?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       dialing_session_leads: {
         Row: {
           attempt_count: number | null
