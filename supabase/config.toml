@@ -1,3 +1,4 @@
+
 project_id = "imrmboyczebjlbnkgjns"
 
 [api]
@@ -41,3 +42,10 @@ verify_jwt = false
 
 [functions.check-approval-emails]
 verify_jwt = false
+
+[functions.sms-webhook-receiver]
+verify_jwt = false
+
+[functions.ai-sms-agent]
+verify_jwt = false
+
