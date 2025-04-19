@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Link } from 'react-router-dom';  // Replace with react-router-dom Link
 import ClientPortalGenerator from './ClientPortalGenerator';
 import { toast } from 'sonner';
-import { Link } from '@/components/ui/link';
 import { ExternalLink } from 'lucide-react';
 
 interface LeadProfileClientPortalProps {
@@ -38,3 +38,4 @@ export const LeadProfileClientPortal = ({ leadId, isMortgageLead }: LeadProfileC
     </Card>
   );
 };
+
