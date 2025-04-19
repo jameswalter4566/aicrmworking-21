@@ -31,16 +31,15 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
   const [conditions, setConditions] = useState<ConditionsData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  useEffect(() => {
+    fetchConditions();
+  }, [leadId]);
+
   const fetchConditions = async () => {
     try {
-      console.log("Fetching conditions for lead ID:", leadId);
-      setLoading(true);
-
       const { data, error } = await supabase.functions.invoke('retrieve-conditions', {
         body: { leadId }
       });
-
-      console.log("Response from retrieve-conditions:", data, error);
 
       if (error) {
         console.error("Error fetching conditions:", error);
@@ -49,34 +48,21 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
       }
 
       if (data.success && data.conditions) {
-        console.log("Successfully fetched conditions:", data.conditions);
         setConditions(data.conditions);
-      } else {
-        console.warn("No conditions found or invalid response format:", data);
-        toast.error("Unable to load conditions data");
       }
     } catch (error) {
-      console.error("Exception fetching conditions:", error);
+      console.error("Error fetching conditions:", error);
       toast.error("Failed to load loan conditions");
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    if (leadId) {
-      console.log("Lead ID present, fetching conditions:", leadId);
-      fetchConditions();
-    } else {
-      console.warn("No lead ID available to fetch conditions");
-      setLoading(false);
-    }
-  }, [leadId]);
-
   const handleFileUpload = async (file: File) => {
     try {
       console.log("File uploaded:", file.name);
       
+      // Using the correct toast API format
       toast.success("Document uploaded successfully", {
         description: `${file.name} has been uploaded and will be reviewed.`
       });
@@ -84,9 +70,7 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
       setTimeout(refreshData, 1000);
     } catch (error) {
       console.error("Error uploading file:", error);
-      toast.error("Upload failed", {
-        description: "There was an error uploading your document. Please try again."
-      });
+      toast.error("There was an error uploading your document. Please try again.");
     }
   };
 
