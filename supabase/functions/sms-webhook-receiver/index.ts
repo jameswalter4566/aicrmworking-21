@@ -1,8 +1,6 @@
 
-// Import Deno standard library's serve function
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
-import { validateTwilioWebhook, parseTwilioWebhook } from "../_shared/twilio-sms.ts";
 
 // Define CORS headers for use in all responses
 const corsHeaders = {
@@ -27,10 +25,6 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Log all request headers for debugging
-    const headersObj = Object.fromEntries(req.headers.entries());
-    console.log(`[${requestId}] Request headers:`, JSON.stringify(headersObj));
-    
     // Create Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -42,108 +36,62 @@ serve(async (req: Request) => {
     console.log(`[${requestId}] Creating Supabase client with service role key`);
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Clone the request to read the body
-    const clonedReq = req.clone();
-    let rawBody;
-    try {
-      rawBody = await clonedReq.text();
-      console.log(`[${requestId}] Raw request body:`, rawBody);
-    } catch (err) {
-      console.error(`[${requestId}] Error reading request body:`, err);
-      rawBody = "";
-    }
-
-    // Parse the webhook payload based on content type
-    let payload;
-    const contentType = req.headers.get('content-type');
-    console.log(`[${requestId}] Content-Type: ${contentType || 'Not specified'}`);
+    // Parse the webhook payload from Twilio's form data
+    const formData = await req.formData();
+    const data: Record<string, string> = {};
     
-    if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
-      // Handle form data (Twilio's standard format)
-      console.log(`[${requestId}] Parsing as form data...`);
-      
-      const formData = new FormData();
-      const urlSearchParams = new URLSearchParams(rawBody);
-      
-      urlSearchParams.forEach((value, key) => {
-        formData.append(key, value);
+    for (const [key, value] of formData.entries()) {
+      data[key] = value.toString();
+      if (key !== 'Body') { // Don't log message content for privacy
         console.log(`[${requestId}] Form param: ${key} = ${value}`);
-      });
-      
-      payload = parseTwilioWebhook(formData);
-      console.log(`[${requestId}] Successfully parsed Twilio webhook data`);
-      
-    } else if (contentType && contentType.includes('application/json')) {
-      // Handle JSON format
-      console.log(`[${requestId}] Parsing as JSON...`);
-      try {
-        payload = JSON.parse(rawBody);
-      } catch (err) {
-        console.error(`[${requestId}] JSON parse error:`, err);
-        payload = { _parseError: err.message, _rawContent: rawBody };
-      }
-    } else {
-      // Fallback to treating as form data anyway
-      console.log(`[${requestId}] No recognized content type, trying form data as fallback...`);
-      try {
-        const formData = new FormData();
-        new URLSearchParams(rawBody).forEach((value, key) => {
-          formData.append(key, value);
-        });
-        payload = parseTwilioWebhook(formData);
-      } catch (formError) {
-        console.error(`[${requestId}] Form data fallback failed:`, formError);
-        payload = { 
-          _raw: rawBody,
-          _parseError: formError.message
-        };
       }
     }
 
-    // Extract key information from the message
-    let phoneNumber = null;
-    let message = null;
-    let messageSid = null;
-    
-    if (payload.from) {
-      phoneNumber = payload.from;
-      message = payload.body;
-      messageSid = payload.messageSid;
-      console.log(`[${requestId}] Extracted data - From: ${phoneNumber}, Message: "${message?.substring(0, 50)}${message?.length > 50 ? '...' : ''}"`);
-    } else {
-      // Fallback extraction for various possible formats
-      phoneNumber = payload.From || payload.from || payload.number || 
-                   payload.sender || payload.Sender || payload.source;
-      message = payload.Body || payload.body || payload.message || 
-               payload.text || payload.Text || payload.content;
-      messageSid = payload.MessageSid || payload.SmsSid || payload.messageSid || payload.id;
-      
-      console.log(`[${requestId}] Extracted from fallback - From: ${phoneNumber}, Message begins: "${message?.substring(0, 50)}${message?.length > 50 ? '...' : ''}"`);
-    }
+    // Extract key information
+    const phoneNumber = data.From;
+    const message = data.Body;
+    const messageSid = data.MessageSid;
 
-    // Store the webhook data in Supabase
-    console.log(`[${requestId}] Storing webhook data in database...`);
+    console.log(`[${requestId}] Processing message from ${phoneNumber}`);
+
+    // Store webhook data in database
     const { data: webhookData, error } = await supabase.from('sms_webhooks').insert({
-      webhook_data: payload,
+      webhook_data: data,
       processed: false,
       received_at: new Date().toISOString(),
       request_id: requestId,
       message_hash: phoneNumber && message ? `${phoneNumber}:${message?.substring(0, 50)}` : undefined
-    }).select('id');
+    }).select('id').single();
 
     if (error) {
       console.error(`[${requestId}] Database error:`, error);
       throw new Error(`Failed to store webhook: ${error.message}`);
     }
 
-    const webhookId = webhookData?.[0]?.id;
-    console.log(`[${requestId}] Successfully stored webhook with ID: ${webhookId}`);
+    // Trigger the AI handler to process the message
+    if (phoneNumber && message) {
+      try {
+        // Process the message with AI handler
+        const aiResponse = await supabase.functions.invoke('sms-webhook-handler', {
+          body: {
+            phoneNumber,
+            messageContent: message,
+            webhookId: webhookData.id
+          }
+        });
 
-    // Generate response for Twilio - MUST be in XML format
-    const responseBody = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
+        console.log(`[${requestId}] AI handler response:`, aiResponse);
+      } catch (aiError) {
+        console.error(`[${requestId}] Error invoking AI handler:`, aiError);
+        // Continue despite AI error - we don't want to break the webhook flow
+      }
+    }
+
+    // Generate TwiML response for Twilio
+    const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?><Response></Response>`;
     
     console.log(`[${requestId}] Sending successful response to Twilio`);
-    return new Response(responseBody, {
+    return new Response(twimlResponse, {
       status: 200,
       headers: { 
         ...corsHeaders, 
