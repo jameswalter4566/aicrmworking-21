@@ -19,6 +19,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
   onConditionsFound
 }) => {
   const [isSearching, setIsSearching] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [processingSteps, setProcessingSteps] = useState<Array<{
     id: string;
     label: string;
@@ -38,38 +39,46 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
   };
 
   useEffect(() => {
-    const checkEmails = async () => {
-      try {
-        updateStepStatus("search", "processing");
-        
-        const { data, error } = await supabase.functions.invoke('check-approval-emails', {
-          body: { leadId }
-        });
+    const fetchLastProcessed = async () => {
+      const { data, error } = await supabase
+        .from('processed_gmail_attachments')
+        .select('processed_at')
+        .eq('lead_id', leadId)
+        .order('processed_at', { ascending: false })
+        .limit(1);
 
-        if (error) {
-          console.error("Error checking emails:", error);
-          return;
-        }
-
-        if (data.success && data.results?.length > 0) {
-          updateStepStatus("search", "completed");
-          updateStepStatus("analyze", "completed");
-          updateStepStatus("extract", "completed");
-          toast.success("Found and processed new approval letter");
-        }
-      } catch (error) {
-        console.error("Error in automatic email check:", error);
+      if (!error && data.length > 0) {
+        setLastChecked(new Date(data[0].processed_at));
       }
     };
 
-    checkEmails();
+    fetchLastProcessed();
+    
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'processed_gmail_attachments',
+          filter: `lead_id=eq.${leadId}`
+        },
+        (payload) => {
+          if (payload.new.success) {
+            toast.success("Found and processed new approval letter");
+          }
+          setLastChecked(new Date(payload.new.processed_at));
+        }
+      )
+      .subscribe();
 
-    const interval = setInterval(checkEmails, 5 * 60 * 1000);
-
-    return () => clearInterval(interval);
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [leadId]);
 
-  const handleSearch = async () => {
+  const handleManualSearch = async () => {
     if (!clientLastName) {
       toast.warning("Client last name is required for email search");
       return;
@@ -81,7 +90,6 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
     try {
       console.log("Starting email search with parameters:", { clientLastName });
       
-      // Search for approval emails
       const { data: searchData, error: searchError } = await supabase.functions.invoke('search-approval-emails', {
         body: { clientLastName }
       });
@@ -101,7 +109,6 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
         return;
       }
       
-      // Process the first email that has PDF attachments
       const emailWithPDF = searchData.emails.find(email => 
         email.attachments && email.attachments.some(att => att.mimeType === "application/pdf")
       );
@@ -117,7 +124,6 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
       const pdfAttachment = emailWithPDF.attachments.find(att => att.mimeType === "application/pdf");
       console.log("Found PDF attachment:", pdfAttachment);
       
-      // Get the download URL for the attachment
       const { data: attachmentData, error: attachmentError } = await supabase.functions.invoke('search-approval-emails', {
         body: { 
           emailId: emailWithPDF.id,
@@ -133,7 +139,6 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
 
       console.log("Successfully got attachment download URL:", attachmentData.downloadUrl.substring(0, 50) + "...");
 
-      // Analyze the PDF using our analyze-pdf-document function
       const { data: parseData, error: parseError } = await supabase.functions.invoke('analyze-pdf-document', {
         body: { 
           fileUrl: attachmentData.downloadUrl,
@@ -182,12 +187,17 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
             AI Email Search
           </h3>
           <p className="text-sm text-blue-600">
-            Click below to search your email for approval letters
+            Emails are automatically checked every minute
           </p>
+          {lastChecked && (
+            <p className="text-xs text-gray-500">
+              Last checked: {lastChecked.toLocaleString()}
+            </p>
+          )}
         </div>
         
         <Button
-          onClick={handleSearch}
+          onClick={handleManualSearch}
           disabled={isSearching}
           size="lg"
           className="bg-blue-600 hover:bg-blue-700 text-white w-full max-w-sm"
@@ -200,7 +210,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
           ) : (
             <>
               <Search className="mr-2 h-4 w-4" />
-              Search Approval Emails
+              Search Now
             </>
           )}
         </Button>
