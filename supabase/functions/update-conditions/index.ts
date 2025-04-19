@@ -116,35 +116,49 @@ serve(async (req: Request) => {
     // After successfully updating conditions, check if we should send an SMS
     // This should happen for any condition update AFTER the first one (when the loan is already approved)
     if (hasConditions && !isFirstConditionUpdate) {
-      console.log(`Conditions updated for lead ${leadId}. Sending SMS notification...`);
+      console.log(`Conditions updated for lead ${leadId}. Checking loan status before sending SMS notification...`);
       
       try {
-        // Check loan status before calling SMS function
+        // Check loan status directly from the leads table
         const { data: leadData, error: leadError } = await supabaseClient
           .from("leads")
           .select("mortgage_data")
           .eq("id", leadId)
           .single();
         
-        const loanStatus = leadData?.mortgage_data?.loan_status?.toLowerCase() || '';
-        console.log(`Current loan status: ${loanStatus}`);
-        
-        if (loanStatus === "approved") {
-          console.log("Loan is in approved status, proceeding with SMS notification");
-          
-          // Call the conditions-update-sms function
-          const { data: smsData, error: smsError } = await supabaseClient.functions.invoke(
-            'conditions-update-sms',
-            { body: { leadId } }
-          );
-
-          if (smsError) {
-            console.error('Error sending conditions update SMS:', smsError);
-          } else {
-            console.log('Conditions update SMS sent successfully:', smsData);
-          }
+        if (leadError) {
+          console.error(`Error retrieving lead data: ${leadError.message}`);
+          // Continue with the response even if we can't check the status
         } else {
-          console.log(`Loan not in approved status (current: ${loanStatus}). Skipping SMS notification.`);
+          // Check different possible paths to loan status in the mortgage_data
+          const loanStatus = leadData?.mortgage_data?.loan_status?.toLowerCase() || 
+                            leadData?.mortgage_data?.loan?.status?.toLowerCase() ||
+                            leadData?.mortgage_data?.loan?.progress?.currentStep?.toLowerCase() || '';
+          
+          console.log(`Current loan status found: "${loanStatus}"`);
+          
+          // Check if the loan is in approved status (various formats)
+          const isApproved = loanStatus === "approved" || 
+                            loanStatus.includes("approved") || 
+                            loanStatus.includes("accept");
+          
+          if (isApproved) {
+            console.log("Loan is in approved status, proceeding with SMS notification");
+            
+            // Call the conditions-update-sms function
+            const { data: smsData, error: smsError } = await supabaseClient.functions.invoke(
+              'conditions-update-sms',
+              { body: { leadId } }
+            );
+
+            if (smsError) {
+              console.error('Error sending conditions update SMS:', smsError);
+            } else {
+              console.log('Conditions update SMS sent successfully:', smsData);
+            }
+          } else {
+            console.log(`Loan not in approved status (current: "${loanStatus}"). Skipping SMS notification.`);
+          }
         }
       } catch (smsErr) {
         console.error('Exception sending conditions update SMS:', smsErr);

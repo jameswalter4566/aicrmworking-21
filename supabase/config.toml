@@ -24,3 +24,4 @@ verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
+

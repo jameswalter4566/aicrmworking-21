@@ -15,18 +15,19 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Conditions update SMS function triggered");
+    const requestId = crypto.randomUUID();
+    console.log(`[${requestId}] Conditions update SMS function triggered`);
     const { leadId } = await req.json();
 
     if (!leadId) {
-      console.error("No leadId provided");
+      console.error(`[${requestId}] No leadId provided`);
       return new Response(
         JSON.stringify({ success: false, error: 'Lead ID is required' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
-    console.log(`Processing SMS notification for lead ID: ${leadId}`);
+    console.log(`[${requestId}] Processing SMS notification for lead ID: ${leadId}`);
 
     // Create Supabase client
     const supabaseClient = createClient(
@@ -44,32 +45,43 @@ serve(async (req) => {
       .from('leads')
       .select('first_name, phone1, mortgage_data')
       .eq('id', leadId)
-      .single();
+      .maybeSingle();
 
     if (leadError || !lead) {
-      console.error('Error fetching lead:', leadError);
+      console.error(`[${requestId}] Error fetching lead:`, leadError);
       return new Response(
         JSON.stringify({ success: false, error: 'Lead not found' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 404 }
       );
     }
 
-    console.log(`Retrieved lead data: ${lead.first_name}, phone: ${lead.phone1}`);
+    console.log(`[${requestId}] Retrieved lead data: ${lead.first_name}, phone: ${lead.phone1}`);
+    console.log(`[${requestId}] Full mortgage data:`, JSON.stringify(lead.mortgage_data));
 
-    // Check if the loan is already in approved status
-    const currentStatus = lead.mortgage_data?.loan_status?.toLowerCase() || '';
-    console.log(`Current loan status: ${currentStatus}`);
+    // Check all possible paths to loan status in the mortgage_data
+    const loanStatus = lead.mortgage_data?.loan_status?.toLowerCase() || 
+                       lead.mortgage_data?.loan?.status?.toLowerCase() || 
+                       lead.mortgage_data?.loan?.progress?.currentStep?.toLowerCase() || '';
     
-    if (currentStatus !== 'approved') {
-      console.log(`Lead ${leadId} is not in approved status (current: ${currentStatus}). Skipping SMS.`);
+    console.log(`[${requestId}] Current loan status detected: "${loanStatus}"`);
+    
+    // Check if the loan is in approved status (various formats)
+    const isApproved = loanStatus === "approved" || 
+                      loanStatus.includes("approved") || 
+                      loanStatus.includes("accept");
+
+    if (!isApproved) {
+      console.log(`[${requestId}] Lead ${leadId} is not in approved status (current: "${loanStatus}"). Skipping SMS.`);
       return new Response(
         JSON.stringify({ success: false, message: 'Lead not in approved status' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
+    console.log(`[${requestId}] Lead ${leadId} is in approved status. Proceeding with SMS.`);
+
     if (!lead.phone1) {
-      console.error(`No phone number available for lead ${leadId}`);
+      console.error(`[${requestId}] No phone number available for lead ${leadId}`);
       return new Response(
         JSON.stringify({ success: false, error: 'No phone number available' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
@@ -79,13 +91,13 @@ serve(async (req) => {
     // Compose the message
     const message = `Hello! ${lead.first_name} Great news! Underwriting just cleared most of our conditions. Just a few more before we get you to the finish line. Please check your client portal and email for the remaining items. Thank you!`;
 
-    console.log(`Sending SMS to ${lead.phone1} with message: ${message}`);
+    console.log(`[${requestId}] Sending SMS to ${lead.phone1} with message: ${message}`);
 
     // Send the SMS
     const smsResult = await sendSMS(lead.phone1, message);
 
     if (!smsResult.success) {
-      console.error('Error sending SMS:', smsResult.error);
+      console.error(`[${requestId}] Error sending SMS:`, smsResult.error);
       return new Response(
         JSON.stringify({ success: false, error: 'Failed to send SMS' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
@@ -93,7 +105,7 @@ serve(async (req) => {
     }
 
     // Log the successful SMS
-    console.log(`Conditions update SMS sent to ${lead.phone1} for lead ${leadId}`);
+    console.log(`[${requestId}] Conditions update SMS sent to ${lead.phone1} for lead ${leadId}`);
 
     return new Response(
       JSON.stringify({ 
