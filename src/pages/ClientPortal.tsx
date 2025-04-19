@@ -553,6 +553,7 @@ const ClientPortal = () => {
       }
       
       try {
+        console.log(`Verifying access for slug: ${slug}, token: ${token}`);
         const { data: portalData, error: portalError } = await supabase
           .from('client_portal_access')
           .select('*')
@@ -566,12 +567,20 @@ const ClientPortal = () => {
           return;
         }
         
+        console.log("Portal data retrieved:", portalData);
+        
         await supabase
           .from('client_portal_access')
           .update({ last_accessed_at: new Date().toISOString() })
           .eq('id', portalData.id);
         
-        setClientData(mockClientData);
+        const clientDataWithLeadId = {
+          ...mockClientData,
+          leadId: portalData.lead_id
+        };
+        
+        console.log("Setting client data with lead ID:", portalData.lead_id);
+        setClientData(clientDataWithLeadId);
         setLeadId(portalData.lead_id?.toString() || null);
         setAuthenticated(true);
       } catch (error) {
@@ -597,6 +606,10 @@ const ClientPortal = () => {
       }
     }
   };
+  
+  useEffect(() => {
+    console.log("Current lead ID:", leadId);
+  }, [leadId]);
   
   if (loading) {
     return (
@@ -657,17 +670,30 @@ const ClientPortal = () => {
     );
   }
   
+  console.log("Rendering portal with lead ID:", leadId);
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <div className="container mx-auto p-4 md:p-6 mt-2">
         {activeTab === "home" && <HomeTab clientData={clientData} />}
-        {activeTab === "conditions" && leadId && (
-          <ClientPortalConditions 
-            leadId={leadId} 
-            refreshData={refreshData} 
-          />
+        {activeTab === "conditions" && (
+          <>
+            {leadId ? (
+              <>
+                <p className="text-sm text-gray-500 mb-4">Debug Info: Using Lead ID {leadId} for conditions</p>
+                <ClientPortalConditions 
+                  leadId={leadId} 
+                  refreshData={refreshData} 
+                />
+              </>
+            ) : (
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                <p className="text-yellow-700">No lead ID found. Unable to fetch conditions.</p>
+              </div>
+            )}
+          </>
         )}
         {activeTab === "attention" && <AttentionTab clientData={clientData} />}
         {activeTab === "support" && <SupportTab />}
