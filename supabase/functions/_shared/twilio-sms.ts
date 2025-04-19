@@ -122,6 +122,9 @@ export function validateTwilioWebhook(request: Request): boolean {
   // In a production environment, you should verify the X-Twilio-Signature header
   // against the request body using the Twilio SDK
   
+  const signature = request.headers.get('x-twilio-signature');
+  console.log(`Validating Twilio signature: ${signature || 'No signature found'}`);
+  
   // For now, we'll return true but this should be implemented properly
   // See: https://www.twilio.com/docs/usage/webhooks/webhooks-security
   
@@ -134,6 +137,7 @@ export function parseTwilioWebhook(formData: FormData) {
   
   for (const [key, value] of formData.entries()) {
     data[key] = value.toString();
+    console.log(`Parsed form data: ${key} = ${value.toString()}`);
   }
   
   return {

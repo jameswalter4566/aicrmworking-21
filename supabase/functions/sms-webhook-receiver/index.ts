@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.2';
 import { validateTwilioWebhook, parseTwilioWebhook } from "../_shared/twilio-sms.ts";
@@ -10,16 +11,21 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Received OPTIONS request - CORS preflight");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     console.log('======= WEBHOOK RECEIVER STARTED =======');
     console.log(`Received request method: ${req.method}`);
+    console.log(`Request URL: ${req.url}`);
     console.log(`Request headers: ${JSON.stringify(Object.fromEntries(req.headers.entries()))}`);
     
+    // Clone the request to read the body multiple times
+    const clonedReq = req.clone();
+    
     // Log full request details for debugging
-    const rawBody = await req.text();
+    const rawBody = await clonedReq.text();
     console.log('Raw Request Body:', rawBody);
 
     // Detailed header logging for Twilio-specific headers
@@ -53,20 +59,20 @@ serve(async (req) => {
         console.warn(`[${requestId}] Invalid Twilio signature`);
         // We're still accepting it for now, but in production you'd want to reject invalid signatures
       }
+    } else {
+      console.warn(`[${requestId}] No Twilio signature found in request headers`);
     }
     
     // Parse incoming webhook payload
     let payload;
     
-    let rawBody = "";
-    
+    // Since we already read the body for logging, use the stored raw content
     try {
-      // Store the raw body for debugging
-      rawBody = await req.text();
-      console.log(`[${requestId}] Raw body:`, rawBody);
+      console.log(`[${requestId}] Parsing request body`);
       
       if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
         // This is the typical Twilio webhook format
+        console.log(`[${requestId}] Parsing as form data`);
         const formData = new FormData();
         new URLSearchParams(rawBody).forEach((value, key) => {
           formData.append(key, value);
@@ -74,18 +80,24 @@ serve(async (req) => {
         
         // Parse the Twilio webhook data
         payload = parseTwilioWebhook(formData);
+        console.log(`[${requestId}] Successfully parsed form data:`, JSON.stringify(payload));
       } else if (contentType && contentType.includes('application/json')) {
         // Handle JSON if sent
+        console.log(`[${requestId}] Parsing as JSON`);
         payload = JSON.parse(rawBody);
+        console.log(`[${requestId}] Successfully parsed JSON data:`, JSON.stringify(payload));
       } else {
         // Try to handle as form data anyway
+        console.log(`[${requestId}] Trying to parse as form data (fallback)`);
         try {
           const formData = new FormData();
           new URLSearchParams(rawBody).forEach((value, key) => {
             formData.append(key, value);
           });
           payload = parseTwilioWebhook(formData);
+          console.log(`[${requestId}] Successfully parsed fallback form data:`, JSON.stringify(payload));
         } catch (formError) {
+          console.error(`[${requestId}] Form data fallback parse error:`, formError);
           payload = { 
             _raw: rawBody,
             _parseError: "Could not parse as form data"
@@ -167,33 +179,8 @@ serve(async (req) => {
       );
     }
     
-    // Check for duplicate message (prevent processing the same message multiple times)
-    const { data: existingMessages, error: checkError } = await supabase
-      .from('sms_webhooks')
-      .select('id, processed')
-      .eq('processed', false)
-      .or(`webhook_data->from.eq.${phoneNumber},webhook_data->From.eq.${phoneNumber}`)
-      .or(`webhook_data->body.eq."${message}",webhook_data->Body.eq."${message}",webhook_data->message.eq."${message}"`)
-      .order('received_at', { ascending: false })
-      .limit(1);
-    
-    if (!checkError && existingMessages && existingMessages.length > 0) {
-      console.log(`[${requestId}] Duplicate message detected from ${phoneNumber}: "${message?.substring(0, 30)}..."`);
-      return new Response(
-        JSON.stringify({ 
-          success: true,
-          message: 'Duplicate message detected - not processing',
-          duplicateId: existingMessages[0].id,
-          requestId
-        }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-    
     // Store incoming message in the database
+    console.log(`[${requestId}] Storing incoming message in database`);
     const { data: webhookData, error } = await supabase.from('sms_webhooks').insert({
       webhook_data: payload,
       processed: false,
