@@ -1,29 +1,58 @@
 
-# This is an example to get you started
-# A Deno project for Supabase Edge Functions
 project_id = "imrmboyczebjlbnkgjns"
 
-[build]
-include = ["src/pages/**", "supabase/functions/**"]
-exclude = ["**/node_modules"]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
-[functions.twilio-token]
-verify_jwt = false
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
 
-[functions.twilio-voice]
-verify_jwt = false
+[realtime]
+enabled = true
+subscription.enabled = false
 
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[auth.email]
+enabled = true
+
+[auth.sms]
+enabled = true
+
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+backend = "postgres"
+
+# Add this to make the webhook receiver function public (no JWT verification)
 [functions.sms-webhook-receiver]
 verify_jwt = false
 
-[functions.sms-test-webhook]
+# Make sure the twilio-token function is also public
+[functions.twilio-token]
 verify_jwt = false
 
-[functions.sms-test-gateway-webhook]
-verify_jwt = false
-
-[functions.sms-webhook-test]
-verify_jwt = false
-
-[functions.sms-send-single]
+# Make sure the twilio-voice function is also public
+[functions.twilio-voice]
 verify_jwt = false
