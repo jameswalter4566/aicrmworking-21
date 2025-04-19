@@ -707,9 +707,50 @@ Instructions:
             
             // Add automation results to our response
             extractedData.automationResults = automationResult.automationResults;
+
+            // NEW: Check for conditions that need LOE and trigger LOE generator
+            console.log("Looking for conditions requiring LOE...");
+            
+            const allConditions = [
+              ...(extractedData.masterConditions || []),
+              ...(extractedData.generalConditions || []),
+              ...(extractedData.priorToFinalConditions || []),
+              ...(extractedData.complianceConditions || [])
+            ];
+
+            const loeConditions = allConditions.filter(c => 
+              c.text && (
+                c.text.toLowerCase().includes('explanation') || 
+                c.text.toLowerCase().includes('loe') ||
+                c.text.toLowerCase().includes('letter')
+              )
+            );
+
+            if (loeConditions.length > 0) {
+              console.log(`Found ${loeConditions.length} conditions that may need LOE, triggering generator...`);
+              
+              const { data: loeData, error: loeError } = await supabase.functions.invoke('loe-generator', {
+                body: { 
+                  leadId,
+                  conditions: loeConditions
+                }
+              });
+
+              if (loeError) {
+                console.error("❌ Error generating LOE documents:", loeError);
+                toast.warning('Conditions processed, but LOE generation had errors.');
+              } else {
+                console.log("✅ LOE generation completed successfully:", loeData);
+                
+                // Add the LOE results to our response
+                extractedData.loeResults = loeData;
+              }
+            } else {
+              console.log("No conditions requiring letters of explanation were found");
+            }
           }
-        } catch (automationErr) {
-          console.error("❌ Exception triggering automation matcher:", automationErr);
+        } catch (error) {
+          console.error("❌ Error in post-processing:", error);
         }
       }
     }
