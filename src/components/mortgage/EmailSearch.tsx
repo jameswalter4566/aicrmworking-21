@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail, Search } from "lucide-react";
@@ -98,6 +99,8 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
         console.error("Error getting attachment download URL:", attachmentError);
         throw new Error("Could not get attachment download URL");
       }
+
+      console.log("Successfully got attachment download URL:", attachmentData.downloadUrl.substring(0, 50) + "...");
 
       // Analyze the PDF using our analyze-pdf-document function
       const { data: parseData, error: parseError } = await supabase.functions.invoke('analyze-pdf-document', {
