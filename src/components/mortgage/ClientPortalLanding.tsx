@@ -3,10 +3,31 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowRight, Shield, Clock, FileCheck, PieChart } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Extract slug from the URL if present
+  const getPortalSlug = () => {
+    const pathParts = location.pathname.split('/');
+    if (pathParts.length > 2 && pathParts[1] === 'client-portal') {
+      return pathParts[2];
+    }
+    return '';
+  };
+  
+  const slug = getPortalSlug();
+  
+  const handleEnterPortal = () => {
+    if (slug) {
+      navigate(`/client-portal/dashboard/${slug}`);
+    } else {
+      // If no slug is found, go to login page where they can enter credentials
+      navigate('/client-portal/dashboard');
+    }
+  };
   
   return (
     <div className="min-h-screen">
@@ -24,7 +45,7 @@ const ClientPortalLanding = () => {
             </p>
             <Button 
               size="lg"
-              onClick={() => navigate('/client-portal/login')}
+              onClick={handleEnterPortal}
               className="bg-emerald-500 hover:bg-emerald-600 text-white"
             >
               Access Your Portal 
@@ -90,7 +111,7 @@ const ClientPortalLanding = () => {
           </p>
           <Button
             size="lg"
-            onClick={() => navigate('/client-portal/login')}
+            onClick={handleEnterPortal}
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
           >
             Enter Portal 
