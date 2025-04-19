@@ -94,8 +94,8 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             return;
           }
 
-          // Fix: Check if data exists and has the created_by property
-          if (data && data.created_by) {
+          // Fix: Check if data exists before accessing properties
+          if (data && 'created_by' in data && data.created_by) {
             // Now fetch the company settings with this user ID
             const { data: companyData, error: companyError } = await supabase
               .from('company_settings')
