@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -99,7 +100,10 @@ serve(async (req: Request) => {
     }
 
     // After successfully updating conditions, check if we should send an SMS
-    if (hasConditions) {
+    // This should happen for any condition update AFTER the first one (when the loan is already approved)
+    if (hasConditions && !isFirstConditionUpdate) {
+      console.log(`Conditions updated for lead ${leadId}. Checking if SMS notification should be sent...`);
+      
       try {
         // Call the conditions-update-sms function
         const { data: smsData, error: smsError } = await supabaseClient.functions.invoke(
