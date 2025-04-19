@@ -119,7 +119,7 @@ export const CompanySettingsCard = () => {
             <div className="space-y-2">
               <Label htmlFor="primary_color">Primary Color</Label>
               <div className="flex space-x-2">
-                <div className="relative w-16 h-10 rounded-md overflow-hidden bg-white">
+                <div className="relative w-16 h-10 rounded-lg overflow-hidden bg-white">
                   <Input
                     id="primary_color"
                     type="color"
@@ -127,7 +127,7 @@ export const CompanySettingsCard = () => {
                     onChange={(e) =>
                       setSettings({ ...settings, primary_color: e.target.value })
                     }
-                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer rounded-md"
+                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer rounded-lg"
                   />
                 </div>
                 <Input
@@ -136,7 +136,7 @@ export const CompanySettingsCard = () => {
                     setSettings({ ...settings, primary_color: e.target.value })
                   }
                   placeholder="#33C3F0"
-                  className="rounded-md"
+                  className="rounded-lg"
                 />
               </div>
             </div>
@@ -144,7 +144,7 @@ export const CompanySettingsCard = () => {
             <div className="space-y-2">
               <Label htmlFor="secondary_color">Secondary Color</Label>
               <div className="flex space-x-2">
-                <div className="relative w-16 h-10 rounded-md overflow-hidden bg-white">
+                <div className="relative w-16 h-10 rounded-lg overflow-hidden bg-white">
                   <Input
                     id="secondary_color"
                     type="color"
@@ -152,7 +152,7 @@ export const CompanySettingsCard = () => {
                     onChange={(e) =>
                       setSettings({ ...settings, secondary_color: e.target.value })
                     }
-                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer rounded-md"
+                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer rounded-lg"
                   />
                 </div>
                 <Input
@@ -161,7 +161,7 @@ export const CompanySettingsCard = () => {
                     setSettings({ ...settings, secondary_color: e.target.value })
                   }
                   placeholder="#8B5CF6"
-                  className="rounded-md"
+                  className="rounded-lg"
                 />
               </div>
             </div>
@@ -169,7 +169,7 @@ export const CompanySettingsCard = () => {
             <div className="space-y-2">
               <Label htmlFor="accent_color">Accent Color</Label>
               <div className="flex space-x-2">
-                <div className="relative w-16 h-10 rounded-md overflow-hidden bg-white">
+                <div className="relative w-16 h-10 rounded-lg overflow-hidden bg-white">
                   <Input
                     id="accent_color"
                     type="color"
@@ -177,7 +177,7 @@ export const CompanySettingsCard = () => {
                     onChange={(e) =>
                       setSettings({ ...settings, accent_color: e.target.value })
                     }
-                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer rounded-md"
+                    className="absolute inset-0 w-full h-full p-0 border-none cursor-pointer rounded-lg"
                   />
                 </div>
                 <Input
@@ -186,7 +186,7 @@ export const CompanySettingsCard = () => {
                     setSettings({ ...settings, accent_color: e.target.value })
                   }
                   placeholder="#EA384C"
-                  className="rounded-md"
+                  className="rounded-lg"
                 />
               </div>
             </div>
