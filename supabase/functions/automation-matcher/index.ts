@@ -44,17 +44,63 @@ async function classifyConditionWithOpenAI(conditionText) {
         messages: [
           {
             role: 'system',
-            content: `You are an expert mortgage condition classifier. Your task is to analyze mortgage loan conditions and categorize them into the appropriate automation type.
-            
-Automation Types:
-1. loe-generator - For all Letter of Explanation (LOE) conditions, including credit inquiries, large deposits, employment gaps, etc.
-2. income-verification - For conditions requesting paystubs, W-2s, employment verification, etc.
-3. asset-verification - For conditions requesting bank statements, investment account verification, etc.
-4. insurance-verification - For conditions requesting homeowners insurance, flood insurance, etc.
-5. title-verification - For conditions regarding title work, legal descriptions, etc.
-6. manual-processing - For complex conditions that don't fit neatly into other categories or require human judgment
+            content: `You are an expert mortgage condition classifier specializing in identifying Letter of Explanation (LOE/LOX) requirements. Your task is to analyze mortgage loan conditions and determine if they require a letter of explanation or fall into other categories.
 
-Respond with only the exact name of the appropriate automation type from the list above, no explanation.`
+Carefully identify LOE conditions based on these characteristics:
+1. Explicitly mentions "letter of explanation", "LOE", or "LOX"
+2. Requires written explanation from borrower, employer, or other parties
+3. Asks for clarification about specific items or discrepancies
+4. Needs documented explanation of circumstances
+
+Common LOE Types (Examples):
+- Income/Employment LOEs:
+  "Based on Timothy Hensel's current rate of pay, the YTD average of $10,559.38 is 13% lower than the calculated rate of $12,133.33. Provide a signed and dated letter of explanation from the employer explaining low YTD earnings."
+
+- Address/Property LOEs:
+  "Sign Letter Of Explanation - Address / Explain ownership in the following address - 34 Rose Ln, Glen Mills, PA 19342"
+
+- Credit-Related LOEs:
+  "Sign Letter Of Explanation - Explaining Credit Inquiry - NUVISION FCU / 03/25/23"
+  "Sign Letter Of Explanation - Explaining Late reporting on credit - JPMCB"
+
+- Business/Self-Employment LOEs:
+  "Borrower to provide LOX verification from their CPA that her business was active as of 12/1/2018"
+
+- Purpose/Intent LOEs:
+  "Sign Letter Of Explanation - Explaining Reason For cash out"
+
+Other Condition Types (NOT LOEs):
+1. income-verification:
+   - Requests for paystubs, W-2s, tax returns
+   - Employment verification forms
+   - Written Verification of Employment (WVOE)
+   - Bank statements showing direct deposits
+
+2. asset-verification:
+   - Bank statement requests
+   - Investment account documentation
+   - Source of funds verification
+   - Gift documentation
+
+3. insurance-verification:
+   - Homeowners insurance policy
+   - Flood insurance requirements
+   - Documentation of coverage amounts
+   - Insurance declarations pages
+
+4. title-verification:
+   - Title commitment requests
+   - Property deed requirements
+   - Legal description verifications
+   - Survey requirements
+
+5. manual-processing:
+   - Complex underwriting requirements
+   - Multiple document requests
+   - Conditions requiring human review
+   - Special program requirements
+
+Respond with only the exact name of the appropriate automation type from the list above. Choose 'loe-generator' ONLY if the condition explicitly requires a written explanation or clarification letter.`
           },
           {
             role: 'user',
@@ -105,18 +151,23 @@ Respond with only the exact name of the appropriate automation type from the lis
 function ruleBasedClassification(conditionText) {
   const text = conditionText.toLowerCase();
   
-  // LOE patterns - now with more detailed matching for better accuracy
-  if (text.includes('letter of explanation') || 
-      text.includes('loe') || 
-      text.includes('explain') || 
-      text.includes('explanation') ||
-      text.includes('clarify') ||
-      text.includes('clarification') ||
-      text.includes('credit inquir') ||
-      text.includes('large deposit') ||
-      text.includes('employment gap') ||
-      text.includes('address') && (text.includes('discrepanc') || text.includes('histor')) ||
-      text.includes('name') && (text.includes('variation') || text.includes('discrepanc'))) {
+  // LOE patterns - Enhanced with more specific matches
+  if ((text.includes('letter of explanation') || 
+       text.includes(' loe ') || 
+       text.includes(' lox ') ||
+       (text.includes('explain') && text.includes('sign'))) &&
+      // Common LOE triggers
+      (text.includes('credit') ||
+       text.includes('address') ||
+       text.includes('employment') ||
+       text.includes('income') ||
+       text.includes('business') ||
+       text.includes('cash out') ||
+       text.includes('late') ||
+       text.includes('inquiry') ||
+       text.includes('gap') ||
+       text.includes('deposit') ||
+       text.includes('discrepanc'))) {
     return AUTOMATION_TYPES.LOE;
   }
   
