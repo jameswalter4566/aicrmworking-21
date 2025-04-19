@@ -1,26 +1,32 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
-interface ClientPortalLandingProps {
-  slug: string;
-  token: string;
+export interface ClientPortalLandingProps {
+  slug?: string;
+  token?: string;
 }
 
-export const ClientPortalLanding = ({ slug, token }: ClientPortalLandingProps) => {
+export const ClientPortalLanding = ({ slug, token }: ClientPortalLandingProps = {}) => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const params = useParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [companyName, setCompanyName] = useState('Your Mortgage Company');
   const [leadName, setLeadName] = useState('');
 
+  // Use props if provided, otherwise try to get from URL params
+  const portalSlug = slug || params.slug || searchParams.get('slug') || '';
+  const accessToken = token || searchParams.get('token') || '';
+
   useEffect(() => {
     const validateAccess = async () => {
-      if (!slug || !token) {
+      if (!portalSlug || !accessToken) {
         setError('Invalid portal link');
         setLoading(false);
         return;
@@ -28,36 +34,41 @@ export const ClientPortalLanding = ({ slug, token }: ClientPortalLandingProps) =
 
       try {
         // Verify access token
-        const { access, error } = await getPortalAccess(slug, token);
+        const { data: portalData, error: portalError } = await supabase
+          .from('client_portal_access')
+          .select('*')
+          .eq('portal_slug', portalSlug)
+          .eq('access_token', accessToken)
+          .maybeSingle();
         
-        if (error || !access) {
+        if (portalError || !portalData) {
           setError('Portal access has expired or is invalid');
           setLoading(false);
           return;
         }
 
         // Get lead information
-        if (access.lead_id) {
+        if (portalData?.lead_id) {
           const { data: leadData } = await supabase
             .from('leads')
-            .select('first_name, last_name')
-            .eq('id', access.lead_id)
-            .single();
+            .select('first_name, last_name, created_by')
+            .eq('id', portalData.lead_id)
+            .maybeSingle();
 
           if (leadData) {
             setLeadName(`${leadData.first_name || ''} ${leadData.last_name || ''}`.trim());
-          }
+            
+            // Get company name if we have a creator
+            if (leadData.created_by) {
+              const { data: companyData } = await supabase
+                .from('company_settings')
+                .select('company_name')
+                .eq('user_id', leadData.created_by)
+                .maybeSingle();
 
-          // Get company name if we have a creator
-          if (access.created_by) {
-            const { data: companyData } = await supabase
-              .from('company_settings')
-              .select('company_name')
-              .eq('user_id', access.created_by)
-              .single();
-
-            if (companyData?.company_name) {
-              setCompanyName(companyData.company_name);
+              if (companyData?.company_name) {
+                setCompanyName(companyData.company_name);
+              }
             }
           }
         }
@@ -72,24 +83,33 @@ export const ClientPortalLanding = ({ slug, token }: ClientPortalLandingProps) =
     };
 
     validateAccess();
-  }, [slug, token]);
+  }, [portalSlug, accessToken, params.slug]);
 
   const handleEnterPortal = async () => {
-    if (!slug || !token) return;
+    if (!portalSlug || !accessToken) return;
 
     try {
       // Update the last_accessed timestamp
-      const { access } = await getPortalAccess(slug, token);
-      if (access?.id) {
-        await updateLastAccessed(access.id);
+      const { data: portalData } = await supabase
+        .from('client_portal_access')
+        .select('id')
+        .eq('portal_slug', portalSlug)
+        .eq('access_token', accessToken)
+        .maybeSingle();
+        
+      if (portalData?.id) {
+        await supabase
+          .from('client_portal_access')
+          .update({ last_accessed_at: new Date().toISOString() })
+          .eq('id', portalData.id);
       }
       
       // Navigate to the client portal
-      navigate(`/client-portal/${slug}?token=${token}`);
+      navigate(`/client-portal/${portalSlug}?token=${accessToken}`);
     } catch (err) {
       console.error('Error updating last accessed:', err);
       // Still navigate even if updating last accessed fails
-      navigate(`/client-portal/${slug}?token=${token}`);
+      navigate(`/client-portal/${portalSlug}?token=${accessToken}`);
     }
   };
 
@@ -179,3 +199,5 @@ export const ClientPortalLanding = ({ slug, token }: ClientPortalLandingProps) =
     </Card>
   );
 };
+
+export default ClientPortalLanding;

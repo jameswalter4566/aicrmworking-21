@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -20,6 +21,60 @@ interface ClientPortalContentProps {
   leadId: string | number;
   isInPipeline?: boolean;
   createdBy?: string;
+}
+
+// Update the mortgage data type to include onboardingCompleted
+interface ExtendedMortgageData {
+  borrower?: {
+    fullLegalName?: string;
+    dateOfBirth?: string;
+    socialSecurityNumber?: string;
+    maritalStatus?: string;
+    dependents?: string;
+    citizenship?: string;
+    creditScore?: string;
+    middleName?: string;
+  };
+  currentAddress?: {
+    streetAddress?: string;
+    cityStateZip?: string;
+    durationAtAddress?: string;
+    housingStatus?: string;
+    monthlyHousingExpense?: string;
+  };
+  employment?: {
+    employerName?: string;
+    employerAddress?: string;
+    jobTitle?: string;
+    startDate?: string;
+    endDate?: string;
+    monthlyIncome?: string;
+    isSelfEmployed?: boolean;
+    employmentStatus?: string;
+  };
+  income?: {
+    baseIncome?: string;
+    overtimeIncome?: string;
+    otherIncome?: string;
+    annualIncome?: string;
+  };
+  mortgage?: {
+    loanType?: string;
+    mortgageTerm?: string;
+    amortizationType?: string;
+    interestRate?: string;
+    mortgageInsurance?: string;
+    hasExistingMortgage?: boolean;
+    currentBalance?: string;
+    monthlyPayment?: string;
+    purpose?: string;
+  };
+  property?: {
+    propertyType?: string;
+    valueEstimate?: string;
+    yearBuilt?: string;
+  };
+  onboardingCompleted?: boolean;
 }
 
 const PrePipelineMessage = ({ title, description, settings }: { title: string; description: string; settings: CompanySettings }) => {
@@ -81,8 +136,10 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
         const leadProfile = await leadProfileService.getLeadById(leadId);
         setLeadData(leadProfile);
         
-        const hasCompletedOnboarding = leadProfile.mortgageData && 
-                                     leadProfile.mortgageData.onboardingCompleted === true;
+        // Type assertion to access the extended mortgage data
+        const mortgageData = leadProfile.mortgageData as ExtendedMortgageData;
+        const hasCompletedOnboarding = mortgageData && mortgageData.onboardingCompleted === true;
+        
         setShowOnboarding(!isInPipeline && !hasCompletedOnboarding);
       } catch (error) {
         console.error('Error fetching lead data:', error);
@@ -145,12 +202,15 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
   const handleOnboardingComplete = async () => {
     try {
+      // Cast to ExtendedMortgageData type to access onboardingCompleted
+      const updatedMortgageData = {
+        ...leadData?.mortgageData as ExtendedMortgageData,
+        onboardingCompleted: true
+      };
+      
       await leadProfileService.updateLead(leadId, {
         ...leadData,
-        mortgageData: {
-          ...leadData?.mortgageData,
-          onboardingCompleted: true
-        }
+        mortgageData: updatedMortgageData
       });
       
       setShowOnboarding(false);

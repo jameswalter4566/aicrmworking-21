@@ -42,6 +42,8 @@ import { ClientPortalLanding } from "./components/mortgage/ClientPortalLanding";
 import LoanApplicationForm from "./pages/LoanApplicationForm";
 import Dialer from "./pages/Dialer";
 import DialerSession from "./pages/DialerSession";
+import ClientPortal from "./pages/ClientPortal";
+import ClientPortalLanding from "./pages/ClientPortalLanding";
 
 const queryClient = new QueryClient();
 

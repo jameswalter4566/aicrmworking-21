@@ -547,6 +547,10 @@ const ClientPortal = () => {
   const [isInPipeline, setIsInPipeline] = useState(false);
   const [createdBy, setCreatedBy] = useState<string | undefined>(undefined);
   
+  useEffect(() => {
+    verifyAccess();
+  }, [slug, token]);
+  
   const verifyAccess = async () => {
     if (!slug || !token) {
       setLoading(false);
