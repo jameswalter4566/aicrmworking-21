@@ -574,7 +574,7 @@ Instructions:
       
       if (documentText.length === 0) {
         console.warn("No text extracted from Adobe results, falling back to base64 method");
-        // Convert PDF to base64 as fallback
+        // Convert PDF to base64 for OpenAI's vision model
         const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
         
         messages.push({
@@ -585,8 +585,11 @@ Instructions:
               text: "Please extract and analyze the text content from this PDF document."
             },
             {
-              type: "text",
-              text: `I'm providing this document as a base64-encoded PDF. The document is a mortgage approval letter containing loan conditions. Please extract the conditions and categorize them according to the instructions.`
+              type: "image_url",
+              image_url: {
+                url: `data:application/pdf;base64,${base64PDF}`,
+                detail: "high"
+              }
             }
           ]
         });
@@ -606,7 +609,7 @@ Instructions:
         });
       }
     } else {
-      // Fallback: Convert PDF to base64 and use GPT-4's ability to work with text
+      // Fallback: Convert PDF to base64 and use GPT-4 Vision's ability to process PDFs
       console.log("Using base64 encoding for OpenAI PDF analysis");
       const base64PDF = btoa(String.fromCharCode(...new Uint8Array(pdfArrayBuffer)));
       
@@ -618,8 +621,11 @@ Instructions:
             text: "Please extract and analyze the text content from this PDF document."
           },
           {
-            type: "text",
-            text: `I'm providing this document as a base64-encoded PDF. The document is a mortgage approval letter containing loan conditions. Please extract the conditions and categorize them according to the instructions.`
+            type: "image_url",
+            image_url: {
+              url: `data:application/pdf;base64,${base64PDF}`,
+              detail: "high"
+            }
           }
         ]
       });
@@ -634,7 +640,7 @@ Instructions:
         "Authorization": `Bearer ${openAiKey}`
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: isAdobeExtraction ? "gpt-4o" : "gpt-4-vision-preview",
         messages: messages,
         temperature: 0.2, // Lower temperature for more consistent results
         response_format: { type: "json_object" }
@@ -690,7 +696,7 @@ Instructions:
       } else {
         console.log("✅ Conditions saved successfully");
 
-        // ENHANCEMENT: Automatically trigger automation matcher
+        // Trigger automation matcher
         console.log("🤖 Triggering automation matcher...");
         try {
           const { data: automationResult, error: automationError } = await supabase.functions.invoke('automation-matcher', {
@@ -710,6 +716,48 @@ Instructions:
           }
         } catch (automationErr) {
           console.error("❌ Exception triggering automation matcher:", automationErr);
+        }
+        
+        // Look for conditions requiring LOE
+        console.log("Looking for conditions requiring LOE...");
+        const allConditions = [
+          ...(extractedData.masterConditions || []),
+          ...(extractedData.generalConditions || []),
+          ...(extractedData.priorToFinalConditions || []),
+          ...(extractedData.complianceConditions || [])
+        ];
+        
+        const loeConditions = allConditions.filter(c => 
+          c.text && (
+            c.text.toLowerCase().includes('explanation') || 
+            c.text.toLowerCase().includes('loe') ||
+            c.text.toLowerCase().includes('letter')
+          )
+        );
+        
+        if (loeConditions.length > 0) {
+          console.log(`Found ${loeConditions.length} conditions that may need LOE, triggering generator...`);
+          try {
+            const { data: loeResult, error: loeError } = await supabase.functions.invoke('loe-generator', {
+              body: {
+                leadId,
+                conditions: loeConditions
+              }
+            });
+            
+            if (loeError) {
+              console.error("Error generating LOE documents:", loeError);
+            } else {
+              console.log("LOE generation completed:", loeResult);
+              if (loeResult) {
+                extractedData.loeResults = loeResult;
+              }
+            }
+          } catch (loeErr) {
+            console.error("Exception in LOE generator:", loeErr);
+          }
+        } else {
+          console.log("No conditions requiring letters of explanation were found");
         }
       }
     }

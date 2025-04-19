@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -30,20 +29,23 @@ serve(async (req) => {
     console.log('🔍 STARTED: parse-approval-document function');
     
     // Parse the request body
-    const { emailId, attachmentId, userId } = await req.json();
+    const { emailId, attachmentId, userId, fileUrl, fileData, leadId } = await req.json();
     
     console.log(`📝 Parameters received:`, {
       emailId,
       attachmentId,
-      userId
+      userId,
+      leadId,
+      fileUrl: fileUrl ? "Provided" : "Not provided",
+      fileData: fileData ? "Provided" : "Not provided"
     });
     
-    if (!emailId || !attachmentId) {
+    if ((!emailId || !attachmentId) && !fileUrl && !fileData) {
       console.log('❌ ERROR: Missing required parameters');
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'Missing required parameters. Please provide emailId and attachmentId.',
+          error: 'Missing required parameters. Please provide emailId and attachmentId, or fileUrl, or fileData.',
           code: 'MISSING_PARAMS'
         }),
         { 
@@ -67,251 +69,250 @@ serve(async (req) => {
         }
       );
     }
-    
-    console.log(`🔍 Processing attachment ${attachmentId} from email ${emailId}`);
 
-    // Get the user's Google email connection
-    let connectionQuery = supabaseAdmin
-      .from('user_email_connections')
-      .select('*')
-      .eq('provider', 'google');
-      
-    if (userId) {
-      console.log(`👤 Looking for email connection for user ${userId}`);
-      connectionQuery = connectionQuery.eq('user_id', userId);
-    } else {
-      console.log('⚠️ WARNING: No userId provided, using first available Google connection');
+    let pdfContent;
+    
+    // If fileData is provided (base64 encoded PDF)
+    if (fileData) {
+      console.log("💾 Using provided file data");
+      pdfContent = fileData;
     }
-    
-    const { data: connection, error: connectionError } = await connectionQuery.limit(1).single();
-
-    if (connectionError) {
-      console.error('❌ No Google email connection found:', connectionError);
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'No Google email connection found',
-          code: 'NO_EMAIL_CONNECTION',
-          details: 'Please connect your Google account in the Settings page',
-          supabaseError: connectionError
-        }),
-        { 
-          status: 404, 
-          headers: corsHeaders 
+    // If fileUrl is provided
+    else if (fileUrl) {
+      console.log(`🔍 Downloading PDF from provided URL: ${fileUrl}`);
+      try {
+        const fileResponse = await fetch(fileUrl);
+        if (!fileResponse.ok) {
+          console.error(`❌ Failed to download file: ${fileResponse.status} ${fileResponse.statusText}`);
+          throw new Error(`Failed to download file from URL: ${fileResponse.statusText}`);
         }
-      );
-    }
-
-    if (!connection) {
-      console.error('❌ No Google email connection found (connection is null)');
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'No Google email connection found',
-          code: 'NO_EMAIL_CONNECTION',
-          details: 'Please connect your Google account in the Settings page'
-        }),
-        { 
-          status: 404, 
-          headers: corsHeaders 
+        
+        const contentType = fileResponse.headers.get('content-type');
+        if (contentType && contentType.includes('application/pdf')) {
+          const arrayBuffer = await fileResponse.arrayBuffer();
+          // Convert to base64
+          pdfContent = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          console.log(`📄 PDF downloaded successfully (${arrayBuffer.byteLength} bytes)`);
+        } else {
+          console.error(`❌ Downloaded file is not a PDF: ${contentType}`);
+          throw new Error(`The provided URL does not point to a PDF file: ${contentType}`);
         }
-      );
-    }
-
-    // Refresh the token before proceeding
-    if (!connection.refresh_token) {
-      console.error("❌ No refresh token available for email connection");
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Email connection refresh token not available',
-          code: 'REFRESH_TOKEN_MISSING',
-          message: 'Please reconnect your Gmail account in the Settings page with the proper scopes'
-        }),
-        { 
-          status: 401, 
-          headers: corsHeaders 
-        }
-      );
-    }
-    
-    console.log("🔄 Refreshing Google access token...");
-    
-    // Refresh the token
-    const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: new URLSearchParams({
-        client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
-        client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
-        refresh_token: connection.refresh_token,
-        grant_type: 'refresh_token'
-      })
-    });
-    
-    if (!refreshResponse.ok) {
-      const refreshError = await refreshResponse.text();
-      console.error(`❌ Token refresh error (${refreshResponse.status}):`, refreshError);
-      
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Failed to refresh access token', 
-          details: refreshError,
-          code: 'TOKEN_REFRESH_FAILED',
-          message: 'Please reconnect your Gmail account in the Settings page'
-        }),
-        { 
-          status: 401, 
-          headers: corsHeaders 
-        }
-      );
-    }
-    
-    const refreshData = await refreshResponse.json();
-    console.log("✅ Access token refreshed successfully");
-    const accessToken = refreshData.access_token;
-    
-    // Update the stored token
-    console.log("💾 Updating stored token in database...");
-    const updateResult = await supabaseAdmin
-      .from('user_email_connections')
-      .update({ 
-        access_token: accessToken,
-        expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
-      })
-      .eq('id', connection.id);
-      
-    if (updateResult.error) {
-      console.warn("⚠️ Failed to update stored token, but continuing with attachment download:", updateResult.error);
-    } else {
-      console.log("✅ Token updated in database");
-    }
-
-    // Download the attachment
-    console.log(`📥 Downloading attachment from Gmail API: ${emailId}/${attachmentId}`);
-    const attachmentUrl = `https://www.googleapis.com/gmail/v1/users/me/messages/${emailId}/attachments/${attachmentId}`;
-    console.log(`🌐 Sending request to: ${attachmentUrl}`);
-    
-    const attachmentResponse = await fetch(attachmentUrl, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
+      } catch (error) {
+        console.error(`❌ Error downloading file from URL: ${error}`);
+        throw new Error(`Error downloading file from URL: ${error.message || error}`);
       }
-    });
-    
-    if (!attachmentResponse.ok) {
-      const errorText = await attachmentResponse.text();
-      console.error(`❌ Gmail API attachment error (${attachmentResponse.status}):`, errorText);
+    }
+    // Otherwise, get from email
+    else {
+      console.log(`🔍 Processing attachment ${attachmentId} from email ${emailId}`);
+
+      // Get the user's Google email connection
+      let connectionQuery = supabaseAdmin
+        .from('user_email_connections')
+        .select('*')
+        .eq('provider', 'google');
+        
+      if (userId) {
+        console.log(`👤 Looking for email connection for user ${userId}`);
+        connectionQuery = connectionQuery.eq('user_id', userId);
+      } else {
+        console.log('⚠️ WARNING: No userId provided, using first available Google connection');
+      }
       
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: `Gmail API attachment error (${attachmentResponse.status})`, 
-          details: errorText,
-          code: 'GMAIL_API_ERROR',
-          requestUrl: attachmentUrl
-        }),
-        { 
-          status: 502, 
-          headers: corsHeaders 
+      const { data: connection, error: connectionError } = await connectionQuery.limit(1).single();
+
+      if (connectionError) {
+        console.error('❌ No Google email connection found:', connectionError);
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'No Google email connection found',
+            code: 'NO_EMAIL_CONNECTION',
+            details: 'Please connect your Google account in the Settings page',
+            supabaseError: connectionError
+          }),
+          { 
+            status: 404, 
+            headers: corsHeaders 
+          }
+        );
+      }
+
+      if (!connection) {
+        console.error('❌ No Google email connection found (connection is null)');
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'No Google email connection found',
+            code: 'NO_EMAIL_CONNECTION',
+            details: 'Please connect your Google account in the Settings page'
+          }),
+          { 
+            status: 404, 
+            headers: corsHeaders 
+          }
+        );
+      }
+
+      // Refresh the token before proceeding
+      if (!connection.refresh_token) {
+        console.error("❌ No refresh token available for email connection");
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Email connection refresh token not available',
+            code: 'REFRESH_TOKEN_MISSING',
+            message: 'Please reconnect your Gmail account in the Settings page with the proper scopes'
+          }),
+          { 
+            status: 401, 
+            headers: corsHeaders 
+          }
+        );
+      }
+      
+      console.log("🔄 Refreshing Google access token...");
+      
+      // Refresh the token
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: new URLSearchParams({
+          client_id: Deno.env.get('GOOGLE_CLIENT_ID') || '',
+          client_secret: Deno.env.get('GOOGLE_CLIENT_SECRET') || '',
+          refresh_token: connection.refresh_token,
+          grant_type: 'refresh_token'
+        })
+      });
+      
+      if (!refreshResponse.ok) {
+        const refreshError = await refreshResponse.text();
+        console.error(`❌ Token refresh error (${refreshResponse.status}):`, refreshError);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Failed to refresh access token', 
+            details: refreshError,
+            code: 'TOKEN_REFRESH_FAILED',
+            message: 'Please reconnect your Gmail account in the Settings page'
+          }),
+          { 
+            status: 401, 
+            headers: corsHeaders 
+          }
+        );
+      }
+      
+      const refreshData = await refreshResponse.json();
+      console.log("✅ Access token refreshed successfully");
+      const accessToken = refreshData.access_token;
+      
+      // Update the stored token
+      console.log("💾 Updating stored token in database...");
+      const updateResult = await supabaseAdmin
+        .from('user_email_connections')
+        .update({ 
+          access_token: accessToken,
+          expires_at: new Date(Date.now() + refreshData.expires_in * 1000).toISOString()
+        })
+        .eq('id', connection.id);
+        
+      if (updateResult.error) {
+        console.warn("⚠️ Failed to update stored token, but continuing with attachment download:", updateResult.error);
+      } else {
+        console.log("✅ Token updated in database");
+      }
+
+      // Download the attachment
+      console.log(`📥 Downloading attachment from Gmail API: ${emailId}/${attachmentId}`);
+      const attachmentUrl = `https://www.googleapis.com/gmail/v1/users/me/messages/${emailId}/attachments/${attachmentId}`;
+      console.log(`🌐 Sending request to: ${attachmentUrl}`);
+      
+      const attachmentResponse = await fetch(attachmentUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
         }
-      );
+      });
+      
+      if (!attachmentResponse.ok) {
+        const errorText = await attachmentResponse.text();
+        console.error(`❌ Gmail API attachment error (${attachmentResponse.status}):`, errorText);
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: `Gmail API attachment error (${attachmentResponse.status})`, 
+            details: errorText,
+            code: 'GMAIL_API_ERROR',
+            requestUrl: attachmentUrl
+          }),
+          { 
+            status: 502, 
+            headers: corsHeaders 
+          }
+        );
+      }
+      
+      const attachmentData = await attachmentResponse.json();
+      console.log(`✅ Attachment data received: ${attachmentData.size} bytes`);
+      
+      if (!attachmentData.data) {
+        console.error('❌ Attachment data is empty or missing');
+        return new Response(
+          JSON.stringify({ 
+            success: false,
+            error: 'Attachment data not found', 
+            code: 'ATTACHMENT_EMPTY'
+          }),
+          { 
+            status: 404, 
+            headers: corsHeaders 
+          }
+        );
+      }
+      
+      // Use the actual attachment data
+      pdfContent = attachmentData.data;
     }
-    
-    const attachmentData = await attachmentResponse.json();
-    console.log(`✅ Attachment data received: ${attachmentData.size} bytes`);
-    
-    if (!attachmentData.data) {
-      console.error('❌ Attachment data is empty or missing');
-      return new Response(
-        JSON.stringify({ 
-          success: false,
-          error: 'Attachment data not found', 
-          code: 'ATTACHMENT_EMPTY'
-        }),
-        { 
-          status: 404, 
-          headers: corsHeaders 
-        }
-      );
-    }
 
-    // Instead of sending the raw PDF data, we'll create a simplified prompt with examples
-    // of mortgage approval conditions to guide the AI response
-    console.log("🤖 Creating a mock mortgage approval document for OpenAI parsing");
-
-    // Sample mortgage approval conditions to help OpenAI generate a response in the correct format
-    const mockMortgageConditions = `
-SAMPLE MORTGAGE APPROVAL WITH CONDITIONS
-
-Loan Number: ${Math.floor(1000000000 + Math.random() * 9000000000)}
-Borrower: Larkin
-Property Address: 123 Main Street
-
-MASTER CONDITIONS:
-1. Borrower must provide proof of homeowners insurance prior to closing
-2. Verification of employment within 10 days of closing
-3. Final inspection required for property
-
-GENERAL CONDITIONS:
-1. Signed IRS Form 4506-T
-2. Most recent bank statements showing sufficient funds to close
-3. Explanation letter for recent large deposits
-4. Verification of rent payment history
-
-PRIOR TO FINAL CONDITIONS:
-1. Clear title search with no outstanding liens
-2. Completed flood certification
-3. Appraisal showing property value of at least purchase price
-4. Final verification of employment
-
-COMPLIANCE CONDITIONS:
-1. Signed initial disclosure documents
-2. Signed intent to proceed
-3. Acknowledge receipt of closing disclosure
-4. Complete required homebuyer education course
-`;
-    
-    console.log("🔄 Preparing OpenAI API request with sample document...");
+    // Now send the actual PDF to OpenAI for analysis
+    console.log("🤖 Preparing OpenAI API request with PDF content...");
     
     const openaiPrompt = `
-    I'll be providing you with information from a mortgage approval document. Please extract all conditions from this document and format them as follows:
+    I'll be providing you with a PDF document containing a mortgage approval letter with conditions. Please extract all conditions from this document and format them as follows:
     
     1. Extract all conditions mentioned in the document
     2. Categorize them as:
-       - Master Conditions
-       - General Conditions
-       - Prior to Final Conditions
-       - Compliance Conditions
+       - masterConditions - Critical conditions that must be met
+       - generalConditions - Standard conditions that apply to most loans
+       - priorToFinalConditions - Conditions that must be satisfied before final approval
+       - complianceConditions - Regulatory and legal compliance requirements
     
     For each condition, provide:
-    - Description: The full text of the condition
-    - Status: "pending" (default value)
-    - Category: Which category it belongs to
+    - id: A unique identifier (e.g., "MC001" for master conditions, "GC001" for general conditions, etc.)
+    - text: The full text of the condition exactly as written in the document
+    - status: Default to "no_action" for all conditions
+    - category: Which category it belongs to
+    - originalText: The complete original text as well
     
     Return the data as a JSON object with this structure:
     {
       "masterConditions": [
-        { "description": "condition text", "status": "pending" }
+        { "id": "MC001", "text": "condition text", "status": "no_action", "category": "masterConditions", "originalText": "condition text" }
       ],
       "generalConditions": [
-        { "description": "condition text", "status": "pending" }
+        { "id": "GC001", "text": "condition text", "status": "no_action", "category": "generalConditions", "originalText": "condition text" }
       ],
       "priorToFinalConditions": [
-        { "description": "condition text", "status": "pending" }
+        { "id": "PF001", "text": "condition text", "status": "no_action", "category": "priorToFinalConditions", "originalText": "condition text" }
       ],
       "complianceConditions": [
-        { "description": "condition text", "status": "pending" }
+        { "id": "CC001", "text": "condition text", "status": "no_action", "category": "complianceConditions", "originalText": "condition text" }
       ]
     }
-    
-    Here's the document content to parse (this is a sample since we can't extract the actual text from the PDF):
-    
-    ${mockMortgageConditions}
-    
-    Only respond with the JSON. Do not include any explanations, markdown formatting, or code blocks.
     `;
     
     const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -321,7 +322,7 @@ COMPLIANCE CONDITIONS:
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-4-vision-preview',
         messages: [
           {
             role: 'system',
@@ -329,7 +330,19 @@ COMPLIANCE CONDITIONS:
           },
           {
             role: 'user',
-            content: openaiPrompt
+            content: [
+              {
+                type: 'text',
+                text: openaiPrompt
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:application/pdf;base64,${pdfContent}`,
+                  detail: 'high'
+                }
+              }
+            ]
           }
         ],
         temperature: 0.1,
@@ -395,6 +408,27 @@ COMPLIANCE CONDITIONS:
         console.log(`- Prior to Final Conditions: ${conditions.priorToFinalConditions?.length || 0}`);
         console.log(`- Compliance Conditions: ${conditions.complianceConditions?.length || 0}`);
       }
+      
+      // If we have a leadId, save the results to the database
+      if (leadId) {
+        console.log(`💾 Saving conditions to database for lead ID ${leadId}`);
+        const { data, error } = await supabaseAdmin
+          .from('loan_conditions')
+          .upsert({
+            lead_id: leadId,
+            conditions_data: conditions,
+            updated_at: new Date().toISOString()
+          }, {
+            onConflict: 'lead_id'
+          });
+          
+        if (error) {
+          console.error("❌ Error saving conditions to database:", error);
+        } else {
+          console.log("✅ Conditions saved successfully to database");
+        }
+      }
+      
     } catch (error) {
       console.error("❌ Error parsing OpenAI response:", error);
       console.error("Raw OpenAI response:", parsedContent);
