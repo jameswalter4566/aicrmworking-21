@@ -1,4 +1,3 @@
-
 /**
  * Letter of Explanation (LOE) templates and utility functions
  * Used for generating structured content for different types of LOEs
@@ -71,7 +70,12 @@ export function determineLOEType(conditionText: string): LOEType {
 export interface LOEParams {
   borrowerName: string;
   propertyAddress?: string;
-  conditionText?: string;
+  phoneNumber?: string;
+  email?: string;
+  accountNumber?: string;
+  goodHistoryStartDate?: string;
+  creditInquirySource?: string;
+  creditInquiryDate?: string;
   // Type-specific parameters
   creditInquiryReason?: string;
   depositAmount?: number;
@@ -97,56 +101,59 @@ export function generateLOEContent(loeType: LOEType, params: LOEParams): string 
     month: 'long',
     day: 'numeric'
   });
-  
-  // Header
+
+  // Professional header format
   let content = `${currentDate}\n\n`;
+  content += `RE: ${params.borrowerName}'s Mortgage Loan Application\n\n`;
   content += `To: Loan Underwriter\n`;
   content += `Subject: Letter of Explanation - ${formatLOETypeTitle(loeType)}\n\n`;
   content += `Dear Underwriter,\n\n`;
-  
-  // Type-specific content
+
+  // Type-specific content with enhanced detail
   switch (loeType) {
     case LOEType.CREDIT_INQUIRY:
       content += getCreditInquiryContent(params);
       break;
-      
     case LOEType.LARGE_DEPOSIT:
       content += getLargeDepositContent(params);
       break;
-      
     case LOEType.EMPLOYMENT_GAP:
       content += getEmploymentGapContent(params);
       break;
-      
     case LOEType.LATE_PAYMENT:
       content += getLatePaymentContent(params);
       break;
-      
     case LOEType.ADDRESS_DISCREPANCY:
       content += getAddressDiscrepancyContent(params);
       break;
-      
     case LOEType.NAME_VARIATION:
       content += getNameVariationContent(params);
       break;
-      
     default:
       content += getGeneralExplanationContent(params);
   }
-  
-  // Closing
-  content += `\n\nPlease let me know if you require any additional information or documentation to support this explanation.\n\n`;
+
+  // Professional closing with contact information
+  content += `\n\nI understand the importance of this explanation in the mortgage approval process. `;
+  content += `All information provided is accurate and complete to the best of my knowledge. `;
+  content += `Please let me know if you require any additional documentation to support this explanation.\n\n`;
   content += `Sincerely,\n\n\n`;
   content += `${params.borrowerName}\n`;
-  
+  content += `${params.propertyAddress || ''}\n`;
+  if (params.phoneNumber) content += `${params.phoneNumber}\n`;
+  if (params.email) content += `${params.email}\n`;
+  content += `Date: ${currentDate}`;
+
   return content;
 }
 
 function getCreditInquiryContent(params: LOEParams): string {
-  return `I am writing to explain the recent credit inquiries on my credit report. ` +
-    `These inquiries were made as part of my research to find the best rates for ${params.creditInquiryReason || 'my financial needs'}. ` +
-    `I ultimately decided to proceed with only one of these options and did not open multiple new accounts. ` +
-    `Please be assured that I have not taken on any additional debt that is not reflected in my credit report.`;
+  return `I am writing to address the credit inquiries that appear on my credit report from ${params.creditInquiryDate || 'recent months'}. ` +
+    `Specifically, the inquiry from ${params.creditInquirySource || 'the listed financial institution'} on ${params.creditInquiryDate || 'the date in question'}. ` +
+    `\n\nThis inquiry was made as part of my research to find the best rates for ${params.creditInquiryReason || 'my financial needs'}. ` +
+    `I want to confirm that I have not opened any new accounts or taken on any additional debt as a result of these inquiries. ` +
+    `This was solely for rate shopping purposes, and no new credit accounts were established.\n\n` +
+    `My credit report accurately reflects all my current credit obligations, and there are no pending or additional debts not shown.`;
 }
 
 function getLargeDepositContent(params: LOEParams): string {
@@ -171,17 +178,21 @@ function getEmploymentGapContent(params: LOEParams): string {
 
 function getLatePaymentContent(params: LOEParams): string {
   const accountInfo = params.latePaymentAccount ? 
-    `on my ${params.latePaymentAccount}` :
-    'on an account';
-  
+    `on my ${params.latePaymentAccount} (Account #${params.accountNumber || 'as referenced'})` :
+    'on the referenced account';
+
   const dateInfo = params.latePaymentDate ? 
-    `that occurred on ${params.latePaymentDate}` :
-    'in my credit history';
-  
-  return `I am writing to explain the late payment ${accountInfo} ${dateInfo}. ` +
-    `This late payment was due to ${params.latePaymentReason || 'an unusual circumstance'} and does not reflect my typical financial behavior. ` +
-    `I have maintained a good payment history before and after this isolated incident, ` +
-    `and have taken steps to ensure this situation will not occur again.`;
+    `during ${params.latePaymentDate}` :
+    'during the period in question';
+
+  return `I am writing to explain the late payment(s) ${accountInfo} ${dateInfo}. ` +
+    `\n\nThe late payment occurred because ${params.latePaymentReason || 'of specific circumstances that have since been resolved'}. ` +
+    `To prevent this situation from recurring, I have taken the following steps:\n` +
+    `- Set up automatic payments\n` +
+    `- Created payment reminders\n` +
+    `- Established an emergency fund\n\n` +
+    `Since this incident, I have maintained a perfect payment history, as evidenced by my account statements from ` +
+    `${params.goodHistoryStartDate || 'the subsequent months'} to present. I am committed to maintaining timely payments on all my obligations.`;
 }
 
 function getAddressDiscrepancyContent(params: LOEParams): string {
