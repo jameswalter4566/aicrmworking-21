@@ -1,13 +1,18 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ArrowRight, Shield, Clock, FileCheck, PieChart } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { getPortalAccess } from '@/utils/clientPortalUtils';
+import { toast } from '@/components/ui/use-toast';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const [isValidating, setIsValidating] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
   
   // Extract slug from the URL if present
   const getPortalSlug = () => {
@@ -19,10 +24,51 @@ const ClientPortalLanding = () => {
   };
   
   const slug = getPortalSlug();
+  const token = searchParams.get('token');
   
-  const handleEnterPortal = () => {
+  // Check if token is in URL params and store it
+  useEffect(() => {
+    if (token) {
+      setAccessToken(token);
+    }
+  }, [token]);
+  
+  const handleEnterPortal = async () => {
     if (slug) {
-      navigate(`/client-portal/dashboard/${slug}`);
+      // If we have both slug and token, validate access
+      if (accessToken) {
+        setIsValidating(true);
+        
+        try {
+          const { access, error } = await getPortalAccess(slug, accessToken);
+          
+          if (access) {
+            // Valid access, navigate to dashboard with token
+            navigate(`/client-portal/dashboard/${slug}?token=${accessToken}`);
+          } else {
+            // Invalid access
+            toast({
+              title: "Access Error",
+              description: error || "Invalid access credentials",
+              variant: "destructive"
+            });
+            
+            // Navigate to general dashboard without specific access
+            navigate('/client-portal/dashboard');
+          }
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Could not validate portal access",
+            variant: "destructive"
+          });
+        } finally {
+          setIsValidating(false);
+        }
+      } else {
+        // No token but we have slug, go to dashboard input page
+        navigate(`/client-portal/dashboard/${slug}`);
+      }
     } else {
       // If no slug is found, go to login page where they can enter credentials
       navigate('/client-portal/dashboard');
@@ -47,8 +93,9 @@ const ClientPortalLanding = () => {
               size="lg"
               onClick={handleEnterPortal}
               className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              disabled={isValidating}
             >
-              Access Your Portal 
+              {isValidating ? 'Validating Access...' : 'Access Your Portal'}
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
             <p className="mt-4 text-sm text-gray-200 flex items-center">
@@ -113,8 +160,9 @@ const ClientPortalLanding = () => {
             size="lg"
             onClick={handleEnterPortal}
             className="bg-emerald-500 hover:bg-emerald-600 text-white"
+            disabled={isValidating}
           >
-            Enter Portal 
+            {isValidating ? 'Validating Access...' : 'Enter Portal'}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </div>

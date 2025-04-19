@@ -38,8 +38,12 @@ export const generateClientPortal = async (leadId: number, createdBy?: string): 
       return { url: '', portal: null, error: error.message };
     }
     
-    // Change here - Redirect to landing page with the slug instead of directly to the portal
-    const fullPortalUrl = `https://mortgagesalespro.com/client-portal/${data.url.split('/client-portal/')[1] || ''}`;
+    // Modified URL generation - direct to landing page first with slug parameter
+    // This preserves the portal slug but removes the token from the URL
+    const slug = data.url.split('/client-portal/')[1]?.split('?')[0] || '';
+    
+    // Construct the URL to the landing page first
+    const fullPortalUrl = `https://mortgagesalespro.com/client-portal/${slug}`;
     
     // Return the portal URL and data
     return {

@@ -89,7 +89,7 @@ serve(async (req) => {
           .eq('id', existingPortal.id)
       }
       
-      // Return the existing portal info
+      // Return the existing portal info - modified to be consistent with new URL format
       return new Response(
         JSON.stringify({ 
           portal: existingPortal,
