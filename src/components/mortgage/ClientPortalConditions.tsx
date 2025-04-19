@@ -62,9 +62,9 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
     try {
       console.log("File uploaded:", file.name);
       
-      toast({
-        title: "Document uploaded successfully",
-        description: `${file.name} has been uploaded and will be reviewed.`,
+      // Using the correct toast API format
+      toast.success("Document uploaded successfully", {
+        description: `${file.name} has been uploaded and will be reviewed.`
       });
       
       setTimeout(refreshData, 1000);

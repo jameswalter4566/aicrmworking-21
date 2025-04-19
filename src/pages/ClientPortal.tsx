@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -269,18 +268,15 @@ const ConditionsTab = ({ clientData, refreshData }: { clientData: ClientData, re
     try {
       console.log("File uploaded:", file.name);
       
-      toast({
-        title: "Document uploaded successfully",
-        description: `${file.name} has been uploaded and will be reviewed.`,
+      toast.success("Document uploaded successfully", {
+        description: `${file.name} has been uploaded and will be reviewed.`
       });
       
       setTimeout(refreshData, 1000);
     } catch (error) {
       console.error("Error uploading file:", error);
-      toast({
-        variant: "destructive",
-        title: "Upload failed",
-        description: "There was an error uploading your document. Please try again.",
+      toast.error("Upload failed", {
+        description: "There was an error uploading your document. Please try again."
       });
     }
   };
