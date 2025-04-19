@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Upload, FileText, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { ConditionItem } from "./ConditionItem";
 
 interface ClientPortalConditionsProps {
   leadId: string | number;
@@ -70,7 +71,6 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
     try {
       console.log("File uploaded:", file.name);
       
-      // Using the correct toast API format
       toast.success("Document uploaded successfully", {
         description: `${file.name} has been uploaded and will be reviewed.`
       });
@@ -91,46 +91,11 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
         {conditions?.length > 0 ? (
           <div className="space-y-2">
             {conditions.map((condition, index) => (
-              <div 
-                key={condition.id || index} 
-                className={`p-4 rounded-lg border flex items-start justify-between ${
-                  condition.status === 'completed' 
-                    ? 'bg-green-50 border-green-200' 
-                    : condition.status === 'urgent'
-                    ? 'bg-red-50 border-red-200' 
-                    : 'bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <div>
-                    {condition.status === 'completed' ? (
-                      <CheckCircle size={20} className="text-green-500" />
-                    ) : (
-                      <FileText size={20} className={condition.status === 'urgent' ? "text-red-500" : "text-gray-400"} />
-                    )}
-                  </div>
-                  <div>
-                    <h4 className={`font-medium ${
-                      condition.status === 'completed' 
-                        ? 'line-through text-green-800' 
-                        : condition.status === 'urgent' 
-                        ? 'text-red-800' 
-                        : 'text-gray-800'
-                    }`}>
-                      {condition.text}
-                    </h4>
-                    {condition.status === 'urgent' && (
-                      <Badge className="mt-1 bg-red-500">Urgent</Badge>
-                    )}
-                  </div>
-                </div>
-                
-                {condition.status !== 'completed' && (
-                  <Button size="sm" className="bg-mortgage-purple hover:bg-mortgage-darkPurple">
-                    <Upload size={16} className="mr-1" /> Upload
-                  </Button>
-                )}
-              </div>
+              <ConditionItem 
+                key={condition.id || index}
+                condition={condition}
+                leadId={leadId}
+              />
             ))}
           </div>
         ) : (

@@ -95,7 +95,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
     return true;
   };
 
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
@@ -109,6 +109,11 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
       
       if (validateFile(droppedFile)) {
         setFile(droppedFile);
+        setIsProcessing(true);
+        setUploadProgress(0);
+        setProcessingStage('uploading');
+        updateStepStatus("upload", "processing");
+        
         if (onFileAccepted) {
           onFileAccepted(droppedFile);
         } else if (leadId) {
@@ -118,7 +123,7 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
     }
   };
 
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setGeneratedLoeUrl(null);
     
@@ -128,6 +133,11 @@ const PDFDropZone: React.FC<PDFDropZoneProps> = ({
     
     if (validateFile(selectedFile)) {
       setFile(selectedFile);
+      setIsProcessing(true);
+      setUploadProgress(0);
+      setProcessingStage('uploading');
+      updateStepStatus("upload", "processing");
+      
       if (onFileAccepted) {
         onFileAccepted(selectedFile);
       } else if (leadId) {

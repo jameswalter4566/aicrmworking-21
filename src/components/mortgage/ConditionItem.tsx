@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Check, Loader2, Download, SendToBack, FileSignature, FileCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -109,11 +108,11 @@ export const ConditionItem: React.FC<{ condition: LoanCondition; leadId?: string
             <Button 
               variant="outline" 
               size="sm" 
-              className="h-7 px-2 text-xs"
+              className="h-7 px-2 text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
               onClick={() => handleDownload(condition.documentUrl!)}
             >
               <Download className="h-3 w-3 mr-1" />
-              Download LOE
+              Download LOE Template
             </Button>
           )}
           
