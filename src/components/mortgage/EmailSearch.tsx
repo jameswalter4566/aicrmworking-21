@@ -1,5 +1,4 @@
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Mail, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -29,7 +28,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
     { id: "analyze", label: "Analyzing approval letter", status: "pending" },
     { id: "extract", label: "Extracting conditions", status: "pending" }
   ]);
-  
+
   const updateStepStatus = (stepId: string, status: "pending" | "processing" | "completed") => {
     setProcessingSteps(steps =>
       steps.map(step =>
@@ -37,6 +36,38 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
       )
     );
   };
+
+  useEffect(() => {
+    const checkEmails = async () => {
+      try {
+        updateStepStatus("search", "processing");
+        
+        const { data, error } = await supabase.functions.invoke('check-approval-emails', {
+          body: { leadId }
+        });
+
+        if (error) {
+          console.error("Error checking emails:", error);
+          return;
+        }
+
+        if (data.success && data.results?.length > 0) {
+          updateStepStatus("search", "completed");
+          updateStepStatus("analyze", "completed");
+          updateStepStatus("extract", "completed");
+          toast.success("Found and processed new approval letter");
+        }
+      } catch (error) {
+        console.error("Error in automatic email check:", error);
+      }
+    };
+
+    checkEmails();
+
+    const interval = setInterval(checkEmails, 5 * 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [leadId]);
 
   const handleSearch = async () => {
     if (!clientLastName) {

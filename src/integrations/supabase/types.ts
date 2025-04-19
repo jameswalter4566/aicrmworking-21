@@ -856,6 +856,33 @@ export type Database = {
         }
         Relationships: []
       }
+      processed_gmail_attachments: {
+        Row: {
+          attachment_id: string
+          email_id: string
+          id: string
+          lead_id: string
+          processed_at: string | null
+          success: boolean | null
+        }
+        Insert: {
+          attachment_id: string
+          email_id: string
+          id?: string
+          lead_id: string
+          processed_at?: string | null
+          success?: boolean | null
+        }
+        Update: {
+          attachment_id?: string
+          email_id?: string
+          id?: string
+          lead_id?: string
+          processed_at?: string | null
+          success?: boolean | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           company: string | null
