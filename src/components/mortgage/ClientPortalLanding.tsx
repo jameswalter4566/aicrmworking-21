@@ -2,9 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ArrowRight, Shield, Clock, FileCheck, PieChart } from 'lucide-react';
+import { ArrowRight, Shield, Clock, FileCheck, PieChart, Loader2 } from 'lucide-react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
-import { getPortalAccess } from '@/utils/clientPortalUtils';
+import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
 import { toast } from '@/components/ui/use-toast';
 
 const ClientPortalLanding = () => {
@@ -13,6 +13,7 @@ const ClientPortalLanding = () => {
   const [searchParams] = useSearchParams();
   const [isValidating, setIsValidating] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Extract slug from the URL if present
   const getPortalSlug = () => {
@@ -31,7 +32,34 @@ const ClientPortalLanding = () => {
     if (token) {
       setAccessToken(token);
     }
+    setIsLoading(false);
   }, [token]);
+  
+  // Validate token when landing page loads if we have both a slug and token
+  useEffect(() => {
+    const validateToken = async () => {
+      if (slug && token && !isValidating && !isLoading) {
+        // Auto-validate the token on page load, but don't auto-redirect
+        try {
+          const { access } = await getPortalAccess(slug, token);
+          
+          if (access) {
+            // Token is valid, but we don't auto-redirect - user must click the button
+            console.log("Token validated successfully");
+            
+            // Update last accessed timestamp
+            if (access.id) {
+              await updateLastAccessed(access.id);
+            }
+          }
+        } catch (error) {
+          console.error("Token validation error:", error);
+        }
+      }
+    };
+    
+    validateToken();
+  }, [slug, token, isLoading]);
   
   const handleEnterPortal = async () => {
     if (slug) {
@@ -74,6 +102,17 @@ const ClientPortalLanding = () => {
       navigate('/client-portal/dashboard');
     }
   };
+  
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 size={48} className="animate-spin text-emerald-500 mb-4" />
+          <p className="text-lg">Loading your portal access...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen">

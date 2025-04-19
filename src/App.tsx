@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -280,10 +279,11 @@ function App() {
                 <Route path="/calling-list/:id" element={<CallingListViewer />} />
                 
                 {/* Update client portal routes to show landing by default */}
+                <Route path="/client-portal-landing" element={<ClientPortalLanding />} />
                 <Route path="/client-portal" element={<ClientPortalLanding />} />
                 <Route path="/client-portal/dashboard/:slug" element={<ClientPortal />} />
                 <Route path="/client-portal/dashboard" element={<ClientPortal />} />
-                <Route path="/client-portal/:slug" element={<ClientPortal />} />
+                <Route path="/client-portal/:slug" element={<ClientPortalLanding />} />
                 
                 <Route path="/dialer" element={<Dialer />} />
                 <Route path="/dialer-session" element={<DialerSession />} />
