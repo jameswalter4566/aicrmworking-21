@@ -35,12 +35,8 @@ const PrePipelineMessage = ({ title, description }: { title: string; description
         <h3 className="text-xl font-semibold" style={{ color: settings.primary_color }}>{title}</h3>
         <p className="text-gray-600">{description}</p>
         <Button 
-          style={{ 
-            backgroundColor: settings.primary_color,
-            '&:hover': {
-              backgroundColor: settings.secondary_color,
-            }
-          }}>
+          className="hover:bg-opacity-90" 
+          style={{ backgroundColor: settings.primary_color }}>
           <Upload className="mr-2 h-4 w-4" />
           Start Your Application
         </Button>
@@ -122,25 +118,15 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Button 
-                className="w-full"
-                style={{ 
-                  backgroundColor: settings.primary_color,
-                  '&:hover': {
-                    backgroundColor: settings.secondary_color,
-                  }
-                }}
+                className="w-full hover:bg-opacity-90" 
+                style={{ backgroundColor: settings.primary_color }}
               >
                 <Upload className="mr-2 h-4 w-4" />
                 Upload Documents
               </Button>
               <Button 
-                className="w-full"
-                style={{ 
-                  backgroundColor: settings.secondary_color,
-                  '&:hover': {
-                    backgroundColor: settings.primary_color,
-                  }
-                }}
+                className="w-full hover:bg-opacity-90" 
+                style={{ backgroundColor: settings.secondary_color }}
               >
                 <Calculator className="mr-2 h-4 w-4" />
                 Payment Calculator
