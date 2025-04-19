@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,8 +8,8 @@ import { CheckCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 import MainLayout from "@/components/layouts/MainLayout";
-import ProcessorSidebar from "@/components/layouts/ProcessorSidebar";
-import ConditionItem from "@/components/mortgage/ConditionItem";
+import ProcessorSidebar from "@/components/mortgage/ProcessorSidebar";
+import { ConditionItem } from "@/components/mortgage/ConditionItem";
 import EmailSearch from "@/components/mortgage/EmailSearch";
 
 interface ConditionType {
