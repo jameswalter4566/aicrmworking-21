@@ -43,6 +43,8 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
     updateStepStatus("search", "processing");
     
     try {
+      console.log("Starting email search with parameters:", { clientLastName, loanNumber });
+      
       // Search for approval emails
       const { data: searchData, error: searchError } = await supabase.functions.invoke('search-approval-emails', {
         body: { 
@@ -52,7 +54,10 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
         }
       });
       
+      console.log("Search response:", searchData, searchError);
+      
       if (searchError) {
+        console.error("Error searching emails:", searchError);
         throw new Error(`Error searching emails: ${searchError.message}`);
       }
       
@@ -78,6 +83,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
       updateStepStatus("analyze", "processing");
       
       const pdfAttachment = emailWithPDF.attachments.find(att => att.mimeType === "application/pdf");
+      console.log("Found PDF attachment:", pdfAttachment);
       
       // Parse the PDF attachment
       const { data: parseData, error: parseError } = await supabase.functions.invoke('parse-approval-document', {
@@ -88,8 +94,11 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
       });
       
       if (parseError) {
+        console.error("Error parsing document:", parseError);
         throw new Error(`Error parsing document: ${parseError.message}`);
       }
+      
+      console.log("Parse response:", parseData);
       
       updateStepStatus("analyze", "completed");
       updateStepStatus("extract", "processing");
@@ -104,6 +113,7 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
         });
         
         if (saveError) {
+          console.error("Error saving conditions:", saveError);
           throw new Error(`Error saving conditions: ${saveError.message}`);
         }
         
@@ -134,9 +144,11 @@ const EmailSearch: React.FC<EmailSearchProps> = ({
         
         updateStepStatus("extract", "completed");
         toast.success("Successfully extracted conditions from approval email");
+      } else {
+        throw new Error("Failed to parse conditions from the document");
       }
     } catch (error: any) {
-      console.error('Error:', error);
+      console.error('Error during email search process:', error);
       toast.error(error.message || "An error occurred while processing the approval letter");
     } finally {
       setIsSearching(false);
