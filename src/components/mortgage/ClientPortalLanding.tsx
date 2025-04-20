@@ -225,8 +225,19 @@ const ClientPortalLanding = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-24">
+            <div className="text-center mb-16 lg:col-span-12">
+              <h2 className="text-4xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Experience the Future of Mortgage Lending
+              </h2>
+              <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+                Our AI-powered platform revolutionizes the mortgage process, making it faster, 
+                smarter, and more convenient than traditional lenders. Get personalized service 
+                24/7 with cutting-edge technology working for you.
+              </p>
+            </div>
+
             <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-12 shadow-lg">
-              <div className="space-y-6">
+              <div className="grid md:grid-cols-1 gap-6">
                 <InfoCard 
                   title="24/7 Support, Even on Weekends"
                   description="Text, call, or email your loan advisor 7 days a week. Day or night, on your schedule and receive an instant response."
@@ -235,15 +246,14 @@ const ClientPortalLanding = () => {
                   title="AI-Powered Rate Shopping"
                   description="We use AI to analyze the top mortgage lenders in the nation to ensure we are shopping for the best possible rate and closing costs."
                 />
-                <InfoCard 
-                  title="Stress-Free Mortgage Process"
-                  description="No more stress involved in the mortgage process! No more dealing with a loan officer - our AI agent does all of the work for you!"
-                />
               </div>
             </div>
 
-            <div className="lg:col-span-4 bg-white rounded-3xl min-h-[700px] shadow-lg">
-              {/* Image placeholder - will be added later */}
+            <div className="lg:col-span-4 bg-[#F1F0FB] rounded-3xl p-12 shadow-lg">
+              <InfoCard 
+                title="Stress-Free Mortgage Process"
+                description="No more stress involved in the mortgage process! No more dealing with a loan officer - our AI agent does all of the work for you!"
+              />
             </div>
           </div>
         </div>
