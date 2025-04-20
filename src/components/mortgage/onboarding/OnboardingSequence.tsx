@@ -12,16 +12,22 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingSequenceProps {
   leadId: string | number;
-  onComplete: () => void;
+  initialData?: Partial<LeadProfile>;
+  onComplete: (onboardingData: any) => void;
 }
 
-export const OnboardingSequence = ({ leadId, onComplete }: OnboardingSequenceProps) => {
+export const OnboardingSequence = ({ leadId, initialData, onComplete }: OnboardingSequenceProps) => {
   const [currentStep, setCurrentStep] = useState(0);
-  const [leadData, setLeadData] = useState<Partial<LeadProfile>>({});
+  const [leadData, setLeadData] = useState<Partial<LeadProfile>>(initialData || {});
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const fetchLeadData = async () => {
+      if (initialData) {
+        setLeadData(initialData);
+        return;
+      }
+      
       try {
         const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
         const { data: { success, data }, error } = await supabase.functions.invoke('lead-profile', {
@@ -37,7 +43,7 @@ export const OnboardingSequence = ({ leadId, onComplete }: OnboardingSequencePro
     };
 
     fetchLeadData();
-  }, [leadId]);
+  }, [leadId, initialData]);
 
   const handleStepSave = async (stepData: Partial<LeadProfile>) => {
     setIsLoading(true);
@@ -80,7 +86,8 @@ export const OnboardingSequence = ({ leadId, onComplete }: OnboardingSequencePro
   ];
 
   if (currentStep >= steps.length) {
-    onComplete();
+    // Pass the collected lead data when completing the onboarding
+    onComplete(leadData);
     return null;
   }
 
