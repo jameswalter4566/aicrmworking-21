@@ -6,6 +6,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import GlowingCard from '@/components/GlowingCard';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
@@ -189,38 +190,29 @@ const ClientPortalLanding = () => {
           <h2 className="text-3xl font-bold text-center mb-12 text-white">Everything You Need in One Place</h2>
           
           <div className="grid md:grid-cols-3 gap-8">
-            <Card className="p-6 bg-blue-800/30 border-blue-700/50 backdrop-blur-sm">
-              <div className="h-12 w-12 rounded-lg bg-blue-700/50 flex items-center justify-center mb-4">
-                <Shield className="h-6 w-6 text-blue-200" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-white">Secure Access</h3>
-              <p className="text-blue-200">
-                Bank-level security protects your sensitive information while providing 
-                easy access to your documents.
-              </p>
-            </Card>
+            <GlowingCard
+              title="Secure Access"
+              description="Bank-level security protects your sensitive information while providing easy access to your documents."
+              gradient="bg-purple-glow"
+              icon={<Shield className="h-6 w-6 text-blue-200" />}
+              delay="delay-1"
+            />
 
-            <Card className="p-6 bg-blue-800/30 border-blue-700/50 backdrop-blur-sm">
-              <div className="h-12 w-12 rounded-lg bg-blue-700/50 flex items-center justify-center mb-4">
-                <PieChart className="h-6 w-6 text-blue-200" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-white">Real-Time Updates</h3>
-              <p className="text-blue-200">
-                Track your loan's progress in real-time and get instant notifications 
-                about important milestones.
-              </p>
-            </Card>
+            <GlowingCard
+              title="Real-Time Updates"
+              description="Track your loan's progress in real-time and get instant notifications about important milestones."
+              gradient="bg-green-glow"
+              icon={<PieChart className="h-6 w-6 text-blue-200" />}
+              delay="delay-2"
+            />
 
-            <Card className="p-6 bg-blue-800/30 border-blue-700/50 backdrop-blur-sm">
-              <div className="h-12 w-12 rounded-lg bg-blue-700/50 flex items-center justify-center mb-4">
-                <FileCheck className="h-6 w-6 text-blue-200" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2 text-white">Document Management</h3>
-              <p className="text-blue-200">
-                Upload, sign, and manage all your loan documents in one centralized, 
-                easy-to-use platform.
-              </p>
-            </Card>
+            <GlowingCard
+              title="Document Management"
+              description="Upload, sign, and manage all your loan documents in one centralized, easy-to-use platform."
+              gradient="bg-blue-glow"
+              icon={<FileCheck className="h-6 w-6 text-blue-200" />}
+              delay="delay-3"
+            />
           </div>
         </div>
       </section>
