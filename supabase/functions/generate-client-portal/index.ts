@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { corsHeaders } from "../_shared/cors.ts"
@@ -124,7 +123,6 @@ serve(async (req) => {
           .eq('id', existingPortal.id);
       }
       
-      // Return the existing portal info
       return new Response(
         JSON.stringify({ 
           portal: existingPortal,
@@ -147,12 +145,12 @@ serve(async (req) => {
     console.log("Inserting new portal access record");
     const { data: newPortal, error: portalError } = await supabaseClient
       .from('client_portal_access')
-      .insert({
+      .insert([{
         lead_id: leadId,
         portal_slug: portalSlug,
         access_token: accessToken,
         created_by: createdBy || null
-      })
+      }])
       .select()
       .single();
 

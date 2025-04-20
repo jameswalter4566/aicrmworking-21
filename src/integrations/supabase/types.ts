@@ -73,6 +73,7 @@ export type Database = {
         Row: {
           access_token: string
           created_at: string | null
+          created_by: string | null
           id: string
           last_accessed_at: string | null
           lead_id: number | null
@@ -81,6 +82,7 @@ export type Database = {
         Insert: {
           access_token: string
           created_at?: string | null
+          created_by?: string | null
           id?: string
           last_accessed_at?: string | null
           lead_id?: number | null
@@ -89,6 +91,7 @@ export type Database = {
         Update: {
           access_token?: string
           created_at?: string | null
+          created_by?: string | null
           id?: string
           last_accessed_at?: string | null
           lead_id?: number | null
