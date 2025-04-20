@@ -100,6 +100,22 @@
   }
 }
 
+@keyframes button-glow {
+  0% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5),
+                0 0 10px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.8),
+                0 0 30px rgba(59, 130, 246, 0.6),
+                0 0 40px rgba(59, 130, 246, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(59, 130, 246, 0.5),
+                0 0 10px rgba(59, 130, 246, 0.3);
+  }
+}
+
 .metric-card {
   @apply bg-white rounded-2xl p-4 border border-gray-200 shadow-sm;
 }
@@ -202,4 +218,9 @@ table tbody tr:hover {
 
 .auth-container {
   animation: pulseGlow 3s infinite alternate;
+}
+
+.glow-button {
+  position: relative;
+  animation: button-glow 3s infinite;
 }

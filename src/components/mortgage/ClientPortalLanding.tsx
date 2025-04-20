@@ -169,7 +169,7 @@ const ClientPortalLanding = () => {
             <Button 
               size="lg"
               onClick={handleEnterPortal}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 text-xl rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] mb-32 md:mb-48 relative z-10"
+              className="glow-button bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 text-xl rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] mb-32 md:mb-48 relative z-10"
               disabled={isValidating}
             >
               {isValidating ? 'Validating Access...' : 'Access Your Portal'}
