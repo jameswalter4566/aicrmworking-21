@@ -18,6 +18,13 @@ const BurningStarUnderline = ({ width = 400 }: BurningStarUnderlineProps) => {
     // Force a repaint to ensure animation starts
     if (containerRef.current) {
       containerRef.current.classList.add('animate-start');
+      
+      // Fade out after animation completes
+      setTimeout(() => {
+        if (containerRef.current) {
+          containerRef.current.classList.add('fade-out');
+        }
+      }, 3500); // 3s for animation + 0.5s buffer
     }
   }, [width]);
 

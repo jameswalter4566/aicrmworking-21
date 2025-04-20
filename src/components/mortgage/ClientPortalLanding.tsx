@@ -164,7 +164,7 @@ const ClientPortalLanding = () => {
               {" "}loan officer
             </h1>
             <div className="relative mb-2">
-              <BurningStarUnderline width={380} />
+              <BurningStarUnderline width={600} />
             </div>
             <Button 
               size="lg"
