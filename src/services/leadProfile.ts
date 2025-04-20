@@ -32,6 +32,7 @@ export interface LeadProfile {
       monthlyHousingExpense?: string;
     };
     employment?: {
+      employmentStatus?: string;
       employerName?: string;
       employerAddress?: string;
       jobTitle?: string;
@@ -87,7 +88,11 @@ export interface LeadProfile {
       amortizationType?: string;
       interestRate?: string;
       mortgageInsurance?: string;
+      currentRate?: string;
+      currentPayment?: string;
     };
+    creditScore?: string;
+    onboardingCompleted?: boolean;
   };
   isMortgageLead?: boolean;
   addedToPipelineAt?: string;
