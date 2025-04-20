@@ -225,20 +225,20 @@ const ClientPortalLanding = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-24">
-            <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-12 shadow-lg">
-              <div className="mb-8 text-center">
-                <h2 className="text-3xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-16 shadow-xl min-h-[800px]">
+              <div className="mb-16 text-center">
+                <h2 className="text-5xl md:text-6xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
                   Revolutionizing Mortgage Lending with AI
                 </h2>
-                <p className="text-gray-600 mb-12">
+                <p className="text-gray-600 mb-16 text-xl max-w-4xl mx-auto leading-relaxed">
                   Experience a smarter way to get your mortgage. Our AI-powered platform 
                   eliminates the traditional hassles and delays, providing you with 
                   instant service and optimal rates.
                 </p>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="md:col-span-1 space-y-6">
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="md:col-span-1 space-y-8">
                   <InfoCard 
                     title="24/7 Support, Even on Weekends"
                     description="Text, call, or email your loan advisor 7 days a week. Day or night, on your schedule and receive an instant response."
@@ -248,7 +248,8 @@ const ClientPortalLanding = () => {
                     description="We use AI to analyze the top mortgage lenders in the nation to ensure we are shopping for the best possible rate and closing costs."
                   />
                 </div>
-                <div className="md:col-span-1">
+
+                <div className="md:col-span-1 mt-24">
                   <InfoCard 
                     title="Stress-Free Mortgage Process"
                     description="No more stress involved in the mortgage process! No more dealing with a loan officer - our AI agent does all of the work for you!"
