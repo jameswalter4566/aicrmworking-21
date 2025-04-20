@@ -15,7 +15,7 @@ const ClientPortalLanding = () => {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [portalAccess, setPortalAccess] = useState<any>(null);
-  
+
   const getPortalSlug = () => {
     const pathParts = location.pathname.split('/');
     if (pathParts.length > 2 && pathParts[1] === 'client-portal') {
@@ -23,17 +23,17 @@ const ClientPortalLanding = () => {
     }
     return '';
   };
-  
+
   const slug = getPortalSlug();
   const token = searchParams.get('token');
-  
+
   useEffect(() => {
     if (token) {
       setAccessToken(token);
     }
     setIsLoading(false);
   }, [token]);
-  
+
   useEffect(() => {
     const validateToken = async () => {
       if (slug && token && !isValidating && !isLoading) {
@@ -56,7 +56,14 @@ const ClientPortalLanding = () => {
     
     validateToken();
   }, [slug, token, isLoading, isValidating]);
-  
+
+  const navigationOptions = [
+    { label: 'Buy', path: '/client-portal/onboarding' },
+    { label: 'Refinance', path: '/client-portal/onboarding' },
+    { label: 'HELOC', path: '/client-portal/onboarding' },
+    { label: 'Rates', path: '/client-portal/onboarding' }
+  ];
+
   const handleEnterPortal = async () => {
     if (slug) {
       if (accessToken) {
@@ -113,7 +120,7 @@ const ClientPortalLanding = () => {
       navigate('/client-portal/dashboard');
     }
   };
-  
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -124,9 +131,26 @@ const ClientPortalLanding = () => {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen">
+      <nav className="absolute top-0 left-0 right-0 z-50 py-6 px-4">
+        <div className="max-w-6xl mx-auto">
+          <ul className="flex justify-center space-x-8">
+            {navigationOptions.map((option) => (
+              <li key={option.label}>
+                <button 
+                  onClick={() => navigate(option.path)}
+                  className="px-6 py-2 rounded-full text-white transition-all duration-300 hover:bg-white hover:text-blue-900 font-medium"
+                >
+                  {option.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </nav>
+
       <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 py-32">
         <div className="max-w-6xl mx-auto">
           <div className="max-w-4xl mx-auto text-center">
