@@ -7,7 +7,6 @@ import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import GlowingCard from '@/components/GlowingCard';
-import WavySignals from '@/components/WavySignals';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
@@ -153,11 +152,10 @@ const ClientPortalLanding = () => {
         </div>
       </nav>
 
-      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center relative overflow-hidden">
-        <WavySignals />
-        <div className="max-w-6xl mx-auto relative z-10">
+      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center relative">
+        <div className="max-w-6xl mx-auto relative">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-7xl font-bold mb-8 leading-tight relative z-20">
+            <h1 className="text-7xl font-bold mb-8 leading-tight">
               The world's first{" "}
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                 AI-Powered

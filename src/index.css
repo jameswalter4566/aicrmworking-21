@@ -100,15 +100,6 @@
   }
 }
 
-@keyframes moveWave {
-  0% {
-    transform: translateX(0%);
-  }
-  100% {
-    transform: translateX(-100%);
-  }
-}
-
 .metric-card {
   @apply bg-white rounded-2xl p-4 border border-gray-200 shadow-sm;
 }
