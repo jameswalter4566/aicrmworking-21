@@ -14,7 +14,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
 } from "@/components/ui/sidebar";
 
 interface ClientPortalSidebarProps {
@@ -25,7 +24,7 @@ interface ClientPortalSidebarProps {
 
 const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPortalSidebarProps) => {
   const menuItems = [
-    { id: 'home', icon: Home, label: 'Home', color: 'bg-blue-100' },
+    { id: 'home', icon: Home, label: 'Dashboard', color: 'bg-blue-100' },
     { id: 'conditions', icon: FileText, label: 'Conditions', color: 'bg-blue-200' },
     { id: 'attention', icon: AlertTriangle, label: 'Attention', color: 'bg-blue-300' },
     { id: 'support', icon: MessageCircle, label: 'Support', color: 'bg-blue-400' },
@@ -34,7 +33,7 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
   return (
     <div className="h-full">
       <Sidebar 
-        className="bg-mortgage-darkPurple text-white" 
+        className="bg-blue-600 text-white" 
         collapsible="icon"
       >
         <SidebarContent>
@@ -46,7 +45,7 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
                     <SidebarMenuButton
                       isActive={activeTab === item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`relative flex items-center w-full rounded-lg ${item.color} hover:bg-blue-600 transition-colors`}
+                      className={`relative flex items-center w-full rounded-lg ${item.color} hover:bg-blue-700 transition-colors`}
                     >
                       <item.icon className="h-5 w-5" />
                       <span className="ml-3">{item.label}</span>

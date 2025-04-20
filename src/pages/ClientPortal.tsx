@@ -136,8 +136,48 @@ const ClientPortalNavbar = ({ clientData, activeTab, setActiveTab }: {
 };
 
 const HomeTab = ({ clientData }: { clientData: ClientData }) => {
+  // Get the three most recent urgent conditions
+  const recentAlerts = clientData.conditions
+    .filter(c => c.urgent)
+    .slice(0, 3);
+    
   return (
     <div className="space-y-6">
+      {/* Recent Alerts Container */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-xl text-mortgage-darkPurple">Recent Alerts</CardTitle>
+          <CardDescription>Your most recent important notifications</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {recentAlerts.length > 0 ? (
+              recentAlerts.map((alert) => (
+                <div 
+                  key={alert.id}
+                  className="p-3 rounded-lg border border-amber-200 bg-amber-50 flex items-start space-x-3"
+                >
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-amber-800">{alert.title}</h4>
+                    {!alert.completed && (
+                      <p className="text-sm text-amber-600 mt-1">
+                        Action required: Please upload this document
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-3 text-gray-500">
+                No urgent alerts at this time
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Keep existing loan summary card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-xl text-mortgage-darkPurple">Loan Summary</CardTitle>
@@ -184,6 +224,7 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
         </CardContent>
       </Card>
       
+      {/* Keep existing property and loan officer cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -222,6 +263,7 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
         </Card>
       </div>
       
+      {/* Keep existing loan progress card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg text-mortgage-darkPurple">Loan Progress</CardTitle>
