@@ -137,14 +137,10 @@ const ClientPortalNavbar = ({ clientData, activeTab, setActiveTab }: {
 };
 
 const HomeTab = ({ clientData }: { clientData: ClientData }) => {
-  const recentAlerts = clientData.conditions
-    .filter(c => c.urgent)
-    .slice(0, 3);
-    
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        <div className="p-6 bg-sky-100/80 rounded-xl shadow-lg">
+        <div className="p-6 bg-sky-100/80 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105">
           <h3 className="font-medium text-sky-900 mb-4">New Loan Details</h3>
           <div className="space-y-3">
             <div className="flex justify-between text-sky-900">
@@ -166,7 +162,7 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
           </div>
         </div>
 
-        <div className="p-6 bg-green-100/80 rounded-xl shadow-lg">
+        <div className="p-6 bg-green-100/80 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105">
           <h3 className="font-medium text-green-900 mb-4">Your Savings</h3>
           <div className="text-center">
             <div className="mb-2">
@@ -188,79 +184,12 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
           <CardDescription>Your most recent important notifications</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recentAlerts.length > 0 ? (
-              recentAlerts.map((alert) => (
-                <div 
-                  key={alert.id}
-                  className="p-3 rounded-lg border border-amber-200 bg-amber-50 flex items-start space-x-3"
-                >
-                  <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5" />
-                  <div>
-                    <h4 className="font-medium text-amber-800">{alert.title}</h4>
-                    {!alert.completed && (
-                      <p className="text-sm text-amber-600 mt-1">
-                        Action required: Please upload this document
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-3 text-gray-500">
-                No urgent alerts at this time
-              </div>
-            )}
+          <div className="text-center py-3 text-gray-500">
+            No urgent alerts at this time
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl text-mortgage-darkPurple">Loan Summary</CardTitle>
-          <CardDescription>Compare your new loan with your current one</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="font-medium">New Loan Details</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Loan Amount:</span>
-                  <span className="font-medium">${clientData.loanAmount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Interest Rate:</span>
-                  <span className="font-medium">{clientData.interestRate}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Term:</span>
-                  <span className="font-medium">{clientData.loanTerm} years</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Monthly Payment:</span>
-                  <span className="font-medium text-mortgage-darkPurple">${clientData.monthlyPayment.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-4 border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-6">
-              <h3 className="font-medium">Your Savings</h3>
-              <div className="p-4 bg-green-50 rounded-lg border border-green-100">
-                <div className="text-center">
-                  <span className="block text-gray-600">Monthly Savings</span>
-                  <span className="block text-2xl font-bold text-green-600">
-                    ${clientData.savingsPerMonth.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-                  </span>
-                  <span className="block text-sm text-gray-500 mt-1">
-                    (${(clientData.savingsPerMonth * 12).toLocaleString()} per year)
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
