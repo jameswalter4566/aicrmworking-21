@@ -164,7 +164,7 @@ const ClientPortalLanding = () => {
             <Button 
               size="lg"
               onClick={handleEnterPortal}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 text-xl rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] mb-32"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 text-xl rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(59,130,246,0.7)] mb-32 md:mb-48 relative z-10"
               disabled={isValidating}
             >
               {isValidating ? 'Validating Access...' : 'Access Your Portal'}
@@ -173,7 +173,7 @@ const ClientPortalLanding = () => {
           </div>
         </div>
         
-        <div className="absolute -bottom-48 left-0 right-0 w-full flex justify-center px-4">
+        <div className="absolute -bottom-48 md:-bottom-56 left-0 right-0 w-full flex justify-center px-4">
           <div className="max-w-6xl w-full bg-white rounded-2xl shadow-2xl p-4 transform transition-all duration-500 ease-in-out hover:scale-[1.02]">
             <img 
               src="/clientportalscreenshot.jpg" 
