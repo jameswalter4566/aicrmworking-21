@@ -163,13 +163,13 @@ const ClientPortalLanding = () => {
               </span>
               {" "}loan officer
             </h1>
+            <div className="relative mb-4">
+              <BurningStarUnderline width={600} />
+            </div>
             <p className="text-xl text-blue-200 mb-8 max-w-2xl mx-auto">
               Experience mortgage lending reimagined with advanced AI technology, 
               providing personalized service 24/7 for your home financing needs.
             </p>
-            <div className="relative mb-2">
-              <BurningStarUnderline width={600} />
-            </div>
             <Button 
               size="lg"
               onClick={handleEnterPortal}
