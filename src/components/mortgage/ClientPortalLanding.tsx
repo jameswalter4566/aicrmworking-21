@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -174,12 +173,12 @@ const ClientPortalLanding = () => {
           </div>
         </div>
         
-        <div className="absolute -bottom-10 left-0 right-0 w-full flex justify-center px-4">
-          <div className="max-w-5xl w-full bg-white rounded-2xl shadow-2xl p-4 transform transition-all duration-500 ease-in-out hover:scale-[1.02] overflow-hidden">
+        <div className="absolute -bottom-20 left-0 right-0 w-full flex justify-center px-4">
+          <div className="max-w-5xl w-full bg-white rounded-2xl shadow-2xl p-4 transform transition-all duration-500 ease-in-out hover:scale-[1.02]">
             <img 
               src="/clientportalscreenshot.jpg" 
               alt="Client Portal Interface" 
-              className="w-full h-auto rounded-lg object-cover max-h-[10vh]"
+              className="w-full h-auto rounded-lg"
             />
           </div>
         </div>
