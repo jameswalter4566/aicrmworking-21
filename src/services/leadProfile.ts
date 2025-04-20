@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface LeadProfile {
@@ -95,10 +96,10 @@ export interface LeadProfile {
 
 export interface LeadNote {
   id: string;
-  lead_id: number;
+  lead_id: number; 
   content: string;
   created_by: string;
-  created_at: string;
+  created_at: string;  
 }
 
 export interface LeadActivity {
@@ -373,3 +374,4 @@ export const leadProfileService = {
     }
   }
 };
+
