@@ -194,41 +194,9 @@ const ClientPortalLanding = () => {
         </div>
       </section>
 
-      <section className="pt-96 md:pt-120 pb-24 px-4 bg-gradient-to-br from-blue-950 to-blue-900">
+      <section className="pt-24 pb-24 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-16 text-white">Everything You Need in One Place</h2>
-          
-          <div className="grid md:grid-cols-3 gap-8 mb-24">
-            <GlowingCard
-              title="Secure Access"
-              description="Bank-level security protects your sensitive information while providing easy access to your documents."
-              gradient="bg-purple-glow"
-              icon={<Shield className="h-6 w-6 text-blue-200" />}
-              delay="delay-1"
-            />
-
-            <GlowingCard
-              title="Real-Time Updates"
-              description="Track your loan's progress in real-time and get instant notifications about important milestones."
-              gradient="bg-green-glow"
-              icon={<PieChart className="h-6 w-6 text-blue-200" />}
-              delay="delay-2"
-            />
-
-            <GlowingCard
-              title="Document Management"
-              description="Upload, sign, and manage all your loan documents in one centralized, easy-to-use platform."
-              gradient="bg-blue-glow"
-              icon={<FileCheck className="h-6 w-6 text-blue-200" />}
-              delay="delay-3"
-            />
-          </div>
-        </div>
-      </section>
-
-      <section className="pt-48 pb-24 px-4 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-12">
             <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-16 shadow-xl min-h-[800px]">
               <div className="mb-16 text-center">
                 <h2 className="text-5xl md:text-6xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
