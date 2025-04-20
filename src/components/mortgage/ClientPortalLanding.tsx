@@ -6,6 +6,7 @@ import { ArrowRight, Shield, Clock, FileCheck, PieChart, Loader2 } from 'lucide-
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ const ClientPortalLanding = () => {
     };
     
     validateToken();
-  }, [slug, token, isLoading]);
+  }, [slug, token, isLoading, isValidating]);
   
   const handleEnterPortal = async () => {
     if (slug) {
@@ -78,15 +79,23 @@ const ClientPortalLanding = () => {
             
             // Check if we have a lead in the mortgage pipeline
             if (access.lead_id) {
-              // Check if the lead is a mortgage lead (in pipeline)
-              // If not, we should redirect to the onboarding sequence
-              const { data: leadData } = await fetch(`/api/leads/${access.lead_id}`).then(res => res.json());
+              // Fetch the lead data to check if it's a mortgage lead
+              const { data: leadData, error: leadError } = await supabase
+                .from('leads')
+                .select('is_mortgage_lead, added_to_pipeline_at')
+                .eq('id', access.lead_id)
+                .single();
               
-              if (leadData?.is_mortgage_lead) {
-                // Lead is in mortgage pipeline, navigate to dashboard
-                navigate(`/client-portal/dashboard/${slug}?token=${accessToken}`);
+              if (!leadError && leadData) {
+                if (leadData.is_mortgage_lead) {
+                  // Lead is in mortgage pipeline, navigate to dashboard
+                  navigate(`/client-portal/dashboard/${slug}?token=${accessToken}`);
+                } else {
+                  // Lead is NOT in pipeline, navigate to onboarding sequence
+                  navigate(`/client-portal/onboarding/${slug}?token=${accessToken}`);
+                }
               } else {
-                // Lead is NOT in pipeline, navigate to onboarding sequence
+                // Error fetching lead or lead doesn't exist, go to onboarding
                 navigate(`/client-portal/onboarding/${slug}?token=${accessToken}`);
               }
             } else {
