@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Home, 
   FileText, 
@@ -533,6 +532,9 @@ const mockClientData: ClientData = {
   leadId: "12345"
 };
 
+import { SidebarProvider } from "@/components/ui/sidebar";
+import ClientPortalSidebar from "@/components/mortgage/ClientPortalSidebar";
+
 const ClientPortal = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams] = useSearchParams();
@@ -664,18 +666,24 @@ const ClientPortal = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />
-      
-      <div className="container mx-auto p-4 md:p-6 mt-2">
-        {activeTab === "home" && <HomeTab clientData={clientData} />}
-        {activeTab === "conditions" && clientData?.leadId && (
-          <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
-        )}
-        {activeTab === "attention" && <AttentionTab clientData={clientData} />}
-        {activeTab === "support" && <SupportTab />}
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full bg-white">
+        <ClientPortalSidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab}
+          urgentCount={clientData.conditions.filter(c => c.urgent && !c.completed).length}
+        />
+        
+        <main className="flex-1 p-6">
+          {activeTab === "home" && <HomeTab clientData={clientData} />}
+          {activeTab === "conditions" && clientData?.leadId && (
+            <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
+          )}
+          {activeTab === "attention" && <AttentionTab clientData={clientData} />}
+          {activeTab === "support" && <SupportTab />}
+        </main>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 
