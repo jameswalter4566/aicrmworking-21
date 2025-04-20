@@ -194,7 +194,7 @@ const ClientPortalLanding = () => {
         </div>
       </section>
 
-      <section className="pt-96 md:pt-120 pb-24 px-4 bg-gradient-to-br from-blue-950 to-blue-900">
+      <section className="pt-96 md:pt-120 pb-24 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-16 text-white">Everything You Need in One Place</h2>
           
