@@ -191,7 +191,7 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
+        <Card className="transition-transform duration-200 hover:scale-105 bg-sky-100/80">
           <CardHeader>
             <CardTitle className="text-lg text-mortgage-darkPurple">Property Details</CardTitle>
           </CardHeader>
@@ -209,7 +209,7 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="transition-transform duration-200 hover:scale-105 bg-sky-100/80">
           <CardHeader>
             <CardTitle className="text-lg text-mortgage-darkPurple">Loan Officer</CardTitle>
           </CardHeader>
@@ -635,16 +635,16 @@ const ClientPortal = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-white">
+      <div className="min-h-screen flex w-full bg-gray-50/70">
         <ClientPortalSidebar 
           activeTab={activeTab} 
           setActiveTab={setActiveTab}
-          urgentCount={clientData.conditions.filter(c => c.urgent && !c.completed).length}
+          urgentCount={clientData?.conditions.filter(c => c.urgent && !c.completed).length || 0}
         />
         
         <main className="flex-1">
           {clientData?.leadId && (
-            <div className="w-full px-8 py-6">
+            <div className="w-full px-8 pt-8">
               <LoanProgressTracker 
                 leadId={clientData.leadId} 
                 className="mb-6"
@@ -652,7 +652,7 @@ const ClientPortal = () => {
             </div>
           )}
           
-          <div className="p-6">
+          <div className="p-6 pt-8">
             {activeTab === "home" && <HomeTab clientData={clientData} />}
             {activeTab === "conditions" && clientData?.leadId && (
               <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
