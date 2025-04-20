@@ -33,7 +33,7 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
   return (
     <div className="h-full">
       <Sidebar 
-        className="bg-blue-600 text-white" 
+        className="bg-blue-600 text-white rounded-tr-3xl shadow-xl z-10" 
         collapsible="icon"
       >
         <SidebarContent>

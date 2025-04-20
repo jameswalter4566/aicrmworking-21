@@ -711,13 +711,24 @@ const ClientPortal = () => {
           urgentCount={clientData.conditions.filter(c => c.urgent && !c.completed).length}
         />
         
-        <main className="flex-1 p-6">
-          {activeTab === "home" && <HomeTab clientData={clientData} />}
-          {activeTab === "conditions" && clientData?.leadId && (
-            <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
+        <main className="flex-1">
+          {clientData?.leadId && (
+            <div className="w-full">
+              <LoanProgressTracker 
+                leadId={clientData.leadId} 
+                className="mb-6"
+              />
+            </div>
           )}
-          {activeTab === "attention" && <AttentionTab clientData={clientData} />}
-          {activeTab === "support" && <SupportTab />}
+          
+          <div className="p-6">
+            {activeTab === "home" && <HomeTab clientData={clientData} />}
+            {activeTab === "conditions" && clientData?.leadId && (
+              <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
+            )}
+            {activeTab === "attention" && <AttentionTab clientData={clientData} />}
+            {activeTab === "support" && <SupportTab />}
+          </div>
         </main>
       </div>
     </SidebarProvider>

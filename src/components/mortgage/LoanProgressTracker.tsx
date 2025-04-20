@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
@@ -30,7 +29,7 @@ interface LoanProgressTrackerProps {
   onProgressLoaded?: (progressData: any) => void;
   showLoader?: boolean;
   className?: string;
-  displayStyle?: 'compact' | 'full'; // Add the displayStyle prop
+  displayStyle?: 'compact' | 'full';
 }
 
 const checkpoints = [
@@ -58,7 +57,7 @@ const Checkpoint: React.FC<CheckpointProps> = ({ label, isCompleted, isActive, i
         className={cn(
           "w-8 h-8 rounded-full flex items-center justify-center z-10 transition-colors",
           isCompleted || isActive
-            ? "bg-mortgage-purple text-white"
+            ? "bg-blue-500 text-white"
             : "bg-white border-2 border-gray-300 text-gray-400"
         )}
       >
@@ -73,7 +72,7 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
   onProgressLoaded,
   showLoader = false,
   className = "",
-  displayStyle = 'full' // Set default value to 'full'
+  displayStyle = 'full'
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -109,12 +108,9 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
           return;
         }
 
-        // Calculate progress percentage correctly - we want the FULL current step to be covered
         const currentStepIndex = data.data.stepIndex;
         const totalSteps = checkpoints.length;
         
-        // Calculate progress to include the entire current step
-        // Add 1 to currentStepIndex to make sure the current checkpoint is fully covered
         const progressPercentage = ((currentStepIndex + 1) / totalSteps) * 100;
         
         setProgressData({
@@ -122,7 +118,6 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
           progressPercentage: progressPercentage
         });
         
-        // Notify parent component if callback provided
         if (onProgressLoaded) {
           onProgressLoaded({
             ...data.data,
@@ -140,13 +135,10 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
     fetchLoanProgress();
   }, [leadId, onProgressLoaded]);
 
-  // Find the index of the current step
   const currentIndex = checkpoints.findIndex((checkpoint) => checkpoint.id === progressData.currentStep);
   
-  // If current step is not found, default to first step
   const activeIndex = currentIndex >= 0 ? currentIndex : 0;
 
-  // For compact display style
   if (displayStyle === 'compact') {
     return (
       <div className={`w-full ${className}`}>
@@ -164,7 +156,7 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
   }
 
   return (
-    <div className={`w-full px-8 py-6 bg-white ${className}`}>
+    <div className={`w-full px-8 py-6 bg-white shadow-lg ${className}`}>
       <h3 className="text-lg font-bold mb-6 text-mortgage-darkPurple">Loan Progress</h3>
       
       {loading && showLoader ? (
@@ -183,16 +175,14 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
         <div className="text-red-500 text-sm">{error}</div>
       ) : (
         <>
-          {/* Progress bar container with increased vertical spacing */}
           <div className="relative mb-8">
             <Progress 
               value={progressData.progressPercentage} 
-              className="h-3 bg-gray-200" // Increased height from h-2 to h-3
+              className="h-3 bg-gray-200" 
             />
           </div>
           
-          {/* Checkpoints */}
-          <div className="flex justify-between mt-[-24px]"> {/* Adjusted negative margin */}
+          <div className="flex justify-between mt-[-24px]">
             {checkpoints.map((checkpoint, index) => (
               <Checkpoint
                 key={checkpoint.id}
