@@ -191,7 +191,7 @@ const ClientPortalLanding = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-24">
             <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-16 shadow-xl min-h-[800px]">
               <div className="mb-16 text-center">
-                <h2 className="text-5xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight md:text-6xl text-center">
+                <h2 className="text-5xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight md:text-6xl text-center mx-0">
                   Revolutionizing Mortgage Lending with AI
                 </h2>
                 <p className="text-gray-600 mb-16 text-xl max-w-4xl mx-auto leading-relaxed">
