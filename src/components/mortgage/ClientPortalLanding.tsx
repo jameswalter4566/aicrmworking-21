@@ -8,6 +8,7 @@ import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import GlowingCard from '@/components/GlowingCard';
 import BurningStarUnderline from '@/components/BurningStarUnderline';
+import InfoCard from './InfoCard';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
@@ -197,7 +198,7 @@ const ClientPortalLanding = () => {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12 text-white">Everything You Need in One Place</h2>
           
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-8 mb-16">
             <GlowingCard
               title="Secure Access"
               description="Bank-level security protects your sensitive information while providing easy access to your documents."
@@ -221,6 +222,29 @@ const ClientPortalLanding = () => {
               icon={<FileCheck className="h-6 w-6 text-blue-200" />}
               delay="delay-3"
             />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-16">
+            <div className="lg:col-span-8 bg-white rounded-2xl p-8">
+              <div className="space-y-6">
+                <InfoCard 
+                  title="24/7 Support, Even on Weekends"
+                  description="Text, call, or email your loan advisor 7 days a week. Day or night, on your schedule and receive an instant response."
+                />
+                <InfoCard 
+                  title="AI-Powered Rate Shopping"
+                  description="We use AI to analyze the top mortgage lenders in the nation to ensure we are shopping for the best possible rate and closing costs."
+                />
+                <InfoCard 
+                  title="Stress-Free Mortgage Process"
+                  description="No more stress involved in the mortgage process! No more dealing with a loan officer - our AI agent does all of the work for you!"
+                />
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 bg-white rounded-2xl min-h-[600px]">
+              {/* Image placeholder - will be added later */}
+            </div>
           </div>
         </div>
       </section>
