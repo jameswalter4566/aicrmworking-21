@@ -7,6 +7,7 @@ import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import GlowingCard from '@/components/GlowingCard';
+import WavySignals from '@/components/WavySignals';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
@@ -153,6 +154,7 @@ const ClientPortalLanding = () => {
       </nav>
 
       <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center relative">
+        <WavySignals />
         <div className="max-w-6xl mx-auto relative">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-7xl font-bold mb-8 leading-tight">
