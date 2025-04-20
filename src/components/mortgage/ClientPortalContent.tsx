@@ -113,8 +113,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     // Fetch lead data to check onboarding status
     const fetchLeadData = async () => {
       try {
+        // Convert leadId to a number if it's a string to ensure compatibility
+        const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+        
         const { data, error } = await supabase.functions.invoke('lead-profile', {
-          body: { id: leadId }
+          body: { id: numericLeadId }
         });
         
         if (error || !data.success) {
@@ -137,7 +140,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       // If we don't have a creator ID but we have a leadId, try to get it from portal access
       const getCreatorFromPortalAccess = async () => {
         try {
-          // Fix: Convert leadId to a number only for the query
+          // Convert leadId to a number if it's a string
           const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
           
           const { data, error } = await supabase

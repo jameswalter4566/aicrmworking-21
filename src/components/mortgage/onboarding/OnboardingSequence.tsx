@@ -59,9 +59,12 @@ export const OnboardingSequence = ({ leadId, accessToken, portalId, onComplete }
           }
         }
 
+        // Convert leadId to number if it's a string to ensure compatibility
+        const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+
         // Fetch lead data
         const { data, error } = await supabase.functions.invoke('lead-profile', {
-          body: { id: leadId }
+          body: { id: numericLeadId }
         });
 
         if (error || !data.success) {
@@ -84,9 +87,13 @@ export const OnboardingSequence = ({ leadId, accessToken, portalId, onComplete }
   const updateLeadData = async (updatedData: Partial<LeadProfile>) => {
     try {
       setIsLoading(true);
+      
+      // Convert leadId to number if it's a string
+      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+      
       const { data, error } = await supabase.functions.invoke('update-lead', {
         body: { 
-          leadId: leadId, 
+          leadId: numericLeadId, 
           leadData: updatedData
         }
       });
