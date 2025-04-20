@@ -43,6 +43,7 @@ import ClientPortalLanding from "./components/mortgage/ClientPortalLanding";
 import LoanApplicationForm from "./pages/LoanApplicationForm";
 import Dialer from "./pages/Dialer";
 import DialerSession from "./pages/DialerSession";
+import ClientPortalOnboarding from './pages/ClientPortalOnboarding';
 
 const queryClient = new QueryClient();
 
@@ -284,6 +285,8 @@ function App() {
                 <Route path="/client-portal/dashboard/:slug" element={<ClientPortal />} />
                 <Route path="/client-portal/dashboard" element={<ClientPortal />} />
                 <Route path="/client-portal/:slug" element={<ClientPortalLanding />} />
+                
+                <Route path="/client-portal/onboarding/:slug" element={<ClientPortalOnboarding />} />
                 
                 <Route path="/dialer" element={<Dialer />} />
                 <Route path="/dialer-session" element={<DialerSession />} />

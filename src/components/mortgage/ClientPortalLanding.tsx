@@ -14,6 +14,7 @@ const ClientPortalLanding = () => {
   const [isValidating, setIsValidating] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [portalAccess, setPortalAccess] = useState<any>(null);
   
   // Extract slug from the URL if present
   const getPortalSlug = () => {
@@ -41,11 +42,12 @@ const ClientPortalLanding = () => {
       if (slug && token && !isValidating && !isLoading) {
         // Auto-validate the token on page load, but don't auto-redirect
         try {
-          const { access } = await getPortalAccess(slug, token);
+          const { access, error } = await getPortalAccess(slug, token);
           
           if (access) {
             // Token is valid, but we don't auto-redirect - user must click the button
-            console.log("Token validated successfully");
+            console.log("Token validated successfully", access);
+            setPortalAccess(access);
             
             // Update last accessed timestamp
             if (access.id) {
@@ -71,8 +73,26 @@ const ClientPortalLanding = () => {
           const { access, error } = await getPortalAccess(slug, accessToken);
           
           if (access) {
-            // Valid access, navigate to dashboard with token
-            navigate(`/client-portal/dashboard/${slug}?token=${accessToken}`);
+            // Get lead information from portal access
+            const leadId = access.lead_id;
+            
+            // Check if we have a lead in the mortgage pipeline
+            if (access.lead_id) {
+              // Check if the lead is a mortgage lead (in pipeline)
+              // If not, we should redirect to the onboarding sequence
+              const { data: leadData } = await fetch(`/api/leads/${access.lead_id}`).then(res => res.json());
+              
+              if (leadData?.is_mortgage_lead) {
+                // Lead is in mortgage pipeline, navigate to dashboard
+                navigate(`/client-portal/dashboard/${slug}?token=${accessToken}`);
+              } else {
+                // Lead is NOT in pipeline, navigate to onboarding sequence
+                navigate(`/client-portal/onboarding/${slug}?token=${accessToken}`);
+              }
+            } else {
+              // No lead ID, go to the onboarding sequence
+              navigate(`/client-portal/onboarding/${slug}?token=${accessToken}`);
+            }
           } else {
             // Invalid access
             toast({
@@ -90,6 +110,7 @@ const ClientPortalLanding = () => {
             description: "Could not validate portal access",
             variant: "destructive"
           });
+          navigate('/client-portal/dashboard');
         } finally {
           setIsValidating(false);
         }
