@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -43,7 +44,7 @@ import LoanApplicationForm from "./pages/LoanApplicationForm";
 import Dialer from "./pages/Dialer";
 import DialerSession from "./pages/DialerSession";
 import ClientPortal from "./pages/ClientPortal";
-import ClientPortalLanding from "./pages/ClientPortalLanding";
+// Remove the duplicate import for ClientPortalLanding
 
 const queryClient = new QueryClient();
 
