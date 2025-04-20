@@ -151,8 +151,8 @@ const ClientPortalLanding = () => {
         </div>
       </nav>
 
-      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center">
-        <div className="max-w-6xl mx-auto">
+      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center relative">
+        <div className="max-w-6xl mx-auto relative">
           <div className="max-w-4xl mx-auto text-center">
             <h1 className="text-7xl font-bold mb-8 leading-tight">
               The world's first{" "}
@@ -172,9 +172,19 @@ const ClientPortalLanding = () => {
             </Button>
           </div>
         </div>
+        
+        <div className="absolute -bottom-20 left-0 right-0 w-full flex justify-center px-4">
+          <div className="max-w-5xl w-full bg-white rounded-2xl shadow-2xl p-4 transform transition-all duration-500 ease-in-out hover:scale-[1.02]">
+            <img 
+              src="/clientportalscreenshot.jpg" 
+              alt="Client Portal Interface" 
+              className="w-full h-auto rounded-lg"
+            />
+          </div>
+        </div>
       </section>
 
-      <section className="py-20 px-4 bg-gradient-to-br from-blue-950 to-blue-900">
+      <section className="py-48 px-4 bg-gradient-to-br from-blue-950 to-blue-900">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12 text-white">Everything You Need in One Place</h2>
           
