@@ -224,7 +224,7 @@ const ClientPortalLanding = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-96">
             <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-16 shadow-xl min-h-[800px]">
               <div className="mb-16 text-center">
                 <h2 className="text-5xl md:text-6xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
