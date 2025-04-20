@@ -151,32 +151,25 @@ const ClientPortalLanding = () => {
         </div>
       </nav>
 
-      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 py-32">
+      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center">
         <div className="max-w-6xl mx-auto">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-6xl font-bold mb-6 leading-tight">
-              Smart Mortgage Processing{" "}
+            <h1 className="text-7xl font-bold mb-8 leading-tight">
+              The world's first{" "}
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
-                Powered by AI
+                AI-Powered
               </span>
+              {" "}loan officer
             </h1>
-            <p className="text-2xl mb-8 text-gray-200">
-              Our technology streamlines your mortgage journey with faster approvals, 
-              transparent processing, and 24/7 access to your loan status.
-            </p>
             <Button 
               size="lg"
               onClick={handleEnterPortal}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-12 py-6 text-xl rounded-full shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(59,130,246,0.7)]"
               disabled={isValidating}
             >
               {isValidating ? 'Validating Access...' : 'Access Your Portal'}
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <ArrowRight className="ml-2 h-6 w-6" />
             </Button>
-            <p className="mt-4 text-sm text-gray-300 flex items-center justify-center">
-              <Clock className="h-4 w-4 mr-2" />
-              Average processing time: 2-3 weeks faster than traditional lenders
-            </p>
           </div>
         </div>
       </section>
