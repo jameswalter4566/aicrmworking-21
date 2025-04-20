@@ -259,43 +259,6 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
           </CardContent>
         </Card>
       </div>
-      
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg text-mortgage-darkPurple">Loan Progress</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {clientData.leadId ? (
-            <LoanProgressTracker leadId={clientData.leadId} />
-          ) : (
-            <div className="space-y-6">
-              <div>
-                <div className="flex justify-between mb-1 text-sm">
-                  <span>{progressSteps[0]}</span>
-                  <span>{progressSteps[progressSteps.length - 1]}</span>
-                </div>
-                <Progress value={((clientData.loanProgress + 1) / progressSteps.length) * 100} className="h-2" />
-              </div>
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {progressSteps.map((step, index) => (
-                  <div 
-                    key={index} 
-                    className={`p-3 rounded-lg border ${index <= clientData.loanProgress ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'} flex items-center space-x-2`}
-                  >
-                    {index <= clientData.loanProgress ? (
-                      <CheckCircle size={16} className="text-green-500" />
-                    ) : (
-                      <div className="h-4 w-4 rounded-full border border-gray-300 flex-shrink-0" />
-                    )}
-                    <span className={`text-sm ${index <= clientData.loanProgress ? 'text-green-800' : 'text-gray-500'}`}>{step}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 };
