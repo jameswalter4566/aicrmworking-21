@@ -8,6 +8,7 @@ import PropertyInfoStep from './steps/PropertyInfoStep';
 import MortgageInfoStep from './steps/MortgageInfoStep';
 import FinancialInfoStep from './steps/FinancialInfoStep';
 import { LeadProfile } from '@/services/leadProfile';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OnboardingSequenceProps {
   leadId: string | number;

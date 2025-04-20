@@ -20,7 +20,7 @@ const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
           loanAmount: leadData.mortgageData?.loan?.loanAmount || '',
           loanType: leadData.mortgageData?.loan?.loanType || '',
           mortgageTerm: leadData.mortgageData?.loan?.mortgageTerm || '',
-          purpose: leadData.mortgageData?.loan?.loanPurpose || ''
+          purpose: leadData.mortgageData?.loan?.purpose || ''
         }
       }
     }

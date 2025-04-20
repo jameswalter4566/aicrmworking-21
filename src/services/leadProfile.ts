@@ -88,6 +88,8 @@ export interface LeadProfile {
       amortizationType?: string;
       interestRate?: string;
       mortgageInsurance?: string;
+      loanAmount?: string;
+      purpose?: string;
     };
   };
   isMortgageLead?: boolean;
