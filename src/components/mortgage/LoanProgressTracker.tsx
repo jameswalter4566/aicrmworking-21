@@ -30,6 +30,7 @@ interface LoanProgressTrackerProps {
   onProgressLoaded?: (progressData: any) => void;
   showLoader?: boolean;
   className?: string;
+  displayStyle?: 'compact' | 'full'; // Add the displayStyle prop
 }
 
 const checkpoints = [
@@ -71,7 +72,8 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
   leadId, 
   onProgressLoaded,
   showLoader = false,
-  className = ""
+  className = "",
+  displayStyle = 'full' // Set default value to 'full'
 }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +145,23 @@ const LoanProgressTracker: React.FC<LoanProgressTrackerProps> = ({
   
   // If current step is not found, default to first step
   const activeIndex = currentIndex >= 0 ? currentIndex : 0;
+
+  // For compact display style
+  if (displayStyle === 'compact') {
+    return (
+      <div className={`w-full ${className}`}>
+        <div className="mb-1 flex justify-between items-center">
+          <span className="text-xs font-medium text-mortgage-darkPurple">
+            {checkpoints[activeIndex].label}
+          </span>
+          <span className="text-xs text-gray-500">
+            {Math.round(progressData.progressPercentage)}%
+          </span>
+        </div>
+        <Progress value={progressData.progressPercentage} className="h-2 bg-gray-200" />
+      </div>
+    );
+  }
 
   return (
     <div className={`w-full px-8 py-6 bg-white ${className}`}>
