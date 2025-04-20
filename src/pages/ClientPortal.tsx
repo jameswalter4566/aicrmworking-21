@@ -572,26 +572,7 @@ const ClientPortal = () => {
           .update({ last_accessed_at: new Date().toISOString() })
           .eq('id', portalData.id);
         
-        const { data, error } = await supabase.functions.invoke('lead-profile', {
-          body: { id: portalData.lead_id }
-        });
-
-        if (error || !data.success) {
-          console.error("Error fetching lead:", error || data.error);
-          setLoading(false);
-          return;
-        }
-        
-        const leadData = data.data.lead;
-        
-        const isInPipeline = leadData.isMortgageLead && leadData.addedToPipelineAt;
-        const hasCompletedOnboarding = leadData.mortgageData?.onboardingCompleted === true;
-        
-        if (!isInPipeline && !hasCompletedOnboarding) {
-          navigate(`/client-portal/onboarding/${slug}?token=${token}&leadId=${portalData.lead_id}&portalId=${portalData.id}`);
-          return;
-        }
-        
+        // Set client data with the lead ID from portal data
         const clientDataWithLeadId = {
           ...mockClientData,
           leadId: portalData.lead_id
@@ -607,7 +588,7 @@ const ClientPortal = () => {
     };
     
     verifyAccess();
-  }, [slug, token, navigate]);
+  }, [slug, token]);
 
   const refreshData = async () => {
     if (clientData) {
