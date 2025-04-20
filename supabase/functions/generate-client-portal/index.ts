@@ -124,7 +124,7 @@ serve(async (req) => {
           .eq('id', existingPortal.id);
       }
       
-      // Return the existing portal info - modified to be consistent with new URL format
+      // Return the existing portal info
       return new Response(
         JSON.stringify({ 
           portal: existingPortal,
@@ -142,33 +142,6 @@ serve(async (req) => {
     const accessToken = generateAccessToken();
     
     console.log("Creating new portal access with slug:", portalSlug);
-
-    // Check if client_portal_access table exists
-    const { data: tableCheck, error: tableCheckError } = await supabaseClient
-      .from('client_portal_access')
-      .select('id')
-      .limit(1);
-      
-    if (tableCheckError) {
-      console.error("Error checking table existence:", tableCheckError.message);
-      
-      // If the table doesn't exist, create it
-      if (tableCheckError.message.includes("relation") && tableCheckError.message.includes("does not exist")) {
-        console.log("Table client_portal_access doesn't exist, trying to create it");
-        
-        // Since we can't create tables directly from edge functions, return a helpful error
-        return new Response(
-          JSON.stringify({ 
-            error: 'The client_portal_access table does not exist. Please create it in your database.',
-            tableError: tableCheckError.message
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500 
-          }
-        );
-      }
-    }
 
     // Store in the database with creator information
     console.log("Inserting new portal access record");

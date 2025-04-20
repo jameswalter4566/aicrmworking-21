@@ -15,13 +15,22 @@ const ClientPortalGenerator = ({ leadId, onLinkGenerated, createdBy }: ClientPor
   const [generating, setGenerating] = useState(false);
 
   const handleGeneratePortal = async () => {
+    if (!leadId) {
+      toast.error('Invalid lead ID');
+      return;
+    }
+
     setGenerating(true);
     try {
-      const { url, error } = await generateClientPortal(leadId, createdBy);
+      const { url, portal, error } = await generateClientPortal(leadId, createdBy);
       
       if (error) {
         console.error('Error generating portal:', error);
         throw new Error(error);
+      }
+
+      if (!url) {
+        throw new Error('No portal URL generated');
       }
 
       onLinkGenerated(url);
@@ -29,7 +38,7 @@ const ClientPortalGenerator = ({ leadId, onLinkGenerated, createdBy }: ClientPor
     } catch (error) {
       console.error('Error generating portal:', error);
       toast.error('Failed to generate portal link', {
-        description: error instanceof Error ? error.message : 'Try again later'
+        description: error instanceof Error ? error.message : 'Please try again later'
       });
     } finally {
       setGenerating(false);

@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 export interface PortalAccess {
@@ -54,7 +53,7 @@ export const generateClientPortal = async (leadId: number, createdBy?: string): 
     // Extract just the slug from the generated URL
     const slug = data.url.split('/client-portal/')[1]?.split('?')[0] || '';
     
-    // Create a landing page URL with the slug
+    // Create a landing page URL with the slug and token
     const fullPortalUrl = `${window.location.origin}/client-portal/${slug}?token=${data.portal.access_token}`;
     
     console.log("Generated portal URL:", fullPortalUrl);
@@ -69,7 +68,7 @@ export const generateClientPortal = async (leadId: number, createdBy?: string): 
     return { 
       url: '', 
       portal: null, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : 'Unknown error occurred' 
     };
   }
 };
