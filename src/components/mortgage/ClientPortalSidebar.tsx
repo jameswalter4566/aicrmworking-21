@@ -57,7 +57,7 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
   return (
     <div className="h-full">
       <Sidebar 
-        className="bg-blue-600 text-white rounded-tr-3xl shadow-xl z-10 w-64 pt-6 mt-4" 
+        className="bg-blue-600 text-white rounded-tr-3xl shadow-xl z-10 w-72 pt-6 mt-4" 
         collapsible="icon"
       >
         <SidebarContent>
@@ -95,11 +95,11 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
                               {loanAppSections.map((section) => (
                                 <SidebarMenuSubButton
                                   key={section.id}
-                                  className="flex items-center w-full text-xs text-white/90 hover:text-white pl-4 py-1.5 
-                                    bg-blue-500/20 rounded-lg mx-2 backdrop-blur-sm border border-white/10 pr-4"
+                                  className="flex items-center w-full text-xs text-white/90 hover:text-white pl-2 py-1.5 
+                                    bg-blue-500/20 rounded-lg mx-1 backdrop-blur-sm border border-white/10 pr-1"
                                 >
-                                  <section.icon className="h-3.5 w-3.5 mr-3 flex-shrink-0" />
-                                  <span className="text-left flex-grow text-left">{section.label}</span>
+                                  <section.icon className="h-3 w-3 mr-2 flex-shrink-0" />
+                                  <span className="whitespace-normal leading-tight flex-grow text-left">{section.label}</span>
                                 </SidebarMenuSubButton>
                               ))}
                             </div>
