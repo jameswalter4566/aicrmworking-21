@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -228,7 +229,7 @@ const ClientPortalLanding = () => {
 
       <section className="pt-48 pb-24 px-4 bg-white">
         <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-96">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-48">
             <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-16 shadow-xl min-h-[800px]">
               <div className="mb-16 text-center">
                 <h2 className="text-5xl md:text-6xl font-bold mb-8 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent leading-tight">
@@ -253,7 +254,7 @@ const ClientPortalLanding = () => {
                   />
                 </div>
 
-                <div className="md:col-span-1 mt-24">
+                <div className="md:col-span-1 mt-0">
                   <InfoCard 
                     title="Stress-Free Mortgage Process"
                     description="No more stress involved in the mortgage process! No more dealing with a loan officer - our AI agent does all of the work for you!"
