@@ -1,0 +1,94 @@
+
+.burning-star-container {
+  position: relative;
+  height: 2px;
+  margin-top: -10px;
+  z-index: 10;
+}
+
+.burning-star-line {
+  position: relative;
+  height: 2px;
+  background: transparent;
+  transform: scaleX(0);
+  transform-origin: center;
+  animation: expandLine 2s ease-out forwards;
+}
+
+.burning-star-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 20%,
+    rgba(255, 255, 255, 0.8) 50%,
+    rgba(255, 255, 255, 0.3) 80%,
+    transparent 100%
+  );
+  box-shadow: 
+    0 0 10px rgba(255, 255, 255, 0.5),
+    0 0 20px rgba(255, 255, 255, 0.3),
+    0 0 30px rgba(255, 255, 255, 0.1);
+}
+
+.star-head-left,
+.star-head-right {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: white;
+  border-radius: 50%;
+  top: -2px;
+  filter: blur(1px);
+  box-shadow: 
+    0 0 10px rgba(255, 255, 255, 1),
+    0 0 20px rgba(255, 255, 255, 0.8),
+    0 0 30px rgba(255, 255, 255, 0.6),
+    0 0 40px rgba(255, 255, 255, 0.4);
+  opacity: 0;
+}
+
+.star-head-left {
+  left: 0;
+  animation: moveStarLeft 2s ease-out forwards;
+}
+
+.star-head-right {
+  right: 0;
+  animation: moveStarRight 2s ease-out forwards;
+}
+
+@keyframes expandLine {
+  0% {
+    transform: scaleX(0);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes moveStarLeft {
+  0% {
+    left: 50%;
+    opacity: 1;
+  }
+  100% {
+    left: 0;
+    opacity: 0;
+  }
+}
+
+@keyframes moveStarRight {
+  0% {
+    right: 50%;
+    opacity: 1;
+  }
+  100% {
+    right: 0;
+    opacity: 0;
+  }
+}

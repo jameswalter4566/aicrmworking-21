@@ -7,6 +7,7 @@ import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
 import { toast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import GlowingCard from '@/components/GlowingCard';
+import BurningStarUnderline from '@/components/BurningStarUnderline';
 
 const ClientPortalLanding = () => {
   const navigate = useNavigate();
