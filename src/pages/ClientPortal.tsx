@@ -19,7 +19,6 @@ import { ClientPortalConditions } from "@/components/mortgage/ClientPortalCondit
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProgress";
-import { ClientPortalNav } from "@/components/mortgage/ClientPortalNav";
 
 const progressSteps = [
   "Application Created",
@@ -665,21 +664,17 @@ const ClientPortal = () => {
   }
 
   return (
-    <div className="min-h-screen bg-white flex">
-      <ClientPortalNav 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab}
-        urgentCount={clientData.conditions.filter(c => c.urgent && !c.completed).length}
-      />
+    <div className="min-h-screen bg-gray-50">
+      <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />
       
-      <main className="flex-1 p-6">
+      <div className="container mx-auto p-4 md:p-6 mt-2">
         {activeTab === "home" && <HomeTab clientData={clientData} />}
         {activeTab === "conditions" && clientData?.leadId && (
           <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
         )}
         {activeTab === "attention" && <AttentionTab clientData={clientData} />}
         {activeTab === "support" && <SupportTab />}
-      </main>
+      </div>
     </div>
   );
 };
