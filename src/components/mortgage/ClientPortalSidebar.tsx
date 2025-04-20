@@ -53,11 +53,7 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
                     >
                       <item.icon className="h-5 w-5" />
                       <span className="ml-3">{item.label}</span>
-                      {item.id === 'attention' && urgentCount && urgentCount > 0 && (
-                        <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                          {urgentCount}
-                        </span>
-                      )}
+                      {/* Removed the urgency count badge */}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
