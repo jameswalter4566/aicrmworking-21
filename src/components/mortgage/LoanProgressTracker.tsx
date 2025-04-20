@@ -15,8 +15,7 @@ import {
   FileUp,
   DoorClosed,
   BanknoteIcon,
-  BadgeCheck,
-  Loader2
+  BadgeCheck
 } from "lucide-react";
 
 interface CheckpointProps {

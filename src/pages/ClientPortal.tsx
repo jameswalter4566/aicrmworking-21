@@ -18,6 +18,7 @@ import { ClientPortalConditions } from "@/components/mortgage/ClientPortalCondit
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProgress";
+import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 
 const progressSteps = [
   "Application Created",
@@ -79,7 +80,7 @@ const ClientPortalNavbar = ({ clientData, activeTab, setActiveTab }: {
         <h1 className="text-xl font-bold mb-2">Your Mortgage Portal</h1>
         <div className="w-full mb-4">
           {clientData.leadId ? (
-            <ClientPortalLoanProgress leadId={clientData.leadId} displayStyle="compact" />
+            <LoanProgressTracker leadId={clientData.leadId} displayStyle="compact" />
           ) : (
             <Progress 
               value={((clientData.loanProgress + 1) / progressSteps.length) * 100} 
@@ -136,14 +137,12 @@ const ClientPortalNavbar = ({ clientData, activeTab, setActiveTab }: {
 };
 
 const HomeTab = ({ clientData }: { clientData: ClientData }) => {
-  // Get the three most recent urgent conditions
   const recentAlerts = clientData.conditions
     .filter(c => c.urgent)
     .slice(0, 3);
     
   return (
     <div className="space-y-6">
-      {/* Recent Alerts Container */}
       <Card>
         <CardHeader>
           <CardTitle className="text-xl text-mortgage-darkPurple">Recent Alerts</CardTitle>
@@ -177,7 +176,6 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
         </CardContent>
       </Card>
 
-      {/* Keep existing loan summary card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-xl text-mortgage-darkPurple">Loan Summary</CardTitle>
@@ -224,7 +222,6 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
         </CardContent>
       </Card>
       
-      {/* Keep existing property and loan officer cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
@@ -263,14 +260,13 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
         </Card>
       </div>
       
-      {/* Keep existing loan progress card */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg text-mortgage-darkPurple">Loan Progress</CardTitle>
         </CardHeader>
         <CardContent>
           {clientData.leadId ? (
-            <ClientPortalLoanProgress leadId={clientData.leadId} />
+            <LoanProgressTracker leadId={clientData.leadId} />
           ) : (
             <div className="space-y-6">
               <div>
@@ -616,7 +612,6 @@ const ClientPortal = () => {
           .update({ last_accessed_at: new Date().toISOString() })
           .eq('id', portalData.id);
         
-        // Set client data with the lead ID from portal data
         const clientDataWithLeadId = {
           ...mockClientData,
           leadId: portalData.lead_id
