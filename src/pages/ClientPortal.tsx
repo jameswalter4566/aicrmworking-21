@@ -713,7 +713,7 @@ const ClientPortal = () => {
         
         <main className="flex-1">
           {clientData?.leadId && (
-            <div className="w-full">
+            <div className="w-full px-8 py-6">
               <LoanProgressTracker 
                 leadId={clientData.leadId} 
                 className="mb-6"
