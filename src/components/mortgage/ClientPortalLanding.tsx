@@ -194,7 +194,7 @@ const ClientPortalLanding = () => {
         </div>
       </section>
 
-      <section className="pt-96 md:pt-120 pb-24 px-4 bg-white">
+      <section className="pt-96 md:pt-120 pb-24 px-4 bg-gradient-to-br from-blue-950 to-blue-900">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-16 text-white">Everything You Need in One Place</h2>
           
@@ -223,7 +223,11 @@ const ClientPortalLanding = () => {
               delay="delay-3"
             />
           </div>
+        </div>
+      </section>
 
+      <section className="pt-48 pb-24 px-4 bg-white">
+        <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-96">
             <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-16 shadow-xl min-h-[800px]">
               <div className="mb-16 text-center">
