@@ -19,6 +19,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProgress";
 import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const progressSteps = [
   "Application Created",
@@ -137,6 +138,8 @@ const ClientPortalNavbar = ({ clientData, activeTab, setActiveTab }: {
 };
 
 const HomeTab = ({ clientData }: { clientData: ClientData }) => {
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  
   const handleFileUpload = async (file: File) => {
     try {
       console.log("File uploaded:", file.name);
@@ -192,76 +195,101 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
         </div>
       </div>
 
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle className="text-xl text-mortgage-darkPurple flex items-center gap-2">
-            Document Upload Center
-            <FileText className="h-5 w-5 text-mortgage-purple" />
-          </CardTitle>
-          <CardDescription>
-            Upload your requested documents securely. Our AI technology will process and submit them to underwriting.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid gap-4">
-            <div className="border rounded-lg p-4 bg-blue-50/50">
-              <h4 className="font-medium text-blue-800 mb-2">Required Documents</h4>
-              <ul className="space-y-3">
-                <li className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                    <span>Last 2 months bank statements</span>
-                  </div>
-                  <Button size="sm" variant="outline" className="text-blue-600">
-                    Upload
-                  </Button>
-                </li>
-                <li className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                    <span>Most recent pay stubs (30 days)</span>
-                  </div>
-                  <Button size="sm" variant="outline" className="text-blue-600">
-                    Upload
-                  </Button>
-                </li>
-                <li className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                    <span>W-2s (last 2 years)</span>
-                  </div>
-                  <Button size="sm" variant="outline" className="text-blue-600">
-                    Upload
-                  </Button>
-                </li>
-                <li className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-blue-600" />
-                    <span>Tax Returns (last 2 years)</span>
-                  </div>
-                  <Button size="sm" variant="outline" className="text-blue-600">
-                    Upload
-                  </Button>
-                </li>
-              </ul>
-            </div>
-            
-            <PDFDropZone 
-              onFileAccepted={handleFileUpload}
-              className="border-2 border-dashed border-blue-200 bg-blue-50/30 hover:bg-blue-50"
-            />
+      <Collapsible open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <div className="flex justify-center mb-4">
+          <CollapsibleTrigger asChild>
+            <Button 
+              className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
+              size="lg"
+            >
+              {isUploadOpen ? (
+                <>
+                  <Upload className="mr-2 h-5 w-5" />
+                  Close Upload Center
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-5 w-5" />
+                  Start Uploading Documents
+                </>
+              )}
+            </Button>
+          </CollapsibleTrigger>
+        </div>
+        
+        <CollapsibleContent className="space-y-4">
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="text-xl text-mortgage-darkPurple flex items-center gap-2">
+                Document Upload Center
+                <FileText className="h-5 w-5 text-mortgage-purple" />
+              </CardTitle>
+              <CardDescription>
+                Upload your requested documents securely. Our AI technology will process and submit them to underwriting.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-4">
+                <div className="border rounded-lg p-4 bg-blue-50/50">
+                  <h4 className="font-medium text-blue-800 mb-2">Required Documents</h4>
+                  <ul className="space-y-3">
+                    <li className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <span>Last 2 months bank statements</span>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-blue-600">
+                        Upload
+                      </Button>
+                    </li>
+                    <li className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <span>Most recent pay stubs (30 days)</span>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-blue-600">
+                        Upload
+                      </Button>
+                    </li>
+                    <li className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <span>W-2s (last 2 years)</span>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-blue-600">
+                        Upload
+                      </Button>
+                    </li>
+                    <li className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        <span>Tax Returns (last 2 years)</span>
+                      </div>
+                      <Button size="sm" variant="outline" className="text-blue-600">
+                        Upload
+                      </Button>
+                    </li>
+                  </ul>
+                </div>
+                
+                <PDFDropZone 
+                  onFileAccepted={handleFileUpload}
+                  className="border-2 border-dashed border-blue-200 bg-blue-50/30 hover:bg-blue-50"
+                />
 
-            <div className="text-center text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-center gap-2 text-blue-600 mb-2">
-                <FileText className="h-5 w-5" />
-                <span className="font-medium">AI-Powered Document Processing</span>
+                <div className="text-center text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center justify-center gap-2 text-blue-600 mb-2">
+                    <FileText className="h-5 w-5" />
+                    <span className="font-medium">AI-Powered Document Processing</span>
+                  </div>
+                  Our advanced AI will automatically analyze your documents, verify the information,
+                  and submit them directly to underwriting for faster processing.
+                </div>
               </div>
-              Our advanced AI will automatically analyze your documents, verify the information,
-              and submit them directly to underwriting for faster processing.
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </CollapsibleContent>
+      </Collapsible>
 
       <Card>
         <CardHeader>
