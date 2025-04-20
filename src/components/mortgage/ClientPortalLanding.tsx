@@ -153,11 +153,11 @@ const ClientPortalLanding = () => {
         </div>
       </nav>
 
-      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center relative">
+      <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center relative overflow-hidden">
         <WavySignals />
-        <div className="max-w-6xl mx-auto relative">
+        <div className="max-w-6xl mx-auto relative z-10">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-7xl font-bold mb-8 leading-tight">
+            <h1 className="text-7xl font-bold mb-8 leading-tight relative z-20">
               The world's first{" "}
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                 AI-Powered
