@@ -24,10 +24,10 @@ interface ClientPortalSidebarProps {
 
 const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPortalSidebarProps) => {
   const menuItems = [
-    { id: 'home', icon: Home, label: 'Dashboard', color: 'bg-blue-100' },
-    { id: 'conditions', icon: FileText, label: 'Conditions', color: 'bg-blue-200' },
-    { id: 'attention', icon: AlertTriangle, label: 'Attention', color: 'bg-blue-300' },
-    { id: 'support', icon: MessageCircle, label: 'Support', color: 'bg-blue-400' },
+    { id: 'home', icon: Home, label: 'Dashboard' },
+    { id: 'conditions', icon: FileText, label: 'Conditions' },
+    { id: 'attention', icon: AlertTriangle, label: 'Attention' },
+    { id: 'support', icon: MessageCircle, label: 'Support' },
   ];
 
   return (
@@ -45,7 +45,11 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
                     <SidebarMenuButton
                       isActive={activeTab === item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`relative flex items-center w-full rounded-lg ${item.color} hover:bg-blue-700 transition-colors`}
+                      className={`relative flex items-center w-full rounded-lg transition-colors ${
+                        activeTab === item.id 
+                          ? 'bg-blue-500 text-white ring-2 ring-white' 
+                          : 'bg-white text-blue-600 hover:bg-blue-50'
+                      }`}
                     >
                       <item.icon className="h-5 w-5" />
                       <span className="ml-3">{item.label}</span>
