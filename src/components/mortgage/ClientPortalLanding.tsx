@@ -225,8 +225,8 @@ const ClientPortalLanding = () => {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-24">
-            <div className="lg:col-span-8 bg-white rounded-3xl p-12 shadow-2xl">
-              <div className="space-y-8">
+            <div className="lg:col-span-8 bg-[#F1F0FB] rounded-3xl p-12 shadow-lg">
+              <div className="space-y-6">
                 <InfoCard 
                   title="24/7 Support, Even on Weekends"
                   description="Text, call, or email your loan advisor 7 days a week. Day or night, on your schedule and receive an instant response."
@@ -242,7 +242,7 @@ const ClientPortalLanding = () => {
               </div>
             </div>
 
-            <div className="lg:col-span-4 bg-white rounded-3xl min-h-[700px] shadow-2xl">
+            <div className="lg:col-span-4 bg-white rounded-3xl min-h-[700px] shadow-lg">
               {/* Image placeholder - will be added later */}
             </div>
           </div>
