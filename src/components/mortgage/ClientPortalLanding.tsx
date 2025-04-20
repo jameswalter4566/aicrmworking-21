@@ -196,9 +196,9 @@ const ClientPortalLanding = () => {
 
       <section className="pt-64 md:pt-72 pb-24 px-4 bg-gradient-to-br from-blue-950 to-blue-900">
         <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12 text-white">Everything You Need in One Place</h2>
+          <h2 className="text-3xl font-bold text-center mb-16 text-white">Everything You Need in One Place</h2>
           
-          <div className="grid md:grid-cols-3 gap-8 mb-16">
+          <div className="grid md:grid-cols-3 gap-8 mb-24">
             <GlowingCard
               title="Secure Access"
               description="Bank-level security protects your sensitive information while providing easy access to your documents."
@@ -224,9 +224,9 @@ const ClientPortalLanding = () => {
             />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-16">
-            <div className="lg:col-span-8 bg-white rounded-2xl p-8">
-              <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 mt-24">
+            <div className="lg:col-span-8 bg-white rounded-3xl p-12 shadow-2xl">
+              <div className="space-y-8">
                 <InfoCard 
                   title="24/7 Support, Even on Weekends"
                   description="Text, call, or email your loan advisor 7 days a week. Day or night, on your schedule and receive an instant response."
@@ -242,7 +242,7 @@ const ClientPortalLanding = () => {
               </div>
             </div>
 
-            <div className="lg:col-span-4 bg-white rounded-2xl min-h-[600px]">
+            <div className="lg:col-span-4 bg-white rounded-3xl min-h-[700px] shadow-2xl">
               {/* Image placeholder - will be added later */}
             </div>
           </div>
