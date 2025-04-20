@@ -1,9 +1,12 @@
 
 .burning-star-container {
   position: relative;
-  height: 2px;
-  margin-top: -10px;
+  height: 10px;
   z-index: 10;
+  display: flex;
+  justify-content: center;
+  margin-top: -30px;
+  margin-bottom: 20px;
 }
 
 .burning-star-line {
@@ -13,6 +16,7 @@
   transform: scaleX(0);
   transform-origin: center;
   animation: expandLine 2s ease-out forwards;
+  will-change: transform;
 }
 
 .burning-star-line::after {
@@ -30,19 +34,19 @@
     transparent 100%
   );
   box-shadow: 
-    0 0 10px rgba(255, 255, 255, 0.5),
-    0 0 20px rgba(255, 255, 255, 0.3),
-    0 0 30px rgba(255, 255, 255, 0.1);
+    0 0 10px rgba(255, 255, 255, 0.6),
+    0 0 20px rgba(255, 255, 255, 0.4),
+    0 0 30px rgba(255, 255, 255, 0.2);
 }
 
 .star-head-left,
 .star-head-right {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
   background: white;
   border-radius: 50%;
-  top: -2px;
+  top: -3px;
   filter: blur(1px);
   box-shadow: 
     0 0 10px rgba(255, 255, 255, 1),
@@ -91,4 +95,22 @@
     right: 0;
     opacity: 0;
   }
+}
+
+/* Add this to be sure the animation plays */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-start .burning-star-line {
+  animation: expandLine 2s ease-out forwards;
+}
+
+.animate-start .star-head-left {
+  animation: moveStarLeft 2s ease-out forwards;
+}
+
+.animate-start .star-head-right {
+  animation: moveStarRight 2s ease-out forwards;
 }

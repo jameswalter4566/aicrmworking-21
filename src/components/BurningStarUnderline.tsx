@@ -8,15 +8,21 @@ interface BurningStarUnderlineProps {
 
 const BurningStarUnderline = ({ width = 400 }: BurningStarUnderlineProps) => {
   const lineRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (lineRef.current) {
       lineRef.current.style.width = `${width}px`;
     }
+    
+    // Force a repaint to ensure animation starts
+    if (containerRef.current) {
+      containerRef.current.classList.add('animate-start');
+    }
   }, [width]);
 
   return (
-    <div className="burning-star-container">
+    <div className="burning-star-container" ref={containerRef}>
       <div className="burning-star-line" ref={lineRef}>
         <div className="star-head-left"></div>
         <div className="star-head-right"></div>
