@@ -156,13 +156,17 @@ const ClientPortalLanding = () => {
       <section className="bg-gradient-to-br from-blue-900 to-blue-950 text-white px-4 min-h-screen flex items-center justify-center relative">
         <div className="max-w-6xl mx-auto relative">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-7xl font-bold mb-8 leading-tight">
-              The world's first{" "}
+            <h1 className="text-7xl font-bold mb-4 leading-tight">
+              <div className="mb-2">The world's first</div>
               <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">
                 AI-Powered
               </span>
               {" "}loan officer
             </h1>
+            <p className="text-xl text-blue-200 mb-8 max-w-2xl mx-auto">
+              Experience mortgage lending reimagined with advanced AI technology, 
+              providing personalized service 24/7 for your home financing needs.
+            </p>
             <div className="relative mb-2">
               <BurningStarUnderline width={600} />
             </div>
