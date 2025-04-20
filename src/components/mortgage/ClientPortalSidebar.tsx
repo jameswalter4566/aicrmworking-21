@@ -35,6 +35,7 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
 
   const menuItems = [
     { id: 'home', icon: Home, label: 'Dashboard' },
+    { id: 'application', icon: FileText, label: 'Application', isExpandable: true },
     { id: 'conditions', icon: FileText, label: 'Conditions' },
     { id: 'attention', icon: AlertTriangle, label: 'Attention' },
     { id: 'support', icon: MessageCircle, label: 'Support' },
@@ -62,57 +63,64 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="space-y-2">
                 {menuItems.map((item) => (
                   <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      isActive={activeTab === item.id}
-                      onClick={() => setActiveTab(item.id)}
-                      className={`relative flex items-center w-full rounded-lg transition-colors ${
-                        activeTab === item.id 
-                          ? 'bg-blue-500 text-white ring-2 ring-white' 
-                          : 'bg-white text-blue-600 hover:bg-blue-50'
-                      }`}
-                    >
-                      <item.icon className="h-5 w-5" />
-                      <span className="ml-3">{item.label}</span>
-                    </SidebarMenuButton>
+                    {item.id === 'application' ? (
+                      <div>
+                        <SidebarMenuButton
+                          onClick={() => setIsLoanAppExpanded(!isLoanAppExpanded)}
+                          className={cn(
+                            "relative flex items-center w-full rounded-lg transition-colors mb-1",
+                            isLoanAppExpanded 
+                              ? "bg-blue-500 text-white ring-2 ring-white" 
+                              : "bg-white text-blue-600 hover:bg-blue-50"
+                          )}
+                        >
+                          <item.icon className="h-5 w-5" />
+                          <span className="ml-3">{item.label}</span>
+                          <ChevronDown 
+                            className={cn(
+                              "ml-auto h-4 w-4 transition-transform duration-200",
+                              isLoanAppExpanded && "rotate-180"
+                            )}
+                          />
+                        </SidebarMenuButton>
+                        <div className={cn(
+                          "overflow-hidden transition-all duration-300 ease-in-out",
+                          isLoanAppExpanded ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+                        )}>
+                          <SidebarMenuSub>
+                            <div className="space-y-3 py-2">
+                              {loanAppSections.map((section) => (
+                                <SidebarMenuSubButton
+                                  key={section.id}
+                                  className="flex items-center w-full text-sm text-white/90 hover:text-white pl-8 py-1.5"
+                                >
+                                  <section.icon className="h-4 w-4 mr-2" />
+                                  {section.label}
+                                </SidebarMenuSubButton>
+                              ))}
+                            </div>
+                          </SidebarMenuSub>
+                        </div>
+                      </div>
+                    ) : (
+                      <SidebarMenuButton
+                        isActive={activeTab === item.id}
+                        onClick={() => setActiveTab(item.id)}
+                        className={`relative flex items-center w-full rounded-lg transition-colors ${
+                          activeTab === item.id 
+                            ? 'bg-blue-500 text-white ring-2 ring-white' 
+                            : 'bg-white text-blue-600 hover:bg-blue-50'
+                        }`}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span className="ml-3">{item.label}</span>
+                      </SidebarMenuButton>
+                    )}
                   </SidebarMenuItem>
                 ))}
-                
-                {/* Loan Application Section */}
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => setIsLoanAppExpanded(!isLoanAppExpanded)}
-                    className={cn(
-                      "relative flex items-center w-full rounded-lg transition-colors bg-white text-blue-600 hover:bg-blue-50",
-                      isLoanAppExpanded && "bg-blue-50"
-                    )}
-                  >
-                    <FileText className="h-5 w-5" />
-                    <span className="ml-3">1003</span>
-                    <ChevronDown 
-                      className={cn(
-                        "ml-auto h-4 w-4 transition-transform",
-                        isLoanAppExpanded && "rotate-180"
-                      )}
-                    />
-                  </SidebarMenuButton>
-
-                  {isLoanAppExpanded && (
-                    <SidebarMenuSub>
-                      {loanAppSections.map((section) => (
-                        <SidebarMenuSubButton
-                          key={section.id}
-                          className="flex items-center w-full text-sm text-white hover:text-blue-100"
-                        >
-                          <section.icon className="h-4 w-4 mr-2" />
-                          {section.label}
-                        </SidebarMenuSubButton>
-                      ))}
-                    </SidebarMenuSub>
-                  )}
-                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
