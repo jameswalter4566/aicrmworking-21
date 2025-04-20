@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -39,12 +38,11 @@ import LoanApplicationViewer from "./pages/LoanApplicationViewer";
 import ProcessorAssist from "./pages/ProcessorAssist";
 import ProcessorAssistViewer from "./pages/ProcessorAssistViewer";
 import CallingListViewer from "./pages/CallingListViewer";
-import { ClientPortalLanding } from "./components/mortgage/ClientPortalLanding";
+import ClientPortal from "./pages/ClientPortal";
+import ClientPortalLanding from "./components/mortgage/ClientPortalLanding";
 import LoanApplicationForm from "./pages/LoanApplicationForm";
 import Dialer from "./pages/Dialer";
 import DialerSession from "./pages/DialerSession";
-import ClientPortal from "./pages/ClientPortal";
-// Remove the duplicate import for ClientPortalLanding
 
 const queryClient = new QueryClient();
 
@@ -280,6 +278,7 @@ function App() {
                 
                 <Route path="/calling-list/:id" element={<CallingListViewer />} />
                 
+                {/* Update client portal routes to show landing by default */}
                 <Route path="/client-portal-landing" element={<ClientPortalLanding />} />
                 <Route path="/client-portal" element={<ClientPortalLanding />} />
                 <Route path="/client-portal/dashboard/:slug" element={<ClientPortal />} />

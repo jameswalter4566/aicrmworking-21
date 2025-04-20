@@ -1,202 +1,221 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, ArrowRight } from 'lucide-react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { Card } from '@/components/ui/card';
+import { ArrowRight, Shield, Clock, FileCheck, PieChart, Loader2 } from 'lucide-react';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { getPortalAccess, updateLastAccessed } from '@/utils/clientPortalUtils';
+import { toast } from '@/components/ui/use-toast';
 
-export interface ClientPortalLandingProps {
-  slug?: string;
-  token?: string;
-}
-
-export const ClientPortalLanding = ({ slug, token }: ClientPortalLandingProps = {}) => {
+const ClientPortalLanding = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
-  const params = useParams();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [companyName, setCompanyName] = useState('Your Mortgage Company');
-  const [leadName, setLeadName] = useState('');
-
-  // Use props if provided, otherwise try to get from URL params
-  const portalSlug = slug || params.slug || searchParams.get('slug') || '';
-  const accessToken = token || searchParams.get('token') || '';
-
+  const [isValidating, setIsValidating] = useState(false);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Extract slug from the URL if present
+  const getPortalSlug = () => {
+    const pathParts = location.pathname.split('/');
+    if (pathParts.length > 2 && pathParts[1] === 'client-portal') {
+      return pathParts[2];
+    }
+    return '';
+  };
+  
+  const slug = getPortalSlug();
+  const token = searchParams.get('token');
+  
+  // Check if token is in URL params and store it
   useEffect(() => {
-    const validateAccess = async () => {
-      if (!portalSlug || !accessToken) {
-        setError('Invalid portal link');
-        setLoading(false);
-        return;
-      }
-
-      try {
-        // Verify access token
-        const { data: portalData, error: portalError } = await supabase
-          .from('client_portal_access')
-          .select('*')
-          .eq('portal_slug', portalSlug)
-          .eq('access_token', accessToken)
-          .maybeSingle();
-        
-        if (portalError || !portalData) {
-          setError('Portal access has expired or is invalid');
-          setLoading(false);
-          return;
-        }
-
-        // Get lead information
-        if (portalData?.lead_id) {
-          const { data: leadData } = await supabase
-            .from('leads')
-            .select('first_name, last_name, created_by')
-            .eq('id', portalData.lead_id)
-            .maybeSingle();
-
-          if (leadData) {
-            setLeadName(`${leadData.first_name || ''} ${leadData.last_name || ''}`.trim());
+    if (token) {
+      setAccessToken(token);
+    }
+    setIsLoading(false);
+  }, [token]);
+  
+  // Validate token when landing page loads if we have both a slug and token
+  useEffect(() => {
+    const validateToken = async () => {
+      if (slug && token && !isValidating && !isLoading) {
+        // Auto-validate the token on page load, but don't auto-redirect
+        try {
+          const { access } = await getPortalAccess(slug, token);
+          
+          if (access) {
+            // Token is valid, but we don't auto-redirect - user must click the button
+            console.log("Token validated successfully");
             
-            // Get company name if we have a creator
-            if (leadData.created_by) {
-              const { data: companyData } = await supabase
-                .from('company_settings')
-                .select('company_name')
-                .eq('user_id', leadData.created_by)
-                .maybeSingle();
-
-              if (companyData?.company_name) {
-                setCompanyName(companyData.company_name);
-              }
+            // Update last accessed timestamp
+            if (access.id) {
+              await updateLastAccessed(access.id);
             }
           }
+        } catch (error) {
+          console.error("Token validation error:", error);
         }
-        
-        setLoading(false);
-
-      } catch (err) {
-        console.error('Error validating portal access:', err);
-        setError('An error occurred while validating your portal access');
-        setLoading(false);
       }
     };
-
-    validateAccess();
-  }, [portalSlug, accessToken, params.slug]);
-
+    
+    validateToken();
+  }, [slug, token, isLoading]);
+  
   const handleEnterPortal = async () => {
-    if (!portalSlug || !accessToken) return;
-
-    try {
-      // Update the last_accessed timestamp
-      const { data: portalData } = await supabase
-        .from('client_portal_access')
-        .select('id')
-        .eq('portal_slug', portalSlug)
-        .eq('access_token', accessToken)
-        .maybeSingle();
+    if (slug) {
+      // If we have both slug and token, validate access
+      if (accessToken) {
+        setIsValidating(true);
         
-      if (portalData?.id) {
-        await supabase
-          .from('client_portal_access')
-          .update({ last_accessed_at: new Date().toISOString() })
-          .eq('id', portalData.id);
+        try {
+          const { access, error } = await getPortalAccess(slug, accessToken);
+          
+          if (access) {
+            // Valid access, navigate to dashboard with token
+            navigate(`/client-portal/dashboard/${slug}?token=${accessToken}`);
+          } else {
+            // Invalid access
+            toast({
+              title: "Access Error",
+              description: error || "Invalid access credentials",
+              variant: "destructive"
+            });
+            
+            // Navigate to general dashboard without specific access
+            navigate('/client-portal/dashboard');
+          }
+        } catch (error) {
+          toast({
+            title: "Error",
+            description: "Could not validate portal access",
+            variant: "destructive"
+          });
+        } finally {
+          setIsValidating(false);
+        }
+      } else {
+        // No token but we have slug, go to dashboard input page
+        navigate(`/client-portal/dashboard/${slug}`);
       }
-      
-      // Navigate to the client portal
-      navigate(`/client-portal/${portalSlug}?token=${accessToken}`);
-    } catch (err) {
-      console.error('Error updating last accessed:', err);
-      // Still navigate even if updating last accessed fails
-      navigate(`/client-portal/${portalSlug}?token=${accessToken}`);
+    } else {
+      // If no slug is found, go to login page where they can enter credentials
+      navigate('/client-portal/dashboard');
     }
   };
-
-  if (loading) {
+  
+  if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p>Verifying your portal access...</p>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 size={48} className="animate-spin text-emerald-500 mb-4" />
+          <p className="text-lg">Loading your portal access...</p>
+        </div>
       </div>
     );
   }
-
-  if (error) {
-    return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader>
-          <CardTitle className="text-center text-red-600">Access Error</CardTitle>
-          <CardDescription className="text-center">
-            {error}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="text-center">
-          <p>If you believe this is an error, please contact your loan officer.</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  
   return (
-    <Card className="w-full max-w-md mx-auto shadow-lg">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">{companyName}</CardTitle>
-        <CardDescription>
-          Secure Client Mortgage Portal
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-6">
-        <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 text-center">
-          <p className="text-base">
-            {leadName ? (
-              <>Welcome, <span className="font-semibold">{leadName}</span></>
-            ) : (
-              <>Welcome to your Mortgage Portal</>
-            )}
+    <div className="min-h-screen">
+      {/* Hero Section */}
+      <section className="bg-gradient-to-br from-green-800 to-green-900 text-white px-4 py-20">
+        <div className="max-w-6xl mx-auto">
+          <div className="max-w-3xl">
+            <h1 className="text-5xl font-bold mb-6">
+              Smart Mortgage Processing
+              <span className="bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent"> Powered by AI</span>
+            </h1>
+            <p className="text-xl mb-8 text-gray-100">
+              Our technology streamlines your mortgage journey with faster approvals, 
+              transparent processing, and 24/7 access to your loan status.
+            </p>
+            <Button 
+              size="lg"
+              onClick={handleEnterPortal}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+              disabled={isValidating}
+            >
+              {isValidating ? 'Validating Access...' : 'Access Your Portal'}
+              <ArrowRight className="ml-2 h-5 w-5" />
+            </Button>
+            <p className="mt-4 text-sm text-gray-200 flex items-center">
+              <Clock className="h-4 w-4 mr-2" />
+              Average processing time: 2-3 weeks faster than traditional lenders
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-20 px-4 bg-gray-50">
+        <div className="max-w-6xl mx-auto">
+          <h2 className="text-3xl font-bold text-center mb-12">Everything You Need in One Place</h2>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="p-6">
+              <div className="h-12 w-12 rounded-lg bg-emerald-100 flex items-center justify-center mb-4">
+                <Shield className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Secure Access</h3>
+              <p className="text-gray-600">
+                Bank-level security protects your sensitive information while providing 
+                easy access to your documents.
+              </p>
+            </Card>
+
+            <Card className="p-6">
+              <div className="h-12 w-12 rounded-lg bg-emerald-100 flex items-center justify-center mb-4">
+                <PieChart className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Real-Time Updates</h3>
+              <p className="text-gray-600">
+                Track your loan's progress in real-time and get instant notifications 
+                about important milestones.
+              </p>
+            </Card>
+
+            <Card className="p-6">
+              <div className="h-12 w-12 rounded-lg bg-emerald-100 flex items-center justify-center mb-4">
+                <FileCheck className="h-6 w-6 text-emerald-600" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Document Management</h3>
+              <p className="text-gray-600">
+                Upload, sign, and manage all your loan documents in one centralized, 
+                easy-to-use platform.
+              </p>
+            </Card>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section */}
+      <section className="py-20 px-4">
+        <div className="max-w-6xl mx-auto text-center">
+          <h2 className="text-3xl font-bold mb-6">Ready to Get Started?</h2>
+          <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">
+            Access your personalized mortgage portal to track your loan progress, 
+            upload documents, and stay connected with your loan team.
+          </p>
+          <Button
+            size="lg"
+            onClick={handleEnterPortal}
+            className="bg-emerald-500 hover:bg-emerald-600 text-white"
+            disabled={isValidating}
+          >
+            {isValidating ? 'Validating Access...' : 'Enter Portal'}
+            <ArrowRight className="ml-2 h-5 w-5" />
+          </Button>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-8 px-4">
+        <div className="max-w-6xl mx-auto text-center">
+          <p className="text-sm opacity-75">
+            © {new Date().getFullYear()} Mortgage Client Portal. All rights reserved.
           </p>
         </div>
-        
-        <div className="space-y-4">
-          <div className="flex items-center space-x-3">
-            <div className="bg-green-100 rounded-full p-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <p className="text-sm">Track your mortgage application progress</p>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className="bg-green-100 rounded-full p-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <p className="text-sm">Upload required documents securely</p>
-          </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className="bg-green-100 rounded-full p-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <p className="text-sm">Easy communication with your loan officer</p>
-          </div>
-        </div>
-      </CardContent>
-      
-      <CardFooter>
-        <Button 
-          onClick={handleEnterPortal} 
-          className="w-full bg-blue-600 hover:bg-blue-700"
-        >
-          Enter Portal <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
-      </CardFooter>
-    </Card>
+      </footer>
+    </div>
   );
 };
 

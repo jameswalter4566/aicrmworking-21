@@ -1,14 +1,12 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
 import ClientPortalLoanProgress from './ClientPortalLoanProgress';
 import { Upload, FileText, ClipboardCheck, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
-import { useEffect } from 'react';
-import { ClientPortalOnboarding } from './ClientPortalOnboarding';
-import { LeadProfile, leadProfileService } from '@/services/leadProfile';
+import { useEffect, useState } from 'react';
 
 interface CompanySettings {
   company_name: string;
@@ -21,60 +19,6 @@ interface ClientPortalContentProps {
   leadId: string | number;
   isInPipeline?: boolean;
   createdBy?: string;
-}
-
-// Update the mortgage data type to include onboardingCompleted
-interface ExtendedMortgageData {
-  borrower?: {
-    fullLegalName?: string;
-    dateOfBirth?: string;
-    socialSecurityNumber?: string;
-    maritalStatus?: string;
-    dependents?: string;
-    citizenship?: string;
-    creditScore?: string;
-    middleName?: string;
-  };
-  currentAddress?: {
-    streetAddress?: string;
-    cityStateZip?: string;
-    durationAtAddress?: string;
-    housingStatus?: string;
-    monthlyHousingExpense?: string;
-  };
-  employment?: {
-    employerName?: string;
-    employerAddress?: string;
-    jobTitle?: string;
-    startDate?: string;
-    endDate?: string;
-    monthlyIncome?: string;
-    isSelfEmployed?: boolean;
-    employmentStatus?: string;
-  };
-  income?: {
-    baseIncome?: string;
-    overtimeIncome?: string;
-    otherIncome?: string;
-    annualIncome?: string;
-  };
-  mortgage?: {
-    loanType?: string;
-    mortgageTerm?: string;
-    amortizationType?: string;
-    interestRate?: string;
-    mortgageInsurance?: string;
-    hasExistingMortgage?: boolean;
-    currentBalance?: string;
-    monthlyPayment?: string;
-    purpose?: string;
-  };
-  property?: {
-    propertyType?: string;
-    valueEstimate?: string;
-    yearBuilt?: string;
-  };
-  onboardingCompleted?: boolean;
 }
 
 const PrePipelineMessage = ({ title, description, settings }: { title: string; description: string; settings: CompanySettings }) => {
@@ -101,15 +45,14 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     secondary_color: '#8B5CF6',
     accent_color: '#EA384C',
   });
-  const [showOnboarding, setShowOnboarding] = useState(!isInPipeline);
-  const [leadData, setLeadData] = useState<LeadProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
 
+  // This effect will now fetch company settings based on the creator ID
   useEffect(() => {
     const fetchCompanySettings = async () => {
       if (!createdBy) return;
 
       try {
+        // If we have a createdBy user ID, try to fetch their company settings
         const { data, error } = await supabase
           .from('company_settings')
           .select('*')
@@ -130,29 +73,14 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       }
     };
 
-    const fetchLeadData = async () => {
-      setIsLoading(true);
-      try {
-        const leadProfile = await leadProfileService.getLeadById(leadId);
-        setLeadData(leadProfile);
-        
-        // Type assertion to access the extended mortgage data
-        const mortgageData = leadProfile.mortgageData as ExtendedMortgageData;
-        const hasCompletedOnboarding = mortgageData && mortgageData.onboardingCompleted === true;
-        
-        setShowOnboarding(!isInPipeline && !hasCompletedOnboarding);
-      } catch (error) {
-        console.error('Error fetching lead data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
+    // If we already have a creator ID, fetch settings immediately
     if (createdBy) {
       fetchCompanySettings();
     } else {
+      // If we don't have a creator ID but we have a leadId, try to get it from portal access
       const getCreatorFromPortalAccess = async () => {
         try {
+          // Fix: Convert leadId to a number only for the query
           const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
           
           const { data, error } = await supabase
@@ -166,9 +94,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             return;
           }
 
+          // Fix: Check if data exists and has the created_by property, and ensure it's a string
           if (data && 'created_by' in data && data.created_by) {
-            const creatorId = String(data.created_by);
+            const creatorId = String(data.created_by); // Explicit cast to string
             
+            // Now fetch the company settings with this user ID
             const { data: companyData, error: companyError } = await supabase
               .from('company_settings')
               .select('*')
@@ -192,59 +122,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
       getCreatorFromPortalAccess();
     }
-    
-    fetchLeadData();
-  }, [createdBy, leadId, isInPipeline]);
+  }, [createdBy, leadId]);
 
   const refreshData = () => {
     console.log("Refreshing data...");
   };
-
-  const handleOnboardingComplete = async () => {
-    try {
-      // Cast to ExtendedMortgageData type to access onboardingCompleted
-      const updatedMortgageData = {
-        ...leadData?.mortgageData as ExtendedMortgageData,
-        onboardingCompleted: true
-      };
-      
-      await leadProfileService.updateLead(leadId, {
-        ...leadData,
-        mortgageData: updatedMortgageData
-      });
-      
-      setShowOnboarding(false);
-    } catch (error) {
-      console.error('Error completing onboarding:', error);
-    }
-  };
-
-  if (isLoading) {
-    return <div className="flex justify-center p-8">Loading...</div>;
-  }
-
-  if (showOnboarding) {
-    return (
-      <div className="space-y-6">
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-white">
-          <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold" style={{ color: settings.primary_color }}>
-              Welcome to {settings.company_name}
-            </h2>
-            <p className="text-gray-600">
-              Let's get started with your mortgage application. Please complete the following steps to provide us with the information we need.
-            </p>
-          </div>
-        </Card>
-
-        <ClientPortalOnboarding 
-          leadId={leadId} 
-          onComplete={handleOnboardingComplete}
-          initialData={leadData || undefined}
-        />
-      </div>
-    );
-  }
 
   if (!isInPipeline) {
     return (

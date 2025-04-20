@@ -19,7 +19,6 @@ import { ClientPortalConditions } from "@/components/mortgage/ClientPortalCondit
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProgress";
-import { ClientPortalContent } from "@/components/mortgage/ClientPortalContent";
 
 const progressSteps = [
   "Application Created",
@@ -544,72 +543,52 @@ const ClientPortal = () => {
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [activeTab, setActiveTab] = useState("home");
-  const [isInPipeline, setIsInPipeline] = useState(false);
-  const [createdBy, setCreatedBy] = useState<string | undefined>(undefined);
   
   useEffect(() => {
-    verifyAccess();
-  }, [slug, token]);
-  
-  const verifyAccess = async () => {
-    if (!slug || !token) {
-      setLoading(false);
-      return;
-    }
-    
-    try {
-      console.log("Verifying portal access for slug:", slug);
-      const { data: portalData, error: portalError } = await supabase
-        .from('client_portal_access')
-        .select('*')
-        .eq('portal_slug', slug)
-        .eq('access_token', token)
-        .single();
-      
-      if (portalError || !portalData) {
-        console.error("Portal access error:", portalError);
+    const verifyAccess = async () => {
+      if (!slug || !token) {
         setLoading(false);
         return;
       }
-
-      console.log("Portal access verified, updating last accessed");
-      await supabase
-        .from('client_portal_access')
-        .update({ last_accessed_at: new Date().toISOString() })
-        .eq('id', portalData.id);
-    
-      // Check if the lead is in the mortgage pipeline
-      if (portalData.lead_id) {
-        const { data: leadData, error: leadError } = await supabase
-          .from('leads')
-          .select('is_mortgage_lead, added_to_pipeline_at, created_by')
-          .eq('id', portalData.lead_id)
-          .maybeSingle();
-          
-        if (!leadError && leadData) {
-          setIsInPipeline(!!leadData.added_to_pipeline_at);
-          
-          // Set createdBy if available
-          if (leadData.created_by) {
-            setCreatedBy(leadData.created_by);
-          }
-        }
-      }
       
-      // Set client data with the lead ID from portal data
-      const clientDataWithLeadId = {
-        ...mockClientData,
-        leadId: portalData.lead_id
-      };
-      console.log("Setting client data with leadId:", clientDataWithLeadId);
-      setClientData(clientDataWithLeadId);
-      setAuthenticated(true);
-    } catch (error) {
-      console.error("Error verifying access:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      try {
+        console.log("Verifying portal access for slug:", slug);
+        const { data: portalData, error: portalError } = await supabase
+          .from('client_portal_access')
+          .select('*')
+          .eq('portal_slug', slug)
+          .eq('access_token', token)
+          .single();
+        
+        if (portalError || !portalData) {
+          console.error("Portal access error:", portalError);
+          setLoading(false);
+          return;
+        }
+
+        console.log("Portal access verified, updating last accessed");
+        await supabase
+          .from('client_portal_access')
+          .update({ last_accessed_at: new Date().toISOString() })
+          .eq('id', portalData.id);
+        
+        // Set client data with the lead ID from portal data
+        const clientDataWithLeadId = {
+          ...mockClientData,
+          leadId: portalData.lead_id
+        };
+        console.log("Setting client data with leadId:", clientDataWithLeadId);
+        setClientData(clientDataWithLeadId);
+        setAuthenticated(true);
+      } catch (error) {
+        console.error("Error verifying access:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    verifyAccess();
+  }, [slug, token]);
 
   const refreshData = async () => {
     if (clientData) {
@@ -689,15 +668,7 @@ const ClientPortal = () => {
       <ClientPortalNavbar clientData={clientData} activeTab={activeTab} setActiveTab={setActiveTab} />
       
       <div className="container mx-auto p-4 md:p-6 mt-2">
-        {activeTab === "home" && clientData?.leadId && (
-          <div className="w-full">
-            <ClientPortalContent 
-              leadId={clientData.leadId} 
-              isInPipeline={isInPipeline}
-              createdBy={createdBy}
-            />
-          </div>
-        )}
+        {activeTab === "home" && <HomeTab clientData={clientData} />}
         {activeTab === "conditions" && clientData?.leadId && (
           <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
         )}
