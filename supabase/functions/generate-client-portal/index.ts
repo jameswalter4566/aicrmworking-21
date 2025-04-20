@@ -26,67 +26,102 @@ function generateAccessToken(length = 32): string {
 }
 
 serve(async (req) => {
+  console.log("Portal generation function called");
+  
   // Handle CORS
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
+    
+    console.log("Supabase URL available:", !!supabaseUrl);
+    console.log("Supabase Anon Key available:", !!supabaseAnonKey);
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error("Missing Supabase credentials");
+    }
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      supabaseUrl,
+      supabaseAnonKey,
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: req.headers.get('Authorization') || '' },
         },
       }
-    )
+    );
 
     // Get request data
-    const { leadId, createdBy } = await req.json()
+    const requestData = await req.json();
+    console.log("Request data:", JSON.stringify(requestData));
+    
+    const { leadId, createdBy } = requestData;
 
     if (!leadId) {
+      console.error("Missing leadId in request");
       return new Response(
         JSON.stringify({ error: 'Lead ID is required' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 400 
         }
-      )
+      );
     }
 
     // Check if the lead exists
+    console.log("Checking if lead exists:", leadId);
     const { data: lead, error: leadError } = await supabaseClient
       .from('leads')
       .select('id, first_name, last_name')
       .eq('id', leadId)
-      .single()
+      .single();
 
-    if (leadError || !lead) {
+    if (leadError) {
+      console.error("Error fetching lead:", leadError.message);
+      return new Response(
+        JSON.stringify({ error: 'Lead not found', details: leadError.message }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 404 
+        }
+      );
+    }
+    
+    if (!lead) {
+      console.error("Lead not found with ID:", leadId);
       return new Response(
         JSON.stringify({ error: 'Lead not found' }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 404 
         }
-      )
+      );
     }
 
     // Check if a portal already exists for this lead
-    const { data: existingPortal } = await supabaseClient
+    console.log("Checking for existing portal for lead:", leadId);
+    const { data: existingPortal, error: existingPortalError } = await supabaseClient
       .from('client_portal_access')
       .select('*')
       .eq('lead_id', leadId)
-      .single()
+      .single();
+      
+    if (existingPortalError && existingPortalError.code !== 'PGRST116') {
+      console.error("Error checking existing portal:", existingPortalError);
+    }
 
     if (existingPortal) {
+      console.log("Found existing portal access", existingPortal.id);
       // Update the created_by field if it's not set and we have a creator now
       if (createdBy && !existingPortal.created_by) {
         await supabaseClient
           .from('client_portal_access')
           .update({ created_by: createdBy })
-          .eq('id', existingPortal.id)
+          .eq('id', existingPortal.id);
       }
       
       // Return the existing portal info - modified to be consistent with new URL format
@@ -99,14 +134,44 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200 
         }
-      )
+      );
     }
 
     // Generate new portal access
-    const portalSlug = generateSlug(10)
-    const accessToken = generateAccessToken()
+    const portalSlug = generateSlug(10);
+    const accessToken = generateAccessToken();
+    
+    console.log("Creating new portal access with slug:", portalSlug);
+
+    // Check if client_portal_access table exists
+    const { data: tableCheck, error: tableCheckError } = await supabaseClient
+      .from('client_portal_access')
+      .select('id')
+      .limit(1);
+      
+    if (tableCheckError) {
+      console.error("Error checking table existence:", tableCheckError.message);
+      
+      // If the table doesn't exist, create it
+      if (tableCheckError.message.includes("relation") && tableCheckError.message.includes("does not exist")) {
+        console.log("Table client_portal_access doesn't exist, trying to create it");
+        
+        // Since we can't create tables directly from edge functions, return a helpful error
+        return new Response(
+          JSON.stringify({ 
+            error: 'The client_portal_access table does not exist. Please create it in your database.',
+            tableError: tableCheckError.message
+          }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500 
+          }
+        );
+      }
+    }
 
     // Store in the database with creator information
+    console.log("Inserting new portal access record");
     const { data: newPortal, error: portalError } = await supabaseClient
       .from('client_portal_access')
       .insert({
@@ -116,18 +181,21 @@ serve(async (req) => {
         created_by: createdBy || null
       })
       .select()
-      .single()
+      .single();
 
     if (portalError) {
+      console.error("Error creating portal access:", portalError.message);
       return new Response(
-        JSON.stringify({ error: 'Failed to create portal access' }),
+        JSON.stringify({ error: 'Failed to create portal access', details: portalError.message }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 500 
         }
-      )
+      );
     }
-
+    
+    console.log("Successfully created new portal access record");
+    
     return new Response(
       JSON.stringify({
         portal: newPortal,
@@ -137,14 +205,15 @@ serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200 
       }
-    )
+    );
   } catch (error) {
+    console.error("Error in generate-client-portal function:", error.message);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message || 'Unknown error' }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500 
       }
-    )
+    );
   }
-})
+});

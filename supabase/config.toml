@@ -1,51 +1,48 @@
 
+# This file contains your Supabase project configuration
 project_id = "imrmboyczebjlbnkgjns"
+functions_dir = "functions"
+manage_secrets = true
 
 [api]
-enabled = true
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
 port = 54322
+major_version = 15
 
 [studio]
-enabled = true
 port = 54323
-api_url = "http://localhost"
 
 [inbucket]
-enabled = true
 port = 54324
-
-[storage]
-enabled = true
+smtp_port = 54325
+pop3_port = 54326
 
 [auth]
-enabled = true
 site_url = "http://localhost:3000"
+additional_redirect_urls = ["https://localhost:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
 
-[realtime]
-enabled = true
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[storage]
+file_size_limit = "50MiB"
 
 [functions.twilio-token]
 verify_jwt = false
 
+[functions.generate-client-portal]
+verify_jwt = false
+
 [functions.twilio-voice]
 verify_jwt = false
-
-[functions.parse-underwriting-email]
-verify_jwt = false
-
-[functions.search-approval-emails]
-verify_jwt = false
-
-[functions.check-approval-emails]
-verify_jwt = false
-
-[functions.sms-webhook-receiver]
-verify_jwt = false
-
-[functions.ai-sms-agent]
-verify_jwt = false
-

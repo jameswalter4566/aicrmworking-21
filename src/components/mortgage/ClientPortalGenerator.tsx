@@ -20,13 +20,17 @@ const ClientPortalGenerator = ({ leadId, onLinkGenerated, createdBy }: ClientPor
       const { url, error } = await generateClientPortal(leadId, createdBy);
       
       if (error) {
+        console.error('Error generating portal:', error);
         throw new Error(error);
       }
 
       onLinkGenerated(url);
+      toast.success('Portal link generated successfully');
     } catch (error) {
       console.error('Error generating portal:', error);
-      toast.error('Failed to generate portal link');
+      toast.error('Failed to generate portal link', {
+        description: error instanceof Error ? error.message : 'Try again later'
+      });
     } finally {
       setGenerating(false);
     }

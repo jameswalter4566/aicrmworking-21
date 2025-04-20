@@ -17,6 +17,8 @@ export const generateClientPortal = async (leadId: number, createdBy?: string): 
   error?: string;
 }> => {
   try {
+    console.log('Generating portal for lead ID:', leadId);
+    
     // Check if lead exists
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -24,7 +26,12 @@ export const generateClientPortal = async (leadId: number, createdBy?: string): 
       .eq('id', leadId)
       .single();
     
-    if (leadError || !lead) {
+    if (leadError) {
+      console.error("Error checking lead:", leadError);
+      return { url: '', portal: null, error: 'Lead not found: ' + leadError.message };
+    }
+    
+    if (!lead) {
       return { url: '', portal: null, error: 'Lead not found' };
     }
     
@@ -38,12 +45,19 @@ export const generateClientPortal = async (leadId: number, createdBy?: string): 
       return { url: '', portal: null, error: error.message };
     }
     
+    if (!data || !data.portal) {
+      console.error("Invalid response from generate-client-portal:", data);
+      return { url: '', portal: null, error: 'Invalid response from server' };
+    }
+    
     // Generate a URL that directs to the client portal landing page
     // Extract just the slug from the generated URL
     const slug = data.url.split('/client-portal/')[1]?.split('?')[0] || '';
     
     // Create a landing page URL with the slug
     const fullPortalUrl = `${window.location.origin}/client-portal/${slug}?token=${data.portal.access_token}`;
+    
+    console.log("Generated portal URL:", fullPortalUrl);
     
     // Return the portal URL and data
     return {
