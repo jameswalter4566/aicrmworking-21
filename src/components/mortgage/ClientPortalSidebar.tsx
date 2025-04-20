@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Home, 
@@ -94,11 +95,11 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
                               {loanAppSections.map((section) => (
                                 <SidebarMenuSubButton
                                   key={section.id}
-                                  className="flex items-center w-full text-xs text-white/90 hover:text-white pl-8 py-1.5 
-                                    bg-blue-500/20 rounded-lg mx-2 backdrop-blur-sm border border-white/10"
+                                  className="flex items-center w-full text-xs text-white/90 hover:text-white pl-4 py-1.5 
+                                    bg-blue-500/20 rounded-lg mx-2 backdrop-blur-sm border border-white/10 pr-2"
                                 >
-                                  <section.icon className="h-3.5 w-3.5 mr-2" />
-                                  <span className="truncate">{section.label}</span>
+                                  <section.icon className="h-3.5 w-3.5 mr-2 flex-shrink-0" />
+                                  <span className="text-left flex-grow">{section.label}</span>
                                 </SidebarMenuSubButton>
                               ))}
                             </div>
