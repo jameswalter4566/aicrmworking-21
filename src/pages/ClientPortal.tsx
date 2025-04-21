@@ -23,7 +23,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import PersonalInfoPlaceholder from "@/components/mortgage/client-portal/PersonalInfoPlaceholder";
 import EmploymentIncomeSection from "@/components/mortgage/client-portal/EmploymentIncomeSection";
 import ClientPortalAssetForm from "@/components/mortgage/client-portal/ClientPortalAssetForm";
-import { RealEstateOwnedForm } from "@/components/mortgage/1003/RealEstateOwnedForm";
 
 const progressSteps = [
   "Application Created",
@@ -762,4 +761,39 @@ const ClientPortal = () => {
           setActiveAppSection={setActiveAppSection}
         />
         
-        <main className="
+        <main className="flex-1 px-8 pt-8 ml-4">
+          {clientData?.leadId && (
+            <div className="w-full mb-6">
+              <LoanProgressTracker 
+                leadId={clientData.leadId} 
+                className=""
+              />
+            </div>
+          )}
+          
+          <div>
+            {activeTab === "application" && activeAppSection === "personal-info" && (
+              <PersonalInfoPlaceholder />
+            )}
+            {activeTab === "application" && activeAppSection === "employment-income" && (
+              <EmploymentIncomeSection />
+            )}
+            {activeTab === "application" && activeAppSection === "assets" && (
+              <ClientPortalAssetForm
+                isEditable={true}
+              />
+            )}
+            {activeTab === "home" && <HomeTab clientData={clientData} />}
+            {activeTab === "conditions" && clientData?.leadId && (
+              <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
+            )}
+            {activeTab === "attention" && <AttentionTab clientData={clientData} />}
+            {activeTab === "support" && <SupportTab />}
+          </div>
+        </main>
+      </div>
+    </SidebarProvider>
+  );
+};
+
+export default ClientPortal;
