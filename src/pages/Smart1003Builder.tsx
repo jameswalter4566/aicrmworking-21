@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,8 @@ const formSections = [
 
 const Smart1003Builder = () => {
   const { leadId } = useParams<{ leadId: string }>();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState<string>('processing');
   const [isProcessing, setIsProcessing] = useState(true);
   const [processingStep, setProcessingStep] = useState(1);
@@ -53,8 +55,7 @@ const Smart1003Builder = () => {
   const [editedMissingFields, setEditedMissingFields] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const navigate = useNavigate();
-  const { toast } = useToast();
+  const [origin, setOrigin] = useState<string | null>(null);
 
   useEffect(() => {
     const steps = [
@@ -140,14 +141,11 @@ const Smart1003Builder = () => {
     return () => clearInterval(intervalId);
   }, [toast]);
 
-  const handleGoToForm = () => {
-    navigate(`/people/${leadId}`);
-    
-    toast({
-      title: "1003 Form Updated",
-      description: "Your information has been saved to the 1003 form."
-    });
-  };
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const o = params.get("origin");
+    setOrigin(o);
+  }, [location.search]);
 
   const fieldKey = (section: string, field: string) => `${section}__${field}`;
 
@@ -194,6 +192,19 @@ const Smart1003Builder = () => {
         variant: "destructive"
       });
     }
+  };
+
+  const handleGoToForm = () => {
+    if (origin) {
+      navigate(origin.startsWith("/") ? origin : `/${origin}`);
+    } else {
+      navigate(`/people/${leadId}`);
+    }
+
+    toast({
+      title: "1003 Form Updated",
+      description: "Your information has been saved to the 1003 form."
+    });
   };
 
   return (

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { FileUp, FileText, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Helper to create a file URL for a file object
 const createFileURL = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -21,9 +19,10 @@ const createFileURL = (file: File): Promise<string> => {
 
 interface Smart1003BuilderDropboxProps {
   leadId: string;
+  dropboxId?: string;
 }
 
-const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadId }) => {
+const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadId, dropboxId }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -31,13 +30,11 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
   const navigate = useNavigate();
   const { toast } = useToast();
 
-  // Handle drag over event
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
   };
 
-  // Handle drop event
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -62,7 +59,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
     }
   };
 
-  // Handle file input change
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files).filter(file => 
@@ -84,12 +80,10 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
     }
   };
 
-  // Handle file removal
   const handleRemoveFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Process files
   const handleProcessFiles = async () => {
     if (files.length === 0) {
       toast({
@@ -101,16 +95,13 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
     }
 
     try {
-      // Start upload process
       setIsUploading(true);
       
-      // Simulate upload progress
       for (let i = 0; i <= 100; i += 10) {
         await new Promise(resolve => setTimeout(resolve, 200));
         setUploadProgress(i);
       }
       
-      // Create file URLs (would normally be uploaded to storage)
       const fileUrls = await Promise.all(files.map(file => createFileURL(file)));
       
       setIsUploading(false);
@@ -121,18 +112,17 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
         description: "Analyzing your documents to fill out the 1003 form...",
       });
       
-      // Call the smart-1003-builder edge function
       try {
         const { data, error } = await supabase.functions.invoke('smart-1003-builder', {
-          body: { fileUrls, leadId },
+          body: { fileUrls, leadId, dropboxId },
         });
         
         if (error) {
           throw new Error(error.message);
         }
         
-        // Navigate to the Smart 1003 Builder page when done
-        navigate(`/mortgage/smart-1003-builder/${leadId}`);
+        const encodedOrigin = encodeURIComponent(dropboxId || "");
+        navigate(`/mortgage/smart-1003-builder/${leadId}${dropboxId ? `?origin=${encodedOrigin}` : ""}`);
         
       } catch (error) {
         console.error("Error calling edge function:", error);
@@ -169,7 +159,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
       </CardHeader>
       
       <CardContent className="p-0">
-        {/* File Drop Area */}
         {files.length === 0 && (
           <div 
             onDragOver={handleDragOver}
@@ -199,7 +188,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
           </div>
         )}
         
-        {/* File List */}
         {files.length > 0 && (
           <div className="p-4">
             <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
@@ -224,7 +212,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
               ))}
             </div>
             
-            {/* Add more files button */}
             <div className="flex items-center justify-between mb-4">
               <Button 
                 variant="outline" 
@@ -241,7 +228,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
               </p>
             </div>
             
-            {/* Progress indicator */}
             {isUploading && (
               <div className="mb-4">
                 <div className="h-2 w-full bg-blue-100 rounded-full overflow-hidden">
@@ -256,7 +242,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
               </div>
             )}
             
-            {/* Process button */}
             <Button 
               className="w-full" 
               onClick={handleProcessFiles}
