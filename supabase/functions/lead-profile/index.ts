@@ -37,13 +37,19 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching lead with ID: ${id}`);
 
-    // Query the leads table for a specific lead
+    // Determine if the ID is numeric or string and handle differently
+    let query = supabase.from('leads').select('*');
+    
+    // If id is numeric or can be converted to a number
+    if (!isNaN(Number(id))) {
+      query = query.eq('id', Number(id));
+    } else {
+      // If id is likely a string (could be a UUID)
+      query = query.eq('id', id);
+    }
+
     // Using maybeSingle() instead of single() to handle the case when no row is found
-    const { data: lead, error: leadError } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
+    const { data: lead, error: leadError } = await query.maybeSingle();
 
     if (leadError) {
       console.error('Error fetching lead:', leadError.message);
@@ -52,10 +58,33 @@ Deno.serve(async (req) => {
 
     if (!lead) {
       console.log('No lead found with the provided ID');
+      
+      // Add additional debug information to help troubleshoot
+      console.log(`ID value: "${id}", Type: ${typeof id}`);
+      
+      // Check if a lead exists in the database at all (for debugging)
+      const { data: anyLeads, error: countError } = await supabase
+        .from('leads')
+        .select('id')
+        .limit(1);
+        
+      if (!countError && anyLeads) {
+        console.log(`Database has leads. Sample ID: ${anyLeads[0]?.id}`);
+      } else if (countError) {
+        console.error('Error checking for any leads:', countError.message);
+      } else {
+        console.log('No leads found in database at all');
+      }
+      
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: 'Lead not found',
+          debug: {
+            idProvided: id,
+            idType: typeof id,
+            wasNumeric: !isNaN(Number(id))
+          }
         }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -68,7 +97,7 @@ Deno.serve(async (req) => {
     const { data: notes, error: notesError } = await supabase
       .from('lead_notes')
       .select('*')
-      .eq('lead_id', id)
+      .eq('lead_id', lead.id)
       .order('created_at', { ascending: false });
 
     if (notesError) {
@@ -80,7 +109,7 @@ Deno.serve(async (req) => {
     const { data: activities, error: activitiesError } = await supabase
       .from('lead_activities')
       .select('*')
-      .eq('lead_id', id)
+      .eq('lead_id', lead.id)
       .order('timestamp', { ascending: false });
 
     if (activitiesError) {

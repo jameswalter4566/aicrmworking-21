@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -126,6 +127,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     if (!leadId) return;
     
     try {
+      // Convert string leadId to number if it's numeric
       const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
       
       console.log("Explicitly calling lead-profile for ID:", numericLeadId);
