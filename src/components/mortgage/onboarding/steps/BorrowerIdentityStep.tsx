@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,8 +40,9 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
   const ssnParts = initialSSN ? (initialSSN.split("-").length === 3 ? initialSSN.split("-") : ["", "", ""]) : ["", "", ""];
 
   const [showSSN, setShowSSN] = useState(false);
+  const [formIsValid, setFormIsValid] = useState(false);
 
-  const { register, handleSubmit, formState, watch } = useForm<FormData>({
+  const { register, handleSubmit, formState, watch, trigger } = useForm<FormData>({
     mode: "onChange", // This makes validation run on change
     defaultValues: {
       dobMonth: birthParts[0],
@@ -54,6 +55,19 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
       creditConsent: false,
     },
   });
+
+  // Watch all form fields to check validity
+  const watchAll = watch();
+  
+  // Check form validity whenever watched fields change
+  useEffect(() => {
+    const checkFormValidity = async () => {
+      const result = await trigger();
+      setFormIsValid(result);
+    };
+    
+    checkFormValidity();
+  }, [watchAll, trigger]);
 
   const onSubmit = (values: FormData) => {
     const dob =
@@ -213,7 +227,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
       <Button
         type="submit"
         className="w-full bg-[#1769aa] text-white hover:bg-[#145089] text-lg rounded-xl py-4 mt-6"
-        disabled={!formState.isValid || formState.isSubmitting}
+        disabled={formState.isSubmitting}
       >
         Continue
       </Button>
