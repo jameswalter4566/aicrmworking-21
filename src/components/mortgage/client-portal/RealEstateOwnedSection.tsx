@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import {
   Card,
@@ -32,7 +31,31 @@ const OCCUPANCY_TYPES = [
   "Primary Residence", "Second Home", "Investment", "Vacant", "Other"
 ];
 
-// Simple tab visuals (not functional, just styled placeholders)
+const MORTGAGE_TYPES = [
+  "Conventional", "FHA", "VA", "USDA", "Jumbo", "Non-QM"
+];
+const AMORTIZATION_TYPES = [
+  "Fixed", "ARM"
+];
+const DOC_TYPE = [
+  "Full", "Limited", "Alt Doc", "Stated", "Other"
+];
+const MORTGAGE_PURPOSES = [
+  "Purchase", "Refinance 1st Mortgage", "Refinance 2nd Mortgage", "Cash-Out Refi", "Home Equity", "Other"
+];
+const REFINANCE_PURPOSES = [
+  "Rate and Term - Conv", "Cash Out", "Streamline", "Other"
+];
+const PROPERTY_RIGHTS = [
+  "Fee Simple", "Leasehold"
+];
+const ATTACHMENT_TYPES = [
+  "Detached", "Attached", "Co-op", "Planned Unit Development", "Other"
+];
+const MANNER_HELD = [
+  "Sole Ownership", "Joint Tenancy", "Tenants in Common", "Husband and Wife", "Other"
+];
+
 function RealEstateSectionTabs() {
   return (
     <div className="flex gap-2 mb-4">
@@ -51,6 +74,409 @@ function RealEstateSectionTabs() {
         RENTAL INCOME & PROPERTY EXPENSES
       </button>
     </div>
+  );
+}
+
+function LoanInfoTabs({ tab, setTab }: { tab: string, setTab: (x: string) => void }) {
+  return (
+    <div className="flex mb-4 border-b text-xs font-medium">
+      <button
+        className={`px-4 py-2 min-w-[200px] border-b-2 transition-colors ${tab === "purpose" ? "border-mortgage-purple text-mortgage-darkPurple bg-white" : "border-transparent text-gray-400 bg-gray-100"}`}
+        onClick={() => setTab("purpose")}
+        type="button"
+        tabIndex={-1}
+      >
+        MORTGAGE PURPOSE, TYPES & TERMS
+      </button>
+      <button
+        className={`px-4 py-2 min-w-[200px] border-b-2 transition-colors ${tab === "property" ? "border-mortgage-purple text-mortgage-darkPurple bg-white" : "border-transparent text-gray-400 bg-gray-100"}`}
+        onClick={() => setTab("property")}
+        type="button"
+        tabIndex={-1}
+      >
+        SUBJECT PROPERTY
+      </button>
+    </div>
+  );
+}
+
+function LoanPurposeFields() {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Mortgage Applied For</Label>
+        <Select disabled defaultValue="">
+          <SelectTrigger className="bg-gray-100 border rounded">
+            <SelectValue placeholder="Conventional" />
+          </SelectTrigger>
+          <SelectContent>
+            {MORTGAGE_TYPES.map(type => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Amortization Type</Label>
+        <Select disabled defaultValue="">
+          <SelectTrigger className="bg-gray-100 border rounded">
+            <SelectValue placeholder="Fixed" />
+          </SelectTrigger>
+          <SelectContent>
+            {AMORTIZATION_TYPES.map(type => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Loan FICO</Label>
+        <Input disabled placeholder="" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Documentation Type</Label>
+        <Select disabled defaultValue="">
+          <SelectTrigger className="bg-gray-100 border rounded">
+            <SelectValue placeholder="Full" />
+          </SelectTrigger>
+          <SelectContent>
+            {DOC_TYPE.map(type => (
+              <SelectItem key={type} value={type}>{type}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Interest Rate</Label>
+        <div className="flex items-center">
+          <Input disabled placeholder="" type="number" className="rounded-l" />
+          <span className="bg-gray-100 px-3 py-2 rounded-r border border-l-0 border-gray-200 text-gray-600 text-xs">%</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Amortized No. Of Payments</Label>
+        <Input disabled placeholder="360" type="number" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Mortgage Purpose</Label>
+        <Select disabled defaultValue="">
+          <SelectTrigger className="bg-gray-100 border rounded">
+            <SelectValue placeholder="Refinance 1st Mortgage" />
+          </SelectTrigger>
+          <SelectContent>
+            {MORTGAGE_PURPOSES.map(purpose => (
+              <SelectItem key={purpose} value={purpose}>{purpose}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Refinance Purpose</Label>
+        <Select disabled defaultValue="">
+          <SelectTrigger className="bg-gray-100 border rounded">
+            <SelectValue placeholder="Rate and Term - Conv" />
+          </SelectTrigger>
+          <SelectContent>
+            {REFINANCE_PURPOSES.map(purpose => (
+              <SelectItem key={purpose} value={purpose}>{purpose}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Appraised Value</Label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+          <Input disabled placeholder="" type="number" className="rounded-r" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Base Loan Amount</Label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+          <Input disabled placeholder="" type="number" className="rounded-r" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Financed Fees</Label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+          <Input disabled placeholder="0.00" type="number" className="rounded-r" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Total Loan Amount</Label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+          <Input disabled placeholder="" type="number" className="rounded-r" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Second Loan Amount</Label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+          <Input disabled placeholder="0.00" type="number" className="rounded-r" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">LTV</Label>
+        <div className="flex items-center">
+          <Input disabled placeholder="" type="number" className="rounded-l" />
+          <span className="bg-gray-100 px-3 py-2 rounded-r border border-l-0 border-gray-200 text-gray-600 text-xs">%</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">CLTV</Label>
+        <div className="flex items-center">
+          <Input disabled placeholder="" type="number" className="rounded-l" />
+          <span className="bg-gray-100 px-3 py-2 rounded-r border border-l-0 border-gray-200 text-gray-600 text-xs">%</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">TLTV</Label>
+        <div className="flex items-center">
+          <Input disabled placeholder="" type="number" className="rounded-l" />
+          <span className="bg-gray-100 px-3 py-2 rounded-r border border-l-0 border-gray-200 text-gray-600 text-xs">%</span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Year Acquired</Label>
+        <Input disabled placeholder="" type="number" />
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Amount Existing Liens</Label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+          <Input disabled placeholder="0.00" type="number" className="rounded-r" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-3">
+        <Label className="text-xs font-semibold">Original Cost</Label>
+        <div className="flex items-center">
+          <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+          <Input disabled placeholder="" type="number" className="rounded-r" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SubjectPropertyFields() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Property Type</Label>
+          <Select disabled defaultValue="">
+            <SelectTrigger className="bg-gray-100 border rounded">
+              <SelectValue placeholder="Single Family Residence" />
+            </SelectTrigger>
+            <SelectContent>
+              {PROPERTY_TYPES.map(type => (
+                <SelectItem key={type} value={type}>{type}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Occupancy</Label>
+          <Select disabled defaultValue="">
+            <SelectTrigger className="bg-gray-100 border rounded">
+              <SelectValue placeholder="Primary Residence" />
+            </SelectTrigger>
+            <SelectContent>
+              {OCCUPANCY_TYPES.map(opt => (
+                <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Attachment Type</Label>
+          <Select disabled defaultValue="">
+            <SelectTrigger className="bg-gray-100 border rounded">
+              <SelectValue placeholder="Detached" />
+            </SelectTrigger>
+            <SelectContent>
+              {ATTACHMENT_TYPES.map(type => (
+                <SelectItem key={type} value={type}>{type}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Address Line 1</Label>
+          <Input disabled placeholder="" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Unit #</Label>
+          <Input disabled placeholder="" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">City</Label>
+          <Input disabled placeholder="" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">State</Label>
+          <Select disabled defaultValue="">
+            <SelectTrigger className="bg-gray-100 border rounded">
+              <SelectValue placeholder="California" />
+            </SelectTrigger>
+            <SelectContent>
+              {STATES.map(state => (
+                <SelectItem key={state} value={state}>{state}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">ZIP Code</Label>
+          <Input disabled placeholder="" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">County</Label>
+          <Input disabled placeholder="" />
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Number Of Units</Label>
+          <Input disabled placeholder="1" type="number" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Year Built</Label>
+          <Input disabled placeholder="" type="number" />
+        </div>
+        <div className="flex items-center pt-5 gap-2">
+          <input type="checkbox" disabled className="accent-mortgage-purple border-mortgage-purple w-5 h-5" />
+          <Label className="text-xs font-medium">New Construction</Label>
+        </div>
+        <div className="flex items-center pt-5 gap-2">
+          <input type="checkbox" disabled className="accent-mortgage-purple border-mortgage-purple w-5 h-5" />
+          <Label className="text-xs font-medium">Land Contract Conversion</Label>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Title To Be Held In</Label>
+          <Input disabled placeholder="" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Manner Held</Label>
+          <Select disabled defaultValue="">
+            <SelectTrigger className="bg-gray-100 border rounded">
+              <SelectValue placeholder="Husband and Wife" />
+            </SelectTrigger>
+            <SelectContent>
+              {MANNER_HELD.map(manner => (
+                <SelectItem key={manner} value={manner}>{manner}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-3">
+          <Label className="text-xs font-semibold">Property Rights</Label>
+          <Select disabled defaultValue="">
+            <SelectTrigger className="bg-gray-100 border rounded">
+              <SelectValue placeholder="Fee Simple" />
+            </SelectTrigger>
+            <SelectContent>
+              {PROPERTY_RIGHTS.map(right => (
+                <SelectItem key={right} value={right}>{right}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="mt-2">
+        <Label className="font-semibold text-xs">Mixed Use Property:</Label>
+        <span className="block text-xs text-gray-500 mb-2">
+          If you will occupy the property, will you set aside space within the property to operate your own business?{" "}
+          <span className="ml-1 text-gray-400 font-normal">(e.g., daycare facility, medical office, beauty/barber shop)</span>
+        </span>
+        <RadioGroup className="flex flex-row gap-6" defaultValue="no" disabled>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="yes" id="sp-mixed-yes" disabled />
+            <Label htmlFor="sp-mixed-yes" className="text-sm">Yes</Label>
+          </div>
+          <div className="flex items-center gap-2">
+            <RadioGroupItem value="no" id="sp-mixed-no" disabled />
+            <Label htmlFor="sp-mixed-no" className="text-sm">No</Label>
+          </div>
+        </RadioGroup>
+      </div>
+
+      <div className="mt-6 rounded-lg border bg-gray-50 p-4">
+        <div className="font-bold text-mortgage-darkPurple text-sm mb-3">RENTAL INCOME CALCULATOR</div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold">Gross Monthly Rent</Label>
+            <div className="flex items-center">
+              <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+              <Input disabled placeholder="0.00" type="number" className="rounded-r" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold">Vacancy Factor</Label>
+            <div className="flex items-center">
+              <Input disabled placeholder="0.00" type="number" className="rounded-l" />
+              <span className="bg-gray-100 px-3 py-2 rounded-r border border-l-0 border-gray-200 text-gray-600 text-xs">%</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold">Adjusted Monthly Gross Income</Label>
+            <div className="flex items-center">
+              <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+              <Input disabled placeholder="0.00" type="number" className="rounded-r" />
+            </div>
+          </div>
+          <div className="flex flex-col gap-1">
+            <Label className="text-xs font-semibold">Net Rental Income</Label>
+            <div className="flex items-center">
+              <span className="bg-gray-100 px-2 py-2 border rounded-l text-gray-600">$</span>
+              <Input disabled placeholder="0.00" type="number" className="rounded-r" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoanInformationCard() {
+  const [tab, setTab] = useState<"purpose" | "property">("purpose");
+
+  return (
+    <Card className="mt-8 border-2 border-mortgage-purple">
+      <CardHeader className="pb-2 flex flex-row gap-3 items-center">
+        <span className="text-mortgage-purple font-bold text-xl flex items-center">
+          <span className="mr-2">$</span>
+          LOAN INFORMATION
+        </span>
+      </CardHeader>
+      <CardContent>
+        <LoanInfoTabs tab={tab} setTab={v => setTab(v as "purpose" | "property")} />
+
+        <div className="mt-4 mb-4">
+          {tab === "purpose" ? <LoanPurposeFields /> : <SubjectPropertyFields />}
+        </div>
+        <div className="flex w-full justify-end mt-4">
+          {tab === "purpose" ? (
+            <Button disabled className="bg-sky-400 text-white px-6 py-2 rounded-md font-bold">
+              <span className="flex items-center gap-2">
+                <span className="text-lg">&#128274;</span> Save Loan Information
+              </span>
+            </Button>
+          ) : (
+            <Button disabled className="bg-sky-500 text-white px-6 py-2 rounded-md font-bold">
+              <span className="flex items-center gap-2">
+                <span className="text-lg">&#128274;</span> Save Property Information
+              </span>
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -264,6 +690,7 @@ const RealEstateOwnedSection = () => {
           <RealEstateFormPlaceholder />
         </CardContent>
       </Card>
+      <LoanInformationCard />
     </div>
   );
 };
