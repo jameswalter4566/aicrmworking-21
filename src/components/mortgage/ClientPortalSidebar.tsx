@@ -68,7 +68,11 @@ const ClientPortalSidebar = ({
     setActiveTab("application");
     setIsLoanAppExpanded(true);
     if (onApplicationClick) {
-      console.log("Section clicked (subsection), calling onApplicationClick");
+      if (sectionId === "personal-info") {
+        console.log("Personal Information section clicked, calling onApplicationClick");
+      } else {
+        console.log("Section clicked (subsection), calling onApplicationClick");
+      }
       onApplicationClick();
     }
   };
@@ -140,6 +144,10 @@ const ClientPortalSidebar = ({
                         isActive={activeTab === item.id}
                         onClick={() => {
                           setActiveTab(item.id);
+                          if (item.id === 'home' && onApplicationClick) {
+                            console.log("Dashboard clicked, firing onApplicationClick");
+                            onApplicationClick();
+                          }
                           if (item.id === 'application' && onApplicationClick) {
                             onApplicationClick();
                           }
