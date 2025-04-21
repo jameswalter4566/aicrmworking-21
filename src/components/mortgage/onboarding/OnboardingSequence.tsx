@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import ContactInfoStep from './steps/ContactInfoStep';
 import PropertyInfoStep from './steps/PropertyInfoStep';
 import MortgageInfoStep from './steps/MortgageInfoStep';
 import FinancialInfoStep from './steps/FinancialInfoStep';
+import EstHomeValueStep from './steps/EstHomeValueStep';
 import { LeadProfile } from '@/services/leadProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from "@/components/ui/progress";
@@ -25,6 +25,7 @@ const stepLabels = [
   "Welcome",
   "Contact Info",
   "Property Info",
+  "Estimate Home Value",
   "Mortgage Info",
   "Financial Info",
 ];
@@ -115,6 +116,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     />,
     <ContactInfoStep key="contact" leadData={leadData} onSave={handleStepSave} />,
     <PropertyInfoStep key="property" leadData={leadData} onSave={handleStepSave} blueStyle />,
+    <EstHomeValueStep key="est-home-value" leadData={leadData} onSave={handleStepSave} />,
     <MortgageInfoStep key="mortgage" leadData={leadData} onSave={handleStepSave} />,
     <FinancialInfoStep key="financial" leadData={leadData} onSave={handleStepSave} />,
   ];
