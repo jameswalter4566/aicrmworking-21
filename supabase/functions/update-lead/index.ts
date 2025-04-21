@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 // Define CORS headers
@@ -51,7 +52,7 @@ Deno.serve(async (req) => {
     const addedToPipelineAt = isMortgageLead ? new Date().toISOString() : null;
 
     // Transform the lead data from camelCase to snake_case for database
-    const transformedData = {
+    const transformedData: any = {
       first_name: leadData.firstName,
       last_name: leadData.lastName,
       email: leadData.email,
@@ -66,11 +67,55 @@ Deno.serve(async (req) => {
     // Handle mortgage data if provided
     if (leadData.mortgageData) {
       transformedData.mortgage_data = leadData.mortgageData;
+      
+      // Important fix: Sync personal information from mortgage data to lead fields
+      if (leadData.mortgageData.personalInfo?.personalInfo) {
+        // Sync first name if available
+        if (leadData.mortgageData.personalInfo.personalInfo.firstName) {
+          transformedData.first_name = leadData.mortgageData.personalInfo.personalInfo.firstName;
+        }
+        
+        // Sync last name if available
+        if (leadData.mortgageData.personalInfo.personalInfo.lastName) {
+          transformedData.last_name = leadData.mortgageData.personalInfo.personalInfo.lastName;
+        }
+      }
+      
+      // Also check borrower.data structure if it exists
+      if (leadData.mortgageData.borrower?.data?.personalInfo) {
+        // Sync first name if available and not already set
+        if (leadData.mortgageData.borrower.data.personalInfo.firstName && !transformedData.first_name) {
+          transformedData.first_name = leadData.mortgageData.borrower.data.personalInfo.firstName;
+        }
+        
+        // Sync last name if available and not already set
+        if (leadData.mortgageData.borrower.data.personalInfo.lastName && !transformedData.last_name) {
+          transformedData.last_name = leadData.mortgageData.borrower.data.personalInfo.lastName;
+        }
+      }
+
+      // Sync email from contact details if available
+      if (leadData.mortgageData.personalInfo?.contactDetails?.emailAddress) {
+        transformedData.email = leadData.mortgageData.personalInfo.contactDetails.emailAddress;
+      } else if (leadData.mortgageData.borrower?.data?.contactDetails?.emailAddress) {
+        transformedData.email = leadData.mortgageData.borrower.data.contactDetails.emailAddress;
+      }
     }
 
     // Update the lead in the database
     transformedData.is_mortgage_lead = isMortgageLead;
-    transformedData.added_to_pipeline_at = addedToPipelineAt;
+    if (addedToPipelineAt) {
+      transformedData.added_to_pipeline_at = addedToPipelineAt;
+    }
+
+    // Filter out undefined values to prevent nullifying existing data
+    Object.keys(transformedData).forEach(key => {
+      if (transformedData[key] === undefined) {
+        delete transformedData[key];
+      }
+    });
+
+    console.log('Final transformed data for database update:', transformedData);
 
     const { data, error } = await supabase
       .from('leads')
