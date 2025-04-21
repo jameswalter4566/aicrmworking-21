@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Home, 
@@ -122,6 +121,24 @@ const ClientPortalSidebar = ({
                               ))}
                             </div>
                           </SidebarMenuSub>
+                        </div>
+                        <div className="mt-2">
+                          <div className="flex flex-col space-y-1">
+                            {loanAppSections.map((section) => (
+                              <button
+                                key={section.id + "-flat"}
+                                className={cn(
+                                  "flex items-center w-full rounded-lg px-2 py-2 text-[13px] transition-colors bg-transparent hover:bg-blue-800 hover:bg-opacity-30 focus:bg-blue-900/30",
+                                  activeAppSection === section.id && "bg-blue-700/80 text-white ring-2 ring-white"
+                                )}
+                                style={{ cursor: "pointer" }}
+                                onClick={() => handleSectionClick(section.id)}
+                              >
+                                <section.icon className="h-4 w-4 mr-2 flex-shrink-0" />
+                                <span>{section.label}</span>
+                              </button>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     ) : (

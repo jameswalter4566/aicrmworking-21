@@ -5,12 +5,12 @@ const labelClass = "block text-sm font-medium text-gray-700 mb-0.5";
 const inputClass = "w-full px-3 py-2 border rounded text-sm bg-gray-50 text-gray-900 placeholder-gray-400 mb-3";
 
 const PersonalInfoPlaceholder: React.FC = () => (
-  <div className="max-w-2xl mx-auto mt-4 bg-white rounded-xl shadow p-6 space-y-6">
+  <div className="max-w-2xl mx-auto mt-4 bg-white rounded-xl shadow p-6 space-y-8">
     <div>
       <h2 className="text-xl font-bold text-mortgage-darkPurple mb-1">Primary Information</h2>
       <hr className="mb-4" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Names */}
+      <div className="grid grid-cols-4 gap-4">
+        {/* Row 1 */}
         <div>
           <label className={labelClass}>First Name</label>
           <input className={inputClass} placeholder="First Name" disabled />
@@ -29,6 +29,7 @@ const PersonalInfoPlaceholder: React.FC = () => (
             <option>Select suffix</option>
           </select>
         </div>
+        {/* Row 2 */}
         <div>
           <label className={labelClass}>Social Security Number</label>
           <input className={inputClass} placeholder="XXX-XX-XXXX" disabled />
@@ -47,6 +48,7 @@ const PersonalInfoPlaceholder: React.FC = () => (
           <label className={labelClass}>No. of Dependents</label>
           <input className={inputClass} placeholder="0" disabled />
         </div>
+        {/* Row 3 */}
         <div>
           <label className={labelClass}>Age of Dependents</label>
           <input className={inputClass} placeholder="e.g., 10, 12, 15" disabled />
@@ -63,6 +65,7 @@ const PersonalInfoPlaceholder: React.FC = () => (
           <label className={labelClass}>Present Address Same As</label>
           <input className={inputClass} disabled />
         </div>
+        {/* Row 4 */}
         <div>
           <label className={labelClass}>Citizenship</label>
           <input className={inputClass} placeholder="U.S. Citizen" disabled />
@@ -71,12 +74,15 @@ const PersonalInfoPlaceholder: React.FC = () => (
           <label className={labelClass}>Veteran</label>
           <input className={inputClass} disabled />
         </div>
+        {/* Empty col placeholders for alignment */}
+        <div></div>
+        <div></div>
       </div>
     </div>
 
     <div>
       <h3 className="font-semibold text-mortgage-darkPurple mb-2 mt-2">Contact Details</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={labelClass}>Home Phone Number</label>
           <input className={inputClass} placeholder="(XXX) XXX-XXXX" disabled />
@@ -97,7 +103,7 @@ const PersonalInfoPlaceholder: React.FC = () => (
           <label className={labelClass}>Email Address</label>
           <input className={inputClass} placeholder="" disabled />
         </div>
-        <div className="flex items-center pt-4">
+        <div className="flex items-center pt-7 col-span-3">
           <input type="checkbox" disabled className="mr-2" /> <span>No Email</span>
         </div>
       </div>
@@ -105,7 +111,7 @@ const PersonalInfoPlaceholder: React.FC = () => (
 
     <div>
       <h3 className="font-semibold text-mortgage-darkPurple mb-2 mt-2">Address History</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={labelClass}>Present Address Line 1</label>
           <input className={inputClass} placeholder="Address Line 1" disabled />
@@ -142,14 +148,14 @@ const PersonalInfoPlaceholder: React.FC = () => (
         </div>
       </div>
 
-      <p className="text-xs mt-2 text-gray-500">
+      <p className="text-xs mt-2 text-gray-500 col-span-4">
         * If residing at present address for less than two years, then the details of previous address must be added.
       </p>
     </div>
 
     <div>
       <h4 className="font-semibold text-mortgage-darkPurple mt-4 mb-1">Previous Address Details</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div>
           <label className={labelClass}>Address Line 1</label>
           <input className={inputClass} placeholder="Address Line 1" disabled />
@@ -188,17 +194,18 @@ const PersonalInfoPlaceholder: React.FC = () => (
           <label className={labelClass}>Rent Amount</label>
           <input className={inputClass} placeholder="$" disabled />
         </div>
+        <div className="col-span-2"></div>
       </div>
     </div>
 
     <div>
       <h4 className="font-semibold text-mortgage-darkPurple mt-4 mb-1">Mailing Address</h4>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
+      <div className="grid grid-cols-4 gap-4">
+        <div className="col-span-2">
           <label className={labelClass}>Mailing Address</label>
           <input className={inputClass} placeholder="" disabled />
         </div>
-        <div className="flex items-center pt-4">
+        <div className="flex items-center pt-7 col-span-2">
           <input type="checkbox" disabled className="mr-2" /> <span>Same as Present Address</span>
         </div>
       </div>
