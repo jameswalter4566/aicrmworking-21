@@ -23,7 +23,6 @@ interface OnboardingSequenceProps {
 // Steps *AFTER* TransactionTypeStep (progress starts there)
 const stepLabels = [
   "Welcome",
-  "Contact Info",
   "Property Info",
   "Mortgage Info",
   "Financial Info",
@@ -87,8 +86,8 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
 
   // ---- PROGRESS LOGIC ----
   // Progress bar displayed *starting on* WelcomeStep (currentStep >= 1)
-  const stepsTotal = 5; // Steps after TransactionTypeStep
-  const progressStepIndex = Math.max(0, currentStep - 1); // ‘Welcome’ is first progress step
+  const stepsTotal = 4; // Removed Contact Info step from total
+  const progressStepIndex = Math.max(0, currentStep - 1); // 'Welcome' is first progress step
   const progressPercent = Math.round((progressStepIndex / stepsTotal) * 100);
 
   // BLUE STYLES
@@ -96,28 +95,52 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   const cardBg = "bg-white/60 backdrop-blur"; // softer, slight glass effect
   const mainBlue = "text-[#1769aa]"; // deep blue 
 
+  // Check if we have sufficient contact information to skip the contact step
+  const hasContactInfo = Boolean(
+    leadData.firstName && 
+    leadData.lastName && 
+    leadData.email && 
+    leadData.phone1
+  );
+
   // --- STEPS ---
-  const steps = [
-    <TransactionTypeStep
-      key="transaction-type"
-      selectedType={transactionType}
-      onSelect={(type) => {
-        setTransactionType(type);
-        setCurrentStep(1); // advance to next step
-      }}
-    />,
-    <WelcomeStep
-      key="welcome"
-      leadData={leadData}
-      onNext={handleStepSave}
-      headingClass={mainBlue}
-      subtitleClass={mainBlue + " font-medium"}
-    />,
-    <ContactInfoStep key="contact" leadData={leadData} onSave={handleStepSave} />,
-    <PropertyInfoStep key="property" leadData={leadData} onSave={handleStepSave} blueStyle />,
-    <MortgageInfoStep key="mortgage" leadData={leadData} onSave={handleStepSave} />,
-    <FinancialInfoStep key="financial" leadData={leadData} onSave={handleStepSave} />,
-  ];
+  // We'll construct the steps dynamically based on available data
+  const getSteps = () => {
+    const allSteps = [
+      <TransactionTypeStep
+        key="transaction-type"
+        selectedType={transactionType}
+        onSelect={(type) => {
+          setTransactionType(type);
+          setCurrentStep(1); // advance to next step
+        }}
+      />,
+      <WelcomeStep
+        key="welcome"
+        leadData={leadData}
+        onNext={handleStepSave}
+        headingClass={mainBlue}
+        subtitleClass={mainBlue + " font-medium"}
+      />
+    ];
+    
+    // Only include the contact info step if we don't have sufficient contact information
+    if (!hasContactInfo) {
+      allSteps.push(
+        <ContactInfoStep key="contact" leadData={leadData} onSave={handleStepSave} />
+      );
+    }
+    
+    allSteps.push(
+      <PropertyInfoStep key="property" leadData={leadData} onSave={handleStepSave} blueStyle />,
+      <MortgageInfoStep key="mortgage" leadData={leadData} onSave={handleStepSave} />,
+      <FinancialInfoStep key="financial" leadData={leadData} onSave={handleStepSave} />
+    );
+    
+    return allSteps;
+  };
+
+  const steps = getSteps();
 
   if (currentStep >= steps.length) {
     onComplete(leadData);
