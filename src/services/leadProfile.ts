@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface LeadProfile {
@@ -18,8 +19,8 @@ export interface LeadProfile {
   mortgageData?: {
     borrower?: {
       fullLegalName?: string;
-      dateOfBirth?: string; // ISO 8601: yyyy-mm-dd
-      socialSecurityNumber?: string; // "123-45-6789"
+      dateOfBirth?: string;
+      socialSecurityNumber?: string;
       maritalStatus?: string;
       dependents?: string;
       citizenship?: string;
@@ -382,3 +383,4 @@ export const leadProfileService = {
     }
   }
 };
+
