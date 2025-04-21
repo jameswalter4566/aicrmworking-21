@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from "@/components/layouts/MainLayout";
@@ -59,23 +58,18 @@ const Smart1003Builder = () => {
   const [origin, setOrigin] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Get lead data to check if processing already happened
         const leadData = await leadProfileService.getLeadById(leadId || '');
         
         if (leadData.mortgageData?.autoFilledAt && leadData.mortgageData?.documentProcessing?.status === 'completed') {
-          // Data is already processed, show results
           setProcessingStep(5);
           setIsProcessing(false);
           setActiveTab('results');
           
-          // Set the processed fields
           setProcessedFields(leadData.mortgageData);
           
-          // Set missing fields
           if (leadData.mortgageData.documentProcessing?.missingFields) {
             setMissingFields(leadData.mortgageData.documentProcessing.missingFields);
           }
@@ -83,7 +77,6 @@ const Smart1003Builder = () => {
           return;
         }
         
-        // If not processed, simulate the processing steps
         const steps = [
           { step: 1, message: "Extracting data from documents..." },
           { step: 2, message: "Analyzing document content..." },
@@ -109,7 +102,6 @@ const Smart1003Builder = () => {
             setIsProcessing(false);
             setActiveTab('results');
             
-            // Try to get the data again, in case it's completed by now
             leadProfileService.getLeadById(leadId || '').then(updatedData => {
               if (updatedData.mortgageData?.autoFilledAt) {
                 setProcessedFields(updatedData.mortgageData);
@@ -118,7 +110,6 @@ const Smart1003Builder = () => {
                   setMissingFields(updatedData.mortgageData.documentProcessing.missingFields);
                 }
               } else {
-                // If still not processed, use mock data as fallback (should not happen in production)
                 setMissingFields([
                   { section: "borrower", field: "citizenship", label: "Citizenship Status" },
                   { section: "borrower", field: "mailingAddress", label: "Current Mailing Address" },
@@ -206,6 +197,7 @@ const Smart1003Builder = () => {
     setSaveError(null);
     try {
       const updates: Record<string, any> = {};
+      
       for (const f of missingFields) {
         const key = fieldKey(f.section, f.field);
         if (editedMissingFields[key]) {
@@ -213,15 +205,154 @@ const Smart1003Builder = () => {
           updates[f.section][f.field] = editedMissingFields[key];
         }
       }
+      
       if (Object.keys(updates).length === 0) {
         setIsSaving(false);
         return;
       }
 
-      let currentMortgage = { ...processedFields, ...updates };
+      const structuredUpdates: Record<string, any> = {};
+      
       Object.keys(updates).forEach(section => {
-        currentMortgage[section] = { ...processedFields[section], ...updates[section] };
+        if (section === 'borrower') {
+          if (!structuredUpdates.personalInfo) {
+            structuredUpdates.personalInfo = {
+              personalInfo: {},
+              contactDetails: {},
+              addressHistory: {}
+            };
+          }
+          
+          if (updates.borrower.firstName) 
+            structuredUpdates.personalInfo.personalInfo.firstName = updates.borrower.firstName;
+          if (updates.borrower.lastName) 
+            structuredUpdates.personalInfo.personalInfo.lastName = updates.borrower.lastName;
+          if (updates.borrower.ssn) 
+            structuredUpdates.personalInfo.personalInfo.socialSecurityNumber = updates.borrower.ssn;
+          if (updates.borrower.dob) 
+            structuredUpdates.personalInfo.personalInfo.dateOfBirth = updates.borrower.dob;
+          if (updates.borrower.maritalStatus) 
+            structuredUpdates.personalInfo.personalInfo.maritalStatus = updates.borrower.maritalStatus;
+          if (updates.borrower.citizenship) 
+            structuredUpdates.personalInfo.personalInfo.citizenship = updates.borrower.citizenship;
+          if (updates.borrower.dependents) 
+            structuredUpdates.personalInfo.personalInfo.numberOfDependents = updates.borrower.dependents;
+          
+          if (updates.borrower.phoneNumber) 
+            structuredUpdates.personalInfo.contactDetails.cellPhoneNumber = updates.borrower.phoneNumber;
+          if (updates.borrower.email) 
+            structuredUpdates.personalInfo.contactDetails.emailAddress = updates.borrower.email;
+          
+          if (updates.borrower.mailingAddress) 
+            structuredUpdates.personalInfo.addressHistory.presentAddressLine1 = updates.borrower.mailingAddress;
+          
+          structuredUpdates.borrower = updates.borrower;
+        } 
+        else if (section === 'employment') {
+          if (!structuredUpdates.employment) {
+            structuredUpdates.employment = {
+              data: {
+                borrower: {
+                  incomeEntries: []
+                }
+              },
+              section: "employment"
+            };
+          }
+          
+          const incomeEntry = {
+            id: Date.now().toString(),
+            employerName: updates.employment.employerName || "",
+            position: updates.employment.position || "",
+            startDate: "",
+            monthlyIncome: {
+              base: updates.employment.monthlyIncome ? parseFloat(updates.employment.monthlyIncome) || 0 : 0
+            },
+            type: "primaryCurrentEmployment"
+          };
+          
+          structuredUpdates.employment.data.borrower.incomeEntries = [
+            incomeEntry,
+            ...(processedFields.employment?.data?.borrower?.incomeEntries || []).filter(
+              (entry: any) => entry.type !== "primaryCurrentEmployment"
+            )
+          ];
+        }
+        else if (section === 'assets') {
+          if (!structuredUpdates.assets) {
+            structuredUpdates.assets = {
+              accounts: []
+            };
+          }
+          
+          if (updates.assets.accountType || updates.assets.bankName || 
+              updates.assets.accountNumber || updates.assets.balance) {
+            structuredUpdates.assets.accounts = [
+              ...(structuredUpdates.assets.accounts || []),
+              {
+                id: Date.now().toString(),
+                accountType: updates.assets.accountType || "",
+                financialInstitution: updates.assets.bankName || "",
+                accountNumber: updates.assets.accountNumber || "",
+                balance: updates.assets.balance ? parseFloat(updates.assets.balance) || 0 : 0,
+              }
+            ];
+          }
+        } 
+        else if (section === 'property') {
+          structuredUpdates.property = {
+            ...(processedFields.property || {}),
+            address: updates.property.address || "",
+            city: updates.property.city || "",
+            state: updates.property.state || "",
+            zipCode: updates.property.zipCode || "",
+            estimatedValue: updates.property.estimatedValue || "",
+            propertyType: updates.property.propertyType || "",
+            occupancy: updates.property.occupancy || ""
+          };
+        }
+        else if (section === 'loan') {
+          structuredUpdates.loan = {
+            ...(processedFields.loan || {}),
+            purpose: updates.loan.purpose || "",
+            loanAmount: updates.loan.loanAmount || "",
+            loanType: updates.loan.loanType || "",
+            mortgageTerm: updates.loan.mortgageTerm || "",
+            amortizationType: updates.loan.amortizationType || "",
+            interestRate: updates.loan.interestRate || ""
+          };
+        }
+        else if (section === 'liabilities') {
+          if (!structuredUpdates.liabilities) {
+            structuredUpdates.liabilities = {
+              accounts: []
+            };
+          }
+          
+          if (updates.liabilities.creditCards) {
+            structuredUpdates.liabilities.creditCards = updates.liabilities.creditCards;
+          }
+          if (updates.liabilities.loans) {
+            structuredUpdates.liabilities.loans = updates.liabilities.loans;
+          }
+          if (updates.liabilities.carLoans) {
+            structuredUpdates.liabilities.carLoans = updates.liabilities.carLoans;
+          }
+          if (updates.liabilities.studentLoans) {
+            structuredUpdates.liabilities.studentLoans = updates.liabilities.studentLoans;
+          }
+          if (updates.liabilities.otherDebts) {
+            structuredUpdates.liabilities.otherDebts = updates.liabilities.otherDebts;
+          }
+        }
+        else {
+          structuredUpdates[section] = updates[section];
+        }
       });
+
+      let currentMortgage = { ...processedFields, ...structuredUpdates };
+      
+      console.log("Saving structured updates:", structuredUpdates);
 
       await leadProfileService.updateMortgageData(
         leadId as string,
@@ -235,6 +366,12 @@ const Smart1003Builder = () => {
         title: "Saved!",
         description: "Your updates have been saved.",
       });
+      
+      const leadData = await leadProfileService.getLeadById(leadId || '');
+      if (leadData.mortgageData) {
+        setProcessedFields(leadData.mortgageData);
+      }
+      
     } catch (err: any) {
       setIsSaving(false);
       setSaveError(err?.message || "Error saving fields");
