@@ -25,6 +25,13 @@ export interface LeadProfile {
       dependents?: string;
       citizenship?: string;
     };
+    spouse?: {
+      firstName?: string;
+      middleName?: string;
+      lastName?: string;
+      email?: string;
+      phone?: string;
+    };
     currentAddress?: {
       streetAddress?: string;
       cityStateZip?: string;

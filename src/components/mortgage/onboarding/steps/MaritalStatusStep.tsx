@@ -18,20 +18,25 @@ const MARITAL_OPTIONS = [
 ];
 
 const MaritalStatusStep = ({ leadData, onSave }: MaritalStatusStepProps) => {
-  const defaultStatus =
-    leadData.mortgageData?.borrower?.maritalStatus ||
-    leadData.maritalStatus ||
-    "";
-  const defaultSpouse = leadData.mortgageData?.coBorrower || {};
+  const defaultStatus = leadData.mortgageData?.borrower?.maritalStatus || "";
+  
+  // Initialize spouse data with empty values
+  const defaultSpouse = {
+    firstName: "",
+    middleName: "",
+    lastName: "",
+    email: "",
+    phone: ""
+  };
 
   const { register, watch, handleSubmit, formState } = useForm({
     defaultValues: {
       maritalStatus: defaultStatus,
-      spouseFirstName: defaultSpouse.firstName || "",
-      spouseMiddleName: defaultSpouse.middleName || "",
-      spouseLastName: defaultSpouse.lastName || "",
-      spouseEmail: defaultSpouse.email || "",
-      spousePhone: defaultSpouse.phone || "",
+      spouseFirstName: defaultSpouse.firstName,
+      spouseMiddleName: defaultSpouse.middleName,
+      spouseLastName: defaultSpouse.lastName,
+      spouseEmail: defaultSpouse.email,
+      spousePhone: defaultSpouse.phone,
     },
   });
 
@@ -50,23 +55,22 @@ const MaritalStatusStep = ({ leadData, onSave }: MaritalStatusStepProps) => {
             },
           },
         };
+        
         if (values.maritalStatus === "married_applying_with_spouse") {
+          // We need to add spouse information somewhere in the mortgageData structure
+          // Since there's no direct coBorrower field in the type, let's add it to an appropriate place
           result.mortgageData = {
             ...result.mortgageData,
-            coBorrower: {
+            spouse: {
               firstName: values.spouseFirstName,
               middleName: values.spouseMiddleName,
               lastName: values.spouseLastName,
               email: values.spouseEmail,
               phone: values.spousePhone,
-            },
-          };
-        } else {
-          result.mortgageData = {
-            ...result.mortgageData,
-            coBorrower: undefined,
+            }
           };
         }
+        
         onSave(result);
       })}
     >
