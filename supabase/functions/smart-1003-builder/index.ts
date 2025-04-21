@@ -51,8 +51,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        processedFields: processedFormData.processedFields,
-        missingFields: processedFormData.missingFields,
+        processedFields: processedFormData.processedFields || {},
+        missingFields: processedFormData.missingFields || [],
         message: 'Documents processed successfully'
       }),
       {
@@ -388,9 +388,21 @@ async function analyzeDataWithOpenAI(extractedDocData) {
       throw new Error('Invalid response from OpenAI');
     }
     
-    const extractedFormData = JSON.parse(openaiResult.choices[0].message.content);
-    
-    return extractedFormData;
+    try {
+      const extractedFormData = JSON.parse(openaiResult.choices[0].message.content);
+      console.log("Successfully parsed OpenAI response as JSON");
+      return {
+        processedFields: extractedFormData.processedFields || {},
+        missingFields: extractedFormData.missingFields || []
+      };
+    } catch (parseError) {
+      console.error("Error parsing OpenAI response:", parseError);
+      // Return empty data structure if parsing fails
+      return {
+        processedFields: {},
+        missingFields: []
+      };
+    }
   } catch (error) {
     console.error('Error analyzing data with OpenAI:', error);
     throw new Error(`Data analysis failed: ${error.message}`);
@@ -405,7 +417,10 @@ async function updateLeadWithFormData(leadId, formData) {
     console.log(`Updating lead ${leadId} with extracted form data`);
     
     // Extract the processed fields to update in the lead
-    const { processedFields, missingFields } = formData;
+    const { processedFields = {}, missingFields = [] } = formData;
+    
+    console.log("Processed fields:", JSON.stringify(processedFields));
+    console.log("Missing fields:", JSON.stringify(missingFields));
     
     // Add metadata about the processing
     const mortgageData = {
