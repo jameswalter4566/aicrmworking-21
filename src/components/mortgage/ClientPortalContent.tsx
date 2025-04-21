@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -59,8 +60,12 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
         // Fetch lead data using the lead-profile function to get complete data
         if (leadId) {
           console.log("Fetching lead data in ClientPortalContent for ID:", leadId);
+          
+          // Convert leadId to number if it's a string
+          const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+          
           const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
-            body: { id: leadId }
+            body: { id: numericLeadId }
           });
           
           if (leadError) {
@@ -68,6 +73,8 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           } else if (leadResponse?.success && leadResponse?.data?.lead) {
             console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
             setLeadData(leadResponse.data.lead);
+          } else {
+            console.error('Invalid lead data response:', leadResponse);
           }
         }
         
@@ -139,8 +146,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           ...updatedMortgageData,
           borrower: {
             ...updatedMortgageData.borrower,
-            data: data,
-            section: "personalInfo"
+            ...data
           }
         };
       } else {
@@ -182,8 +188,10 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     if (!leadId) return;
     
     try {
+      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+      
       const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
-        body: { id: leadId }
+        body: { id: numericLeadId }
       });
       
       if (leadError) {
@@ -199,6 +207,23 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       console.error('Error refreshing data:', error);
     }
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6">
+          <div className="text-center">
+            <div className="animate-pulse flex flex-col items-center">
+              <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded w-2/3 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   if (!isInPipeline) {
     return (
@@ -292,3 +317,4 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     </div>
   );
 };
+

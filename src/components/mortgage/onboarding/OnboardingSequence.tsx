@@ -82,14 +82,13 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
       const currentMortgageData = leadData?.mortgageData || {};
       let updatedMortgageData = { ...currentMortgageData };
       
-      // If we're updating borrower data, use the special structure
+      // If we're updating borrower data, use the correct structure
       if (stepData.mortgageData?.borrower) {
         updatedMortgageData = {
           ...updatedMortgageData,
           borrower: {
             ...updatedMortgageData.borrower,
-            data: stepData.mortgageData.borrower,
-            section: "personalInfo"
+            ...stepData.mortgageData.borrower
           }
         };
       } 
