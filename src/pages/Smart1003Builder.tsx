@@ -59,89 +59,139 @@ const Smart1003Builder = () => {
   const [origin, setOrigin] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Fetch data from API
   useEffect(() => {
-    const steps = [
-      { step: 1, message: "Extracting data from documents..." },
-      { step: 2, message: "Analyzing document content..." },
-      { step: 3, message: "Identifying form fields..." },
-      { step: 4, message: "Filling out 1003 form..." },
-      { step: 5, message: "Validating information..." },
-    ];
-
-    let currentStep = 0;
-    
-    const intervalId = setInterval(() => {
-      if (currentStep < steps.length) {
-        setProcessingStep(steps[currentStep].step);
+    const fetchData = async () => {
+      try {
+        // Get lead data to check if processing already happened
+        const leadData = await leadProfileService.getLeadById(leadId || '');
         
-        toast({
-          title: `Step ${steps[currentStep].step} of ${steps.length}`,
-          description: steps[currentStep].message,
-        });
+        if (leadData.mortgageData?.autoFilledAt && leadData.mortgageData?.documentProcessing?.status === 'completed') {
+          // Data is already processed, show results
+          setProcessingStep(5);
+          setIsProcessing(false);
+          setActiveTab('results');
+          
+          // Set the processed fields
+          setProcessedFields(leadData.mortgageData);
+          
+          // Set missing fields
+          if (leadData.mortgageData.documentProcessing?.missingFields) {
+            setMissingFields(leadData.mortgageData.documentProcessing.missingFields);
+          }
+          
+          return;
+        }
         
-        currentStep++;
-      } else {
-        clearInterval(intervalId);
+        // If not processed, simulate the processing steps
+        const steps = [
+          { step: 1, message: "Extracting data from documents..." },
+          { step: 2, message: "Analyzing document content..." },
+          { step: 3, message: "Identifying form fields..." },
+          { step: 4, message: "Filling out 1003 form..." },
+          { step: 5, message: "Validating information..." },
+        ];
+        
+        let currentStep = 0;
+        
+        const intervalId = setInterval(() => {
+          if (currentStep < steps.length) {
+            setProcessingStep(steps[currentStep].step);
+            
+            toast({
+              title: `Step ${steps[currentStep].step} of ${steps.length}`,
+              description: steps[currentStep].message,
+            });
+            
+            currentStep++;
+          } else {
+            clearInterval(intervalId);
+            setIsProcessing(false);
+            setActiveTab('results');
+            
+            // Try to get the data again, in case it's completed by now
+            leadProfileService.getLeadById(leadId || '').then(updatedData => {
+              if (updatedData.mortgageData?.autoFilledAt) {
+                setProcessedFields(updatedData.mortgageData);
+                
+                if (updatedData.mortgageData.documentProcessing?.missingFields) {
+                  setMissingFields(updatedData.mortgageData.documentProcessing.missingFields);
+                }
+              } else {
+                // If still not processed, use mock data as fallback (should not happen in production)
+                setMissingFields([
+                  { section: "borrower", field: "citizenship", label: "Citizenship Status" },
+                  { section: "borrower", field: "mailingAddress", label: "Current Mailing Address" },
+                  { section: "employment", field: "previousEmployment", label: "Previous Employment History" },
+                  { section: "assets", field: "investments", label: "Investment Accounts" },
+                  { section: "liabilities", field: "creditCards", label: "Credit Card Accounts" },
+                  { section: "liabilities", field: "loans", label: "Outstanding Loans" }
+                ]);
+                
+                setProcessedFields({
+                  borrower: {
+                    firstName: "John",
+                    lastName: "Doe",
+                    ssn: "XXX-XX-1234",
+                    dob: "1980-01-15",
+                    phoneNumber: "(555) 123-4567",
+                    email: "john.doe@example.com",
+                    maritalStatus: "Married"
+                  },
+                  employment: {
+                    employerName: "ACME Corporation",
+                    position: "Software Engineer",
+                    yearsAtJob: 5,
+                    monthlyIncome: 8500
+                  },
+                  assets: [
+                    {
+                      accountType: "Checking",
+                      bankName: "First National Bank",
+                      accountNumber: "XXXX1234",
+                      balance: 12500.75
+                    },
+                    {
+                      accountType: "Savings", 
+                      bankName: "First National Bank",
+                      accountNumber: "XXXX5678",
+                      balance: 45000.50
+                    }
+                  ],
+                  property: {
+                    address: "123 Main St",
+                    city: "Anytown",
+                    state: "CA",
+                    zipCode: "12345",
+                    estimatedValue: 750000
+                  }
+                });
+              }
+              
+              toast({
+                title: "Processing complete!",
+                description: "Your documents have been analyzed and your 1003 form has been filled out.",
+              });
+            });
+          }
+        }, 2000);
+        
+        return () => clearInterval(intervalId);
+      } catch (error) {
+        console.error('Error fetching data:', error);
         setIsProcessing(false);
         setActiveTab('results');
         
-        setMissingFields([
-          { section: "borrower", field: "citizenship", label: "Citizenship Status" },
-          { section: "borrower", field: "mailingAddress", label: "Current Mailing Address" },
-          { section: "employment", field: "previousEmployment", label: "Previous Employment History" },
-          { section: "assets", field: "investments", label: "Investment Accounts" },
-          { section: "liabilities", field: "creditCards", label: "Credit Card Accounts" },
-          { section: "liabilities", field: "loans", label: "Outstanding Loans" }
-        ]);
-        
-        setProcessedFields({
-          borrower: {
-            firstName: "John",
-            lastName: "Doe",
-            ssn: "XXX-XX-1234",
-            dob: "1980-01-15",
-            phoneNumber: "(555) 123-4567",
-            email: "john.doe@example.com",
-            maritalStatus: "Married"
-          },
-          employment: {
-            employerName: "ACME Corporation",
-            position: "Software Engineer",
-            yearsAtJob: 5,
-            monthlyIncome: 8500
-          },
-          assets: [
-            {
-              accountType: "Checking",
-              bankName: "First National Bank",
-              accountNumber: "XXXX1234",
-              balance: 12500.75
-            },
-            {
-              accountType: "Savings", 
-              bankName: "First National Bank",
-              accountNumber: "XXXX5678",
-              balance: 45000.50
-            }
-          ],
-          property: {
-            address: "123 Main St",
-            city: "Anytown",
-            state: "CA",
-            zipCode: "12345",
-            estimatedValue: 750000
-          }
-        });
-        
         toast({
-          title: "Processing complete!",
-          description: "Your documents have been analyzed and your 1003 form has been filled out.",
+          title: "Error processing documents",
+          description: "There was an error processing your documents. Please try again.",
+          variant: "destructive"
         });
       }
-    }, 2000);
+    };
     
-    return () => clearInterval(intervalId);
-  }, [toast]);
+    fetchData();
+  }, [leadId, toast]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);

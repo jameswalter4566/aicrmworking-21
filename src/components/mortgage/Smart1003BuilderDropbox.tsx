@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FileUp, FileText, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Function to create a data URL from a File object
 const createFileURL = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -97,13 +99,22 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
     try {
       setIsUploading(true);
       
-      for (let i = 0; i <= 100; i += 10) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setUploadProgress(i);
-      }
+      // Show upload progress animation
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 300);
       
+      // Convert files to data URLs for processing
       const fileUrls = await Promise.all(files.map(file => createFileURL(file)));
       
+      clearInterval(progressInterval);
+      setUploadProgress(100);
       setIsUploading(false);
       setIsProcessing(true);
       
@@ -113,32 +124,45 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
       });
       
       try {
+        // Call the edge function to process the documents
         const { data, error } = await supabase.functions.invoke('smart-1003-builder', {
-          body: { fileUrls, leadId, dropboxId },
+          body: { 
+            fileUrls, 
+            leadId,
+            dropboxId 
+          },
         });
         
         if (error) {
           throw new Error(error.message);
         }
         
-        const encodedOrigin = encodeURIComponent(dropboxId || "");
-        navigate(`/mortgage/smart-1003-builder/${leadId}${dropboxId ? `?origin=${encodedOrigin}` : ""}`);
+        // Encode origin parameter for redirect back to this dropbox
+        const encodedOrigin = dropboxId ? encodeURIComponent(dropboxId) : "";
+        const redirectUrl = `/mortgage/smart-1003-builder/${leadId}${encodedOrigin ? `?origin=${encodedOrigin}` : ""}`;
         
-      } catch (error) {
+        // Navigate to the smart builder results page
+        navigate(redirectUrl);
+        
+        toast({
+          title: "Documents processed successfully",
+          description: "Your documents have been analyzed and your 1003 form is being filled out."
+        });
+        
+      } catch (error: any) {
         console.error("Error calling edge function:", error);
         toast({
           title: "Processing failed",
-          description: "There was an error processing your documents. Please try again.",
+          description: error?.message || "There was an error processing your documents. Please try again.",
           variant: "destructive"
         });
-      } finally {
         setIsProcessing(false);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error processing files:", error);
       toast({
         title: "Processing failed",
-        description: "There was an error processing your documents. Please try again.",
+        description: error?.message || "There was an error processing your documents. Please try again.",
         variant: "destructive"
       });
       setIsUploading(false);
@@ -205,6 +229,7 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
                     size="sm" 
                     className="h-8 w-8 p-0" 
                     onClick={() => handleRemoveFile(index)}
+                    disabled={isUploading || isProcessing}
                   >
                     &times;
                   </Button>
@@ -218,6 +243,7 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
                 size="sm" 
                 className="text-sm"
                 onClick={() => document.getElementById('file-upload')?.click()}
+                disabled={isUploading || isProcessing}
               >
                 <FileUp className="h-4 w-4 mr-1" />
                 Add More Files
