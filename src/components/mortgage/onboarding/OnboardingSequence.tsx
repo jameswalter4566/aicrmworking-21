@@ -8,6 +8,7 @@ import PropertyInfoStep from './steps/PropertyInfoStep';
 import MortgageInfoStep from './steps/MortgageInfoStep';
 import FinancialInfoStep from './steps/FinancialInfoStep';
 import EstHomeValueStep from './steps/EstHomeValueStep';
+import MaritalStatusStep from './steps/MaritalStatusStep';
 import { LeadProfile } from '@/services/leadProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from "@/components/ui/progress";
@@ -27,6 +28,7 @@ const stepLabels = [
   "Property Info",
   "Estimate Home Value",
   "Mortgage Info",
+  "Marital Status",
   "Financial Info",
 ];
 
@@ -88,7 +90,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
 
   // ---- PROGRESS LOGIC ----
   // Progress bar displayed *starting on* WelcomeStep (currentStep >= 1)
-  const stepsTotal = 5; // Steps after TransactionTypeStep
+  const stepsTotal = 6; // Steps after TransactionTypeStep
   const progressStepIndex = Math.max(0, currentStep - 1); // ‘Welcome’ is first progress step
   const progressPercent = Math.round((progressStepIndex / stepsTotal) * 100);
 
@@ -118,6 +120,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     <PropertyInfoStep key="property" leadData={leadData} onSave={handleStepSave} blueStyle />,
     <EstHomeValueStep key="est-home-value" leadData={leadData} onSave={handleStepSave} />,
     <MortgageInfoStep key="mortgage" leadData={leadData} onSave={handleStepSave} />,
+    <MaritalStatusStep key="marital-status" leadData={leadData} onSave={handleStepSave} />,
     <FinancialInfoStep key="financial" leadData={leadData} onSave={handleStepSave} />,
   ];
 
