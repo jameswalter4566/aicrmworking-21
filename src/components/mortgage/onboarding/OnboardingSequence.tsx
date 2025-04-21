@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-// New import:
 import TransactionTypeStep from './steps/TransactionTypeStep';
 import WelcomeStep from './steps/WelcomeStep';
 import ContactInfoStep from './steps/ContactInfoStep';
@@ -11,6 +10,7 @@ import MortgageInfoStep from './steps/MortgageInfoStep';
 import FinancialInfoStep from './steps/FinancialInfoStep';
 import { LeadProfile } from '@/services/leadProfile';
 import { supabase } from '@/integrations/supabase/client';
+import { Progress } from "@/components/ui/progress";
 
 type TransactionType = "buy_home" | "refinance" | "cash_out";
 
@@ -20,12 +20,19 @@ interface OnboardingSequenceProps {
   onComplete: (onboardingData: any) => void;
 }
 
+// Steps *AFTER* TransactionTypeStep (progress starts there)
+const stepLabels = [
+  "Welcome",
+  "Contact Info",
+  "Property Info",
+  "Mortgage Info",
+  "Financial Info",
+];
+
 export const OnboardingSequence = ({ leadId, initialData, onComplete }: OnboardingSequenceProps) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [leadData, setLeadData] = useState<Partial<LeadProfile>>(initialData || {});
   const [isLoading, setIsLoading] = useState(false);
-
-  // New state for transaction type choice
   const [transactionType, setTransactionType] = useState<TransactionType | null>(null);
 
   useEffect(() => {
@@ -34,21 +41,16 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
         setLeadData(initialData);
         return;
       }
-      
       try {
         const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
         const { data: { success, data }, error } = await supabase.functions.invoke('lead-profile', {
           body: { id: numericLeadId }
         });
-
-        if (success && data?.lead) {
-          setLeadData(data.lead);
-        }
+        if (success && data?.lead) setLeadData(data.lead);
       } catch (error) {
         console.error('Error fetching lead data:', error);
       }
     };
-
     fetchLeadData();
   }, [leadId, initialData]);
 
@@ -57,11 +59,10 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     try {
       const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
       const { data: { success }, error } = await supabase.functions.invoke('update-lead', {
-        body: { 
+        body: {
           leadId: numericLeadId,
           leadData: {
             ...stepData,
-            // Preserve existing mortgage data
             mortgageData: {
               ...(leadData.mortgageData || {}),
               ...(stepData.mortgageData || {})
@@ -84,7 +85,18 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     }
   };
 
-  // Steps array now begins with TransactionTypeStep
+  // ---- PROGRESS LOGIC ----
+  // Progress bar displayed *starting on* WelcomeStep (currentStep >= 1)
+  const stepsTotal = 5; // Steps after TransactionTypeStep
+  const progressStepIndex = Math.max(0, currentStep - 1); // ‘Welcome’ is first progress step
+  const progressPercent = Math.round((progressStepIndex / stepsTotal) * 100);
+
+  // BLUE STYLES
+  const bgColor = "bg-[#f3f7fa]"; // very light blue
+  const cardBg = "bg-white/60 backdrop-blur"; // softer, slight glass effect
+  const mainBlue = "text-[#1769aa]"; // deep blue 
+
+  // --- STEPS ---
   const steps = [
     <TransactionTypeStep
       key="transaction-type"
@@ -94,26 +106,51 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
         setCurrentStep(1); // advance to next step
       }}
     />,
-    <WelcomeStep key="welcome" leadData={leadData} onNext={handleStepSave} />,
+    <WelcomeStep
+      key="welcome"
+      leadData={leadData}
+      onNext={handleStepSave}
+      headingClass={mainBlue}
+      subtitleClass={mainBlue + " font-medium"}
+    />,
     <ContactInfoStep key="contact" leadData={leadData} onSave={handleStepSave} />,
-    <PropertyInfoStep key="property" leadData={leadData} onSave={handleStepSave} />,
+    <PropertyInfoStep key="property" leadData={leadData} onSave={handleStepSave} blueStyle />,
     <MortgageInfoStep key="mortgage" leadData={leadData} onSave={handleStepSave} />,
     <FinancialInfoStep key="financial" leadData={leadData} onSave={handleStepSave} />,
   ];
 
   if (currentStep >= steps.length) {
-    // Pass the collected lead data when completing the onboarding
     onComplete(leadData);
     return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className={`min-h-screen ${bgColor} py-12`}>
       <div className="max-w-3xl mx-auto px-4">
-        <Card className="p-6">
+        {/* Progress Bar, shown on steps >= 1 (not for transaction type choice) */}
+        {currentStep >= 1 && (
+          <div className="mb-5">
+            <Progress value={progressPercent} className="h-2 bg-[#ddeaf6] [&>div]:bg-[#1769aa]" />
+            <div className="flex justify-between mt-1">
+              <span className="text-xs text-[#1769aa] font-semibold">{progressPercent}%</span>
+            </div>
+          </div>
+        )}
+        <Card className={`p-6 ${cardBg} shadow-2xl rounded-2xl`}>
+          {currentStep === 1 && (
+            // Blue themed welcome text block for WelcomeStep only
+            <div className="text-center mb-8">
+              <h1 className={`text-3xl md:text-4xl font-extrabold mb-4 ${mainBlue}`}>
+                Welcome to Your Mortgage Journey
+              </h1>
+              <h2 className={`text-lg md:text-xl mb-3 ${mainBlue}`}>
+                Let's gather some information to get your mortgage process started
+              </h2>
+            </div>
+          )}
           {steps[currentStep]}
           {isLoading && (
-            <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-white/40 flex items-center justify-center z-10">
               <div className="loading-spinner" />
             </div>
           )}
