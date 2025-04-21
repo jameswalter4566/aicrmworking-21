@@ -23,7 +23,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import PersonalInfoPlaceholder from "@/components/mortgage/client-portal/PersonalInfoPlaceholder";
 import EmploymentIncomeSection from "@/components/mortgage/client-portal/EmploymentIncomeSection";
 import ClientPortalAssetForm from "@/components/mortgage/client-portal/ClientPortalAssetForm";
-import RealEstateOwnedSection from "@/components/mortgage/client-portal/RealEstateOwnedSection";
 
 const progressSteps = [
   "Application Created",
@@ -783,9 +782,6 @@ const ClientPortal = () => {
               <ClientPortalAssetForm
                 isEditable={true}
               />
-            )}
-            {activeTab === "application" && activeAppSection === "liabilities-real-estate-owned" && (
-              <RealEstateOwnedSection />
             )}
             {activeTab === "home" && <HomeTab clientData={clientData} />}
             {activeTab === "conditions" && clientData?.leadId && (
