@@ -58,6 +58,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       try {
         // Fetch lead data using the lead-profile function to get complete data
         if (leadId) {
+          console.log("Fetching lead data in ClientPortalContent for ID:", leadId);
           const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
             body: { id: leadId }
           });

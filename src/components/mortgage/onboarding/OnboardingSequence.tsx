@@ -87,6 +87,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
         updatedMortgageData = {
           ...updatedMortgageData,
           borrower: {
+            ...updatedMortgageData.borrower,
             data: stepData.mortgageData.borrower,
             section: "personalInfo"
           }
