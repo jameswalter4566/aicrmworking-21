@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Home, 
@@ -68,10 +67,8 @@ const ClientPortalSidebar = ({
     if (setActiveAppSection) setActiveAppSection(sectionId);
     setActiveTab("application");
     setIsLoanAppExpanded(true);
-    
-    // Also fire the onApplicationClick handler when any section is clicked
     if (onApplicationClick) {
-      console.log("Section clicked, calling onApplicationClick");
+      console.log("Section clicked (subsection), calling onApplicationClick");
       onApplicationClick();
     }
   };
@@ -143,7 +140,6 @@ const ClientPortalSidebar = ({
                         isActive={activeTab === item.id}
                         onClick={() => {
                           setActiveTab(item.id);
-                          // If this is the application tab, also fire the onApplicationClick handler
                           if (item.id === 'application' && onApplicationClick) {
                             onApplicationClick();
                           }
