@@ -20,7 +20,12 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
       <div className="mb-6 w-full max-w-lg">
         <Smart1003BuilderDropbox leadId={String(leadId)} />
       </div>
-      <Button variant="outline" className="mt-2" onClick={onContinue}>
+      <Button
+        variant="default"    // solid background button variant
+        size="lg"            // larger size
+        className="mt-2"
+        onClick={onContinue}
+      >
         Skip and Fill Out Manually
       </Button>
     </div>
