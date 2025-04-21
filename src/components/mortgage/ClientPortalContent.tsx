@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -7,6 +6,8 @@ import { Upload, FileText, ClipboardCheck, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
+import EmploymentIncomeSection from './client-portal/EmploymentIncomeSection';
+import { PersonalInfoPlaceholder } from './client-portal/PersonalInfoPlaceholder';
 
 interface CompanySettings {
   company_name: string;
@@ -19,6 +20,7 @@ interface ClientPortalContentProps {
   leadId: string | number;
   isInPipeline?: boolean;
   createdBy?: string;
+  activeSection?: string;
 }
 
 const PrePipelineMessage = ({ title, description, settings }: { title: string; description: string; settings: CompanySettings }) => {
@@ -38,7 +40,7 @@ const PrePipelineMessage = ({ title, description, settings }: { title: string; d
   );
 };
 
-export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }: ClientPortalContentProps) => {
+export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy, activeSection }: ClientPortalContentProps) => {
   const [settings, setSettings] = useState<CompanySettings>({
     company_name: 'Your Mortgage Company',
     primary_color: '#33C3F0',
@@ -46,13 +48,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     accent_color: '#EA384C',
   });
 
-  // This effect will now fetch company settings based on the creator ID
   useEffect(() => {
     const fetchCompanySettings = async () => {
       if (!createdBy) return;
 
       try {
-        // If we have a createdBy user ID, try to fetch their company settings
         const { data, error } = await supabase
           .from('company_settings')
           .select('*')
@@ -73,14 +73,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       }
     };
 
-    // If we already have a creator ID, fetch settings immediately
     if (createdBy) {
       fetchCompanySettings();
     } else {
-      // If we don't have a creator ID but we have a leadId, try to get it from portal access
       const getCreatorFromPortalAccess = async () => {
         try {
-          // Fix: Convert leadId to a number only for the query
           const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
           
           const { data, error } = await supabase
@@ -94,11 +91,9 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             return;
           }
 
-          // Fix: Check if data exists and has the created_by property, and ensure it's a string
           if (data && 'created_by' in data && data.created_by) {
-            const creatorId = String(data.created_by); // Explicit cast to string
+            const creatorId = String(data.created_by);
             
-            // Now fetch the company settings with this user ID
             const { data: companyData, error: companyError } = await supabase
               .from('company_settings')
               .select('*')
@@ -126,6 +121,17 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
   const refreshData = () => {
     console.log("Refreshing data...");
+  };
+
+  const renderApplicationSection = () => {
+    switch(activeSection) {
+      case 'personal-info':
+        return <PersonalInfoPlaceholder />;
+      case 'employment':
+        return <EmploymentIncomeSection />;
+      default:
+        return <div className="p-6 text-center text-gray-500">Select a section from the sidebar to view your application details.</div>;
+    }
   };
 
   if (!isInPipeline) {
@@ -197,14 +203,24 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           {settings.company_name}
         </h1>
       </div>
-      <ClientPortalLoanProgress 
-        leadId={leadId} 
-        className="mb-6" 
-      />
-      <ClientPortalConditions 
-        leadId={leadId}
-        refreshData={refreshData}
-      />
+      
+      {activeSection && activeSection.startsWith('personal-info') || 
+       activeSection && activeSection.startsWith('employment') || 
+       activeSection && activeSection.startsWith('assets') || 
+       activeSection && activeSection.startsWith('liabilities') ? (
+        renderApplicationSection()
+      ) : (
+        <>
+          <ClientPortalLoanProgress 
+            leadId={leadId} 
+            className="mb-6" 
+          />
+          <ClientPortalConditions 
+            leadId={leadId}
+            refreshData={refreshData}
+          />
+        </>
+      )}
     </div>
   );
 };
