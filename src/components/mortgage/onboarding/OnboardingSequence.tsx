@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import FinancialInfoStep from './steps/FinancialInfoStep';
 import EstHomeValueStep from './steps/EstHomeValueStep';
 import MaritalStatusStep from './steps/MaritalStatusStep';
 import BorrowerIdentityStep from './steps/BorrowerIdentityStep';
+import Smart1003DropStep from "./steps/Smart1003DropStep";
 import { LeadProfile } from '@/services/leadProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from "@/components/ui/progress";
@@ -103,14 +103,20 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   const mainBlue = "text-[#1769aa]"; // deep blue 
 
   // --- STEPS ---
+  // We add Smart1003DropStep after TransactionTypeStep and before WelcomeStep
   const steps = [
     <TransactionTypeStep
       key="transaction-type"
       selectedType={transactionType}
       onSelect={(type) => {
         setTransactionType(type);
-        setCurrentStep(1); // advance to next step
+        setCurrentStep(1); // Move to upload smart builder step
       }}
+    />,
+    <Smart1003DropStep
+      key="smart-1003-dropbox"
+      leadId={leadId}
+      onContinue={() => setCurrentStep(2)}
     />,
     <WelcomeStep
       key="welcome"
@@ -136,8 +142,8 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   return (
     <div className={`min-h-screen ${bgColor} py-12`}>
       <div className="max-w-3xl mx-auto px-4">
-        {/* Progress Bar, shown on steps >= 1 (not for transaction type choice) */}
-        {currentStep >= 1 && (
+        {/* Progress Bar, shown on steps >= 2 (not for transaction or upload step) */}
+        {currentStep >= 2 && (
           <div className="mb-5">
             <Progress value={progressPercent} className="h-2 bg-[#ddeaf6] [&>div]:bg-[#1769aa]" />
             <div className="flex justify-between mt-1">
@@ -146,7 +152,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
           </div>
         )}
         <Card className={`p-6 ${cardBg} shadow-2xl rounded-2xl`}>
-          {currentStep === 1 && (
+          {currentStep === 2 && (
             // Blue themed welcome text block for WelcomeStep only
             <div className="text-center mb-8">
               <h1 className={`text-3xl md:text-4xl font-extrabold mb-4 ${mainBlue}`}>
