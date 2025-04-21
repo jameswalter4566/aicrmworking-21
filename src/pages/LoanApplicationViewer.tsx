@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -110,6 +111,7 @@ const LoanApplicationViewer = () => {
       
       const { mortgageData = {} } = loanApplication || {};
       
+      // Create updated mortgage data object
       const updatedMortgageData = {
         ...mortgageData,
         [section]: {
@@ -118,10 +120,31 @@ const LoanApplicationViewer = () => {
         }
       };
       
+      // Create the request payload for top-level lead fields
+      // This ensures we're also updating the main lead record fields when relevant
+      const leadDataPayload: any = { mortgageData: updatedMortgageData };
+      
+      // If this is personal information, also update the top-level fields
+      if (section === 'personalInfo' && data.personalInfo) {
+        if (data.personalInfo.firstName) {
+          leadDataPayload.firstName = data.personalInfo.firstName;
+        }
+        if (data.personalInfo.lastName) {
+          leadDataPayload.lastName = data.personalInfo.lastName;
+        }
+      }
+      
+      // If this has contact details, sync the email
+      if (section === 'personalInfo' && data.contactDetails && data.contactDetails.emailAddress) {
+        leadDataPayload.email = data.contactDetails.emailAddress;
+      }
+      
+      console.log('Saving form data with payload:', leadDataPayload);
+      
       const { data: responseData, error } = await supabase.functions.invoke('update-lead', {
         body: { 
           leadId: id,
-          leadData: { mortgageData: updatedMortgageData }
+          leadData: leadDataPayload
         }
       });
       
@@ -133,12 +156,17 @@ const LoanApplicationViewer = () => {
         if (!prev) return null;
         return {
           ...prev,
-          mortgageData: updatedMortgageData
+          mortgageData: updatedMortgageData,
+          // Also update the top-level fields if they were changed
+          ...(data.personalInfo?.firstName && { firstName: data.personalInfo.firstName }),
+          ...(data.personalInfo?.lastName && { lastName: data.personalInfo.lastName }),
+          ...(data.contactDetails?.emailAddress && { email: data.contactDetails.emailAddress })
         };
       });
       
       toast.success(`${section.charAt(0).toUpperCase() + section.slice(1)} information saved successfully`);
       
+      // Refetch to ensure we have the latest data
       fetchLoanApplicationData(id);
       
     } catch (error) {
