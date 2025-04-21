@@ -42,6 +42,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
   const [showSSN, setShowSSN] = useState(false);
 
   const { register, handleSubmit, formState, watch } = useForm<FormData>({
+    mode: "onChange", // This makes validation run on change
     defaultValues: {
       dobMonth: birthParts[0],
       dobDay: birthParts[1],
@@ -85,17 +86,44 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
       <div className="grid grid-cols-3 gap-4">
         <div>
           <Label htmlFor="dobMonth">Month</Label>
-          <Input id="dobMonth" placeholder="MM" maxLength={2} {...register("dobMonth", { required: true, minLength: 1 })} />
+          <Input 
+            id="dobMonth" 
+            placeholder="MM" 
+            maxLength={2} 
+            {...register("dobMonth", { 
+              required: true, 
+              minLength: 1,
+              pattern: /^(0?[1-9]|1[0-2])$/
+            })} 
+          />
           {formState.errors.dobMonth && <span className="text-red-500 text-xs">Required</span>}
         </div>
         <div>
           <Label htmlFor="dobDay">Day</Label>
-          <Input id="dobDay" placeholder="DD" maxLength={2} {...register("dobDay", { required: true, minLength: 1 })} />
+          <Input 
+            id="dobDay" 
+            placeholder="DD" 
+            maxLength={2} 
+            {...register("dobDay", { 
+              required: true, 
+              minLength: 1,
+              pattern: /^(0?[1-9]|[12]\d|3[01])$/ 
+            })} 
+          />
           {formState.errors.dobDay && <span className="text-red-500 text-xs">Required</span>}
         </div>
         <div>
           <Label htmlFor="dobYear">Year</Label>
-          <Input id="dobYear" placeholder="YYYY" maxLength={4} {...register("dobYear", { required: true, minLength: 4 })} />
+          <Input 
+            id="dobYear" 
+            placeholder="YYYY" 
+            maxLength={4} 
+            {...register("dobYear", { 
+              required: true, 
+              minLength: 4,
+              pattern: /^\d{4}$/
+            })} 
+          />
           {formState.errors.dobYear && <span className="text-red-500 text-xs">Required</span>}
         </div>
       </div>
@@ -110,7 +138,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
             maxLength={3}
             type={showSSN ? "text" : "password"}
             autoComplete="off"
-            {...register("ssn1", { required: true, minLength: 3, maxLength: 3 })}
+            {...register("ssn1", { required: true, minLength: 3, maxLength: 3, pattern: /^\d{3}$/ })}
           />
         </div>
         <span>-</span>
@@ -122,7 +150,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
             maxLength={2}
             type={showSSN ? "text" : "password"}
             autoComplete="off"
-            {...register("ssn2", { required: true, minLength: 2, maxLength: 2 })}
+            {...register("ssn2", { required: true, minLength: 2, maxLength: 2, pattern: /^\d{2}$/ })}
           />
         </div>
         <span>-</span>
@@ -134,7 +162,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
             maxLength={4}
             type={showSSN ? "text" : "password"}
             autoComplete="off"
-            {...register("ssn3", { required: true, minLength: 4, maxLength: 4 })}
+            {...register("ssn3", { required: true, minLength: 4, maxLength: 4, pattern: /^\d{4}$/ })}
           />
         </div>
         <Button
@@ -185,7 +213,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
       <Button
         type="submit"
         className="w-full bg-[#1769aa] text-white hover:bg-[#145089] text-lg rounded-xl py-4 mt-6"
-        disabled={formState.isSubmitting}
+        disabled={!formState.isValid || formState.isSubmitting}
       >
         Continue
       </Button>
