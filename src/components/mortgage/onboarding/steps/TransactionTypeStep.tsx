@@ -1,6 +1,7 @@
 
+// Fixed imports for lucide-react icons (case-sensitive)
 import React from "react";
-import { dollarSign, home } from "lucide-react";
+import { DollarSign, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 type TransactionType = "buy_home" | "refinance" | "cash_out";
