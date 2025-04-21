@@ -131,24 +131,44 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       
       console.log("Explicitly calling lead-profile for ID:", numericLeadId);
       
-      const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
-        body: { id: numericLeadId }
-      });
+      // Call both functions - the original lead-profile and our test function
+      const [leadProfileResponse, testFunctionResponse] = await Promise.allSettled([
+        supabase.functions.invoke('lead-profile', {
+          body: { id: numericLeadId }
+        }),
+        supabase.functions.invoke('test-edgefunction', {
+          body: { id: numericLeadId, timestamp: new Date().toISOString(), source: 'fetchLeadProfile' }
+        })
+      ]);
       
-      console.log("Response from lead-profile:", leadResponse, "Error:", leadError);
+      console.log("Response from lead-profile:", 
+        leadProfileResponse.status === 'fulfilled' ? leadProfileResponse.value : "Promise rejected", 
+        leadProfileResponse.status === 'rejected' ? leadProfileResponse.reason : "");
       
-      if (leadError) {
-        console.error('Error fetching lead data:', leadError);
-        toast.error('Failed to load mortgage data');
-        return;
-      } 
+      console.log("Response from test-edgefunction:", 
+        testFunctionResponse.status === 'fulfilled' ? testFunctionResponse.value : "Promise rejected", 
+        testFunctionResponse.status === 'rejected' ? testFunctionResponse.reason : "");
       
-      if (leadResponse?.success && leadResponse?.data?.lead) {
-        console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
-        setLeadData(leadResponse.data.lead);
+      // Process lead-profile response if fulfilled
+      if (leadProfileResponse.status === 'fulfilled') {
+        const { data: leadResponse, error: leadError } = leadProfileResponse.value;
+        
+        if (leadError) {
+          console.error('Error fetching lead data:', leadError);
+          toast.error('Failed to load mortgage data');
+          return;
+        } 
+        
+        if (leadResponse?.success && leadResponse?.data?.lead) {
+          console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
+          setLeadData(leadResponse.data.lead);
+        } else {
+          console.error('Invalid lead data response:', leadResponse);
+          toast.error('Could not retrieve mortgage data');
+        }
       } else {
-        console.error('Invalid lead data response:', leadResponse);
-        toast.error('Could not retrieve mortgage data');
+        console.error('Lead profile request rejected:', leadProfileResponse.reason);
+        toast.error('Failed to load mortgage data');
       }
     } catch (error) {
       console.error('Error in fetchLeadProfile:', error);
@@ -222,7 +242,21 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     if (!leadId) return;
     try {
       console.log("Manually firing lead-profile for Application tab", leadId);
-      await fetchLeadProfile();
+      
+      // Call both functions when application is clicked
+      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+      
+      const [leadProfileResult, testFunctionResult] = await Promise.allSettled([
+        fetchLeadProfile(),
+        supabase.functions.invoke('test-edgefunction', {
+          body: { id: numericLeadId, timestamp: new Date().toISOString(), source: 'applicationClick' }
+        })
+      ]);
+      
+      console.log("Application click - test function result:", 
+        testFunctionResult.status === 'fulfilled' ? testFunctionResult.value : "Promise rejected",
+        testFunctionResult.status === 'rejected' ? testFunctionResult.reason : "");
+        
     } catch (error) {
       console.error('Error firing lead-profile from Application click:', error);
     }

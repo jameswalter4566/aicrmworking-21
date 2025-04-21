@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Home, 
@@ -73,7 +74,16 @@ const ClientPortalSidebar = ({
       } else {
         console.log("Section clicked (subsection), calling onApplicationClick");
       }
-      onApplicationClick();
+      
+      console.log("onApplicationClick is defined:", typeof onApplicationClick === 'function');
+      try {
+        onApplicationClick();
+        console.log("onApplicationClick called successfully");
+      } catch (error) {
+        console.error("Error calling onApplicationClick:", error);
+      }
+    } else {
+      console.warn("onApplicationClick is not defined for section:", sectionId);
     }
   };
 
@@ -96,7 +106,15 @@ const ClientPortalSidebar = ({
                             setIsLoanAppExpanded(!isLoanAppExpanded);
                             if (onApplicationClick) {
                               console.log("Application clicked, explicitly firing onApplicationClick");
-                              onApplicationClick();
+                              console.log("onApplicationClick is defined:", typeof onApplicationClick === 'function');
+                              try {
+                                onApplicationClick();
+                                console.log("onApplicationClick called successfully from application button");
+                              } catch (error) {
+                                console.error("Error calling onApplicationClick from application button:", error);
+                              }
+                            } else {
+                              console.warn("onApplicationClick is not defined for application tab");
                             }
                           }}
                           className={cn(
@@ -146,10 +164,22 @@ const ClientPortalSidebar = ({
                           setActiveTab(item.id);
                           if (item.id === 'home' && onApplicationClick) {
                             console.log("Dashboard clicked, firing onApplicationClick");
-                            onApplicationClick();
+                            console.log("onApplicationClick is defined:", typeof onApplicationClick === 'function');
+                            try {
+                              onApplicationClick();
+                              console.log("onApplicationClick called successfully from dashboard");
+                            } catch (error) {
+                              console.error("Error calling onApplicationClick from dashboard:", error);
+                            }
                           }
                           if (item.id === 'application' && onApplicationClick) {
-                            onApplicationClick();
+                            console.log("onApplicationClick is defined:", typeof onApplicationClick === 'function');
+                            try {
+                              onApplicationClick();
+                              console.log("onApplicationClick called successfully from application menu item");
+                            } catch (error) {
+                              console.error("Error calling onApplicationClick from application menu item:", error);
+                            }
                           }
                         }}
                         className={`relative flex items-center w-full rounded-lg transition-colors ${
