@@ -1,6 +1,6 @@
 
 import React from "react";
-import Smart1003BuilderDropbox from "./Smart1003BuilderDropbox";
+import Smart1003BuilderDropbox from "../../Smart1003BuilderDropbox";
 import { Button } from "@/components/ui/button";
 
 interface Smart1003DropStepProps {
