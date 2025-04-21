@@ -40,6 +40,7 @@ export interface LeadProfile {
       monthlyHousingExpense?: string;
     };
     employment?: {
+      employmentType?: string; // Added this property
       employerName?: string;
       employerAddress?: string;
       jobTitle?: string;
@@ -47,11 +48,16 @@ export interface LeadProfile {
       endDate?: string;
       monthlyIncome?: string;
       isSelfEmployed?: boolean;
+      industry?: string; // Added this property
+      employerPhone?: string; // Added this property
+      isFamilyMember?: boolean; // Added this property
     };
     income?: {
       baseIncome?: string;
       overtimeIncome?: string;
       otherIncome?: string;
+      bonusIncome?: string; // Added this property
+      commissionIncome?: string; // Added this property
     };
     assets?: {
       bankAccounts?: string;
@@ -97,6 +103,25 @@ export interface LeadProfile {
       mortgageInsurance?: string;
       loanAmount?: string;
       purpose?: string;
+    };
+    // Added co-applicant field
+    coApplicant?: {
+      employmentType?: string;
+      employerName?: string;
+      employerAddress?: string;
+      jobTitle?: string;
+      startDate?: string;
+      isSelfEmployed?: boolean;
+      industry?: string;
+      employerPhone?: string;
+      isFamilyMember?: boolean;
+      income?: {
+        baseIncome?: string;
+        overtimeIncome?: string;
+        bonusIncome?: string;
+        commissionIncome?: string;
+        otherIncome?: string;
+      };
     };
   };
   isMortgageLead?: boolean;
