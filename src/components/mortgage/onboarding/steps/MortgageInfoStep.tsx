@@ -6,14 +6,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 
 interface MortgageInfoStepProps {
   leadData: Partial<LeadProfile>;
   onSave: (data: Partial<LeadProfile>) => void;
 }
 
+const loanTypeOptions = [
+  { value: 'Conventional', label: 'Conventional' },
+  { value: 'FHA', label: 'FHA' },
+  { value: 'VA', label: 'VA' },
+  { value: 'REVERSE', label: 'REVERSE' }
+];
+
 const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
-  const { register, handleSubmit } = useForm({
+  const { register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
       mortgageData: {
         loan: {
@@ -26,12 +34,14 @@ const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
     }
   });
 
+  const watchedLoanType = watch('mortgageData.loan.loanType');
+
   return (
     <form onSubmit={handleSubmit(onSave)} className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Mortgage Information</h2>
       
       <div className="space-y-2">
-        <Label htmlFor="loanAmount">Desired Loan Amount</Label>
+        <Label htmlFor="loanAmount">Current Loan Balance</Label>
         <Input 
           id="loanAmount" 
           type="number" 
@@ -41,11 +51,23 @@ const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
 
       <div className="space-y-2">
         <Label htmlFor="loanType">Loan Type</Label>
-        <Input id="loanType" {...register('mortgageData.loan.loanType')} />
+        <Select
+          value={watchedLoanType}
+          onValueChange={val => setValue('mortgageData.loan.loanType', val, { shouldValidate: true })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select loan type" />
+          </SelectTrigger>
+          <SelectContent>
+            {loanTypeOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="mortgageTerm">Mortgage Term (years)</Label>
+        <Label htmlFor="mortgageTerm">Desired Mortgage Term (years)</Label>
         <Input 
           id="mortgageTerm" 
           type="number" 
@@ -67,3 +89,4 @@ const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
 };
 
 export default MortgageInfoStep;
+
