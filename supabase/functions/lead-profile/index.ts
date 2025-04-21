@@ -97,7 +97,9 @@ Deno.serve(async (req) => {
       createdAt: lead.created_at,
       updatedAt: lead.updated_at,
       createdBy: lead.created_by,
-      mortgageData: lead.mortgage_data
+      mortgageData: lead.mortgage_data,
+      isMortgageLead: lead.is_mortgage_lead,
+      addedToPipelineAt: lead.added_to_pipeline_at
     };
 
     console.log(`Successfully retrieved lead: ${formattedLead.firstName} ${formattedLead.lastName}`);

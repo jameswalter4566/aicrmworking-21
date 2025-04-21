@@ -21,9 +21,9 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
         <Smart1003BuilderDropbox leadId={String(leadId)} />
       </div>
       <Button
-        variant="default"    // solid background button variant
-        size="lg"            // larger size
-        className="mt-2 px-8 py-2.5 bg-blue-600 hover:bg-blue-700" // Added blue background and hover effect
+        variant="default"
+        size="lg"
+        className="mt-4 px-10 py-3 bg-blue-600 hover:bg-blue-700 text-lg font-medium"
         onClick={onContinue}
       >
         Skip and Fill Out Manually

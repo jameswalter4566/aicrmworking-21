@@ -70,11 +70,13 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           
           if (leadError) {
             console.error('Error fetching lead data:', leadError);
+            toast.error('Failed to load mortgage data');
           } else if (leadResponse?.success && leadResponse?.data?.lead) {
             console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
             setLeadData(leadResponse.data.lead);
           } else {
             console.error('Invalid lead data response:', leadResponse);
+            toast.error('Could not retrieve mortgage data');
           }
         }
         
@@ -99,7 +101,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             .from('client_portal_access')
             .select('created_by')
             .eq('lead_id', numericLeadId)
-            .single();
+            .maybeSingle(); // Changed from single() to avoid potential errors
 
           if (error) {
             console.error('Error fetching portal creator:', error);
@@ -110,7 +112,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
               .from('company_settings')
               .select('*')
               .eq('user_id', creatorId)
-              .single();
+              .maybeSingle(); // Changed from single()
 
             if (companyError) {
               console.error('Error fetching company settings:', companyError);
@@ -121,12 +123,22 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+        toast.error('Failed to load data');
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
+    
+    // Set up an interval to periodically refresh the data when the component is mounted
+    const refreshInterval = setInterval(() => {
+      if (leadId) {
+        refreshData();
+      }
+    }, 60000); // Refresh every minute
+    
+    return () => clearInterval(refreshInterval); // Clean up on unmount
   }, [createdBy, leadId]);
 
   const handleSaveMortgageData = async (section: string, data: Record<string, any>) => {
@@ -189,6 +201,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     
     try {
       const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+      console.log("Refreshing lead data for ID:", numericLeadId);
       
       const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
         body: { id: numericLeadId }
@@ -202,6 +215,8 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       if (leadResponse?.success && leadResponse?.data?.lead) {
         console.log("Refreshed lead data in client portal:", leadResponse.data.lead);
         setLeadData(leadResponse.data.lead);
+      } else {
+        console.error('Invalid response when refreshing lead data:', leadResponse);
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -317,4 +332,3 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     </div>
   );
 };
-
