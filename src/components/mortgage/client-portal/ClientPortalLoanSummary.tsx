@@ -1,354 +1,498 @@
 
-import React, { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import React, { useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { DollarSign } from "lucide-react";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2 } from "lucide-react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const inputClass = "w-full border-gray-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300";
+const loanTypes = [
+  "Conventional",
+  "FHA",
+  "VA",
+  "USDA",
+  "Jumbo",
+  "Non-QM",
+  "Other"
+];
 
-const selectClass = "w-full border-gray-200 rounded-lg bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sky-300";
-const labelClass = "block text-xs font-semibold text-neutral-600 mb-1";
-const formGrid = "grid grid-cols-1 md:grid-cols-2 gap-6";
+const loanTerms = [
+  "30 Year Fixed",
+  "15 Year Fixed",
+  "20 Year Fixed",
+  "10 Year Fixed",
+  "7/1 ARM",
+  "5/1 ARM",
+  "3/1 ARM"
+];
 
-// Default values for demonstration (no db integration yet)
-const initialFormA = {
-  loanType: "Conventional",
-  amortizationType: "Fixed",
-  loanFico: "",
-  documentationType: "Full",
-  interestRate: "",
-  amortizedPayments: "360",
-  loanPurpose: "Refinance 1st Mortgage",
-  refinancePurpose: "Rate and Term - Conv",
-  appraisedValue: "",
-  baseLoanAmount: "",
-  financedFees: "0.00",
-  totalLoanAmount: "",
-  secondLoanAmount: "0.00",
-  ltv: "",
-  cltv: "",
-  tltv: "",
-  yearAcquired: "",
-  existingLiens: "0.00",
-  originalCost: "",
-};
+const loanPurposes = [
+  "Purchase",
+  "Refinance - Rate/Term",
+  "Refinance - Cash Out",
+  "Home Equity",
+  "Construction"
+];
 
-const initialFormB = {
-  propertyType: "Single Family Residence",
-  occupancy: "Primary Residence",
-  attachmentType: "Detached",
-  address: "",
-  city: "",
-  state: "California",
-  zip: "",
-  county: "",
-  unit: "",
-  yearBuilt: "",
-  numUnits: "1",
-  newConstruction: false,
-  landContract: false,
-  titleHeldIn: "",
-  mannerHeld: "Husband and Wife",
-  propertyRights: "Fee Simple",
-  mixedUse: "No",
-  grossRent: "0.00",
-  vacancyFactor: "0.00",
-  adjustedGross: "0.00",
-  netRental: "0.00",
-};
+const propertyTypes = [
+  "Single Family",
+  "Condominium",
+  "Townhouse",
+  "Multi-Family (2-4 units)",
+  "Multi-Family (5+ units)",
+  "Manufactured Home",
+  "Other"
+];
 
-const tabStyles = "bg-gray-100 rounded-t-md h-10 flex items-center px-4 font-semibold data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow";
+const propertyUses = [
+  "Primary residence",
+  "Second home",
+  "Investment property"
+];
 
-export default function ClientPortalLoanSummary() {
-  const [activeTab, setActiveTab] = useState<"purpose" | "property">("purpose");
-  const [formA, setFormA] = useState(initialFormA);
-  const [formB, setFormB] = useState(initialFormB);
+const ClientPortalLoanSummary: React.FC = () => {
+  const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+  
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [formData, setFormData] = useState({
+    // Loan information
+    loanType: "",
+    loanAmount: "",
+    loanTerm: "",
+    purpose: "",
+    interestRate: "",
+    estimatedClosingDate: "",
+    
+    // Property information
+    propertyAddress: "",
+    propertyCity: "",
+    propertyState: "",
+    propertyZip: "",
+    propertyType: "",
+    propertyUse: "",
+    propertyValue: "",
+    downPayment: "",
+    isNewPurchase: true
+  });
+  
+  useEffect(() => {
+    if (!slug || !token) return;
+    
+    const fetchLoanData = async () => {
+      try {
+        setLoading(true);
+        // Get lead ID from portal access
+        const { data: portalData, error: portalError } = await supabase
+          .from('client_portal_access')
+          .select('lead_id')
+          .eq('portal_slug', slug)
+          .eq('access_token', token)
+          .single();
+        
+        if (portalError || !portalData?.lead_id) {
+          console.error("Error fetching portal access:", portalError);
+          return;
+        }
+        
+        setLeadId(portalData.lead_id.toString());
+        
+        // Get lead data
+        const { data: response, error: profileError } = await supabase.functions.invoke('lead-profile', {
+          body: { id: portalData.lead_id }
+        });
 
-  const handleChangeA = (e: any) => setFormA({ ...formA, [e.target.name]: e.target.value });
-  const handleChangeB = (e: any) => setFormB({ ...formB, [e.target.name]: e.target.value });
+        if (profileError || !response.success || !response.data.lead) {
+          console.error("Error fetching lead data:", profileError || response.error);
+          return;
+        }
+        
+        const lead = response.data.lead;
+        const mortgageData = lead.mortgageData || {};
+        const loanData = mortgageData.loan || {};
+        const propertyData = mortgageData.property || {};
+        
+        // Split the property address if it exists
+        let propertyAddress = lead.propertyAddress || "";
+        let propertyCity = "";
+        let propertyState = "";
+        let propertyZip = "";
+        
+        if (propertyAddress) {
+          const parts = propertyAddress.split(',');
+          if (parts.length >= 1) propertyAddress = parts[0].trim();
+          if (parts.length >= 2) {
+            const cityPart = parts[1].trim();
+            propertyCity = cityPart;
+            
+            // Try to extract state and zip if in "City, ST 12345" format
+            if (parts.length >= 3) {
+              const stateZipPart = parts[2].trim();
+              const stateZipMatch = stateZipPart.match(/([A-Z]{2})\s*(\d{5})?/);
+              if (stateZipMatch) {
+                propertyState = stateZipMatch[1];
+                propertyZip = stateZipMatch[2] || "";
+              }
+            }
+          }
+        }
+        
+        setFormData({
+          loanType: loanData.loanType || "",
+          loanAmount: loanData.loanAmount || "",
+          loanTerm: loanData.mortgageTerm || "",
+          purpose: loanData.purpose || "",
+          interestRate: loanData.interestRate || "",
+          estimatedClosingDate: loanData.closingDate || "",
+          
+          propertyAddress: propertyAddress || "",
+          propertyCity: propertyCity || "",
+          propertyState: propertyState || "",
+          propertyZip: propertyZip || "",
+          propertyType: propertyData.propertyType || "",
+          propertyUse: propertyData.occupancy || "",
+          propertyValue: propertyData.propertyValue || "",
+          downPayment: propertyData.downPayment || "",
+          isNewPurchase: propertyData.isNewPurchase || true
+        });
+      } catch (error) {
+        console.error("Error in fetchLoanData:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchLoanData();
+  }, [slug, token]);
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleCheckboxChange = (name: string, checked: boolean) => {
+    setFormData(prev => ({ ...prev, [name]: checked }));
+  };
+  
+  const handleSave = async () => {
+    if (!leadId) {
+      toast.error("Cannot save: Lead ID is missing");
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      
+      // Format loan and property data for saving
+      const mortgageData = {
+        loan: {
+          loanType: formData.loanType,
+          loanAmount: formData.loanAmount,
+          mortgageTerm: formData.loanTerm,
+          purpose: formData.purpose,
+          interestRate: formData.interestRate,
+          closingDate: formData.estimatedClosingDate
+        },
+        property: {
+          propertyType: formData.propertyType,
+          occupancy: formData.propertyUse,
+          propertyValue: formData.propertyValue,
+          downPayment: formData.downPayment,
+          isNewPurchase: formData.isNewPurchase
+        }
+      };
+      
+      // Format property address
+      const propertyAddress = `${formData.propertyAddress}, ${formData.propertyCity}, ${formData.propertyState} ${formData.propertyZip}`.replace(/,\s*,/g, ',').replace(/\s+/g, ' ').trim();
+      
+      const { data, error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId: leadId,
+          leadData: { 
+            propertyAddress,
+            mortgageData 
+          }
+        }
+      });
+      
+      if (error || !data.success) {
+        throw new Error(error?.message || data?.error || "Failed to update loan information");
+      }
+      
+      toast.success("Loan information saved successfully");
+    } catch (error) {
+      console.error("Error saving loan information:", error);
+      toast.error("Failed to save loan information");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card className="mb-6">
+        <CardContent className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="mt-10">
-      <CardHeader className="flex flex-row gap-2 items-center">
-        <DollarSign className="text-blue-700" />
-        <CardTitle className="text-lg font-bold tracking-tight">Loan Information</CardTitle>
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="text-mortgage-darkPurple">Loan Summary</CardTitle>
+        <CardDescription>
+          Review and update details about your mortgage loan
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)} className="w-full">
-          <TabsList className="flex w-full mb-4 border-b border-gray-200 bg-transparent rounded-none p-0">
-            <TabsTrigger value="purpose" className={tabStyles + " basis-1/2"}>Mortgage Purpose, Types & Terms</TabsTrigger>
-            <TabsTrigger value="property" className={tabStyles + " basis-1/2"}>Subject Property</TabsTrigger>
-          </TabsList>
-          <TabsContent value="purpose">
-            <form className={formGrid + " gap-y-4"}>
-              <div>
-                <label className={labelClass}>Mortgage Applied For</label>
-                <select name="loanType" value={formA.loanType} onChange={handleChangeA} className={selectClass}>
-                  <option>Conventional</option>
-                  <option>FHA</option>
-                  <option>VA</option>
-                  <option>USDA</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Amortization Type</label>
-                <select name="amortizationType" value={formA.amortizationType} onChange={handleChangeA} className={selectClass}>
-                  <option>Fixed</option>
-                  <option>ARM</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Loan FICO</label>
-                <input name="loanFico" value={formA.loanFico} onChange={handleChangeA} className={inputClass} placeholder="Enter FICO" />
-              </div>
-              <div>
-                <label className={labelClass}>Documentation Type</label>
-                <select name="documentationType" value={formA.documentationType} onChange={handleChangeA} className={selectClass}>
-                  <option>Full</option>
-                  <option>Lite Doc</option>
-                  <option>No Doc</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Interest Rate</label>
-                <div className="relative">
-                  <input name="interestRate" value={formA.interestRate} onChange={handleChangeA} className={inputClass + " pr-8"} placeholder="%" />
-                  <span className="absolute right-3 top-2.5 text-gray-400 text-sm">%</span>
-                </div>
-              </div>
-              <div>
-                <label className={labelClass}>Amortized No. Of Payments</label>
-                <input name="amortizedPayments" value={formA.amortizedPayments} onChange={handleChangeA} className={inputClass} placeholder="360" />
-              </div>
-              <div>
-                <label className={labelClass}>Mortgage Purpose</label>
-                <select name="loanPurpose" value={formA.loanPurpose} onChange={handleChangeA} className={selectClass}>
-                  <option>Refinance 1st Mortgage</option>
-                  <option>Purchase</option>
-                  <option>Home Equity</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Refinance Purpose</label>
-                <select name="refinancePurpose" value={formA.refinancePurpose} onChange={handleChangeA} className={selectClass}>
-                  <option>Rate and Term - Conv</option>
-                  <option>Cash Out</option>
-                  <option>Debt Consolidation</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Appraised Value</label>
-                <input name="appraisedValue" value={formA.appraisedValue} onChange={handleChangeA} className={inputClass} placeholder="$" />
-              </div>
-              <div>
-                <label className={labelClass}>Base Loan Amount</label>
-                <input name="baseLoanAmount" value={formA.baseLoanAmount} onChange={handleChangeA} className={inputClass} placeholder="$" />
-              </div>
-              <div>
-                <label className={labelClass}>Financed Fees</label>
-                <input name="financedFees" value={formA.financedFees} onChange={handleChangeA} className={inputClass} placeholder="$ 0.00" />
-              </div>
-              <div>
-                <label className={labelClass}>Total Loan Amount</label>
-                <input name="totalLoanAmount" value={formA.totalLoanAmount} onChange={handleChangeA} className={inputClass} placeholder="$" />
-              </div>
-              <div>
-                <label className={labelClass}>Second Loan Amount</label>
-                <input name="secondLoanAmount" value={formA.secondLoanAmount} onChange={handleChangeA} className={inputClass} placeholder="$ 0.00" />
-              </div>
-              <div>
-                <label className={labelClass}>LTV</label>
-                <input name="ltv" value={formA.ltv} onChange={handleChangeA} className={inputClass} placeholder="%" />
-              </div>
-              <div>
-                <label className={labelClass}>CLTV</label>
-                <input name="cltv" value={formA.cltv} onChange={handleChangeA} className={inputClass} placeholder="%" />
-              </div>
-              <div>
-                <label className={labelClass}>TLTV</label>
-                <input name="tltv" value={formA.tltv} onChange={handleChangeA} className={inputClass} placeholder="%" />
-              </div>
-              <div>
-                <label className={labelClass}>Year Acquired</label>
-                <input name="yearAcquired" value={formA.yearAcquired} onChange={handleChangeA} className={inputClass} placeholder="YYYY" />
-              </div>
-              <div>
-                <label className={labelClass}>Amount Existing Liens</label>
-                <input name="existingLiens" value={formA.existingLiens} onChange={handleChangeA} className={inputClass} placeholder="$ 0.00" />
-              </div>
-              <div>
-                <label className={labelClass}>Original Cost</label>
-                <input name="originalCost" value={formA.originalCost} onChange={handleChangeA} className={inputClass} placeholder="$" />
-              </div>
-            </form>
-            <div className="flex justify-end mt-6">
-              <Button type="button" className="bg-sky-400 hover:bg-sky-500 text-white font-semibold">
-                <span className="flex items-center gap-2">
-                  <DollarSign size={18} /> Save Loan Information
-                </span>
-              </Button>
+      <CardContent className="space-y-6">
+        <div>
+          <h3 className="font-semibold text-mortgage-darkPurple mb-3">Loan Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="purpose">Loan Purpose</Label>
+              <Select 
+                value={formData.purpose} 
+                onValueChange={(value) => handleSelectChange("purpose", value)}
+              >
+                <SelectTrigger id="purpose">
+                  <SelectValue placeholder="Select purpose" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loanPurposes.map(purpose => (
+                    <SelectItem key={purpose} value={purpose}>{purpose}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </TabsContent>
-          <TabsContent value="property">
-            <form className={formGrid + " gap-y-4"}>
+            
+            <div>
+              <Label htmlFor="loanType">Loan Type</Label>
+              <Select 
+                value={formData.loanType} 
+                onValueChange={(value) => handleSelectChange("loanType", value)}
+              >
+                <SelectTrigger id="loanType">
+                  <SelectValue placeholder="Select loan type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loanTypes.map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="loanAmount">Loan Amount</Label>
+              <Input
+                id="loanAmount"
+                name="loanAmount"
+                placeholder="$ Amount"
+                value={formData.loanAmount}
+                onChange={handleInputChange}
+                prefix="$"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="loanTerm">Loan Term</Label>
+              <Select 
+                value={formData.loanTerm} 
+                onValueChange={(value) => handleSelectChange("loanTerm", value)}
+              >
+                <SelectTrigger id="loanTerm">
+                  <SelectValue placeholder="Select term" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loanTerms.map(term => (
+                    <SelectItem key={term} value={term}>{term}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <Label htmlFor="interestRate">Interest Rate (%)</Label>
+              <Input
+                id="interestRate"
+                name="interestRate"
+                placeholder="5.25"
+                value={formData.interestRate}
+                onChange={handleInputChange}
+                suffix="%"
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="estimatedClosingDate">Estimated Closing Date</Label>
+              <Input
+                id="estimatedClosingDate"
+                name="estimatedClosingDate"
+                type="date"
+                value={formData.estimatedClosingDate}
+                onChange={handleInputChange}
+              />
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        <div>
+          <h3 className="font-semibold text-mortgage-darkPurple mb-3">Property Information</h3>
+          
+          <div className="mb-4 flex items-center space-x-2">
+            <Checkbox 
+              id="isNewPurchase" 
+              checked={formData.isNewPurchase}
+              onCheckedChange={(checked) => handleCheckboxChange("isNewPurchase", !!checked)}
+            />
+            <Label htmlFor="isNewPurchase">This is a new property purchase</Label>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="propertyAddress">Property Address</Label>
+              <Input
+                id="propertyAddress"
+                name="propertyAddress"
+                placeholder="Street address"
+                value={formData.propertyAddress}
+                onChange={handleInputChange}
+              />
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className={labelClass}>Property Type</label>
-                <select name="propertyType" value={formB.propertyType} onChange={handleChangeB} className={selectClass}>
-                  <option>Single Family Residence</option>
-                  <option>Condo</option>
-                  <option>PUD</option>
-                  <option>Multi-Family</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Occupancy</label>
-                <select name="occupancy" value={formB.occupancy} onChange={handleChangeB} className={selectClass}>
-                  <option>Primary Residence</option>
-                  <option>Second Home</option>
-                  <option>Investment</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Attachment Type</label>
-                <select name="attachmentType" value={formB.attachmentType} onChange={handleChangeB} className={selectClass}>
-                  <option>Detached</option>
-                  <option>Attached</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Address Line 1</label>
-                <input name="address" value={formB.address} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Unit #</label>
-                <input name="unit" value={formB.unit} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>City</label>
-                <input name="city" value={formB.city} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>State</label>
-                <input name="state" value={formB.state} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>ZIP Code</label>
-                <input name="zip" value={formB.zip} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>County</label>
-                <input name="county" value={formB.county} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Number Of Units</label>
-                <input name="numUnits" value={formB.numUnits} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Year Built</label>
-                <input name="yearBuilt" value={formB.yearBuilt} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div className="flex items-center gap-2 mt-6">
-                <input
-                  type="checkbox"
-                  checked={formB.newConstruction}
-                  onChange={e => setFormB(f => ({ ...f, newConstruction: e.target.checked }))}
-                  className="accent-sky-500"
-                  id="newConstruction"
+                <Label htmlFor="propertyCity">City</Label>
+                <Input
+                  id="propertyCity"
+                  name="propertyCity"
+                  placeholder="City"
+                  value={formData.propertyCity}
+                  onChange={handleInputChange}
                 />
-                <label htmlFor="newConstruction" className="text-sm">New Construction</label>
               </div>
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formB.landContract}
-                  onChange={e => setFormB(f => ({ ...f, landContract: e.target.checked }))}
-                  className="accent-sky-500"
-                  id="landContract"
+              
+              <div>
+                <Label htmlFor="propertyState">State</Label>
+                <Input
+                  id="propertyState"
+                  name="propertyState"
+                  placeholder="State"
+                  value={formData.propertyState}
+                  onChange={handleInputChange}
                 />
-                <label htmlFor="landContract" className="text-sm">Land Contract Conversion</label>
               </div>
+              
               <div>
-                <label className={labelClass}>Title To Be Held In</label>
-                <input name="titleHeldIn" value={formB.titleHeldIn} onChange={handleChangeB} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Manner Held</label>
-                <select name="mannerHeld" value={formB.mannerHeld} onChange={handleChangeB} className={selectClass}>
-                  <option>Husband and Wife</option>
-                  <option>Single</option>
-                  <option>Tenants in Common</option>
-                  <option>Joint Tenants</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Property Rights</label>
-                <select name="propertyRights" value={formB.propertyRights} onChange={handleChangeB} className={selectClass}>
-                  <option>Fee Simple</option>
-                  <option>Leasehold</option>
-                </select>
-              </div>
-              <div className="col-span-2 mt-3">
-                <label className={labelClass + " mb-0"}>Mixed Use Property:</label>
-                <div className="flex items-center mt-1 gap-6">
-                  <span className="text-sm text-gray-600 mr-2">
-                    If you will occupy the property, will you set aside space within the property to operate your own business? (e.g., daycare, beauty shop)
-                  </span>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" value="Yes" checked={formB.mixedUse === "Yes"} onChange={() => setFormB(f => ({ ...f, mixedUse: "Yes" }))} />
-                    Yes
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" value="No" checked={formB.mixedUse === "No"} onChange={() => setFormB(f => ({ ...f, mixedUse: "No" }))} />
-                    No
-                  </label>
-                </div>
-              </div>
-            </form>
-            {/* Rental Income Calculator */}
-            <div className="border-t mt-8 pt-4">
-              <p className="font-semibold text-blue-800">Rental Income Calculator</p>
-              <div className="grid md:grid-cols-4 grid-cols-1 gap-4 mt-2">
-                <div>
-                  <label className={labelClass}>Gross Monthly Rent</label>
-                  <div className="relative">
-                    <input name="grossRent" value={formB.grossRent} onChange={handleChangeB} className={inputClass + " pr-8"} placeholder="$ 0.00" />
-                    <span className="absolute right-3 top-2.5 text-gray-400 text-sm">$</span>
-                  </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Vacancy Factor</label>
-                  <div className="relative">
-                    <input name="vacancyFactor" value={formB.vacancyFactor} onChange={handleChangeB} className={inputClass + " pr-8"} placeholder="0.00" />
-                    <span className="absolute right-3 top-2.5 text-gray-400 text-sm">%</span>
-                  </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Adjusted Monthly Gross Income</label>
-                  <div className="relative">
-                    <input name="adjustedGross" value={formB.adjustedGross} onChange={handleChangeB} className={inputClass + " pr-8"} placeholder="$ 0.00" />
-                    <span className="absolute right-3 top-2.5 text-gray-400 text-sm">$</span>
-                  </div>
-                </div>
-                <div>
-                  <label className={labelClass}>Net Rental Income</label>
-                  <div className="relative">
-                    <input name="netRental" value={formB.netRental} onChange={handleChangeB} className={inputClass + " pr-8"} placeholder="$ 0.00" />
-                    <span className="absolute right-3 top-2.5 text-gray-400 text-sm">$</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex justify-end mt-6">
-                <Button type="button" className="bg-sky-400 hover:bg-sky-500 text-white font-semibold">
-                  <span className="flex items-center gap-2">
-                    <DollarSign size={18} /> Save Property Information
-                  </span>
-                </Button>
+                <Label htmlFor="propertyZip">ZIP Code</Label>
+                <Input
+                  id="propertyZip"
+                  name="propertyZip"
+                  placeholder="ZIP Code"
+                  value={formData.propertyZip}
+                  onChange={handleInputChange}
+                />
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="propertyType">Property Type</Label>
+                <Select 
+                  value={formData.propertyType} 
+                  onValueChange={(value) => handleSelectChange("propertyType", value)}
+                >
+                  <SelectTrigger id="propertyType">
+                    <SelectValue placeholder="Select property type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {propertyTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="propertyUse">Property Use</Label>
+                <Select 
+                  value={formData.propertyUse} 
+                  onValueChange={(value) => handleSelectChange("propertyUse", value)}
+                >
+                  <SelectTrigger id="propertyUse">
+                    <SelectValue placeholder="Select property use" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {propertyUses.map(use => (
+                      <SelectItem key={use} value={use}>{use}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor="propertyValue">Estimated Property Value</Label>
+                <Input
+                  id="propertyValue"
+                  name="propertyValue"
+                  placeholder="$ Amount"
+                  value={formData.propertyValue}
+                  onChange={handleInputChange}
+                  prefix="$"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="downPayment">Down Payment</Label>
+                <Input
+                  id="downPayment"
+                  name="downPayment"
+                  placeholder="$ Amount"
+                  value={formData.downPayment}
+                  onChange={handleInputChange}
+                  prefix="$"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end pt-4">
+          <Button 
+            onClick={handleSave} 
+            className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
+            disabled={saving}
+          >
+            {saving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Loan Information'
+            )}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
-}
+};
+
+export default ClientPortalLoanSummary;

@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
 
     // Handle mortgage data if provided
     if (leadData.mortgageData) {
-      // Ensure data consistency between personalInfo and borrower paths
+      // Convert all mortgage data to ensure consistent structure
       const mortgageData = leadData.mortgageData;
       
       // Special handling for syncing personalInfo to borrower data structure
@@ -129,6 +129,19 @@ Deno.serve(async (req) => {
         transformedData.email = mortgageData.personalInfo.contactDetails.emailAddress;
       } else if (mortgageData.borrower?.data?.contactDetails?.emailAddress) {
         transformedData.email = mortgageData.borrower.data.contactDetails.emailAddress;
+      }
+      
+      // Sync phone numbers from contact details if available
+      if (mortgageData.personalInfo?.contactDetails?.cellPhoneNumber) {
+        transformedData.phone1 = mortgageData.personalInfo.contactDetails.cellPhoneNumber;
+      } else if (mortgageData.borrower?.data?.contactDetails?.cellPhoneNumber) {
+        transformedData.phone1 = mortgageData.borrower.data.contactDetails.cellPhoneNumber;
+      }
+      
+      if (mortgageData.personalInfo?.contactDetails?.homePhoneNumber) {
+        transformedData.phone2 = mortgageData.personalInfo.contactDetails.homePhoneNumber;
+      } else if (mortgageData.borrower?.data?.contactDetails?.homePhoneNumber) {
+        transformedData.phone2 = mortgageData.borrower.data.contactDetails.homePhoneNumber;
       }
     }
 

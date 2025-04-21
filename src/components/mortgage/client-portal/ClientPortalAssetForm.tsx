@@ -1,306 +1,309 @@
 
-import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import React, { useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, CreditCard, MapPin, Plus } from "lucide-react";
+import { Plus, Trash2, Loader2 } from "lucide-react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-interface AssetEntry {
+interface Asset {
   id: string;
-  assetOwner: string;
-  borrowerName: string;
-  assetType: string;
-  depositor: string;
-  addressLine1: string;
-  addressLine2: string;
-  city: string;
-  state: string;
-  zipCode: string;
+  type: string;
+  institution: string;
   accountNumber: string;
-  cashValue: number;
+  value: string;
 }
 
 interface ClientPortalAssetFormProps {
-  initialAssets?: AssetEntry[];
   isEditable?: boolean;
-  onAssetsChange?: (assets: AssetEntry[]) => void;
 }
 
-// Default asset form entry
-const defaultEntry: AssetEntry = {
-  id: "",
-  assetOwner: "borrower",
-  borrowerName: "",
-  assetType: "checkingAccount",
-  depositor: "",
-  addressLine1: "",
-  addressLine2: "",
-  city: "",
-  state: "",
-  zipCode: "",
-  accountNumber: "",
-  cashValue: 0
-};
+const assetTypes = [
+  "Checking Account",
+  "Savings Account",
+  "Money Market Account",
+  "Certificate of Deposit",
+  "Mutual Fund",
+  "Stocks",
+  "Bonds",
+  "Retirement Account",
+  "Cash Value of Life Insurance",
+  "Other Liquid Asset"
+];
 
-const assetTypeLabels: Record<string, string> = {
-  checkingAccount: "Checking Account",
-  savingsAccount: "Savings Account",
-  moneyMarket: "Money Market",
-  cd: "Certificate of Deposit",
-  stocks: "Stocks/Bonds/Mutual Funds",
-  retirement: "Retirement Account",
-  other: "Other Asset"
-};
+export default function ClientPortalAssetForm({ isEditable = false }: ClientPortalAssetFormProps) {
+  const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+  
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  
+  useEffect(() => {
+    if (!slug || !token) return;
+    
+    const fetchAssetData = async () => {
+      try {
+        setLoading(true);
+        // Get lead ID from portal access
+        const { data: portalData, error: portalError } = await supabase
+          .from('client_portal_access')
+          .select('lead_id')
+          .eq('portal_slug', slug)
+          .eq('access_token', token)
+          .single();
+        
+        if (portalError || !portalData?.lead_id) {
+          console.error("Error fetching portal access:", portalError);
+          return;
+        }
+        
+        setLeadId(portalData.lead_id.toString());
+        
+        // Get lead data
+        const { data: response, error: profileError } = await supabase.functions.invoke('lead-profile', {
+          body: { id: portalData.lead_id }
+        });
 
-export const ClientPortalAssetForm: React.FC<ClientPortalAssetFormProps> = ({
-  initialAssets = [],
-  isEditable = true,
-  onAssetsChange
-}) => {
-  const [showForm, setShowForm] = useState(false);
-  const [assetEntries, setAssetEntries] = useState<AssetEntry[]>(initialAssets);
-  const [currentEntry, setCurrentEntry] = useState<AssetEntry>({
-    ...defaultEntry,
-    id: Date.now().toString()
-  });
+        if (profileError || !response.success || !response.data.lead) {
+          console.error("Error fetching lead data:", profileError || response.error);
+          return;
+        }
+        
+        const lead = response.data.lead;
+        const mortgageData = lead.mortgageData || {};
+        const assetData = mortgageData.assets?.accounts || [];
+        
+        if (Array.isArray(assetData) && assetData.length > 0) {
+          const formattedAssets = assetData.map((asset: any, index: number) => ({
+            id: `asset-${index}`,
+            type: asset.type || "",
+            institution: asset.institution || "",
+            accountNumber: asset.accountNumber || "",
+            value: asset.value?.toString() || ""
+          }));
+          setAssets(formattedAssets);
+        } else {
+          // Add a default empty asset if none exist
+          setAssets([{ 
+            id: `asset-0`, 
+            type: "", 
+            institution: "", 
+            accountNumber: "", 
+            value: "" 
+          }]);
+        }
+      } catch (error) {
+        console.error("Error in fetchAssetData:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchAssetData();
+  }, [slug, token]);
 
-  const handleAddNewAsset = () => {
-    setShowForm(true);
-    setCurrentEntry({ ...defaultEntry, id: Date.now().toString() });
+  const handleAddAsset = () => {
+    const newId = `asset-${assets.length}`;
+    setAssets([...assets, { id: newId, type: "", institution: "", accountNumber: "", value: "" }]);
   };
 
-  const handleSaveAsset = () => {
-    const updatedEntries = [...assetEntries, currentEntry];
-    setAssetEntries(updatedEntries);
-    setShowForm(false);
-    setCurrentEntry({ ...defaultEntry, id: Date.now().toString() });
-
-    // Notify parent if needed
-    onAssetsChange?.(updatedEntries);
+  const handleRemoveAsset = (id: string) => {
+    if (assets.length <= 1) return; // Keep at least one asset form
+    setAssets(assets.filter(asset => asset.id !== id));
   };
 
-  const handleCancelForm = () => {
-    setShowForm(false);
+  const handleAssetChange = (id: string, field: keyof Asset, value: string) => {
+    setAssets(assets.map(asset => 
+      asset.id === id ? { ...asset, [field]: value } : asset
+    ));
+  };
+  
+  const handleSave = async () => {
+    if (!leadId) {
+      toast.error("Cannot save: Lead ID is missing");
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      
+      // Format assets for saving
+      const formattedAssets = assets.filter(asset => 
+        asset.type || asset.institution || asset.accountNumber || asset.value
+      ).map(asset => ({
+        type: asset.type,
+        institution: asset.institution,
+        accountNumber: asset.accountNumber,
+        value: asset.value
+      }));
+      
+      const mortgageData = {
+        assets: {
+          accounts: formattedAssets
+        }
+      };
+      
+      const { data, error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId: leadId,
+          leadData: { mortgageData }
+        }
+      });
+      
+      if (error || !data.success) {
+        throw new Error(error?.message || data?.error || "Failed to update asset information");
+      }
+      
+      toast.success("Asset information saved successfully");
+    } catch (error) {
+      console.error("Error saving asset information:", error);
+      toast.error("Failed to save asset information");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleInputChange = (field: keyof AssetEntry, value: any) => {
-    setCurrentEntry(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  if (loading) {
+    return (
+      <Card className="mb-6">
+        <CardContent className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Asset Information</h3>
-        {!showForm && (
-          <Button
-            onClick={handleAddNewAsset}
-            className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
-            disabled={!isEditable}
+    <Card className="mb-6">
+      <CardHeader>
+        <CardTitle className="text-mortgage-darkPurple">Assets</CardTitle>
+        <CardDescription>Provide information about your liquid assets and accounts</CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-6">
+        {assets.map((asset) => (
+          <div key={asset.id} className="p-4 border rounded-md bg-gray-50/80">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="font-medium text-gray-700">Asset Information</h3>
+              {assets.length > 1 && isEditable && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleRemoveAsset(asset.id)}
+                  className="text-red-500 border-red-200 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Remove
+                </Button>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <Label htmlFor={`type-${asset.id}`}>Asset Type</Label>
+                <Select
+                  disabled={!isEditable}
+                  value={asset.type}
+                  onValueChange={(value) => handleAssetChange(asset.id, "type", value)}
+                >
+                  <SelectTrigger id={`type-${asset.id}`} className="w-full">
+                    <SelectValue placeholder="Select asset type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assetTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div>
+                <Label htmlFor={`institution-${asset.id}`}>Financial Institution</Label>
+                <Input
+                  id={`institution-${asset.id}`}
+                  placeholder="Bank or institution name"
+                  value={asset.institution}
+                  onChange={(e) => handleAssetChange(asset.id, "institution", e.target.value)}
+                  disabled={!isEditable}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor={`account-${asset.id}`}>Account Number (last 4 digits)</Label>
+                <Input
+                  id={`account-${asset.id}`}
+                  placeholder="xxxx"
+                  value={asset.accountNumber}
+                  onChange={(e) => handleAssetChange(asset.id, "accountNumber", e.target.value)}
+                  disabled={!isEditable}
+                  maxLength={4}
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor={`value-${asset.id}`}>Current Value</Label>
+                <Input
+                  id={`value-${asset.id}`}
+                  placeholder="$ Amount"
+                  value={asset.value}
+                  onChange={(e) => {
+                    // Allow only numbers and decimal point
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    handleAssetChange(asset.id, "value", value);
+                  }}
+                  type="text"
+                  inputMode="decimal"
+                  disabled={!isEditable}
+                  prefix="$"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {isEditable && (
+          <Button 
+            variant="outline" 
+            className="w-full border-dashed border-gray-300 hover:border-gray-400"
+            onClick={handleAddAsset}
           >
             <Plus className="mr-2 h-4 w-4" />
-            Add Asset
+            Add Another Asset
           </Button>
         )}
-      </div>
 
-      {assetEntries.length === 0 && !showForm && (
-        <div className="text-center py-8 border border-dashed rounded-md">
-          <DollarSign className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-500">No asset information has been added yet.</p>
-          <Button
-            variant="outline"
-            onClick={handleAddNewAsset}
-            className="mt-2"
-            disabled={!isEditable}
-          >
-            Add Asset
-          </Button>
-        </div>
-      )}
-
-      {assetEntries.map((entry) => (
-        <Card key={entry.id} className="bg-gray-50">
-          <CardContent className="pt-4">
-            <div className="font-medium mb-4 flex items-center">
-              <DollarSign className="mr-2 h-4 w-4 text-mortgage-purple" />
-              {assetTypeLabels[entry.assetType] || "Other Asset"}
-            </div>
-            <div className="text-sm">
-              <p>
-                <strong>Depositor:</strong> {entry.depositor}
-              </p>
-              <p>
-                <strong>Account Number:</strong> {entry.accountNumber}
-              </p>
-              <p>
-                <strong>Cash Value:</strong> ${entry.cashValue?.toLocaleString()}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-
-      {showForm && (
-        <div className="border rounded-lg p-4 bg-white">
-          <h4 className="text-lg font-medium mb-4 border-b pb-2">Add Asset Information</h4>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="col-span-1">
-              <Label htmlFor="assetOwner">Asset Owner</Label>
-              <Select
-                value={currentEntry.assetOwner}
-                onValueChange={value => handleInputChange("assetOwner", value)}
-                disabled={!isEditable}
-              >
-                <SelectTrigger id="assetOwner">
-                  <SelectValue placeholder="Select Owner" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="borrower">Borrower</SelectItem>
-                  <SelectItem value="coBorrower">Co-Borrower</SelectItem>
-                  <SelectItem value="joint">Joint</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="borrowerName">Borrower Name</Label>
-              <Input
-                id="borrowerName"
-                value={currentEntry.borrowerName}
-                onChange={e => handleInputChange("borrowerName", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="assetType">Asset Type</Label>
-              <Select
-                value={currentEntry.assetType}
-                onValueChange={value => handleInputChange("assetType", value)}
-                disabled={!isEditable}
-              >
-                <SelectTrigger id="assetType">
-                  <SelectValue placeholder="Select Asset Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="checkingAccount">Checking Account</SelectItem>
-                  <SelectItem value="savingsAccount">Savings Account</SelectItem>
-                  <SelectItem value="moneyMarket">Money Market</SelectItem>
-                  <SelectItem value="cd">Certificate of Deposit</SelectItem>
-                  <SelectItem value="stocks">Stocks/Bonds/Mutual Funds</SelectItem>
-                  <SelectItem value="retirement">Retirement Account</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="depositor">Depositor/Financial Institution</Label>
-              <Input
-                id="depositor"
-                value={currentEntry.depositor}
-                onChange={e => handleInputChange("depositor", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
+        <div className="flex justify-between items-center mt-6">
+          <div className="text-lg font-medium">
+            Total Assets: ${assets.reduce((sum, asset) => sum + (parseFloat(asset.value) || 0), 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="col-span-1">
-              <Label htmlFor="addressLine1">
-                <MapPin className="inline h-4 w-4 mr-1 opacity-70" />
-                Address Line 1
-              </Label>
-              <Input
-                id="addressLine1"
-                value={currentEntry.addressLine1}
-                onChange={e => handleInputChange("addressLine1", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="addressLine2">Address Line 2</Label>
-              <Input
-                id="addressLine2"
-                value={currentEntry.addressLine2}
-                onChange={e => handleInputChange("addressLine2", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="city">City</Label>
-              <Input
-                id="city"
-                value={currentEntry.city}
-                onChange={e => handleInputChange("city", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="state">State</Label>
-              <Input
-                id="state"
-                value={currentEntry.state}
-                onChange={e => handleInputChange("state", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="col-span-1">
-              <Label htmlFor="zipCode">ZIP Code</Label>
-              <Input
-                id="zipCode"
-                value={currentEntry.zipCode}
-                onChange={e => handleInputChange("zipCode", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="accountNumber">
-                <CreditCard className="inline h-4 w-4 mr-1 opacity-70" />
-                Account Number
-              </Label>
-              <Input
-                id="accountNumber"
-                value={currentEntry.accountNumber}
-                onChange={e => handleInputChange("accountNumber", e.target.value)}
-                disabled={!isEditable}
-              />
-            </div>
-            <div className="col-span-1">
-              <Label htmlFor="cashValue">
-                <DollarSign className="inline h-4 w-4 mr-1 opacity-70" />
-                Cash / Fair Market Value
-              </Label>
-              <Input
-                id="cashValue"
-                type="number"
-                value={currentEntry.cashValue.toString()}
-                onChange={e =>
-                  handleInputChange("cashValue", parseFloat(e.target.value) || 0)
-                }
-                disabled={!isEditable}
-              />
-            </div>
-          </div>
-          <div className="flex justify-end space-x-2">
-            <Button variant="outline" onClick={handleCancelForm} disabled={!isEditable}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSaveAsset}
-              disabled={!isEditable || !currentEntry.depositor}
+          
+          {isEditable && (
+            <Button 
+              onClick={handleSave} 
               className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
+              disabled={saving}
             >
-              Save Asset Information
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Assets'
+              )}
             </Button>
-          </div>
+          )}
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
-};
-
-export default ClientPortalAssetForm;
+}

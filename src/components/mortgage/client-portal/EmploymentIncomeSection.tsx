@@ -1,11 +1,15 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
+import { useParams, useSearchParams } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
 
 type EmploymentType = "employed" | "self_employed" | "unemployed" | "retired" | "";
 
@@ -35,11 +39,85 @@ const months = [
 ];
 
 export default function EmploymentIncomeSection() {
+  const { slug } = useParams<{ slug: string }>();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token');
+  
+  const [leadId, setLeadId] = useState<string | null>(null);
   const [fields, setFields] = useState(initialFields);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!slug || !token) return;
+    
+    const fetchEmploymentData = async () => {
+      try {
+        setLoading(true);
+        // Get lead ID from portal access
+        const { data: portalData, error: portalError } = await supabase
+          .from('client_portal_access')
+          .select('lead_id')
+          .eq('portal_slug', slug)
+          .eq('access_token', token)
+          .single();
+        
+        if (portalError || !portalData?.lead_id) {
+          console.error("Error fetching portal access:", portalError);
+          return;
+        }
+        
+        setLeadId(portalData.lead_id.toString());
+        
+        // Get lead data
+        const { data: response, error: profileError } = await supabase.functions.invoke('lead-profile', {
+          body: { id: portalData.lead_id }
+        });
+
+        if (profileError || !response.success || !response.data.lead) {
+          console.error("Error fetching lead data:", profileError || response.error);
+          return;
+        }
+        
+        const lead = response.data.lead;
+        const mortgageData = lead.mortgageData || {};
+        const employment = mortgageData.employment || {};
+        
+        // Map data from existing employment info if available
+        setFields({
+          employmentType: employment.employmentType || "",
+          employerName: employment.employerName || "",
+          addressStreet: employment.addressStreet || "",
+          addressCity: employment.addressCity || "",
+          addressState: employment.addressState || "",
+          addressZip: employment.addressZip || "",
+          industry: employment.industry || "",
+          phone: employment.phone || "",
+          position: employment.position || "",
+          startMonth: employment.startMonth || "",
+          startYear: employment.startYear || "",
+          isRelated: employment.isRelated || false,
+          incomeBase: employment.incomeBase || "",
+          incomeOvertime: employment.incomeOvertime || "",
+          incomeBonus: employment.incomeBonus || "",
+          incomeCommission: employment.incomeCommission || "",
+          incomeOther: employment.incomeOther || "",
+        });
+      } catch (error) {
+        console.error("Error in fetchEmploymentData:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchEmploymentData();
+  }, [slug, token]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFields({ ...fields, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFields({ ...fields, [name]: value });
   };
+  
   const handleSelect = (name: string, value: string) => {
     setFields({ ...fields, [name]: value });
   };
@@ -47,13 +125,61 @@ export default function EmploymentIncomeSection() {
   const handleCheckbox = (checked: boolean) => {
     setFields({ ...fields, isRelated: checked });
   };
+  
+  const handleSubmit = async () => {
+    if (!leadId) {
+      toast.error("Cannot save: Lead ID is missing");
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      
+      // Prepare employment data for saving
+      const employmentData = {
+        ...fields
+      };
+      
+      const mortgageData = {
+        employment: employmentData
+      };
+      
+      const { data, error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId: leadId,
+          leadData: { mortgageData }
+        }
+      });
+      
+      if (error || !data.success) {
+        throw new Error(error?.message || data?.error || "Failed to update employment information");
+      }
+      
+      toast.success("Employment information saved successfully");
+    } catch (error) {
+      console.error("Error saving employment information:", error);
+      toast.error("Failed to save employment information");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Card className="mb-4">
+        <CardContent className="flex justify-center items-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-mortgage-purple" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="mb-4">
       <CardHeader>
         <CardTitle>Employment & Income</CardTitle>
         <CardDescription>
-          Please provide your current employment and income details below. All fields are available at all times for you to review or update.
+          Please provide your current employment and income details below.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -101,10 +227,30 @@ export default function EmploymentIncomeSection() {
           <div>
             <Label>Employer Address</Label>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-2 mt-1">
-              <Input placeholder="Street Address" value={fields.addressStreet} name="addressStreet" onChange={handleChange} />
-              <Input placeholder="City" value={fields.addressCity} name="addressCity" onChange={handleChange} />
-              <Input placeholder="State" value={fields.addressState} name="addressState" onChange={handleChange} />
-              <Input placeholder="Zipcode" value={fields.addressZip} name="addressZip" onChange={handleChange} />
+              <Input 
+                placeholder="Street Address" 
+                value={fields.addressStreet} 
+                name="addressStreet" 
+                onChange={handleChange} 
+              />
+              <Input 
+                placeholder="City" 
+                value={fields.addressCity} 
+                name="addressCity" 
+                onChange={handleChange} 
+              />
+              <Input 
+                placeholder="State" 
+                value={fields.addressState} 
+                name="addressState" 
+                onChange={handleChange} 
+              />
+              <Input 
+                placeholder="Zipcode" 
+                value={fields.addressZip} 
+                name="addressZip" 
+                onChange={handleChange} 
+              />
             </div>
           </div>
           <div className="flex flex-col md:flex-row gap-4">
@@ -227,8 +373,19 @@ export default function EmploymentIncomeSection() {
             </div>
           </div>
           <div className="flex justify-end mt-4">
-            <Button className="bg-mortgage-purple" disabled>
-              Save (Coming Soon)
+            <Button 
+              className="bg-mortgage-purple hover:bg-mortgage-darkPurple"
+              onClick={handleSubmit}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Employment Information'
+              )}
             </Button>
           </div>
         </div>
