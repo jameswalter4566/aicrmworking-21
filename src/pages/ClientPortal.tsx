@@ -21,6 +21,7 @@ import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProg
 import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import PersonalInfoPlaceholder from "@/components/mortgage/client-portal/PersonalInfoPlaceholder";
+import EmploymentIncomeSection from "@/components/mortgage/client-portal/EmploymentIncomeSection";
 
 const progressSteps = [
   "Application Created",
@@ -772,6 +773,9 @@ const ClientPortal = () => {
           <div>
             {activeTab === "application" && activeAppSection === "personal-info" && (
               <PersonalInfoPlaceholder />
+            )}
+            {activeTab === "application" && activeAppSection === "employment-income" && (
+              <EmploymentIncomeSection />
             )}
             {activeTab === "home" && <HomeTab clientData={clientData} />}
             {activeTab === "conditions" && clientData?.leadId && (
