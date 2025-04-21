@@ -335,7 +335,7 @@ const Smart1003Builder = () => {
                     <h3 className="font-medium text-lg mb-3">Successfully Extracted Fields</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {formSections.map(section => (
-                        <Card key={section.id} className="bg-gray-50">
+                        <Card key={section.id} className="bg-green-50">
                           <CardHeader className="py-3 px-4">
                             <CardTitle className="text-sm">{section.label}</CardTitle>
                           </CardHeader>
@@ -344,10 +344,10 @@ const Smart1003Builder = () => {
                               {processedFields[section.id] ? (
                                 Object.entries(processedFields[section.id]).map(([key, value]) => (
                                   <div key={key} className="flex items-center">
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mr-2" />
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mr-2" />
                                     <p className="text-sm">
                                       <span className="font-medium">{key}: </span>
-                                      <span className="text-gray-600">
+                                      <span className="text-gray-700">
                                         {typeof value === 'object' ? JSON.stringify(value) : value?.toString()}
                                       </span>
                                     </p>
@@ -371,18 +371,18 @@ const Smart1003Builder = () => {
                     <p className="text-sm text-gray-600 mb-4">
                       The following fields could not be extracted from your documents and need to be filled out manually.
                     </p>
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                       <Accordion type="multiple" className="">
-                        {missingFields.map((field, idx) => {
+                        {missingFields.map((field) => {
                           const key = fieldKey(field.section, field.field);
                           const inputType = field.label.length > 24 ? "textarea" : "input";
                           return (
-                            <AccordionItem value={key} key={key} className="mb-2 border-b border-amber-200">
+                            <AccordionItem value={key} key={key} className="mb-2 border-b border-red-200">
                               <AccordionTrigger className="pr-3">
-                                <span className="flex items-center text-amber-800">
-                                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mr-2" />
+                                <span className="flex items-center text-red-800">
+                                  <AlertTriangle className="h-3.5 w-3.5 text-red-500 mr-2" />
                                   <span className="text-sm font-medium">{field.label}</span>
-                                  <span className="text-xs text-amber-600 ml-2">
+                                  <span className="text-xs text-red-600 ml-2">
                                     ({formSections.find(s => s.id === field.section)?.label || field.section})
                                   </span>
                                 </span>
