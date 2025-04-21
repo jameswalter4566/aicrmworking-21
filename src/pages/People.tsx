@@ -342,24 +342,13 @@ const People = () => {
     };
 
     try {
-      // Get authentication session
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData?.session?.access_token;
-      
-      // Setup headers for authentication
-      let headers = {
-        "Content-Type": "application/json",
-      };
-      
-      if (authToken) {
-        headers["Authorization"] = `Bearer ${authToken}`;
-      }
-      
       const response = await fetch(
         "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
         {
           method: "POST",
-          headers,
+          headers: {
+            "Content-Type": "application/json",
+          },
           body: JSON.stringify({
             leads: [newLead],
             leadType: "custom"
@@ -933,4 +922,75 @@ const People = () => {
                       <Textarea 
                         placeholder="Same as mailing address or different" 
                         {...field} 
-                        className="
+                        className="rounded-lg"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          handlePropertyAddressChange(e);
+                        }}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+
+              <div className="flex justify-center">
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-crm-blue focus:ring-crm-blue"
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        form.setValue("propertyAddress", form.getValues("mailingAddress"));
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-gray-600">Same as mailing address</span>
+                </label>
+              </div>
+
+              <DialogFooter className="sm:justify-between flex gap-2 pt-4">
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  className="rounded-lg"
+                  onClick={() => setIsAddLeadOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-crm-blue hover:bg-crm-blue/90 rounded-lg"
+                >
+                  Add Lead
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+        <DialogContent className="sm:max-w-[700px] rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Import Leads</DialogTitle>
+          </DialogHeader>
+          
+          <IntelligentFileUpload onImportComplete={handleImportComplete} />
+          
+          <DialogFooter className="sm:justify-between flex gap-2 pt-4">
+            <Button 
+              type="button" 
+              variant="outline"
+              className="rounded-lg"
+              onClick={() => setIsImportOpen(false)}
+            >
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </MainLayout>
+  );
+};
+
+export default People;

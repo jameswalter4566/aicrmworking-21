@@ -29,28 +29,12 @@ export const thoughtlyService = {
     try {
       console.log('Creating contact in Thoughtly:', contact);
       
-      // Get authentication session
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData?.session?.access_token;
-      
-      // Setup headers for authentication if token exists
-      let headers = {};
-      if (authToken) {
-        console.log('Auth token found, adding to request');
-        headers = {
-          Authorization: `Bearer ${authToken}`
-        };
-      } else {
-        console.log('No auth token found, request will be anonymous');
-      }
-      
       // First, also store the contact in our local database to ensure persistence
       const { data: storedData, error: storeError } = await supabase.functions.invoke('store-leads', {
         body: {
           leads: [contact],
           leadType: "manual"
-        },
-        headers
+        }
       });
       
       if (storeError) {
@@ -64,8 +48,7 @@ export const thoughtlyService = {
         body: {
           action: 'createContact',
           contacts: contact
-        },
-        headers
+        }
       });
 
       if (error) {
@@ -90,28 +73,12 @@ export const thoughtlyService = {
     try {
       console.log(`Creating ${contacts.length} contacts in Thoughtly`);
       
-      // Get authentication session
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData?.session?.access_token;
-      
-      // Setup headers for authentication if token exists
-      let headers = {};
-      if (authToken) {
-        console.log('Auth token found, adding to request');
-        headers = {
-          Authorization: `Bearer ${authToken}`
-        };
-      } else {
-        console.log('No auth token found, request will be anonymous');
-      }
-      
       // First, also store the contacts in our local database to ensure persistence
       const { data: storedData, error: storeError } = await supabase.functions.invoke('store-leads', {
         body: {
           leads: contacts,
           leadType: "bulk"
-        },
-        headers
+        }
       });
       
       if (storeError) {
@@ -125,8 +92,7 @@ export const thoughtlyService = {
         body: {
           action: 'createContact',
           contacts: contacts
-        },
-        headers
+        }
       });
 
       if (error) {
