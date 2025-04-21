@@ -141,7 +141,13 @@ const ClientPortalSidebar = ({
                     ) : (
                       <SidebarMenuButton
                         isActive={activeTab === item.id}
-                        onClick={() => setActiveTab(item.id)}
+                        onClick={() => {
+                          setActiveTab(item.id);
+                          // If this is the application tab, also fire the onApplicationClick handler
+                          if (item.id === 'application' && onApplicationClick) {
+                            onApplicationClick();
+                          }
+                        }}
                         className={`relative flex items-center w-full rounded-lg transition-colors ${
                           activeTab === item.id 
                             ? 'bg-blue-500 text-white ring-2 ring-white' 

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -133,6 +134,8 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
         body: { id: numericLeadId }
       });
+      
+      console.log("Response from lead-profile:", leadResponse, "Error:", leadError);
       
       if (leadError) {
         console.error('Error fetching lead data:', leadError);

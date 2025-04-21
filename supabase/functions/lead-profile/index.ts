@@ -16,8 +16,11 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Main function to handle requests
 Deno.serve(async (req) => {
+  console.log("lead-profile function called with method:", req.method);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Responding to OPTIONS request with CORS headers");
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -25,7 +28,10 @@ Deno.serve(async (req) => {
     // Extract lead ID from request body
     const { id } = await req.json();
 
+    console.log(`Received request for lead ID: ${id} (${typeof id})`);
+
     if (!id) {
+      console.error("No lead ID provided in request body");
       throw new Error('Lead ID is required');
     }
 
