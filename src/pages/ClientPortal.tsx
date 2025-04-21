@@ -622,12 +622,12 @@ const ClientPortal = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const navigate = useNavigate();
-  
+
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [activeTab, setActiveTab] = useState("home");
-  
+
   useEffect(() => {
     const verifyAccess = async () => {
       if (!slug || !token) {
@@ -755,17 +755,17 @@ const ClientPortal = () => {
           urgentCount={clientData?.conditions.filter(c => c.urgent && !c.completed).length || 0}
         />
         
-        <main className="flex-1">
+        <main className="flex-1 px-8 pt-8 ml-4">
           {clientData?.leadId && (
-            <div className="w-full px-8 pt-8">
+            <div className="w-full mb-6">
               <LoanProgressTracker 
                 leadId={clientData.leadId} 
-                className="mb-6"
+                className=""
               />
             </div>
           )}
           
-          <div className="p-6 pt-8">
+          <div>
             {activeTab === "home" && <HomeTab clientData={clientData} />}
             {activeTab === "conditions" && clientData?.leadId && (
               <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
