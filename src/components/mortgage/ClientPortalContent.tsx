@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -7,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import EmploymentIncomeSection from './client-portal/EmploymentIncomeSection';
-import { PersonalInfoPlaceholder } from './client-portal/PersonalInfoPlaceholder';
+import PersonalInfoPlaceholder from './client-portal/PersonalInfoPlaceholder';  // Fix import here
 
 interface CompanySettings {
   company_name: string;
@@ -123,93 +124,73 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy, a
     console.log("Refreshing data...");
   };
 
-  const renderApplicationSection = () => {
-    switch(activeSection) {
-      case 'personal-info':
-        return <PersonalInfoPlaceholder />;
-      case 'employment':
-        return <EmploymentIncomeSection />;
-      default:
-        return <div className="p-6 text-center text-gray-500">Select a section from the sidebar to view your application details.</div>;
-    }
-  };
-
-  if (!isInPipeline) {
-    return (
-      <div className="space-y-6">
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-white">
-          <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold" style={{ color: settings.primary_color }}>
-              Welcome to {settings.company_name}
-            </h2>
-            <p className="text-gray-600">
-              Start your journey towards homeownership by uploading your documents and completing your application.
-              Once submitted, you'll have access to track your loan progress and manage conditions.
-            </p>
-          </div>
-        </Card>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <PrePipelineMessage 
-            title="Loan Progress"
-            description="After submitting your application, you'll be able to track your loan progress here."
-            settings={settings}
-          />
-          
-          <PrePipelineMessage
-            title="Loan Conditions"
-            description="Once your application is in process, you'll see your required conditions here."
-            settings={settings}
-          />
-        </div>
-
-        <Card className="p-6">
-          <div className="space-y-4">
-            <h3 
-              className="text-xl font-semibold"
-              style={{ color: settings.primary_color }}
-            >
-              Get Started
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Button 
-                className="w-full hover:bg-opacity-90" 
-                style={{ backgroundColor: settings.primary_color }}
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Upload Documents
-              </Button>
-              <Button 
-                className="w-full hover:bg-opacity-90" 
-                style={{ backgroundColor: settings.secondary_color }}
-              >
-                <Calculator className="mr-2 h-4 w-4" />
-                Payment Calculator
-              </Button>
-            </div>
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
+  // Always render these placeholders, do not conditionally render:
   return (
     <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h1 
-          className="text-2xl font-bold mb-2"
-          style={{ color: settings.primary_color }}
-        >
-          {settings.company_name}
-        </h1>
-      </div>
-      
-      {activeSection && activeSection.startsWith('personal-info') || 
-       activeSection && activeSection.startsWith('employment') || 
-       activeSection && activeSection.startsWith('assets') || 
-       activeSection && activeSection.startsWith('liabilities') ? (
-        renderApplicationSection()
-      ) : (
+      {/* Show header if not in pipeline */}
+      {!isInPipeline && (
+        <>
+          <Card className="p-6 bg-gradient-to-br from-blue-50 to-white">
+            <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold" style={{ color: settings.primary_color }}>
+                Welcome to {settings.company_name}
+              </h2>
+              <p className="text-gray-600">
+                Start your journey towards homeownership by uploading your documents and completing your application.
+                Once submitted, you'll have access to track your loan progress and manage conditions.
+              </p>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <PrePipelineMessage 
+              title="Loan Progress"
+              description="After submitting your application, you'll be able to track your loan progress here."
+              settings={settings}
+            />
+            
+            <PrePipelineMessage
+              title="Loan Conditions"
+              description="Once your application is in process, you'll see your required conditions here."
+              settings={settings}
+            />
+          </div>
+
+          <Card className="p-6">
+            <div className="space-y-4">
+              <h3 
+                className="text-xl font-semibold"
+                style={{ color: settings.primary_color }}
+              >
+                Get Started
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Button 
+                  className="w-full hover:bg-opacity-90" 
+                  style={{ backgroundColor: settings.primary_color }}
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Upload Documents
+                </Button>
+                <Button 
+                  className="w-full hover:bg-opacity-90" 
+                  style={{ backgroundColor: settings.secondary_color }}
+                >
+                  <Calculator className="mr-2 h-4 w-4" />
+                  Payment Calculator
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </>
+      )}
+
+      {/* Always render both sections no matter activeSection or pipeline status */}
+      <PersonalInfoPlaceholder />
+      <EmploymentIncomeSection />
+
+      {/* If in pipeline, render loan progress & conditions */}
+      {isInPipeline && (
         <>
           <ClientPortalLoanProgress 
             leadId={leadId} 
