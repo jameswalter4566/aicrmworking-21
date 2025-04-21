@@ -9,6 +9,7 @@ import MortgageInfoStep from './steps/MortgageInfoStep';
 import FinancialInfoStep from './steps/FinancialInfoStep';
 import EstHomeValueStep from './steps/EstHomeValueStep';
 import MaritalStatusStep from './steps/MaritalStatusStep';
+import BorrowerIdentityStep from './steps/BorrowerIdentityStep';
 import { LeadProfile } from '@/services/leadProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from "@/components/ui/progress";
@@ -29,6 +30,7 @@ const stepLabels = [
   "Estimate Home Value",
   "Mortgage Info",
   "Marital Status",
+  "Borrower Identity",
   "Financial Info",
 ];
 
@@ -121,6 +123,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     <EstHomeValueStep key="est-home-value" leadData={leadData} onSave={handleStepSave} />,
     <MortgageInfoStep key="mortgage" leadData={leadData} onSave={handleStepSave} />,
     <MaritalStatusStep key="marital-status" leadData={leadData} onSave={handleStepSave} />,
+    <BorrowerIdentityStep key="identity" leadData={leadData} onSave={handleStepSave} />,
     <FinancialInfoStep key="financial" leadData={leadData} onSave={handleStepSave} />,
   ];
 
