@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+// New import:
+import TransactionTypeStep from './steps/TransactionTypeStep';
 import WelcomeStep from './steps/WelcomeStep';
 import ContactInfoStep from './steps/ContactInfoStep';
 import PropertyInfoStep from './steps/PropertyInfoStep';
@@ -9,6 +11,8 @@ import MortgageInfoStep from './steps/MortgageInfoStep';
 import FinancialInfoStep from './steps/FinancialInfoStep';
 import { LeadProfile } from '@/services/leadProfile';
 import { supabase } from '@/integrations/supabase/client';
+
+type TransactionType = "buy_home" | "refinance" | "cash_out";
 
 interface OnboardingSequenceProps {
   leadId: string | number;
@@ -20,6 +24,9 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   const [currentStep, setCurrentStep] = useState(0);
   const [leadData, setLeadData] = useState<Partial<LeadProfile>>(initialData || {});
   const [isLoading, setIsLoading] = useState(false);
+
+  // New state for transaction type choice
+  const [transactionType, setTransactionType] = useState<TransactionType | null>(null);
 
   useEffect(() => {
     const fetchLeadData = async () => {
@@ -77,7 +84,16 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     }
   };
 
+  // Steps array now begins with TransactionTypeStep
   const steps = [
+    <TransactionTypeStep
+      key="transaction-type"
+      selectedType={transactionType}
+      onSelect={(type) => {
+        setTransactionType(type);
+        setCurrentStep(1); // advance to next step
+      }}
+    />,
     <WelcomeStep key="welcome" leadData={leadData} onNext={handleStepSave} />,
     <ContactInfoStep key="contact" leadData={leadData} onSave={handleStepSave} />,
     <PropertyInfoStep key="property" leadData={leadData} onSave={handleStepSave} />,
