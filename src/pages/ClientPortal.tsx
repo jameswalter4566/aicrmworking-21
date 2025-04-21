@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import ClientPortalLoanProgress from "@/components/mortgage/ClientPortalLoanProgress";
 import LoanProgressTracker from "@/components/mortgage/LoanProgressTracker";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import PersonalInfoPlaceholder from "@/components/mortgage/client-portal/PersonalInfoPlaceholder";
 
 const progressSteps = [
   "Application Created",
@@ -627,6 +628,7 @@ const ClientPortal = () => {
   const [loading, setLoading] = useState(true);
   const [clientData, setClientData] = useState<ClientData | null>(null);
   const [activeTab, setActiveTab] = useState("home");
+  const [activeAppSection, setActiveAppSection] = useState<string | null>("personal-info");
 
   useEffect(() => {
     const verifyAccess = async () => {
@@ -753,6 +755,8 @@ const ClientPortal = () => {
           activeTab={activeTab} 
           setActiveTab={setActiveTab}
           urgentCount={clientData?.conditions.filter(c => c.urgent && !c.completed).length || 0}
+          activeAppSection={activeAppSection!}
+          setActiveAppSection={setActiveAppSection}
         />
         
         <main className="flex-1 px-8 pt-8 ml-4">
@@ -766,6 +770,9 @@ const ClientPortal = () => {
           )}
           
           <div>
+            {activeTab === "application" && activeAppSection === "personal-info" && (
+              <PersonalInfoPlaceholder />
+            )}
             {activeTab === "home" && <HomeTab clientData={clientData} />}
             {activeTab === "conditions" && clientData?.leadId && (
               <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />

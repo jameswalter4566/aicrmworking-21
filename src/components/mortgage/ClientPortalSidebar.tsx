@@ -28,9 +28,17 @@ interface ClientPortalSidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   urgentCount?: number;
+  activeAppSection?: string;
+  setActiveAppSection?: (section: string) => void;
 }
 
-const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPortalSidebarProps) => {
+const ClientPortalSidebar = ({ 
+  activeTab,
+  setActiveTab,
+  urgentCount,
+  activeAppSection,
+  setActiveAppSection
+}: ClientPortalSidebarProps) => {
   const [isLoanAppExpanded, setIsLoanAppExpanded] = useState(false);
 
   const menuItems = [
@@ -53,6 +61,12 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
     { id: 'declarations', label: 'Declarations', icon: FileText },
     { id: 'monitoring', label: 'Government Monitoring', icon: Shield },
   ];
+
+  const handleSectionClick = (sectionId: string) => {
+    if (setActiveAppSection) setActiveAppSection(sectionId);
+    setActiveTab("application");
+    setIsLoanAppExpanded(true);
+  };
 
   return (
     <div className="h-full">
@@ -95,8 +109,12 @@ const ClientPortalSidebar = ({ activeTab, setActiveTab, urgentCount }: ClientPor
                               {loanAppSections.map((section) => (
                                 <SidebarMenuSubButton
                                   key={section.id}
-                                  className="flex items-center w-full text-xs text-white/90 hover:text-white pl-2 py-1.5 
-                                    bg-blue-500/20 rounded-lg mx-1 backdrop-blur-sm border border-white/10 pr-1"
+                                  className={cn(
+                                    "flex items-center w-full text-xs pl-2 py-1.5 bg-blue-500/20 rounded-lg mx-1 backdrop-blur-sm border border-white/10 pr-1",
+                                    activeAppSection === section.id && "bg-blue-700/50 ring-2 ring-white"
+                                  )}
+                                  onClick={() => handleSectionClick(section.id)}
+                                  style={{ cursor: "pointer" }}
                                 >
                                   <section.icon className="h-3 w-3 mr-2 flex-shrink-0" />
                                   <span className="whitespace-normal leading-tight flex-grow text-left">{section.label}</span>
