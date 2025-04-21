@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Home, 
@@ -23,6 +22,7 @@ import {
   SidebarMenuSubButton,
 } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ClientPortalSidebarProps {
   activeTab: string;
@@ -33,7 +33,7 @@ interface ClientPortalSidebarProps {
   onApplicationClick?: () => void;
 }
 
-const ClientPortalSidebar = ({ 
+const ClientPortalSidebar = ({
   activeTab,
   setActiveTab,
   urgentCount,
@@ -84,6 +84,24 @@ const ClientPortalSidebar = ({
       }
     } else {
       console.warn("onApplicationClick is not defined for section:", sectionId);
+    }
+  };
+
+  const handleFetchLeadProfile = async () => {
+    const leadId = 123456;
+    console.log("[TEST] Fetch Lead Profile button clicked. Attempting to call lead-profile edge function with id:", leadId);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('lead-profile', {
+        body: { id: leadId }
+      });
+      if (error) {
+        console.error("[TEST] Error calling lead-profile edge function:", error);
+      } else {
+        console.log("[TEST] lead-profile edge function returned data:", data);
+      }
+    } catch (err) {
+      console.error("[TEST] Exception when calling lead-profile edge function:", err);
     }
   };
 
@@ -197,6 +215,20 @@ const ClientPortalSidebar = ({
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+
+          <div className="mt-8 flex flex-col items-center px-4">
+            <hr className="w-full border-white/20 mb-2" />
+            <button
+              onClick={handleFetchLeadProfile}
+              className="bg-yellow-500 hover:bg-yellow-600 text-white rounded-md px-4 py-2 font-semibold w-full transition-colors duration-200"
+            >
+              Fetch Lead Profile
+            </button>
+            <span className="block text-xs text-yellow-100 mt-1 opacity-80 text-center">
+              Direct test: <b>calls lead-profile edge function</b> (see console for logs)<br />
+              Using id: <b>123456</b>
+            </span>
+          </div>
         </SidebarContent>
       </Sidebar>
     </div>
