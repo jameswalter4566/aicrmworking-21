@@ -76,9 +76,6 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
     onSave(result);
   };
 
-  const turboConsent = watch("turboConsent");
-  const creditConsent = watch("creditConsent");
-
   return (
     <form className="max-w-md mx-auto space-y-8 pt-6" onSubmit={handleSubmit(onSubmit)}>
       <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-[#1769aa]">Your Birthdate</h2>
@@ -159,11 +156,9 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
       )}
       <div className="mt-6">
         <div className="flex items-start space-x-2">
-          <Checkbox
-            id="turbo-consent"
-            checked={turboConsent}
+          <Checkbox 
+            id="turbo-consent" 
             {...register("turboConsent", { required: true })}
-            onCheckedChange={v => {}}
           />
           <Label htmlFor="turbo-consent" className="text-sm">
             I authorize Turbo Insurance Group to contact me (including text messages, carrier fees may apply) at the number provided, regarding placement of insurance products. I may revoke my consent at any point by emailing <a href="mailto:support@turboinsurancegroup.com" className="underline text-blue-600">support@turboinsurancegroup.com</a> or by calling 877-714-1000. I understand that I am not required to give my consent as a condition of purchasing any goods or services, rather I am opting into a service to assist in obtaining insurance policies on my behalf for review and acceptance separately.
@@ -175,11 +170,9 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
       </div>
       <div className="mt-2">
         <div className="flex items-start space-x-2">
-          <Checkbox
-            id="credit-consent"
-            checked={creditConsent}
+          <Checkbox 
+            id="credit-consent" 
             {...register("creditConsent", { required: true })}
-            onCheckedChange={v => {}}
           />
           <Label htmlFor="credit-consent" className="text-sm">
             I allow my credit report to be accessed by Mortgagesalespro.com
