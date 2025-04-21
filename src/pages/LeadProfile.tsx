@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import MainLayout from "@/components/layouts/MainLayout";
@@ -33,6 +34,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import DispositionSelector from "@/components/DispositionSelector";
 import Mortgage1003Form from "@/components/mortgage/Mortgage1003Form";
 import { LeadProfileClientPortal } from '@/components/mortgage/LeadProfileClientPortal';
+import Smart1003BuilderDropbox from "@/components/mortgage/Smart1003BuilderDropbox";
 
 const LeadProfile = () => {
   const { id } = useParams<{ id: string }>();
@@ -294,9 +296,9 @@ const LeadProfile = () => {
       <div className="flex justify-between items-start mb-6">
         <div>
           <h1 className="text-3xl font-bold">
-            {lead.firstName} {lead.lastName}
+            {lead?.firstName} {lead?.lastName}
           </h1>
-          <p className="text-gray-500">Lead ID: {lead.id}</p>
+          <p className="text-gray-500">Lead ID: {lead?.id}</p>
         </div>
         <Button 
           variant={editMode ? "destructive" : "outline"}
@@ -574,12 +576,19 @@ const LeadProfile = () => {
         </div>
 
         {activeIndustry === 'mortgage' && (
-          <Mortgage1003Form 
-            lead={lead} 
-            onSave={handleMortgageDataSave}
-            isEditable={!editMode} 
-            isSaving={isSaving}
-          />
+          <>
+            {/* Add Smart 1003 Builder Dropbox above the 1003 form */}
+            <div className="mb-6">
+              <Smart1003BuilderDropbox leadId={id || ''} />
+            </div>
+
+            <Mortgage1003Form 
+              lead={lead} 
+              onSave={handleMortgageDataSave}
+              isEditable={!editMode} 
+              isSaving={isSaving}
+            />
+          </>
         )}
         
         <Card>
