@@ -123,6 +123,12 @@ export interface LeadProfile {
         otherIncome?: string;
       };
     };
+    // Add the new fields that are causing the TypeScript errors
+    autoFilledAt?: string;
+    documentProcessing?: {
+      status?: string;
+      missingFields?: Array<{section: string, field: string, label: string}>;
+    };
   };
   isMortgageLead?: boolean;
   addedToPipelineAt?: string;
