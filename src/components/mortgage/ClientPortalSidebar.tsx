@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { 
   Home, 
@@ -31,6 +32,7 @@ interface ClientPortalSidebarProps {
   activeAppSection?: string;
   setActiveAppSection?: (section: string) => void;
   onApplicationClick?: () => void;
+  leadId?: string | number; // Add leadId prop
 }
 
 const ClientPortalSidebar = ({
@@ -39,7 +41,8 @@ const ClientPortalSidebar = ({
   urgentCount,
   activeAppSection,
   setActiveAppSection,
-  onApplicationClick
+  onApplicationClick,
+  leadId // Get leadId from props
 }: ClientPortalSidebarProps) => {
   const [isLoanAppExpanded, setIsLoanAppExpanded] = useState(false);
 
@@ -88,12 +91,13 @@ const ClientPortalSidebar = ({
   };
 
   const handleFetchLeadProfile = async () => {
-    const leadId = 123456;
-    console.log("[TEST] Fetch Lead Profile button clicked. Attempting to call lead-profile edge function with id:", leadId);
+    // Use the leadId from props if available, or fall back to a test ID
+    const idToFetch = leadId || 123456;
+    console.log("[TEST] Fetch Lead Profile button clicked. Attempting to call lead-profile edge function with id:", idToFetch);
 
     try {
       const { data, error } = await supabase.functions.invoke('lead-profile', {
-        body: { id: leadId }
+        body: { id: idToFetch }
       });
       if (error) {
         console.error("[TEST] Error calling lead-profile edge function:", error);
@@ -226,7 +230,7 @@ const ClientPortalSidebar = ({
             </button>
             <span className="block text-xs text-yellow-100 mt-1 opacity-80 text-center">
               Direct test: <b>calls lead-profile edge function</b> (see console for logs)<br />
-              Using id: <b>123456</b>
+              Using id: <b>{leadId || "123456"}</b>
             </span>
           </div>
         </SidebarContent>

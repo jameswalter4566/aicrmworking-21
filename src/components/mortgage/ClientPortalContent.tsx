@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -347,6 +346,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           activeAppSection={activeAppSection}
           setActiveAppSection={setActiveAppSection}
           onApplicationClick={handleApplicationClick}
+          leadId={leadId}
         />
       </div>
       <div className="ml-72"> 
