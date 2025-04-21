@@ -66,39 +66,69 @@ Deno.serve(async (req) => {
 
     // Handle mortgage data if provided
     if (leadData.mortgageData) {
-      transformedData.mortgage_data = leadData.mortgageData;
+      // Ensure data consistency between personalInfo and borrower paths
+      const mortgageData = leadData.mortgageData;
+      
+      // Special handling for syncing personalInfo to borrower data structure
+      if (mortgageData.personalInfo && !mortgageData.borrower) {
+        mortgageData.borrower = {
+          data: {
+            personalInfo: mortgageData.personalInfo.personalInfo || {},
+            contactDetails: mortgageData.personalInfo.contactDetails || {},
+            addressHistory: mortgageData.personalInfo.addressHistory || {}
+          },
+          section: "personalInfo"
+        };
+      } else if (mortgageData.personalInfo && mortgageData.borrower) {
+        // Update borrower data with personalInfo
+        mortgageData.borrower.data = {
+          ...mortgageData.borrower.data,
+          personalInfo: mortgageData.personalInfo.personalInfo || mortgageData.borrower.data.personalInfo || {},
+          contactDetails: mortgageData.personalInfo.contactDetails || mortgageData.borrower.data.contactDetails || {},
+          addressHistory: mortgageData.personalInfo.addressHistory || mortgageData.borrower.data.addressHistory || {}
+        };
+      } else if (mortgageData.borrower && !mortgageData.personalInfo) {
+        // Sync from borrower to personalInfo
+        mortgageData.personalInfo = {
+          personalInfo: mortgageData.borrower.data.personalInfo || {},
+          contactDetails: mortgageData.borrower.data.contactDetails || {},
+          addressHistory: mortgageData.borrower.data.addressHistory || {}
+        };
+      }
+      
+      transformedData.mortgage_data = mortgageData;
       
       // Important fix: Sync personal information from mortgage data to lead fields
-      if (leadData.mortgageData.personalInfo?.personalInfo) {
+      if (mortgageData.personalInfo?.personalInfo) {
         // Sync first name if available
-        if (leadData.mortgageData.personalInfo.personalInfo.firstName) {
-          transformedData.first_name = leadData.mortgageData.personalInfo.personalInfo.firstName;
+        if (mortgageData.personalInfo.personalInfo.firstName) {
+          transformedData.first_name = mortgageData.personalInfo.personalInfo.firstName;
         }
         
         // Sync last name if available
-        if (leadData.mortgageData.personalInfo.personalInfo.lastName) {
-          transformedData.last_name = leadData.mortgageData.personalInfo.personalInfo.lastName;
+        if (mortgageData.personalInfo.personalInfo.lastName) {
+          transformedData.last_name = mortgageData.personalInfo.personalInfo.lastName;
         }
       }
       
       // Also check borrower.data structure if it exists
-      if (leadData.mortgageData.borrower?.data?.personalInfo) {
+      if (mortgageData.borrower?.data?.personalInfo) {
         // Sync first name if available and not already set
-        if (leadData.mortgageData.borrower.data.personalInfo.firstName && !transformedData.first_name) {
-          transformedData.first_name = leadData.mortgageData.borrower.data.personalInfo.firstName;
+        if (mortgageData.borrower.data.personalInfo.firstName && !transformedData.first_name) {
+          transformedData.first_name = mortgageData.borrower.data.personalInfo.firstName;
         }
         
         // Sync last name if available and not already set
-        if (leadData.mortgageData.borrower.data.personalInfo.lastName && !transformedData.last_name) {
-          transformedData.last_name = leadData.mortgageData.borrower.data.personalInfo.lastName;
+        if (mortgageData.borrower.data.personalInfo.lastName && !transformedData.last_name) {
+          transformedData.last_name = mortgageData.borrower.data.personalInfo.lastName;
         }
       }
 
       // Sync email from contact details if available
-      if (leadData.mortgageData.personalInfo?.contactDetails?.emailAddress) {
-        transformedData.email = leadData.mortgageData.personalInfo.contactDetails.emailAddress;
-      } else if (leadData.mortgageData.borrower?.data?.contactDetails?.emailAddress) {
-        transformedData.email = leadData.mortgageData.borrower.data.contactDetails.emailAddress;
+      if (mortgageData.personalInfo?.contactDetails?.emailAddress) {
+        transformedData.email = mortgageData.personalInfo.contactDetails.emailAddress;
+      } else if (mortgageData.borrower?.data?.contactDetails?.emailAddress) {
+        transformedData.email = mortgageData.borrower.data.contactDetails.emailAddress;
       }
     }
 

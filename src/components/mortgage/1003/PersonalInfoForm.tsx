@@ -26,16 +26,36 @@ export const PersonalInfoForm: React.FC<PersonalInfoFormProps> = ({
   // Extract personal info, handling different data structures
   // This accounts for both direct structure and nested structure under borrower.data
   const getBorrowerData = () => {
-    if (mortgageData.borrower?.data) {
-      return mortgageData.borrower.data;
+    // First check if we have data in borrower.data path
+    if (mortgageData.borrower?.data?.personalInfo) {
+      return {
+        personalInfo: mortgageData.borrower.data.personalInfo || {},
+        contactDetails: mortgageData.borrower.data.contactDetails || {},
+        addressHistory: mortgageData.borrower.data.addressHistory || {}
+      };
     }
-    return mortgageData;
+    
+    // Then check if we have data in personalInfo path
+    if (mortgageData.personalInfo) {
+      return {
+        personalInfo: mortgageData.personalInfo.personalInfo || {},
+        contactDetails: mortgageData.personalInfo.contactDetails || {},
+        addressHistory: mortgageData.personalInfo.addressHistory || {}
+      };
+    }
+    
+    // Default to empty objects
+    return {
+      personalInfo: {},
+      contactDetails: {},
+      addressHistory: {}
+    };
   };
 
   const borrowerData = getBorrowerData();
-  const personalInfo = borrowerData.personalInfo || {};
-  const contactDetails = borrowerData.contactDetails || {};
-  const addressHistory = borrowerData.addressHistory || {};
+  const personalInfo = borrowerData.personalInfo;
+  const contactDetails = borrowerData.contactDetails;
+  const addressHistory = borrowerData.addressHistory;
 
   const [isSaving, setIsSaving] = useState(false);
   
@@ -95,9 +115,9 @@ export const PersonalInfoForm: React.FC<PersonalInfoFormProps> = ({
   // Update form data when mortgageData changes
   useEffect(() => {
     const borrowerData = getBorrowerData();
-    const personalInfo = borrowerData.personalInfo || {};
-    const contactDetails = borrowerData.contactDetails || {};
-    const addressHistory = borrowerData.addressHistory || {};
+    const personalInfo = borrowerData.personalInfo;
+    const contactDetails = borrowerData.contactDetails;
+    const addressHistory = borrowerData.addressHistory;
 
     setFormData({
       // Primary Information

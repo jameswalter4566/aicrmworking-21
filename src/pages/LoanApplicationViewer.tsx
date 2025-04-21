@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -113,17 +112,21 @@ const LoanApplicationViewer = () => {
       
       // Create updated mortgage data object
       let updatedMortgageData = {
-        ...mortgageData,
-        [section]: {
-          ...(mortgageData[section] || {}),
-          ...data
-        }
+        ...mortgageData
       };
-      
-      // IMPORTANT: Sync data between personalInfo and borrower.data.personalInfo paths
-      // This ensures both data structures are kept consistent
+
+      // Different handling based on section
       if (section === 'personalInfo') {
-        // Make sure borrower structure exists
+        // For personal info, we need to update both data paths
+        updatedMortgageData = {
+          ...updatedMortgageData,
+          personalInfo: {
+            ...(updatedMortgageData.personalInfo || {}),
+            ...data
+          }
+        };
+        
+        // Make sure borrower structure exists for consistent data across both paths
         if (!updatedMortgageData.borrower) {
           updatedMortgageData.borrower = {
             data: {},
@@ -135,27 +138,23 @@ const LoanApplicationViewer = () => {
           updatedMortgageData.borrower.data = {};
         }
         
-        // Sync the personalInfo data to the borrower.data.personalInfo
-        updatedMortgageData.borrower.data.personalInfo = {
-          ...(updatedMortgageData.borrower.data.personalInfo || {}),
-          ...data.personalInfo
+        // Sync the data to borrower.data structure
+        updatedMortgageData.borrower.data = {
+          ...updatedMortgageData.borrower.data,
+          personalInfo: data.personalInfo,
+          contactDetails: data.contactDetails,
+          addressHistory: data.addressHistory
         };
         
-        // Also sync contactDetails if present
-        if (data.contactDetails) {
-          updatedMortgageData.borrower.data.contactDetails = {
-            ...(updatedMortgageData.borrower.data.contactDetails || {}),
-            ...data.contactDetails
-          };
-        }
-        
-        // Also sync addressHistory if present
-        if (data.addressHistory) {
-          updatedMortgageData.borrower.data.addressHistory = {
-            ...(updatedMortgageData.borrower.data.addressHistory || {}),
-            ...data.addressHistory
-          };
-        }
+      } else {
+        // For other sections, just update the specific section
+        updatedMortgageData = {
+          ...updatedMortgageData,
+          [section]: {
+            ...(updatedMortgageData[section] || {}),
+            ...data
+          }
+        };
       }
       
       // Create the request payload for top-level lead fields
