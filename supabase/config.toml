@@ -54,7 +54,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.twilio-voice]
-verify_jwt = true
+verify_jwt = false
 
 [functions.test-edgefunction]
 verify_jwt = false

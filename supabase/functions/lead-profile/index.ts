@@ -38,11 +38,12 @@ Deno.serve(async (req) => {
     console.log(`Fetching lead with ID: ${id}`);
 
     // Query the leads table for a specific lead
+    // Using maybeSingle() instead of single() to handle the case when no row is found
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select('*')
       .eq('id', id)
-      .single();
+      .maybeSingle();
 
     if (leadError) {
       console.error('Error fetching lead:', leadError.message);
