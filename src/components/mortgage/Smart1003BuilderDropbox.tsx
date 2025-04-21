@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { FileUp, FileText, CheckCircle2, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 // Helper to create a file URL for a file object
 const createFileURL = (file: File): Promise<string> => {
@@ -100,7 +101,7 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
     }
 
     try {
-      // Mock file upload
+      // Start upload process
       setIsUploading(true);
       
       // Simulate upload progress
@@ -115,19 +116,34 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
       setIsUploading(false);
       setIsProcessing(true);
       
-      // Call the smart-1003-builder edge function to process the files
-      // This is a mock, in a real implementation you'd call the actual edge function
       toast({
         title: "Processing documents",
         description: "Analyzing your documents to fill out the 1003 form...",
       });
       
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      // Navigate to the Smart 1003 Builder page when done
-      navigate(`/mortgage/smart-1003-builder/${leadId}`);
-      
+      // Call the smart-1003-builder edge function
+      try {
+        const { data, error } = await supabase.functions.invoke('smart-1003-builder', {
+          body: { fileUrls, leadId },
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        // Navigate to the Smart 1003 Builder page when done
+        navigate(`/mortgage/smart-1003-builder/${leadId}`);
+        
+      } catch (error) {
+        console.error("Error calling edge function:", error);
+        toast({
+          title: "Processing failed",
+          description: "There was an error processing your documents. Please try again.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsProcessing(false);
+      }
     } catch (error) {
       console.error("Error processing files:", error);
       toast({

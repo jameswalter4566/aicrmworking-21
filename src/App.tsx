@@ -44,6 +44,7 @@ import LoanApplicationForm from "./pages/LoanApplicationForm";
 import Dialer from "./pages/Dialer";
 import DialerSession from "./pages/DialerSession";
 import ClientPortalOnboarding from './pages/ClientPortalOnboarding';
+import Smart1003Builder from "./pages/Smart1003Builder";
 
 const queryClient = new QueryClient();
 
@@ -289,6 +290,8 @@ function App() {
                 
                 <Route path="/dialer" element={<Dialer />} />
                 <Route path="/dialer-session" element={<DialerSession />} />
+                
+                <Route path="/mortgage/smart-1003-builder/:leadId" element={<ProtectedRoute><Smart1003Builder /></ProtectedRoute>} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
