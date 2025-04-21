@@ -777,6 +777,9 @@ const ClientPortal = () => {
             {activeTab === "application" && activeAppSection === "employment-income" && (
               <EmploymentIncomeSection />
             )}
+            {activeTab === "application" && activeAppSection === "employment" && (
+              <EmploymentIncomeSection />
+            )}
             {activeTab === "home" && <HomeTab clientData={clientData} />}
             {activeTab === "conditions" && clientData?.leadId && (
               <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />

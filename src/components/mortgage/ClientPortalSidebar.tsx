@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Home, 
@@ -51,7 +50,8 @@ const ClientPortalSidebar = ({
 
   const loanAppSections = [
     { id: 'personal-info', label: 'Personal Information', icon: User },
-    { id: 'employment', label: 'Employment & Income', icon: Briefcase },
+    { id: 'employment-income', label: 'Employment & Income', icon: Briefcase },
+    { id: 'employment', label: 'Employment & Income', icon: Briefcase }, // Adding this as a fallback
     { id: 'assets', label: 'Assets', icon: Wallet },
     { id: 'liabilities', label: 'Liabilities', icon: Shield },
     { id: 'real-estate', label: 'Real Estate Owned', icon: Home },
