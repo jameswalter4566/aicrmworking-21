@@ -27,8 +27,10 @@ const EstHomeValueStep = ({ leadData, onSave }: EstHomeValueStepProps) => {
       onSubmit={handleSubmit((data) => {
         // ensure numeric value
         const value = data.mortgageData?.property?.propertyValue;
-        const parsedValue =
-          typeof value === "string" ? parseFloat(value.replace(/,/g, "")) : value;
+        // Convert to number for calculation, but store as string to match the type
+        const parsedValue = typeof value === "string" 
+          ? value.replace(/,/g, "") // Remove commas but keep as string
+          : String(value); // Ensure it's a string
 
         onSave({
           mortgageData: {
@@ -54,11 +56,9 @@ const EstHomeValueStep = ({ leadData, onSave }: EstHomeValueStepProps) => {
           </label>
           <Input
             id="propertyValue"
-            type="number"
+            type="text" // Changed from number to text to better handle currency format
             inputMode="numeric"
             maxLength={14}
-            min={0}
-            step="any"
             autoFocus
             className="bg-[#e7f0fa] text-black border-none text-xl px-0 focus:ring-0 font-bold focus:outline-none focus:border-[#1769aa]"
             style={{ boxShadow: "none" }}
