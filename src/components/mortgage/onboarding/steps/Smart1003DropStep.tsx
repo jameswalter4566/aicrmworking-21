@@ -1,6 +1,6 @@
 
 import React from "react";
-import Smart1003BuilderDropbox from "../../Smart1003BuilderDropbox";
+import Smart1003BuilderDropbox from "../../../Smart1003BuilderDropbox";
 import { Button } from "@/components/ui/button";
 
 interface Smart1003DropStepProps {
@@ -23,7 +23,7 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
       <Button
         variant="default"    // solid background button variant
         size="lg"            // larger size
-        className="mt-2 px-8 py-2.5 bg-blue-600 hover:bg-blue-700" // Added blue background and hover effect
+        className="mt-4 px-10 py-3 bg-blue-600 hover:bg-blue-700 text-lg font-medium"
         onClick={onContinue}
       >
         Skip and Fill Out Manually
