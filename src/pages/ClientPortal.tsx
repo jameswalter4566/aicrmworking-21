@@ -620,180 +620,95 @@ const mockClientData: ClientData = {
 import { SidebarProvider } from "@/components/ui/sidebar";
 import ClientPortalSidebar from "@/components/mortgage/ClientPortalSidebar";
 
-const ClientPortal = () => {
-  const { slug } = useParams<{ slug: string }>();
-  const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
-  const navigate = useNavigate();
-
-  const [authenticated, setAuthenticated] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [clientData, setClientData] = useState<ClientData | null>(null);
-  const [activeTab, setActiveTab] = useState("home");
-  const [activeAppSection, setActiveAppSection] = useState<string | null>("personal-info");
-
-  useEffect(() => {
-    const verifyAccess = async () => {
-      if (!slug || !token) {
-        setLoading(false);
-        return;
-      }
-      
-      try {
-        console.log("Verifying portal access for slug:", slug);
-        const { data: portalData, error: portalError } = await supabase
-          .from('client_portal_access')
-          .select('*')
-          .eq('portal_slug', slug)
-          .eq('access_token', token)
-          .single();
-        
-        if (portalError || !portalData) {
-          console.error("Portal access error:", portalError);
-          setLoading(false);
-          return;
-        }
-
-        console.log("Portal access verified, updating last accessed");
-        await supabase
-          .from('client_portal_access')
-          .update({ last_accessed_at: new Date().toISOString() })
-          .eq('id', portalData.id);
-        
-        const clientDataWithLeadId = {
-          ...mockClientData,
-          leadId: portalData.lead_id
-        };
-        console.log("Setting client data with leadId:", clientDataWithLeadId);
-        setClientData(clientDataWithLeadId);
-        setAuthenticated(true);
-      } catch (error) {
-        console.error("Error verifying access:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    verifyAccess();
-  }, [slug, token]);
-
-  const refreshData = async () => {
-    if (clientData) {
-      const updatedConditions = [...clientData.conditions];
-      const urgentIndex = updatedConditions.findIndex(c => c.urgent && !c.completed);
-      if (urgentIndex !== -1) {
-        updatedConditions[urgentIndex].completed = true;
-        setClientData({
-          ...clientData,
-          conditions: updatedConditions
-        });
-      }
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <Loader2 size={48} className="animate-spin text-mortgage-purple mb-4" />
-          <p className="text-lg font-medium text-gray-700">Loading your portal...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!slug || slug === "login" || !token) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-mortgage-purple/20 to-white p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-mortgage-darkPurple">Client Portal Access</CardTitle>
-            <CardDescription>Please use the link provided in your email to access your portal</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center p-4">
-              <p className="mb-4">If you have received a portal access link, please use it to access your loan information.</p>
-              <p className="text-sm text-gray-500">If you need assistance, contact your loan officer.</p>
-            </div>
-          </CardContent>
-          <CardFooter className="justify-center">
-            <Button onClick={() => navigate('/client-portal-landing')} className="bg-mortgage-purple hover:bg-mortgage-darkPurple">
-              Back to Portal Landing
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!authenticated || !clientData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-red-100 to-white p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-red-600">Access Denied</CardTitle>
-            <CardDescription>Unable to verify your portal access</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center p-4">
-              <p className="mb-4">The portal link you used is invalid or has expired.</p>
-              <p className="text-sm text-gray-500">Please contact your loan officer for a new access link.</p>
-            </div>
-          </CardContent>
-          <CardFooter className="justify-center">
-            <Button onClick={() => navigate('/client-portal-landing')} className="bg-mortgage-purple hover:bg-mortgage-darkPurple">
-              Back to Portal Landing
-            </Button>
-          </CardFooter>
-        </Card>
-      </div>
-    );
-  }
+// Add this new local component ABOVE the ClientPortal component
+const ClientPortalRealEstateOwnedForm = () => {
+  const [adding, setAdding] = React.useState(false);
 
   return (
-    <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-gray-50/70">
-        <ClientPortalSidebar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab}
-          urgentCount={clientData?.conditions.filter(c => c.urgent && !c.completed).length || 0}
-          activeAppSection={activeAppSection!}
-          setActiveAppSection={setActiveAppSection}
-        />
-        
-        <main className="flex-1 px-8 pt-8 ml-4">
-          {clientData?.leadId && (
-            <div className="w-full mb-6">
-              <LoanProgressTracker 
-                leadId={clientData.leadId} 
-                className=""
-              />
-            </div>
-          )}
-          
-          <div>
-            {activeTab === "application" && activeAppSection === "personal-info" && (
-              <PersonalInfoPlaceholder />
-            )}
-            {activeTab === "application" && activeAppSection === "employment-income" && (
-              <EmploymentIncomeSection />
-            )}
-            {activeTab === "application" && activeAppSection === "assets" && (
-              <ClientPortalAssetForm
-                isEditable={true}
-              />
-            )}
-            {activeTab === "home" && <HomeTab clientData={clientData} />}
-            {activeTab === "conditions" && clientData?.leadId && (
-              <ClientPortalConditions leadId={clientData.leadId} refreshData={refreshData} />
-            )}
-            {activeTab === "attention" && <AttentionTab clientData={clientData} />}
-            {activeTab === "support" && <SupportTab />}
-          </div>
-        </main>
+    <div className="space-y-8 max-w-2xl mx-auto">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold text-mortgage-darkPurple">Real Estate Owned</h2>
+        <button
+          className="flex items-center bg-mortgage-purple text-white px-4 py-2 rounded-lg hover:bg-mortgage-darkPurple"
+          onClick={() => setAdding(true)}
+        >
+          <svg width="20" height="20" className="mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14m7-7H5"/></svg>
+          Add
+        </button>
       </div>
-    </SidebarProvider>
-  );
-};
 
-export default ClientPortal;
+      {!adding ? (
+        <div className="text-center text-gray-500 py-16 border rounded-xl bg-gray-50">
+          <p className="font-medium mb-2">No real estate properties have been added yet.</p>
+          <button
+            className="inline-flex items-center px-4 py-2 bg-mortgage-purple text-white rounded-md hover:bg-mortgage-darkPurple"
+            onClick={() => setAdding(true)}
+          >
+            <svg width="20" height="20" className="mr-2" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14m7-7H5"/></svg>
+            Add New Real Estate
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6 border rounded-xl bg-white p-6 shadow-md">
+          <h3 className="text-xl font-semibold mb-4 text-mortgage-darkPurple">Add New Real Estate</h3>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <div className="text-mortgage-purple font-semibold">REAL ESTATE DETAILS</div>
+              <label className="block text-sm font-medium text-gray-700">Subject Property</label>
+              <input className="w-full border border-gray-200 rounded px-3 py-2" placeholder="Property Name or Ref"/>
+            </div>
+            <div className="space-y-2">
+              <div className="text-mortgage-purple font-semibold">RENTAL INCOME & PROPERTY EXPENSES</div>
+              <label className="block text-sm font-medium text-gray-700">Rental Income</label>
+              <input className="w-full border border-gray-200 rounded px-3 py-2" placeholder="$0.00" />
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Real Estate Owners:</label>
+              <div className="bg-gray-100 p-2 rounded mt-1 text-gray-800 text-sm">
+                Rene Pastor<br/>
+                Iohana Tapia Garcia
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Borrower(s) Using This As Primary Address:</label>
+              <div className="bg-gray-100 p-2 rounded mt-1 text-gray-800 text-sm">
+                Rene Pastor<br/>
+                Iohana Tapia Garcia
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Address Line 1 *</label>
+              <input className="w-full border border-gray-200 rounded px-3 py-2" placeholder="Enter street address" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Unit #</label>
+              <input className="w-full border border-gray-200 rounded px-3 py-2" placeholder="Enter unit number" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Address Line 2</label>
+              <input className="w-full border border-gray-200 rounded px-3 py-2" placeholder="Enter additional address info" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">Intended Occupancy *</label>
+              <select className="w-full border border-gray-200 rounded px-3 py-2">
+                <option>Primary Residence</option>
+                <option>Second Home</option>
+                <option>Investment</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">City *</label>
+              <input className="w-full border border-gray-200 rounded px-3 py-2" placeholder="Enter city" />
+            </div>
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">State *</label>
+              <select className="w-full border border-gray-200 rounded px-3 py-2">
+                <option>Select state</option>
+                <option>CA</option>
+                <option>TX</option>
+                <option>NY</option>
+                {/* ...expand with all states as needed */}
