@@ -112,13 +112,51 @@ const LoanApplicationViewer = () => {
       const { mortgageData = {} } = loanApplication || {};
       
       // Create updated mortgage data object
-      const updatedMortgageData = {
+      let updatedMortgageData = {
         ...mortgageData,
         [section]: {
           ...(mortgageData[section] || {}),
           ...data
         }
       };
+      
+      // IMPORTANT: Sync data between personalInfo and borrower.data.personalInfo paths
+      // This ensures both data structures are kept consistent
+      if (section === 'personalInfo') {
+        // Make sure borrower structure exists
+        if (!updatedMortgageData.borrower) {
+          updatedMortgageData.borrower = {
+            data: {},
+            section: "personalInfo"
+          };
+        }
+        
+        if (!updatedMortgageData.borrower.data) {
+          updatedMortgageData.borrower.data = {};
+        }
+        
+        // Sync the personalInfo data to the borrower.data.personalInfo
+        updatedMortgageData.borrower.data.personalInfo = {
+          ...(updatedMortgageData.borrower.data.personalInfo || {}),
+          ...data.personalInfo
+        };
+        
+        // Also sync contactDetails if present
+        if (data.contactDetails) {
+          updatedMortgageData.borrower.data.contactDetails = {
+            ...(updatedMortgageData.borrower.data.contactDetails || {}),
+            ...data.contactDetails
+          };
+        }
+        
+        // Also sync addressHistory if present
+        if (data.addressHistory) {
+          updatedMortgageData.borrower.data.addressHistory = {
+            ...(updatedMortgageData.borrower.data.addressHistory || {}),
+            ...data.addressHistory
+          };
+        }
+      }
       
       // Create the request payload for top-level lead fields
       // This ensures we're also updating the main lead record fields when relevant
