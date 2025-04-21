@@ -423,27 +423,24 @@ async function updateLeadWithFormData(leadId, formData) {
     console.log("Missing fields:", JSON.stringify(missingFields));
     
     // Format mortgage data to match the expected structure in update-lead
-    // Ensure we have the proper nested structure for personalInfo if it exists in processedFields
+    // Create the base structure with personalInfo - this is critical to avoid the error
     let structuredMortgageData = {
       ...processedFields,
       autoFilledAt: new Date().toISOString(),
       documentProcessing: {
         status: 'completed',
         missingFields: missingFields
+      },
+      // Always initialize personalInfo structure to avoid the error
+      personalInfo: {
+        personalInfo: {},
+        contactDetails: {},
+        addressHistory: {}
       }
     };
     
-    // If borrower data exists, ensure we have the proper personalInfo structure
+    // If borrower data exists, populate the personalInfo structure
     if (processedFields.borrower) {
-      // Make sure we have the personalInfo object
-      if (!structuredMortgageData.personalInfo) {
-        structuredMortgageData.personalInfo = {
-          personalInfo: {},
-          contactDetails: {},
-          addressHistory: {}
-        };
-      }
-      
       // Map borrower data to personalInfo structure
       structuredMortgageData.personalInfo.personalInfo = {
         firstName: processedFields.borrower.firstName || '',

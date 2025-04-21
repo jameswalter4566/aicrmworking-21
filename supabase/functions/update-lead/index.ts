@@ -66,8 +66,17 @@ Deno.serve(async (req) => {
 
     // Handle mortgage data if provided
     if (leadData.mortgageData) {
-      // Convert all mortgage data to ensure consistent structure
+      // Always ensure the mortgage data has a proper structure to avoid undefined errors
       const mortgageData = leadData.mortgageData;
+      
+      // Initialize personalInfo if it doesn't exist
+      if (!mortgageData.personalInfo) {
+        mortgageData.personalInfo = {
+          personalInfo: {},
+          contactDetails: {},
+          addressHistory: {}
+        };
+      }
       
       // Special handling for syncing personalInfo to borrower data structure
       if (mortgageData.personalInfo && !mortgageData.borrower) {
@@ -90,9 +99,9 @@ Deno.serve(async (req) => {
       } else if (mortgageData.borrower && !mortgageData.personalInfo) {
         // Sync from borrower to personalInfo
         mortgageData.personalInfo = {
-          personalInfo: mortgageData.borrower.data.personalInfo || {},
-          contactDetails: mortgageData.borrower.data.contactDetails || {},
-          addressHistory: mortgageData.borrower.data.addressHistory || {}
+          personalInfo: mortgageData.borrower.data?.personalInfo || {},
+          contactDetails: mortgageData.borrower.data?.contactDetails || {},
+          addressHistory: mortgageData.borrower.data?.addressHistory || {}
         };
       }
       
