@@ -23,7 +23,7 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
       <Button
         variant="default"    // solid background button variant
         size="lg"            // larger size
-        className="mt-2"
+        className="mt-2 px-8 py-2.5" // Added more padding for a larger button
         onClick={onContinue}
       >
         Skip and Fill Out Manually

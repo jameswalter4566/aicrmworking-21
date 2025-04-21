@@ -43,14 +43,16 @@ const ClientPortalOnboarding = () => {
         
         // Fetch lead data if available
         if (access.lead_id) {
-          const { data: lead, error: leadError } = await supabase
-            .from('leads')
-            .select('*')
-            .eq('id', access.lead_id)
-            .single();
+          // Updated to use lead-profile edge function to get complete lead data including full mortgage data
+          const { data: response, error: leadError } = await supabase.functions.invoke('lead-profile', {
+            body: { id: access.lead_id }
+          });
           
-          if (!leadError && lead) {
-            setLeadData(lead);
+          if (!leadError && response?.success && response?.data?.lead) {
+            setLeadData(response.data.lead);
+            console.log("Retrieved lead data for client portal:", response.data.lead);
+          } else {
+            console.error("Error fetching complete lead data:", leadError || response?.error);
           }
         }
       } catch (error) {
@@ -71,15 +73,23 @@ const ClientPortalOnboarding = () => {
         return;
       }
       
-      // Update lead with onboarding data
-      const { error } = await supabase
-        .from('leads')
-        .update({ 
-          mortgage_data: onboardingData,
-          is_mortgage_lead: true, // Mark as mortgage lead now that onboarding is complete
-          added_to_pipeline_at: new Date().toISOString()
-        })
-        .eq('id', portalAccess.lead_id);
+      // Preserve existing mortgage data that might not be part of the onboarding
+      const combinedMortgageData = {
+        ...(leadData?.mortgageData || {}),
+        ...onboardingData
+      };
+      
+      // Update lead with combined onboarding data
+      const { error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId: portalAccess.lead_id, 
+          leadData: { 
+            mortgageData: combinedMortgageData,
+            is_mortgage_lead: true,
+            added_to_pipeline_at: new Date().toISOString()
+          }
+        }
+      });
         
       if (error) {
         throw new Error(error.message);

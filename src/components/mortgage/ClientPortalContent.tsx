@@ -7,6 +7,8 @@ import { Upload, FileText, ClipboardCheck, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
+import Mortgage1003Form from './Mortgage1003Form';
+import { toast } from 'sonner';
 
 interface CompanySettings {
   company_name: string;
@@ -45,42 +47,45 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     secondary_color: '#8B5CF6',
     accent_color: '#EA384C',
   });
+  const [leadData, setLeadData] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // This effect will now fetch company settings based on the creator ID
+  // This effect fetches both company settings and lead data
   useEffect(() => {
-    const fetchCompanySettings = async () => {
-      if (!createdBy) return;
-
+    const fetchData = async () => {
+      setIsLoading(true);
+      
       try {
-        // If we have a createdBy user ID, try to fetch their company settings
-        const { data, error } = await supabase
-          .from('company_settings')
-          .select('*')
-          .eq('user_id', createdBy)
-          .single();
-
-        if (error) {
-          console.error('Error fetching company settings:', error);
-          return;
+        // Fetch lead data using the lead-profile function to get complete data
+        if (leadId) {
+          const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
+            body: { id: leadId }
+          });
+          
+          if (leadError) {
+            console.error('Error fetching lead data:', leadError);
+          } else if (leadResponse?.success && leadResponse?.data?.lead) {
+            setLeadData(leadResponse.data.lead);
+            console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
+          }
         }
-
-        if (data) {
-          setSettings(data);
-          console.log('Company settings loaded:', data);
-        }
-      } catch (error) {
-        console.error('Error in fetchCompanySettings:', error);
-      }
-    };
-
-    // If we already have a creator ID, fetch settings immediately
-    if (createdBy) {
-      fetchCompanySettings();
-    } else {
-      // If we don't have a creator ID but we have a leadId, try to get it from portal access
-      const getCreatorFromPortalAccess = async () => {
-        try {
-          // Fix: Convert leadId to a number only for the query
+        
+        // Fetch company settings
+        if (createdBy) {
+          const { data, error } = await supabase
+            .from('company_settings')
+            .select('*')
+            .eq('user_id', createdBy)
+            .single();
+  
+          if (error) {
+            console.error('Error fetching company settings:', error);
+          } else if (data) {
+            setSettings(data);
+          }
+        } else if (leadId) {
+          // If we don't have a creator ID but we have a leadId, try to get it from portal access
           const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
           
           const { data, error } = await supabase
@@ -91,14 +96,9 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
           if (error) {
             console.error('Error fetching portal creator:', error);
-            return;
-          }
-
-          // Fix: Check if data exists and has the created_by property, and ensure it's a string
-          if (data && 'created_by' in data && data.created_by) {
-            const creatorId = String(data.created_by); // Explicit cast to string
+          } else if (data && 'created_by' in data && data.created_by) {
+            const creatorId = String(data.created_by);
             
-            // Now fetch the company settings with this user ID
             const { data: companyData, error: companyError } = await supabase
               .from('company_settings')
               .select('*')
@@ -107,25 +107,77 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
             if (companyError) {
               console.error('Error fetching company settings:', companyError);
-              return;
-            }
-
-            if (companyData) {
+            } else if (companyData) {
               setSettings(companyData);
-              console.log('Company settings loaded from portal access:', companyData);
             }
           }
-        } catch (error) {
-          console.error('Error in getCreatorFromPortalAccess:', error);
         }
-      };
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-      getCreatorFromPortalAccess();
-    }
+    fetchData();
   }, [createdBy, leadId]);
 
-  const refreshData = () => {
-    console.log("Refreshing data...");
+  const handleSaveMortgageData = async (section: string, data: Record<string, any>) => {
+    if (!leadId || !leadData) return;
+    
+    try {
+      setIsSaving(true);
+      
+      const currentMortgageData = leadData.mortgageData || {};
+      const updatedMortgageData = {
+        ...currentMortgageData,
+        [section]: data
+      };
+      
+      const { data: responseData, error } = await supabase.functions.invoke('update-lead', {
+        body: { 
+          leadId, 
+          leadData: { mortgageData: updatedMortgageData }
+        }
+      });
+      
+      if (error || !responseData.success) {
+        throw new Error(error || responseData?.error || "Failed to update mortgage information");
+      }
+      
+      setLeadData(prev => ({
+        ...prev,
+        mortgageData: updatedMortgageData
+      }));
+      
+      toast.success(`${section} information saved successfully`);
+    } catch (error) {
+      console.error("Error updating mortgage data:", error);
+      toast.error(`Failed to update ${section} information`);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const refreshData = async () => {
+    if (!leadId) return;
+    
+    try {
+      const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
+        body: { id: leadId }
+      });
+      
+      if (leadError) {
+        console.error('Error refreshing lead data:', leadError);
+        return;
+      }
+      
+      if (leadResponse?.success && leadResponse?.data?.lead) {
+        setLeadData(leadResponse.data.lead);
+      }
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    }
   };
 
   if (!isInPipeline) {
@@ -201,6 +253,18 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
         leadId={leadId} 
         className="mb-6" 
       />
+      
+      {leadData && (
+        <Card className="mb-6">
+          <Mortgage1003Form 
+            lead={leadData}
+            onSave={handleSaveMortgageData}
+            isEditable={true}
+            isSaving={isSaving}
+          />
+        </Card>
+      )}
+      
       <ClientPortalConditions 
         leadId={leadId}
         refreshData={refreshData}

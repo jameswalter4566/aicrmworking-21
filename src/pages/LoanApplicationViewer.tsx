@@ -46,28 +46,27 @@ const LoanApplicationViewer = () => {
   const fetchLoanApplicationData = async (leadId: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { 
-          leadId,
-          industryFilter: 'mortgage'
-        }
+      const { data: response, error: profileError } = await supabase.functions.invoke('lead-profile', {
+        body: { id: leadId }
       });
 
-      if (error) {
-        console.error("Error fetching loan application:", error);
+      if (profileError) {
+        console.error("Error fetching loan application:", profileError);
         toast.error("Failed to load loan application details");
         setLoading(false);
         return;
       }
 
-      if (!data.success || !data.data || data.data.length === 0) {
-        console.error("API returned error or no data:", data.error);
-        toast.error(data.error || "Failed to load loan application details");
+      if (!response.success || !response.data || !response.data.lead) {
+        console.error("API returned error or no data:", response.error);
+        toast.error(response.error || "Failed to load loan application details");
         setLoading(false);
         return;
       }
 
-      const lead = data.data[0];
+      const lead = response.data.lead;
+      console.log("Retrieved complete lead data:", lead);
+      
       const loanAmountStr = lead.mortgageData?.property?.loanAmount || '0';
       const loanAmount = parseFloat(loanAmountStr.replace(/,/g, '')) || 0;
       
@@ -112,7 +111,10 @@ const LoanApplicationViewer = () => {
       
       const updatedMortgageData = {
         ...mortgageData,
-        ...data
+        [section]: {
+          ...(mortgageData[section] || {}),
+          ...data
+        }
       };
       
       const { data: responseData, error } = await supabase.functions.invoke('update-lead', {
@@ -135,6 +137,9 @@ const LoanApplicationViewer = () => {
       });
       
       toast.success(`${section.charAt(0).toUpperCase() + section.slice(1)} information saved successfully`);
+      
+      fetchLoanApplicationData(id);
+      
     } catch (error) {
       console.error("Error saving form data:", error);
       toast.error("Failed to save information");
