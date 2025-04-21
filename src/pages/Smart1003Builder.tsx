@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import MainLayout from "@/components/layouts/MainLayout";
@@ -56,6 +57,7 @@ const Smart1003Builder = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [origin, setOrigin] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     const steps = [
