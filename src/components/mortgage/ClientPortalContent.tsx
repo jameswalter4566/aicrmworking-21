@@ -50,37 +50,20 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
   const [leadData, setLeadData] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("application");
+  const [activeAppSection, setActiveAppSection] = useState("personal-info");
 
-  // This effect fetches both company settings and lead data
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       
       try {
-        // Fetch lead data using the lead-profile function to get complete data
         if (leadId) {
-          console.log("Fetching lead data in ClientPortalContent for ID:", leadId);
+          console.log("Fetching initial lead data in ClientPortalContent for ID:", leadId);
           
-          // Convert leadId to number if it's a string
-          const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
-          
-          const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
-            body: { id: numericLeadId }
-          });
-          
-          if (leadError) {
-            console.error('Error fetching lead data:', leadError);
-            toast.error('Failed to load mortgage data');
-          } else if (leadResponse?.success && leadResponse?.data?.lead) {
-            console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
-            setLeadData(leadResponse.data.lead);
-          } else {
-            console.error('Invalid lead data response:', leadResponse);
-            toast.error('Could not retrieve mortgage data');
-          }
+          await fetchLeadProfile();
         }
         
-        // Fetch company settings
         if (createdBy) {
           const { data, error } = await supabase
             .from('company_settings')
@@ -94,15 +77,14 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
             setSettings(data);
           }
         } else if (leadId) {
-          // If we don't have a creator ID but we have a leadId, try to get it from portal access
           const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
           
           const { data, error } = await supabase
             .from('client_portal_access')
             .select('created_by')
             .eq('lead_id', numericLeadId)
-            .maybeSingle(); // Changed from single() to avoid potential errors
-
+            .maybeSingle();
+  
           if (error) {
             console.error('Error fetching portal creator:', error);
           } else if (data && 'created_by' in data && data.created_by) {
@@ -112,8 +94,8 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
               .from('company_settings')
               .select('*')
               .eq('user_id', creatorId)
-              .maybeSingle(); // Changed from single()
-
+              .maybeSingle();
+  
             if (companyError) {
               console.error('Error fetching company settings:', companyError);
             } else if (companyData) {
@@ -131,15 +113,45 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
     fetchData();
     
-    // Set up an interval to periodically refresh the data when the component is mounted
     const refreshInterval = setInterval(() => {
       if (leadId) {
         refreshData();
       }
-    }, 60000); // Refresh every minute
+    }, 60000);
     
-    return () => clearInterval(refreshInterval); // Clean up on unmount
+    return () => clearInterval(refreshInterval);
   }, [createdBy, leadId]);
+
+  const fetchLeadProfile = async () => {
+    if (!leadId) return;
+    
+    try {
+      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+      
+      console.log("Explicitly calling lead-profile for ID:", numericLeadId);
+      
+      const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
+        body: { id: numericLeadId }
+      });
+      
+      if (leadError) {
+        console.error('Error fetching lead data:', leadError);
+        toast.error('Failed to load mortgage data');
+        return;
+      } 
+      
+      if (leadResponse?.success && leadResponse?.data?.lead) {
+        console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
+        setLeadData(leadResponse.data.lead);
+      } else {
+        console.error('Invalid lead data response:', leadResponse);
+        toast.error('Could not retrieve mortgage data');
+      }
+    } catch (error) {
+      console.error('Error in fetchLeadProfile:', error);
+      toast.error('Failed to load lead profile');
+    }
+  };
 
   const handleSaveMortgageData = async (section: string, data: Record<string, any>) => {
     if (!leadId || !leadData) return;
@@ -149,11 +161,9 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       
       const currentMortgageData = leadData.mortgageData || {};
       
-      // Create a properly structured update based on the section
       let updatedMortgageData = { ...currentMortgageData };
       
       if (section === "borrower") {
-        // Handle the special structure for borrower data
         updatedMortgageData = {
           ...updatedMortgageData,
           borrower: {
@@ -162,7 +172,6 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           }
         };
       } else {
-        // For other sections, keep the normal structure
         updatedMortgageData = {
           ...updatedMortgageData,
           [section]: data
@@ -200,48 +209,22 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     if (!leadId) return;
     
     try {
-      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
-      console.log("Refreshing lead data for ID:", numericLeadId);
-      
-      const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
-        body: { id: numericLeadId }
-      });
-      
-      if (leadError) {
-        console.error('Error refreshing lead data:', leadError);
-        return;
-      }
-      
-      if (leadResponse?.success && leadResponse?.data?.lead) {
-        console.log("Refreshed lead data in client portal:", leadResponse.data.lead);
-        setLeadData(leadResponse.data.lead);
-      } else {
-        console.error('Invalid response when refreshing lead data:', leadResponse);
-      }
+      await fetchLeadProfile();
     } catch (error) {
       console.error('Error refreshing data:', error);
     }
   };
 
-  // Function to fire the lead-profile edge function (called when Application is clicked)
   const handleApplicationClick = async () => {
     if (!leadId) return;
     try {
-      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
-      // Optionally set a loading state here
-      console.log("Manually firing lead-profile for Application tab:", numericLeadId);
-      const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
-        body: { id: numericLeadId }
-      });
-      if (!leadError && leadResponse?.success && leadResponse?.data?.lead) {
-        setLeadData(leadResponse.data.lead);
-      }
+      console.log("Manually firing lead-profile for Application tab", leadId);
+      await fetchLeadProfile();
     } catch (error) {
       console.error('Error firing lead-profile from Application click:', error);
     }
   };
 
-  // Show loading state
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -319,18 +302,17 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
   return (
     <div className="space-y-6">
-      {/* Sidebar with manual application tab edge function fire */}
       <div className="fixed left-0 top-0 z-20">
         <ClientPortalSidebar
-          activeTab={"application"} // Optionally pass or manage as needed
-          setActiveTab={() => {}}   // Optionally handle tab state if required
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          urgentCount={0}
+          activeAppSection={activeAppSection}
+          setActiveAppSection={setActiveAppSection}
           onApplicationClick={handleApplicationClick}
         />
       </div>
-      {/* ... keep the rest of the component content the same ... */}
       <div className="ml-72"> 
-        {/* main portal content, previously everything rendered after sidebar */}
-        {/* ... keep everything after the sidebar (loan progress, Mortgage1003Form etc) the same ... */}
         <div className="text-center mb-8">
           <h1 
             className="text-2xl font-bold mb-2"

@@ -1,71 +1,57 @@
 
-# A string used as a super secret to generate JWT tokens. DO NOT share this with anyone!
-project_id = "default-project-id"
+project_id = "crm"
 
 [api]
 enabled = true
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
 
 [db]
 port = 54322
 shadow_port = 54320
-major_version = 15
-
-[db.pooler]
-enabled = false
-port = 54329
-pool_mode = "transaction"
-default_pool_size = 20
-max_client_conn = 100
-
-[realtime]
-enabled = true
-
-[storage]
-enabled = true
-file_size_limit = "50MiB"
-
-[auth]
-enabled = true
-site_url = "http://localhost:3000"
-additional_redirect_urls = ["https://localhost:3000"]
-jwt_expiry = 3600
-enable_refresh_token_rotation = true
-refresh_token_reuse_interval = 10
-enable_signup = true
-
-[auth.email]
-enable_signup = true
-double_confirm_changes = true
-enable_confirmations = false
-
-[auth.external.github]
-enabled = false
-client_id = ""
-secret = ""
-# Overrides the default auth redirectUrl.
-redirect_uri = ""
-# Overrides the default auth provider URL. Used to support self-hosted gitlab instances.
-url = ""
-
-[analytics]
-enabled = false
-port = 54327
-vector_port = 54328
-# Configure one of these backends
-backend = "postgres"
 
 [studio]
 enabled = true
 port = 54323
-api_url = "https://api.supabase.io"
+api_url = "http://localhost"
 
-[functions]
+[inbucket]
 enabled = true
-[functions.twilio-voice]
+port = 54324
+
+[storage]
+enabled = true
+port = 54325
+
+[auth]
+enabled = true
+port = 54326
+
+[realtime]
+enabled = true
+port = 54327
+
+[analytics]
+enabled = true
+port = 54328
+
+[pooler]
+enabled = true
+port = 54329
+connection_string = "postgresql://postgres:postgres@localhost:54322/postgres"
+
+[vector]
+enabled = true
+port = 54330
+
+[functions.retrieve-conditions]
 verify_jwt = false
+
+[functions.lead-profile]
+verify_jwt = false
+
 [functions.twilio-token]
+verify_jwt = false
+
+[functions.twilio-voice]
 verify_jwt = false
