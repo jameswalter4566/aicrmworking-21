@@ -7,8 +7,6 @@ import { Upload, FileText, ClipboardCheck, Calculator } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
-import EmploymentIncomeSection from './client-portal/EmploymentIncomeSection';
-import PersonalInfoPlaceholder from './client-portal/PersonalInfoPlaceholder';  // Fix import here
 
 interface CompanySettings {
   company_name: string;
@@ -21,7 +19,6 @@ interface ClientPortalContentProps {
   leadId: string | number;
   isInPipeline?: boolean;
   createdBy?: string;
-  activeSection?: string;
 }
 
 const PrePipelineMessage = ({ title, description, settings }: { title: string; description: string; settings: CompanySettings }) => {
@@ -41,7 +38,7 @@ const PrePipelineMessage = ({ title, description, settings }: { title: string; d
   );
 };
 
-export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy, activeSection }: ClientPortalContentProps) => {
+export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }: ClientPortalContentProps) => {
   const [settings, setSettings] = useState<CompanySettings>({
     company_name: 'Your Mortgage Company',
     primary_color: '#33C3F0',
@@ -49,11 +46,13 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy, a
     accent_color: '#EA384C',
   });
 
+  // This effect will now fetch company settings based on the creator ID
   useEffect(() => {
     const fetchCompanySettings = async () => {
       if (!createdBy) return;
 
       try {
+        // If we have a createdBy user ID, try to fetch their company settings
         const { data, error } = await supabase
           .from('company_settings')
           .select('*')
@@ -74,11 +73,14 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy, a
       }
     };
 
+    // If we already have a creator ID, fetch settings immediately
     if (createdBy) {
       fetchCompanySettings();
     } else {
+      // If we don't have a creator ID but we have a leadId, try to get it from portal access
       const getCreatorFromPortalAccess = async () => {
         try {
+          // Fix: Convert leadId to a number only for the query
           const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
           
           const { data, error } = await supabase
@@ -92,9 +94,11 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy, a
             return;
           }
 
+          // Fix: Check if data exists and has the created_by property, and ensure it's a string
           if (data && 'created_by' in data && data.created_by) {
-            const creatorId = String(data.created_by);
+            const creatorId = String(data.created_by); // Explicit cast to string
             
+            // Now fetch the company settings with this user ID
             const { data: companyData, error: companyError } = await supabase
               .from('company_settings')
               .select('*')
@@ -124,84 +128,83 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy, a
     console.log("Refreshing data...");
   };
 
-  // Always render these placeholders, do not conditionally render:
+  if (!isInPipeline) {
+    return (
+      <div className="space-y-6">
+        <Card className="p-6 bg-gradient-to-br from-blue-50 to-white">
+          <div className="text-center space-y-4">
+            <h2 className="text-2xl font-bold" style={{ color: settings.primary_color }}>
+              Welcome to {settings.company_name}
+            </h2>
+            <p className="text-gray-600">
+              Start your journey towards homeownership by uploading your documents and completing your application.
+              Once submitted, you'll have access to track your loan progress and manage conditions.
+            </p>
+          </div>
+        </Card>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <PrePipelineMessage 
+            title="Loan Progress"
+            description="After submitting your application, you'll be able to track your loan progress here."
+            settings={settings}
+          />
+          
+          <PrePipelineMessage
+            title="Loan Conditions"
+            description="Once your application is in process, you'll see your required conditions here."
+            settings={settings}
+          />
+        </div>
+
+        <Card className="p-6">
+          <div className="space-y-4">
+            <h3 
+              className="text-xl font-semibold"
+              style={{ color: settings.primary_color }}
+            >
+              Get Started
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button 
+                className="w-full hover:bg-opacity-90" 
+                style={{ backgroundColor: settings.primary_color }}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                Upload Documents
+              </Button>
+              <Button 
+                className="w-full hover:bg-opacity-90" 
+                style={{ backgroundColor: settings.secondary_color }}
+              >
+                <Calculator className="mr-2 h-4 w-4" />
+                Payment Calculator
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {/* Show header if not in pipeline */}
-      {!isInPipeline && (
-        <>
-          <Card className="p-6 bg-gradient-to-br from-blue-50 to-white">
-            <div className="text-center space-y-4">
-              <h2 className="text-2xl font-bold" style={{ color: settings.primary_color }}>
-                Welcome to {settings.company_name}
-              </h2>
-              <p className="text-gray-600">
-                Start your journey towards homeownership by uploading your documents and completing your application.
-                Once submitted, you'll have access to track your loan progress and manage conditions.
-              </p>
-            </div>
-          </Card>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <PrePipelineMessage 
-              title="Loan Progress"
-              description="After submitting your application, you'll be able to track your loan progress here."
-              settings={settings}
-            />
-            
-            <PrePipelineMessage
-              title="Loan Conditions"
-              description="Once your application is in process, you'll see your required conditions here."
-              settings={settings}
-            />
-          </div>
-
-          <Card className="p-6">
-            <div className="space-y-4">
-              <h3 
-                className="text-xl font-semibold"
-                style={{ color: settings.primary_color }}
-              >
-                Get Started
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button 
-                  className="w-full hover:bg-opacity-90" 
-                  style={{ backgroundColor: settings.primary_color }}
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Upload Documents
-                </Button>
-                <Button 
-                  className="w-full hover:bg-opacity-90" 
-                  style={{ backgroundColor: settings.secondary_color }}
-                >
-                  <Calculator className="mr-2 h-4 w-4" />
-                  Payment Calculator
-                </Button>
-              </div>
-            </div>
-          </Card>
-        </>
-      )}
-
-      {/* Always render both sections no matter activeSection or pipeline status */}
-      <PersonalInfoPlaceholder />
-      <EmploymentIncomeSection />
-
-      {/* If in pipeline, render loan progress & conditions */}
-      {isInPipeline && (
-        <>
-          <ClientPortalLoanProgress 
-            leadId={leadId} 
-            className="mb-6" 
-          />
-          <ClientPortalConditions 
-            leadId={leadId}
-            refreshData={refreshData}
-          />
-        </>
-      )}
+      <div className="text-center mb-8">
+        <h1 
+          className="text-2xl font-bold mb-2"
+          style={{ color: settings.primary_color }}
+        >
+          {settings.company_name}
+        </h1>
+      </div>
+      <ClientPortalLoanProgress 
+        leadId={leadId} 
+        className="mb-6" 
+      />
+      <ClientPortalConditions 
+        leadId={leadId}
+        refreshData={refreshData}
+      />
     </div>
   );
 };
