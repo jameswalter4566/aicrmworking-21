@@ -50,7 +50,7 @@ const ClientPortalOnboarding = () => {
           });
           
           if (!leadError && response?.success && response?.data?.lead) {
-            console.log("Successfully retrieved lead data:", response.data.lead);
+            console.log("Successfully retrieved lead data in ClientPortalOnboarding:", response.data.lead);
             setLeadData(response.data.lead);
           } else {
             console.error("Error fetching complete lead data:", leadError || response?.error);
@@ -74,13 +74,33 @@ const ClientPortalOnboarding = () => {
         return;
       }
       
-      // Preserve existing mortgage data that might not be part of the onboarding
-      const combinedMortgageData = {
-        ...(leadData?.mortgageData || {}),
-        ...onboardingData
+      // Structure the mortgage data properly for consistency across platforms
+      let combinedMortgageData = leadData?.mortgageData || {};
+      
+      // Handle special borrower structure if present
+      if (onboardingData.mortgageData?.borrower) {
+        combinedMortgageData = {
+          ...combinedMortgageData,
+          borrower: {
+            data: onboardingData.mortgageData.borrower,
+            section: "personalInfo"
+          }
+        };
+        
+        // Remove borrower from the main object to avoid duplication
+        delete onboardingData.mortgageData.borrower;
+      }
+      
+      // Merge any remaining mortgage data
+      combinedMortgageData = {
+        ...combinedMortgageData,
+        ...(onboardingData.mortgageData || {})
       };
       
-      console.log("Saving onboarding data:", combinedMortgageData);
+      console.log("Saving onboarding data in ClientPortalOnboarding:", {
+        leadId: portalAccess.lead_id,
+        mortgageData: combinedMortgageData
+      });
       
       // Update lead with combined onboarding data
       const { error } = await supabase.functions.invoke('update-lead', {

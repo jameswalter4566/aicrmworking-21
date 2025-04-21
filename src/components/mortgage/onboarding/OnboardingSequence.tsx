@@ -44,15 +44,27 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   useEffect(() => {
     const fetchLeadData = async () => {
       if (initialData) {
+        console.log("Using initialData in OnboardingSequence:", initialData);
         setLeadData(initialData);
         return;
       }
       try {
         const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
-        const { data: { success, data }, error } = await supabase.functions.invoke('lead-profile', {
+        console.log("Fetching lead data in OnboardingSequence for ID:", numericLeadId);
+        
+        const { data: response, error } = await supabase.functions.invoke('lead-profile', {
           body: { id: numericLeadId }
         });
-        if (success && data?.lead) setLeadData(data.lead);
+        
+        if (error) {
+          console.error("Error fetching lead data:", error);
+          return;
+        }
+        
+        if (response?.success && response?.data?.lead) {
+          console.log("Successfully retrieved lead data:", response.data.lead);
+          setLeadData(response.data.lead);
+        }
       } catch (error) {
         console.error('Error fetching lead data:', error);
       }
@@ -64,26 +76,59 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     setIsLoading(true);
     try {
       const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
-      const { data: { success }, error } = await supabase.functions.invoke('update-lead', {
+      console.log("Saving onboarding step data:", stepData);
+      
+      // Start with current mortgage data
+      const currentMortgageData = leadData?.mortgageData || {};
+      let updatedMortgageData = { ...currentMortgageData };
+      
+      // If we're updating borrower data, use the special structure
+      if (stepData.mortgageData?.borrower) {
+        updatedMortgageData = {
+          ...updatedMortgageData,
+          borrower: {
+            data: stepData.mortgageData.borrower,
+            section: "personalInfo"
+          }
+        };
+      } 
+      // Otherwise merge normally
+      else if (stepData.mortgageData) {
+        updatedMortgageData = {
+          ...updatedMortgageData,
+          ...stepData.mortgageData
+        };
+      }
+      
+      const requestPayload = {
+        ...stepData,
+        mortgageData: updatedMortgageData
+      };
+      
+      console.log("Final request payload for step save:", requestPayload);
+      
+      const { data: response, error } = await supabase.functions.invoke('update-lead', {
         body: {
           leadId: numericLeadId,
-          leadData: {
-            ...stepData,
-            mortgageData: {
-              ...(leadData.mortgageData || {}),
-              ...(stepData.mortgageData || {})
-            }
-          }
+          leadData: requestPayload
         }
       });
 
-      if (success) {
-        setLeadData(prev => ({
-          ...prev,
-          ...stepData
-        }));
-        setCurrentStep(prev => prev + 1);
+      if (error) {
+        throw new Error(error.message);
       }
+      
+      if (!response.success) {
+        throw new Error(response.error || "Failed to save step data");
+      }
+
+      setLeadData(prev => ({
+        ...prev,
+        ...stepData,
+        mortgageData: updatedMortgageData
+      }));
+      
+      setCurrentStep(prev => prev + 1);
     } catch (error) {
       console.error('Error saving step data:', error);
     } finally {

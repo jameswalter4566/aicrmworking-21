@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -66,8 +65,8 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
           if (leadError) {
             console.error('Error fetching lead data:', leadError);
           } else if (leadResponse?.success && leadResponse?.data?.lead) {
-            setLeadData(leadResponse.data.lead);
             console.log("Retrieved lead data for client portal content:", leadResponse.data.lead);
+            setLeadData(leadResponse.data.lead);
           }
         }
         
@@ -129,10 +128,29 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       setIsSaving(true);
       
       const currentMortgageData = leadData.mortgageData || {};
-      const updatedMortgageData = {
-        ...currentMortgageData,
-        [section]: data
-      };
+      
+      // Create a properly structured update based on the section
+      let updatedMortgageData = { ...currentMortgageData };
+      
+      if (section === "borrower") {
+        // Handle the special structure for borrower data
+        updatedMortgageData = {
+          ...updatedMortgageData,
+          borrower: {
+            ...updatedMortgageData.borrower,
+            data: data,
+            section: "personalInfo"
+          }
+        };
+      } else {
+        // For other sections, keep the normal structure
+        updatedMortgageData = {
+          ...updatedMortgageData,
+          [section]: data
+        };
+      }
+      
+      console.log("Saving mortgage data in client portal:", updatedMortgageData);
       
       const { data: responseData, error } = await supabase.functions.invoke('update-lead', {
         body: { 
@@ -173,6 +191,7 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
       }
       
       if (leadResponse?.success && leadResponse?.data?.lead) {
+        console.log("Refreshed lead data in client portal:", leadResponse.data.lead);
         setLeadData(leadResponse.data.lead);
       }
     } catch (error) {

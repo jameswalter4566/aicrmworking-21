@@ -50,6 +50,7 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
   useEffect(() => {
     // Check if we have documents to consolidate
     setHasDocuments(checkForDocuments());
+    console.log("Mortgage data in 1003 Form:", mortgageData);
   }, [mortgageData]);
   
   const handleSaveSection = async (section: string, data: Record<string, any>) => {
