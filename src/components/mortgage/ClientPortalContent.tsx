@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card } from '@/components/ui/card';
 import { ClientPortalConditions } from './ClientPortalConditions';
@@ -9,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useEffect, useState } from 'react';
 import Mortgage1003Form from './Mortgage1003Form';
 import { toast } from 'sonner';
+import ClientPortalSidebar from './ClientPortalSidebar';
 
 interface CompanySettings {
   company_name: string;
@@ -223,6 +223,24 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
     }
   };
 
+  // Function to fire the lead-profile edge function (called when Application is clicked)
+  const handleApplicationClick = async () => {
+    if (!leadId) return;
+    try {
+      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+      // Optionally set a loading state here
+      console.log("Manually firing lead-profile for Application tab:", numericLeadId);
+      const { data: leadResponse, error: leadError } = await supabase.functions.invoke('lead-profile', {
+        body: { id: numericLeadId }
+      });
+      if (!leadError && leadResponse?.success && leadResponse?.data?.lead) {
+        setLeadData(leadResponse.data.lead);
+      }
+    } catch (error) {
+      console.error('Error firing lead-profile from Application click:', error);
+    }
+  };
+
   // Show loading state
   if (isLoading) {
     return (
@@ -301,34 +319,47 @@ export const ClientPortalContent = ({ leadId, isInPipeline = false, createdBy }:
 
   return (
     <div className="space-y-6">
-      <div className="text-center mb-8">
-        <h1 
-          className="text-2xl font-bold mb-2"
-          style={{ color: settings.primary_color }}
-        >
-          {settings.company_name}
-        </h1>
+      {/* Sidebar with manual application tab edge function fire */}
+      <div className="fixed left-0 top-0 z-20">
+        <ClientPortalSidebar
+          activeTab={"application"} // Optionally pass or manage as needed
+          setActiveTab={() => {}}   // Optionally handle tab state if required
+          onApplicationClick={handleApplicationClick}
+        />
       </div>
-      <ClientPortalLoanProgress 
-        leadId={leadId} 
-        className="mb-6" 
-      />
-      
-      {leadData && (
-        <Card className="mb-6">
-          <Mortgage1003Form 
-            lead={leadData}
-            onSave={handleSaveMortgageData}
-            isEditable={true}
-            isSaving={isSaving}
-          />
-        </Card>
-      )}
-      
-      <ClientPortalConditions 
-        leadId={leadId}
-        refreshData={refreshData}
-      />
+      {/* ... keep the rest of the component content the same ... */}
+      <div className="ml-72"> 
+        {/* main portal content, previously everything rendered after sidebar */}
+        {/* ... keep everything after the sidebar (loan progress, Mortgage1003Form etc) the same ... */}
+        <div className="text-center mb-8">
+          <h1 
+            className="text-2xl font-bold mb-2"
+            style={{ color: settings.primary_color }}
+          >
+            {settings.company_name}
+          </h1>
+        </div>
+        <ClientPortalLoanProgress 
+          leadId={leadId} 
+          className="mb-6" 
+        />
+        
+        {leadData && (
+          <Card className="mb-6">
+            <Mortgage1003Form 
+              lead={leadData}
+              onSave={handleSaveMortgageData}
+              isEditable={true}
+              isSaving={isSaving}
+            />
+          </Card>
+        )}
+        
+        <ClientPortalConditions 
+          leadId={leadId}
+          refreshData={refreshData}
+        />
+      </div>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { 
   Home, 
@@ -30,6 +29,7 @@ interface ClientPortalSidebarProps {
   urgentCount?: number;
   activeAppSection?: string;
   setActiveAppSection?: (section: string) => void;
+  onApplicationClick?: () => void;
 }
 
 const ClientPortalSidebar = ({ 
@@ -37,7 +37,8 @@ const ClientPortalSidebar = ({
   setActiveTab,
   urgentCount,
   activeAppSection,
-  setActiveAppSection
+  setActiveAppSection,
+  onApplicationClick
 }: ClientPortalSidebarProps) => {
   const [isLoanAppExpanded, setIsLoanAppExpanded] = useState(false);
 
@@ -52,7 +53,6 @@ const ClientPortalSidebar = ({
   const loanAppSections = [
     { id: 'personal-info', label: 'Personal Information', icon: User },
     { id: 'employment-income', label: 'Employment & Income', icon: Briefcase },
-    // Removed duplicate entry with id 'employment'
     { id: 'assets', label: 'Assets', icon: Wallet },
     { id: 'liabilities', label: 'Liabilities', icon: Shield },
     { id: 'real-estate', label: 'Real Estate Owned', icon: Home },
@@ -84,7 +84,12 @@ const ClientPortalSidebar = ({
                     {item.id === 'application' ? (
                       <div>
                         <SidebarMenuButton
-                          onClick={() => setIsLoanAppExpanded(!isLoanAppExpanded)}
+                          onClick={() => {
+                            setIsLoanAppExpanded(!isLoanAppExpanded);
+                            if (onApplicationClick) {
+                              onApplicationClick();
+                            }
+                          }}
                           className={cn(
                             "relative flex items-center w-full rounded-lg transition-colors mb-1",
                             isLoanAppExpanded 
@@ -151,4 +156,3 @@ const ClientPortalSidebar = ({
 };
 
 export default ClientPortalSidebar;
-
