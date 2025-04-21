@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
@@ -26,7 +25,7 @@ const ClientPortalLanding = () => {
             <Button 
               size="lg" 
               onClick={() => navigate('/client-portal/login')}
-              className="bg-white text-mortgage-darkPurple hover:bg-gray-100"
+              className="bg-white text-mortgage-darkPurple hover:bg-gray-100 relative z-10"
             >
               Access Client Portal <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
@@ -35,7 +34,7 @@ const ClientPortalLanding = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-16">
+      <section className="py-16 relative z-10 bg-white">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="text-3xl font-bold text-center mb-12 text-mortgage-darkPurple">Everything You Need in One Place</h2>
           
@@ -76,7 +75,7 @@ const ClientPortalLanding = () => {
       </section>
 
       {/* How It Works */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-gray-50 relative z-10">
         <div className="container mx-auto px-4 md:px-6">
           <h2 className="text-3xl font-bold text-center mb-12 text-mortgage-darkPurple">How It Works</h2>
           
@@ -109,7 +108,7 @@ const ClientPortalLanding = () => {
       </section>
 
       {/* Benefits */}
-      <section className="py-16">
+      <section className="py-16 relative z-10 bg-white">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
@@ -143,7 +142,7 @@ const ClientPortalLanding = () => {
               </Button>
             </div>
             
-            <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-6">
+            <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-6 h-full">
               <div className="space-y-4">
                 <div className="h-2.5 rounded-full bg-green-500 w-full"></div>
                 <h3 className="text-center text-sm text-gray-500">Loan Progress</h3>
@@ -188,7 +187,7 @@ const ClientPortalLanding = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 bg-mortgage-purple/10">
+      <section className="py-16 bg-mortgage-purple/10 relative z-10">
         <div className="container mx-auto px-4 md:px-6 text-center">
           <h2 className="text-3xl font-bold mb-4 text-mortgage-darkPurple">Ready to Access Your Loan Information?</h2>
           <p className="text-xl text-gray-600 mb-8 max-w-2xl mx-auto">Take control of your mortgage journey with our comprehensive client portal</p>
@@ -203,7 +202,7 @@ const ClientPortalLanding = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8">
+      <footer className="bg-gray-800 text-white py-8 relative z-10">
         <div className="container mx-auto px-4 md:px-6">
           <div className="text-center">
             <p className="text-sm opacity-75">© {new Date().getFullYear()} Mortgage Client Portal. All rights reserved.</p>
