@@ -46,6 +46,7 @@ const LoanApplicationViewer = () => {
   const fetchLoanApplicationData = async (leadId: string) => {
     setLoading(true);
     try {
+      console.log("Fetching loan application data for ID:", leadId);
       const { data: response, error: profileError } = await supabase.functions.invoke('lead-profile', {
         body: { id: leadId }
       });
@@ -318,6 +319,8 @@ const LoanApplicationViewer = () => {
     };
     
     const title = sectionTitles[section as keyof typeof sectionTitles] || "Loan Application";
+    
+    console.log(`Rendering 1003 section: ${section} with data:`, loanApplication?.mortgageData);
     
     return (
       <div className="p-6">

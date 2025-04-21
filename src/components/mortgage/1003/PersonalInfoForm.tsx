@@ -23,10 +23,19 @@ export const PersonalInfoForm: React.FC<PersonalInfoFormProps> = ({
   isEditable = true,
   onSave
 }) => {
-  // Get personal info data from mortgage data or initialize empty objects
-  const personalInfo = mortgageData.personalInfo || {};
-  const contactDetails = mortgageData.contactDetails || {};
-  const addressHistory = mortgageData.addressHistory || {};
+  // Extract personal info, handling different data structures
+  // This accounts for both direct structure and nested structure under borrower.data
+  const getBorrowerData = () => {
+    if (mortgageData.borrower?.data) {
+      return mortgageData.borrower.data;
+    }
+    return mortgageData;
+  };
+
+  const borrowerData = getBorrowerData();
+  const personalInfo = borrowerData.personalInfo || {};
+  const contactDetails = borrowerData.contactDetails || {};
+  const addressHistory = borrowerData.addressHistory || {};
 
   const [isSaving, setIsSaving] = useState(false);
   
@@ -82,6 +91,66 @@ export const PersonalInfoForm: React.FC<PersonalInfoFormProps> = ({
     mailingAddressLine1: addressHistory.mailingAddressLine1 || "",
     mailingAddressUnit: addressHistory.mailingAddressUnit || ""
   });
+
+  // Update form data when mortgageData changes
+  useEffect(() => {
+    const borrowerData = getBorrowerData();
+    const personalInfo = borrowerData.personalInfo || {};
+    const contactDetails = borrowerData.contactDetails || {};
+    const addressHistory = borrowerData.addressHistory || {};
+
+    setFormData({
+      // Primary Information
+      firstName: personalInfo.firstName || "",
+      middleName: personalInfo.middleName || "",
+      lastName: personalInfo.lastName || "",
+      suffix: personalInfo.suffix || "",
+      socialSecurityNumber: personalInfo.socialSecurityNumber || "",
+      dateOfBirth: personalInfo.dateOfBirth || "",
+      maritalStatus: personalInfo.maritalStatus || "",
+      numberOfDependents: personalInfo.numberOfDependents || "0",
+      ageOfDependents: personalInfo.ageOfDependents || "",
+      joinedToBorrower: personalInfo.joinedToBorrower || false,
+      taxFilingAddressSameAs: personalInfo.taxFilingAddressSameAs || "",
+      presentAddressSameAs: personalInfo.presentAddressSameAs || "",
+      citizenship: personalInfo.citizenship || "U.S. Citizen",
+      isVeteran: personalInfo.isVeteran || false,
+      
+      // Contact Details
+      homePhoneNumber: contactDetails.homePhoneNumber || "",
+      cellPhoneNumber: contactDetails.cellPhoneNumber || "",
+      workPhoneNumber: contactDetails.workPhoneNumber || "",
+      workPhoneExt: contactDetails.workPhoneExt || "",
+      emailAddress: contactDetails.emailAddress || "",
+      noEmail: contactDetails.noEmail || false,
+      
+      // Present Address
+      presentAddressLine1: addressHistory.presentAddressLine1 || "",
+      presentAddressUnit: addressHistory.presentAddressUnit || "",
+      presentCity: addressHistory.presentCity || "",
+      presentState: addressHistory.presentState || "",
+      presentZipCode: addressHistory.presentZipCode || "",
+      presentCountry: addressHistory.presentCountry || "USA",
+      presentTimeAtResidence: addressHistory.presentTimeAtResidence || "1",
+      presentOwnership: addressHistory.presentOwnership || "",
+      
+      // Previous Address
+      previousAddressLine1: addressHistory.previousAddressLine1 || "",
+      previousAddressUnit: addressHistory.previousAddressUnit || "",
+      previousCity: addressHistory.previousCity || "",
+      previousState: addressHistory.previousState || "",
+      previousZipCode: addressHistory.previousZipCode || "",
+      previousCountry: addressHistory.previousCountry || "USA",
+      previousTimeAtResidence: addressHistory.previousTimeAtResidence || "",
+      previousOwnership: addressHistory.previousOwnership || "",
+      previousRentAmount: addressHistory.previousRentAmount || "",
+      
+      // Mailing Address
+      mailingAddressSameAsPresent: addressHistory.mailingAddressSameAsPresent || true,
+      mailingAddressLine1: addressHistory.mailingAddressLine1 || "",
+      mailingAddressUnit: addressHistory.mailingAddressUnit || ""
+    });
+  }, [mortgageData]);
 
   // Handle input changes
   const handleInputChange = (field: string, value: string | boolean | number) => {

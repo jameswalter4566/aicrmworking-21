@@ -40,10 +40,16 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
   // Get mortgage data or empty object if none exists
   const mortgageData = lead?.mortgageData || {};
   
+  // Helper to check if data exists in different possible structures
+  const checkForDocuments = () => {
+    const documents = mortgageData.documents || 
+                     (mortgageData.borrower?.data?.documents) || [];
+    return documents.length > 0;
+  };
+  
   useEffect(() => {
     // Check if we have documents to consolidate
-    const documents = mortgageData.documents || [];
-    setHasDocuments(documents.length > 0);
+    setHasDocuments(checkForDocuments());
   }, [mortgageData]);
   
   const handleSaveSection = async (section: string, data: Record<string, any>) => {
@@ -67,6 +73,12 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
     } finally {
       setIsConsolidating(false);
     }
+  };
+  
+  // Helper function to check for documents in mortgage data
+  const getDocumentsList = () => {
+    return mortgageData.documents || 
+          (mortgageData.borrower?.data?.documents) || [];
   };
   
   return (
@@ -101,14 +113,14 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
         </div>
       </CardHeader>
       <CardContent>
-        {mortgageData.documents && mortgageData.documents.length > 0 && (
+        {getDocumentsList().length > 0 && (
           <div className="bg-amber-50 p-4 rounded-lg mb-6 border border-amber-200">
             <div className="flex gap-3 mb-2">
               <FileUp className="h-5 w-5 text-amber-600" />
               <h3 className="font-medium text-amber-800">Uploaded Documents</h3>
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
-              {mortgageData.documents.map((doc: any, index: number) => (
+              {getDocumentsList().map((doc: any, index: number) => (
                 <Badge 
                   key={index} 
                   variant="outline" 

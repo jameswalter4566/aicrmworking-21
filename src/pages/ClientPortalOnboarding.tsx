@@ -43,14 +43,15 @@ const ClientPortalOnboarding = () => {
         
         // Fetch lead data if available
         if (access.lead_id) {
-          // Updated to use lead-profile edge function to get complete lead data including full mortgage data
+          console.log("Fetching lead data for ID:", access.lead_id);
+          // Use lead-profile edge function to get complete lead data including full mortgage data
           const { data: response, error: leadError } = await supabase.functions.invoke('lead-profile', {
             body: { id: access.lead_id }
           });
           
           if (!leadError && response?.success && response?.data?.lead) {
+            console.log("Successfully retrieved lead data:", response.data.lead);
             setLeadData(response.data.lead);
-            console.log("Retrieved lead data for client portal:", response.data.lead);
           } else {
             console.error("Error fetching complete lead data:", leadError || response?.error);
           }
@@ -78,6 +79,8 @@ const ClientPortalOnboarding = () => {
         ...(leadData?.mortgageData || {}),
         ...onboardingData
       };
+      
+      console.log("Saving onboarding data:", combinedMortgageData);
       
       // Update lead with combined onboarding data
       const { error } = await supabase.functions.invoke('update-lead', {
