@@ -13,7 +13,7 @@ interface BorrowerIdentityStepProps {
 }
 
 const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) => {
-  const { register, handleSubmit, formState: { errors }, watch } = useForm({
+  const { register, handleSubmit, watch } = useForm({
     defaultValues: {
       month: "",
       day: "",
@@ -25,8 +25,6 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
       creditConsent: false,
     }
   });
-
-  const watchAllFields = watch();
   
   const onSubmit = (values: any) => {
     // Format date as ISO string (YYYY-MM-DD)
@@ -48,16 +46,6 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
     
     onSave(updatedData);
   };
-  
-  const isFormComplete = 
-    watchAllFields.month && 
-    watchAllFields.day && 
-    watchAllFields.year && 
-    watchAllFields.ssn1 && 
-    watchAllFields.ssn2 && 
-    watchAllFields.ssn3 && 
-    watchAllFields.contactConsent && 
-    watchAllFields.creditConsent;
 
   return (
     <form
@@ -74,37 +62,24 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
           <Input
             id="month"
             placeholder="Month"
-            {...register("month", { required: true, pattern: /^(0?[1-9]|1[0-2])$/ })}
+            {...register("month")}
           />
-          {errors.month && (
-            <span className="text-red-500 text-sm">Valid month required (1-12)</span>
-          )}
         </div>
         <div>
           <Label htmlFor="day">Day of Birth</Label>
           <Input
             id="day"
             placeholder="Day"
-            {...register("day", { required: true, pattern: /^(0?[1-9]|[12][0-9]|3[01])$/ })}
+            {...register("day")}
           />
-          {errors.day && (
-            <span className="text-red-500 text-sm">Valid day required (1-31)</span>
-          )}
         </div>
         <div>
           <Label htmlFor="year">Year of Birth</Label>
           <Input
             id="year"
             placeholder="Year"
-            {...register("year", { 
-              required: true, 
-              pattern: /^\d{4}$/,
-              validate: value => parseInt(value) < new Date().getFullYear() - 18 || "Must be at least 18 years old"
-            })}
+            {...register("year")}
           />
-          {errors.year && (
-            <span className="text-red-500 text-sm">Valid year required</span>
-          )}
         </div>
       </div>
       <p className="text-sm text-gray-500 mt-1">We use your birthdate to verify your identity.</p>
@@ -118,7 +93,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
             <Input
               type="password"
               placeholder="First 3"
-              {...register("ssn1", { required: true, pattern: /^\d{3}$/ })}
+              {...register("ssn1")}
             />
           </div>
           <span className="text-gray-500">-</span>
@@ -126,7 +101,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
             <Input
               type="password"
               placeholder="Middle 2"
-              {...register("ssn2", { required: true, pattern: /^\d{2}$/ })}
+              {...register("ssn2")}
             />
           </div>
           <span className="text-gray-500">-</span>
@@ -134,13 +109,10 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
             <Input
               type="password"
               placeholder="Last 4"
-              {...register("ssn3", { required: true, pattern: /^\d{4}$/ })}
+              {...register("ssn3")}
             />
           </div>
         </div>
-        {(errors.ssn1 || errors.ssn2 || errors.ssn3) && (
-          <span className="text-red-500 text-sm block mt-1">Please enter a valid SSN format</span>
-        )}
         <p className="text-sm text-gray-500 mt-2">
           Don't worry, this is private and is needed to securely complete the application process.
         </p>
@@ -154,7 +126,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
         <div className="flex space-x-2">
           <Checkbox 
             id="contactConsent" 
-            {...register("contactConsent", { required: true })}
+            {...register("contactConsent")}
           />
           <Label className="text-sm" htmlFor="contactConsent">
             I authorize Turbo Insurance Group to contact me (including text messages, carrier fees may apply) at the number provided, 
@@ -167,7 +139,7 @@ const BorrowerIdentityStep = ({ leadData, onSave }: BorrowerIdentityStepProps) =
         <div className="flex space-x-2">
           <Checkbox 
             id="creditConsent" 
-            {...register("creditConsent", { required: true })}
+            {...register("creditConsent")}
           />
           <Label className="text-sm" htmlFor="creditConsent">
             I allow my credit report to be accessed by Mortgagesalespro.com
