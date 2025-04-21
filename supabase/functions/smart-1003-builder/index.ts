@@ -422,8 +422,9 @@ async function updateLeadWithFormData(leadId, formData) {
     console.log("Processed fields:", JSON.stringify(processedFields));
     console.log("Missing fields:", JSON.stringify(missingFields));
     
-    // Add metadata about the processing
-    const mortgageData = {
+    // Format mortgage data to match the expected structure in update-lead
+    // Ensure we have the proper nested structure for personalInfo if it exists in processedFields
+    let structuredMortgageData = {
       ...processedFields,
       autoFilledAt: new Date().toISOString(),
       documentProcessing: {
@@ -431,6 +432,40 @@ async function updateLeadWithFormData(leadId, formData) {
         missingFields: missingFields
       }
     };
+    
+    // If borrower data exists, ensure we have the proper personalInfo structure
+    if (processedFields.borrower) {
+      // Make sure we have the personalInfo object
+      if (!structuredMortgageData.personalInfo) {
+        structuredMortgageData.personalInfo = {
+          personalInfo: {},
+          contactDetails: {},
+          addressHistory: {}
+        };
+      }
+      
+      // Map borrower data to personalInfo structure
+      structuredMortgageData.personalInfo.personalInfo = {
+        firstName: processedFields.borrower.firstName || '',
+        lastName: processedFields.borrower.lastName || '',
+        ssn: processedFields.borrower.ssn || '',
+        dateOfBirth: processedFields.borrower.dob || '',
+        maritalStatus: processedFields.borrower.maritalStatus || '',
+        citizenship: processedFields.borrower.citizenship || '',
+        numberOfDependents: processedFields.borrower.dependents || ''
+      };
+      
+      // Map contact info
+      structuredMortgageData.personalInfo.contactDetails = {
+        emailAddress: processedFields.borrower.email || '',
+        cellPhoneNumber: processedFields.borrower.phoneNumber || ''
+      };
+      
+      // Map address info
+      structuredMortgageData.personalInfo.addressHistory = {
+        presentAddressLine1: processedFields.borrower.mailingAddress || ''
+      };
+    }
     
     // Update the lead using the update-lead function
     const updateLeadUrl = `${supabaseUrl}/functions/v1/update-lead`;
@@ -442,7 +477,7 @@ async function updateLeadWithFormData(leadId, formData) {
       },
       body: JSON.stringify({
         leadId,
-        leadData: { mortgageData }
+        leadData: { mortgageData: structuredMortgageData }
       })
     });
     

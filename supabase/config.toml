@@ -59,3 +59,5 @@ verify_jwt = false
 [functions.test-edgefunction]
 verify_jwt = false
 
+[functions.smart-1003-builder]
+verify_jwt = false
