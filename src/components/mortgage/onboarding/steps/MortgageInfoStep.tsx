@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useForm } from 'react-hook-form';
 import { LeadProfile } from '@/services/leadProfile';
@@ -20,10 +19,20 @@ const loanTypeOptions = [
   { value: 'REVERSE', label: 'REVERSE' }
 ];
 
+const propertyTypeOptions = [
+  { value: 'Primary residence', label: 'Primary residence' },
+  { value: 'Investment property', label: 'Investment property' },
+  { value: 'Secondary home', label: 'Secondary home' },
+  { value: 'Vacation home', label: 'Vacation home' }
+];
+
 const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
   const { register, handleSubmit, setValue, watch } = useForm({
     defaultValues: {
       mortgageData: {
+        property: {
+          propertyType: leadData.mortgageData?.property?.propertyType || '',
+        },
         loan: {
           loanAmount: leadData.mortgageData?.loan?.loanAmount || '',
           loanType: leadData.mortgageData?.loan?.loanType || '',
@@ -34,12 +43,45 @@ const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
     }
   });
 
+  const watchedPropertyType = watch('mortgageData.property.propertyType');
   const watchedLoanType = watch('mortgageData.loan.loanType');
 
+  const onLocalSave = (formValues: any) => {
+    onSave({
+      mortgageData: {
+        ...leadData.mortgageData,
+        property: {
+          ...leadData.mortgageData?.property,
+          propertyType: formValues.mortgageData?.property?.propertyType || '',
+        },
+        loan: {
+          ...formValues.mortgageData?.loan
+        }
+      }
+    });
+  };
+
   return (
-    <form onSubmit={handleSubmit(onSave)} className="space-y-6">
+    <form onSubmit={handleSubmit(onLocalSave)} className="space-y-6">
       <h2 className="text-2xl font-bold text-gray-900">Mortgage Information</h2>
       
+      <div className="space-y-2">
+        <Label htmlFor="propertyType">What type of property is this?</Label>
+        <Select
+          value={watchedPropertyType}
+          onValueChange={val => setValue('mortgageData.property.propertyType', val, { shouldValidate: true })}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select property type" />
+          </SelectTrigger>
+          <SelectContent>
+            {propertyTypeOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="loanAmount">Current Loan Balance</Label>
         <Input 
@@ -89,4 +131,3 @@ const MortgageInfoStep = ({ leadData, onSave }: MortgageInfoStepProps) => {
 };
 
 export default MortgageInfoStep;
-
