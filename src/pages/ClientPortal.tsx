@@ -24,6 +24,7 @@ import PersonalInfoPlaceholder from "@/components/mortgage/client-portal/Persona
 import EmploymentIncomeSection from "@/components/mortgage/client-portal/EmploymentIncomeSection";
 import ClientPortalAssetForm from "@/components/mortgage/client-portal/ClientPortalAssetForm";
 import RealEstateOwnedSection from "@/components/mortgage/client-portal/RealEstateOwnedSection";
+import ClientPortalLoanSummary from "@/components/mortgage/client-portal/ClientPortalLoanSummary";
 
 const progressSteps = [
   "Application Created",
@@ -786,6 +787,9 @@ const ClientPortal = () => {
             )}
             {activeTab === "application" && activeAppSection === "real-estate" && (
               <RealEstateOwnedSection />
+            )}
+            {activeTab === "application" && activeAppSection === "loan-info" && (
+              <ClientPortalLoanSummary />
             )}
             {activeTab === "home" && <HomeTab clientData={clientData} />}
             {activeTab === "conditions" && clientData?.leadId && (
