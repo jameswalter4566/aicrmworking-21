@@ -759,4 +759,20 @@ const ClientPortal = () => {
           activeTab={activeTab} 
           setActiveTab={setActiveTab}
           urgentCount={clientData?.conditions.filter(c => c.urgent && !c.completed).length || 0}
-          activeAppSection={active
+          activeAppSection={activeAppSection}
+          setActiveAppSection={setActiveAppSection}
+        />
+
+        <main className="flex-1 p-6 overflow-auto">
+          {activeTab === "home" && <HomeTab clientData={clientData} />}
+          {activeTab === "conditions" && <ConditionsTab clientData={clientData} refreshData={refreshData} />}
+          {activeTab === "attention" && <AttentionTab clientData={clientData} />}
+          {activeTab === "support" && <SupportTab />}
+          {activeTab === "loan-info" && <ClientPortalLoanInformationForm />}
+        </main>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+export default ClientPortal;
