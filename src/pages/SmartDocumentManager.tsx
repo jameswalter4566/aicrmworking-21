@@ -26,6 +26,19 @@ const SmartDocumentManager: React.FC = () => {
       <div className="flex-1 max-w-4xl mx-auto p-10">
         {selectedCategory === "Dropbox" ? (
           <div className="mt-10">
+            {/* Welcome Message shown above DropboxUploader */}
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold mb-3 text-white">
+                Welcome to the Smart Document Manager.
+              </h2>
+              <p className="text-lg text-white font-medium">
+                Here you’ll be able to upload and manage documents, and soon, our AI will automatically analyze 
+                and categorize your PDFs so you can easily find what you need.
+              </p>
+              <p className="mt-1 text-base text-white">
+                <span className="font-semibold">Advanced lead-based and user-only access controls will be enforced here.</span>
+              </p>
+            </div>
             <h2 className="text-2xl font-bold text-blue-700 mb-6 flex items-center gap-3">
               <FilePlus className="h-7 w-7 mr-2 text-blue-600" />
               Dropbox: Upload Your Documents
@@ -60,3 +73,4 @@ const SmartDocumentManager: React.FC = () => {
 };
 
 export default SmartDocumentManager;
+
