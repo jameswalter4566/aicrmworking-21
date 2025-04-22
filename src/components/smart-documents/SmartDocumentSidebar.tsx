@@ -194,6 +194,7 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
 }) => {
   const [openCategories, setOpenCategories] = useState<string[]>([]);
   const [onlyShowWithFiles, setOnlyShowWithFiles] = useState(false);
+  const [hoveredSubcat, setHoveredSubcat] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const isUploaded = (subcategory: string) => {
@@ -209,14 +210,21 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
     );
   };
 
-  const allCategories = [
-    DROPBOX_OPTION,
-    ...DOCUMENT_STRUCTURE.map((cat, i) => ({
-      ...cat,
-      colorClass: categoryColors[(i + 1) % categoryColors.length],
-      index: i + 1
-    }))
-  ];
+  const getCategoryColor = (idx: number) => categoryColors[(idx + 1) % categoryColors.length];
+  const getColorCode = (colorClass: string) => {
+    const match = colorClass.match(/#([A-Fa-f0-9]{6})/);
+    if (match) return `#${match[1]}`;
+    if (colorClass.includes("blue")) return "#3B82F6";
+    if (colorClass.includes("purple")) return "#8B5CF6";
+    if (colorClass.includes("orange")) return "#F97316";
+    if (colorClass.includes("green")) return "#34d399";
+    if (colorClass.includes("sky")) return "#33C3F0";
+    if (colorClass.includes("magenta")) return "#D946EF";
+    if (colorClass.includes("teal")) return "#36cfc9";
+    if (colorClass.includes("pink")) return "#f472b6";
+    if (colorClass.includes("gold")) return "#fbbf24";
+    return "#3B82F6";
+  };
 
   return (
     <aside
@@ -272,8 +280,9 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
             </button>
           </div>
           {DOCUMENT_STRUCTURE.map((cat, idx) => {
-            const colorClass = categoryColors[(idx + 1) % categoryColors.length];
+            const colorClass = getCategoryColor(idx);
             const isOpen = openCategories.includes(cat.name);
+            const categoryColorHex = getColorCode(colorClass);
 
             return (
               <div
@@ -299,32 +308,78 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                   {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </button>
                 {isOpen && (
-                  <ul className="py-3 px-3 flex flex-col gap-3">
-                    {cat.subcategories.filter(isUploaded).map((sub) => (
-                      <li key={sub}>
-                        <button
-                          onClick={() => onSelect?.(cat.name, sub)}
-                          className={cn(
-                            "flex items-center w-full px-4 py-2 rounded-xl font-medium text-base border-2 outline-none transition-transform duration-150 group hover:bg-white hover:text-black focus:bg-white focus:text-black",
-                            activeSubcategory === sub
-                              ? "bg-white text-black border-black ring-2 ring-black scale-[1.025] font-bold"
-                              : "border-[#8E9196] bg-white/10 text-white hover:scale-[1.01]",
-                            colorClass
-                          )}
-                          style={{
-                            textShadow: activeSubcategory === sub ? undefined : "0 1px 8px rgba(20,26,84,0.18)",
-                          }}
-                        >
-                          <FileText className={cn("h-4 w-4 mr-2 opacity-90", activeSubcategory === sub || undefined ? "text-black" : "")} />
-                          {sub}
-                          {fakeUploads[sub] && (
-                            <CheckSquare className={cn("ml-auto h-4 w-4", activeSubcategory === sub ? "text-green-500" : "text-green-300")} />
-                          )}
-                        </button>
-                      </li>
-                    ))}
+                  <ul
+                    className="py-3 px-3 flex flex-col gap-3"
+                    style={{
+                      background: "#fff",
+                      borderBottomLeftRadius: "1rem",
+                      borderBottomRightRadius: "1rem",
+                    }}
+                  >
+                    {cat.subcategories.filter(isUploaded).map((sub) => {
+                      const isActive = activeSubcategory === sub;
+                      const isHovered = hoveredSubcat === `${cat.name}|${sub}`;
+
+                      let subBg = "#fff";
+                      let subText = colorClass.includes("text-black") ? "text-black" : "text-black";
+                      let borderColor = categoryColorHex;
+                      let fontWeight = "font-medium";
+                      let boxShadow = "";
+                      let ring = "";
+                      let iconColor = "";
+                      let checkColor = "";
+
+                      if (isHovered) {
+                        subBg = categoryColorHex;
+                        subText = "text-white";
+                        fontWeight = "font-bold";
+                        ring = "ring-2 ring-offset-2 ring-white";
+                        iconColor = "text-white";
+                        checkColor = "text-white";
+                        boxShadow = "shadow-[0_2px_12px_0_rgba(0,0,0,0.05)]";
+                      } else if (isActive) {
+                        subBg = categoryColorHex;
+                        subText = "text-white";
+                        fontWeight = "font-bold";
+                        ring = "ring-2 ring-black";
+                        iconColor = "text-white";
+                        checkColor = "text-white";
+                        boxShadow = "shadow-[0_3px_10px_0_rgba(0,0,0,0.09)]";
+                      }
+
+                      return (
+                        <li key={sub}>
+                          <button
+                            onClick={() => onSelect?.(cat.name, sub)}
+                            onMouseEnter={() => setHoveredSubcat(`${cat.name}|${sub}`)}
+                            onMouseLeave={() => setHoveredSubcat(null)}
+                            className={cn(
+                              "flex items-center w-full px-4 py-2 rounded-xl border-2 outline-none transition-transform duration-150 group",
+                              fontWeight,
+                              subText,
+                              ring,
+                              boxShadow
+                            )}
+                            style={{
+                              background: subBg,
+                              borderColor: borderColor,
+                              textShadow: isHovered || isActive ? undefined : "0 1px 8px rgba(20,26,84,0.09)",
+                              fontWeight: isHovered || isActive ? 600 : 500,
+                              transition: "background 0.17s, border-color 0.16s, color 0.12s",
+                              color: undefined,
+                            }}
+                          >
+                            <FileText className={cn("h-4 w-4 mr-2 opacity-90", iconColor)} />
+                            {sub}
+                            {fakeUploads[sub] && (
+                              <CheckSquare className={cn("ml-auto h-4 w-4", checkColor ? checkColor : (isActive ? "text-green-500" : "text-green-300"))} />
+                            )}
+                          </button>
+                        </li>
+                      );
+                    })}
                     {cat.subcategories.filter(isUploaded).length === 0 && (
-                      <li className="text-xs text-white/60 italic py-2 px-2">
+                      <li className="text-xs text-neutral-500 italic py-2 px-2">
                         No documents uploaded
                       </li>
                     )}
