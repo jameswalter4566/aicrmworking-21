@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -11,6 +12,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SendPitchDeckModal from "@/components/pitch-deck/SendPitchDeckModal";
 
+// Define the Template interface that was missing
+interface Template {
+  name: string;
+  slides: number;
+  description: string;
+}
+
+// Update PitchDeck interface to match expected types
 interface PitchDeck {
   id: string;
   title: string;
@@ -22,7 +31,13 @@ interface PitchDeck {
   client_info?: {
     firstName?: string;
     lastName?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
   };
+  loan_officer_info?: any;
+  mortgage_data?: any;
 }
 
 const PitchDeckPro = () => {
