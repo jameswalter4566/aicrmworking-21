@@ -162,6 +162,8 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
 
   return (
     <div className="space-y-6">
+      <NextStepsStrip />
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         <div className="p-6 bg-sky-100/80 rounded-xl shadow-lg transition-transform duration-200 hover:scale-105">
           <h3 className="font-medium text-sky-900 mb-4">New Loan Details</h3>
@@ -303,7 +305,7 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
           <CardDescription>Your most recent important notifications</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-3 text-gray-500">
+          <div className="text-center py-3 text-gray-500 bg-blue-50 border border-blue-200 rounded-lg animate-pulse shadow-[0_0_15px_rgba(59,130,246,0.5)]">
             No urgent alerts at this time
           </div>
         </CardContent>
