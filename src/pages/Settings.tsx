@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Settings as SettingsIcon, UserRound, Home, Building, DollarSign, Mail, AlertCircle, Phone } from "lucide-react";
@@ -9,10 +8,11 @@ import { ColoredSwitch } from "@/components/ui/colored-switch";
 import { useIndustry, IndustryType } from "@/context/IndustryContext";
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { customSupabase } from "@/utils/supabase-custom-client";
 import { CompanySettingsCard } from "@/components/settings/CompanySettings";
+import { PhoneNumberField } from "@/components/settings/PhoneNumberField";
 
 const SUPABASE_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
 const REDIRECT_URL = "https://preview--aicrmworking.lovable.app/settings";
