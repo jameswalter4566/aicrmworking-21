@@ -38,8 +38,8 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingComplete, setProcessingComplete] = useState(false);
-  const [processedFields, setProcessedFields] = useState({});
-  const [missingFields, setMissingFields] = useState([]);
+  const [processedFields, setProcessedFields] = useState<Record<string, any>>({});
+  const [missingFields, setMissingFields] = useState<Array<any>>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -152,6 +152,8 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             description: "Your documents have been analyzed and your loan application has been updated.",
           });
           
+          setProcessedFields(data?.processedFields || {});
+          setMissingFields(data?.missingFields || []);
           setProcessingComplete(true);
           setIsProcessing(false);
           return;
@@ -220,51 +222,57 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             <div>
               <h3 className="font-medium text-lg mb-3">Successfully Extracted Fields</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(processedFields).map(([sectionKey, sectionData]) => {
-                  if (!sectionData || typeof sectionData !== 'object') return null;
-                  
-                  const sectionTitle = {
-                    borrower: 'Borrower Information',
-                    employment: 'Employment & Income',
-                    assets: 'Assets & Accounts',
-                    liabilities: 'Liabilities & Debts',
-                    property: 'Property Information'
-                  }[sectionKey];
+                {Object.entries(processedFields).length > 0 ? (
+                  Object.entries(processedFields).map(([sectionKey, sectionData]: [string, any]) => {
+                    if (!sectionData || typeof sectionData !== 'object') return null;
+                    
+                    const sectionTitle = {
+                      borrower: 'Borrower Information',
+                      employment: 'Employment & Income',
+                      assets: 'Assets & Accounts',
+                      liabilities: 'Liabilities & Debts',
+                      property: 'Property Information'
+                    }[sectionKey as keyof typeof sectionTitle];
 
-                  if (!sectionTitle) return null;
+                    if (!sectionTitle) return null;
 
-                  return (
-                    <Card key={sectionKey} className="bg-green-50">
-                      <CardHeader className="py-3 px-4">
-                        <CardTitle className="text-sm">{sectionTitle}</CardTitle>
-                      </CardHeader>
-                      <CardContent className="py-2 px-4">
-                        <div className="space-y-2">
-                          {Object.entries(sectionData).length > 0 ? (
-                            Object.entries(sectionData).map(([key, value]) => {
-                              if (typeof value === 'object') return null;
-                              return (
-                                <div key={key} className="flex items-center">
-                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mr-2" />
-                                  <p className="text-sm">
-                                    <span className="font-medium">{key}: </span>
-                                    <span className="text-gray-700">{value?.toString()}</span>
-                                  </p>
-                                </div>
-                              );
-                            })
-                          ) : (
-                            <p className="text-sm text-gray-500">No fields extracted for this section</p>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
+                    return (
+                      <Card key={sectionKey} className="bg-green-50">
+                        <CardHeader className="py-3 px-4">
+                          <CardTitle className="text-sm">{sectionTitle}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="py-2 px-4">
+                          <div className="space-y-2">
+                            {Object.entries(sectionData).length > 0 ? (
+                              Object.entries(sectionData).map(([key, value]) => {
+                                if (typeof value === 'object') return null;
+                                return (
+                                  <div key={key} className="flex items-center">
+                                    <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mr-2" />
+                                    <p className="text-sm">
+                                      <span className="font-medium">{key}: </span>
+                                      <span className="text-gray-700">{value?.toString()}</span>
+                                    </p>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <p className="text-sm text-gray-500">No fields extracted for this section</p>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-2">
+                    <p className="text-gray-500">No fields were successfully extracted from your documents.</p>
+                  </div>
+                )}
               </div>
             </div>
             
-            {missingFields.length > 0 && (
+            {missingFields && missingFields.length > 0 && (
               <div>
                 <h3 className="font-medium text-lg mb-3 flex items-center">
                   <AlertTriangle className="h-5 w-5 text-amber-500 mr-2" />
@@ -273,17 +281,17 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
                 <p className="text-sm text-gray-600 mb-4">
                   The following fields could not be extracted from your documents and need to be filled out manually.
                 </p>
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                   <Accordion type="multiple" className="space-y-2">
-                    {missingFields.map((field) => {
-                      const key = `${field.section}__${field.field}`;
+                    {missingFields.map((field, index) => {
+                      const key = `${field.section}__${field.field}__${index}`;
                       return (
-                        <AccordionItem value={key} key={key} className="border-b border-red-200">
+                        <AccordionItem value={key} key={key} className="border-b border-amber-200">
                           <AccordionTrigger className="hover:no-underline">
-                            <span className="flex items-center text-red-800">
-                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 mr-2" />
+                            <span className="flex items-center text-amber-800">
+                              <AlertTriangle className="h-3.5 w-3.5 text-amber-500 mr-2" />
                               <span className="text-sm font-medium">{field.label}</span>
-                              <span className="text-xs text-red-600 ml-2">
+                              <span className="text-xs text-amber-600 ml-2">
                                 ({field.section})
                               </span>
                             </span>
