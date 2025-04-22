@@ -58,12 +58,15 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
       
       const result = await leadProfileService.consolidateMortgageData(lead.id);
       
-      toast.success("Document data successfully consolidated", {
+      toast.success({
+        title: "Document data successfully consolidated",
         description: `Processed ${result.processedDocuments?.length || 0} documents`
       });
     } catch (error) {
       console.error("Error consolidating data:", error);
-      toast.error("Failed to consolidate document data");
+      toast.error({
+        title: "Failed to consolidate document data"
+      });
     } finally {
       setIsConsolidating(false);
     }
