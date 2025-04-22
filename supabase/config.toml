@@ -65,3 +65,6 @@ verify_jwt = false
 [functions.update-lead]
 verify_jwt = false
 
+[functions.store-leads]
+verify_jwt = false
+
