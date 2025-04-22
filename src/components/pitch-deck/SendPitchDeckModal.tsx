@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -9,18 +8,18 @@ import { supabase } from '@/integrations/supabase/client';
 import { Send, Copy, Check, Loader2 } from 'lucide-react';
 
 interface ClientInfo {
-  name: string;
-  email: string;
-  phone: string;
-  address: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
 }
 
 interface LoanOfficerInfo {
-  name: string;
-  nmls_id: string;
-  company: string;
-  phone: string;
-  email: string;
+  name?: string;
+  nmls_id?: string;
+  company?: string;
+  phone?: string;
+  email?: string;
 }
 
 interface MortgageData {
@@ -82,11 +81,9 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   
   React.useEffect(() => {
     if (isOpen) {
-      // Use client name in the subject if available
       const clientName = pitchDeck?.client_info?.name || 'Client';
       setSubject(pitchDeck?.title ? `Mortgage Proposal for ${clientName}: ${pitchDeck.title}` : '');
       
-      // Create personalized message with client and loan officer info
       const officerName = pitchDeck?.loan_officer_info?.name || 'Your Mortgage Professional';
       const officerCompany = pitchDeck?.loan_officer_info?.company || '';
       const officerSignature = officerCompany ? `${officerName}\n${officerCompany}` : officerName;
@@ -99,21 +96,17 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
         }\n\nPlease review the attached document and let me know if you have any questions.\n\nBest regards,\n${officerSignature}`
       );
       
-      // Pre-populate recipient email if available
       if (pitchDeck?.client_info?.email) {
         setRecipientEmail(pitchDeck.client_info.email);
       } else {
         setRecipientEmail('');
       }
       
-      // Set property value from pitch deck or default
       if (pitchDeck?.mortgage_data?.propertyValue) {
         setPropertyValue(pitchDeck.mortgage_data.propertyValue.toString());
       } else {
-        // Try to estimate from mortgage data if available
         const currentLoan = pitchDeck?.mortgage_data?.currentLoan;
         if (currentLoan?.balance) {
-          // Default estimate: loan balance × 1.25 (assuming 80% LTV)
           setPropertyValue((currentLoan.balance * 1.25).toString());
         } else {
           setPropertyValue('');
@@ -142,7 +135,6 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
     setIsCreatingLandingPage(true);
 
     try {
-      // Update pitch deck with property value if provided
       if (propertyValue && !isNaN(Number(propertyValue))) {
         const propertyValueNumber = Number(propertyValue);
         
@@ -217,10 +209,7 @@ const SendPitchDeckModal: React.FC<SendPitchDeckModalProps> = ({ isOpen, onClose
   };
 
   const formatCurrency = (value: string): string => {
-    // Remove non-digit characters
     const digitsOnly = value.replace(/\D/g, '');
-    
-    // Convert to number and format
     const num = parseInt(digitsOnly, 10);
     if (isNaN(num)) return '';
     
