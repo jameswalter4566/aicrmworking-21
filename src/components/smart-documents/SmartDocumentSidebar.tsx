@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { ChevronDown, ChevronUp, FileText, FolderClosed, CheckSquare, ArrowLeft, Box } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -7,21 +6,21 @@ import { useNavigate } from "react-router-dom";
 
 // Rainbow/varied solid color backgrounds for each category (no gradients)
 const categoryColors = [
-  "bg-[#ea384c]", // red
-  "bg-[#F97316]", // orange
+  "bg-[#ea384c] text-white", // red
+  "bg-[#F97316] text-white", // orange
   "bg-[#FEF7CD] text-black", // yellow (dark text)
-  "bg-[#63e6be]", // green
-  "bg-[#33C3F0]", // sky blue
-  "bg-[#3B82F6]", // blue
-  "bg-[#8B5CF6]", // vivid purple
-  "bg-[#D946EF]", // magenta pink
-  "bg-[#36cfc9]", // teal-aqua
-  "bg-[#f472b6]", // pink
-  "bg-[#60a5fa]", // cornflower blue
-  "bg-[#e879f9]", // light purple
+  "bg-[#63e6be] text-white", // green
+  "bg-[#33C3F0] text-white", // sky blue
+  "bg-[#3B82F6] text-white", // blue
+  "bg-[#8B5CF6] text-white", // vivid purple
+  "bg-[#D946EF] text-white", // magenta pink
+  "bg-[#36cfc9] text-white", // teal-aqua
+  "bg-[#f472b6] text-white", // pink
+  "bg-[#60a5fa] text-white", // cornflower blue
+  "bg-[#e879f9] text-white", // light purple
   "bg-[#fde68a] text-black", // pale yellow (dark text)
-  "bg-[#fbbf24]", // gold
-  "bg-[#34d399]"  // emerald green
+  "bg-[#fbbf24] text-white", // gold
+  "bg-[#34d399] text-white"  // emerald green
 ];
 
 // Inserted at the top
@@ -228,7 +227,7 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
   return (
     <aside
       className={cn(
-        "w-80 min-w-[16rem] max-w-xs h-full pt-7 px-3 pb-6 flex flex-col border-r border-neutral-200 shadow-2xl bg-blue-500/60 rounded-tr-3xl"
+        "w-80 min-w-[16rem] max-w-xs h-full pt-7 px-3 pb-6 flex flex-col border-r border-neutral-200 shadow-2xl bg-blue-500/60 rounded-tr-3xl text-white"
       )}
       style={{
         backdropFilter: "blur(7px)",
@@ -237,7 +236,7 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
       }}
     >
       {/* Back Button + Label */}
-      <div className="flex items-center pl-1 pb-3 mb-2 gap-2 select-none">
+      <div className="flex items-center pl-1 pb-3 mb-2 gap-2 select-none text-white">
         <button
           className="flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition w-10 h-10 text-white border border-white/30 shadow-md"
           onClick={() => navigate(-1)}
@@ -249,7 +248,7 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
         <span className="ml-2 text-xl font-extrabold text-white tracking-wide">File Manager</span>
       </div>
       {/* Filter Checkbox */}
-      <div className="flex items-center mb-6 pl-2">
+      <div className="flex items-center mb-6 pl-2 text-white">
         <Checkbox
           id="show-with-files"
           checked={onlyShowWithFiles}
