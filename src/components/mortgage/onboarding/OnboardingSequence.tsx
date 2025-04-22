@@ -167,6 +167,30 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     }
   };
 
+  const handleFinishClick = async () => {
+    try {
+      const numericLeadId = typeof leadId === 'string' ? parseInt(leadId, 10) : leadId;
+      
+      // Send SMS notification
+      const { error } = await supabase.functions.invoke('loan-onboarding-completed', {
+        body: { 
+          leadId: numericLeadId,
+          clientName: `${leadData.firstName || ''} ${leadData.lastName || ''}`
+        }
+      });
+
+      if (error) {
+        console.error('Error sending completion notification:', error);
+      }
+
+      // Call the original onComplete handler
+      handleOnboardingComplete(leadData);
+    } catch (error) {
+      console.error('Error in finish click:', error);
+      toast.error('Error completing onboarding');
+    }
+  };
+
   // ---- PROGRESS LOGIC ----
   // Progress bar displayed *starting on* WelcomeStep (currentStep >= 1)
   const stepsTotal = 7; // Updated for the new step
@@ -217,8 +241,16 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   ];
 
   if (currentStep >= steps.length) {
-    handleOnboardingComplete(leadData);
-    return null;
+    return (
+      <div className="flex flex-col items-center justify-center p-8">
+        <Button 
+          onClick={handleFinishClick}
+          className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg text-lg"
+        >
+          Finish Application
+        </Button>
+      </div>
+    );
   }
 
   return (

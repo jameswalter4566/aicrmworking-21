@@ -2,3 +2,6 @@
 [functions]
 [functions.update-user-account-info]
 verify_jwt = true
+
+[functions.loan-onboarding-completed]
+verify_jwt = false
