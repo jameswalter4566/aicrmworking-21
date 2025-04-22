@@ -395,23 +395,9 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
           </div>
         </div> : <div onDragEnter={handleDragEnter} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} onClick={() => document.getElementById('file-upload')?.click()} className="">
           <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium mb-2">Drag and drop your file here</h3>
-          <p className="text-sm text-gray-500 mb-4">
-            or <span className="text-blue-500">browse</span> to select a file
-          </p>
           <p className="text-xs text-gray-400">
             Supported file formats: .CSV, .XLS, .XLSX
           </p>
-          <div className="mt-6 p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <h4 className="text-sm font-medium text-gray-700 mb-2 flex items-center justify-center gap-2">
-              <Brain className="h-4 w-4 text-blue-500" />
-              AI-Powered Import
-            </h4>
-            <p className="text-xs text-gray-500">
-              Our AI will automatically analyze your file and intelligently map columns to the correct fields, 
-              even for complex or irregularly formatted data.
-            </p>
-          </div>
           <input id="file-upload" type="file" accept=".csv,.xls,.xlsx" className="hidden" onChange={handleFileChange} />
         </div>}
     </div>;
