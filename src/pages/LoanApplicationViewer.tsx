@@ -387,18 +387,32 @@ const LoanApplicationViewer = () => {
     
     console.log(`Rendering 1003 section: ${section} with data:`, loanApplication?.mortgageData);
     
-    return (
-      <div className="p-6">
-        <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
-        
-        {section === "personal" && loanApplication && (
+    if (section === "personal" && loanApplication && (
+      <PersonalInfoForm 
+        leadId={loanApplication.id} 
+        mortgageData={loanApplication.mortgageData} 
+        onSave={saveFormData}
+        isEditable={true}
+      />
+    )) {
+      // Remove any mock PDF dropbox or reference to it
+      return (
+        <div className="p-6">
+          <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
+          
           <PersonalInfoForm 
             leadId={loanApplication.id} 
             mortgageData={loanApplication.mortgageData} 
             onSave={saveFormData}
             isEditable={true}
           />
-        )}
+        </div>
+      );
+    }
+    
+    return (
+      <div className="p-6">
+        <h2 className="text-2xl font-semibold mb-4">1003: {title}</h2>
         
         {section === "employment" && loanApplication && (
           <EmploymentIncomeForm 
