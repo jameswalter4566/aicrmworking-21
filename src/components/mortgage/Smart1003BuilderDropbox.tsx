@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,7 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [processingComplete, setProcessingComplete] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -147,9 +149,10 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             title: "Documents processed successfully",
             description: "Your documents have been analyzed and your loan application has been updated.",
           });
-          if (returnUrl) {
-            navigate(returnUrl);
-          }
+          
+          // Instead of redirecting or returning, set the processing complete state
+          setProcessingComplete(true);
+          setIsProcessing(false);
           return;
         }
         
@@ -188,6 +191,38 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
       setIsProcessing(false);
     }
   };
+
+  // Success view for client portal
+  if (isClientPortal && processingComplete) {
+    return (
+      <Card className="border-2 border-green-300 bg-green-50">
+        <CardHeader className="bg-green-100">
+          <CardTitle className="text-green-700 flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5" />
+            Processing Complete
+          </CardTitle>
+          <CardDescription className="text-green-600">
+            We've analyzed your documents and filled out your 1003 form
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-6 text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+            <CheckCircle2 className="h-8 w-8 text-green-600" />
+          </div>
+          <h3 className="font-medium text-lg mb-2 text-green-800">Form Auto-Fill Complete</h3>
+          <p className="text-gray-600 mb-4">
+            We've successfully extracted information from your documents and filled out your 1003 form.
+          </p>
+          <Button 
+            className="bg-green-600 hover:bg-green-700"
+            onClick={() => setProcessingComplete(false)}
+          >
+            Upload More Documents
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="border-2 border-dashed border-blue-300 hover:border-blue-500 transition-colors">
