@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import MainLayout from "@/components/layouts/MainLayout";
@@ -577,7 +576,11 @@ const LeadProfile = () => {
 
         {activeIndustry === 'mortgage' && (
           <>
-            {/* Add Smart 1003 Builder Dropbox above the 1003 form */}
+            <LeadProfileClientPortal 
+              leadId={id || ''} 
+              isMortgageLead={lead?.isMortgageLead}
+            />
+
             <div className="mb-6">
               <Smart1003BuilderDropbox leadId={id || ''} />
             </div>
@@ -683,11 +686,6 @@ const LeadProfile = () => {
           </CardContent>
         </Card>
       </div>
-
-      <LeadProfileClientPortal 
-        leadId={id || ''} 
-        isMortgageLead={lead?.isMortgageLead}
-      />
     </MainLayout>
   );
 };
