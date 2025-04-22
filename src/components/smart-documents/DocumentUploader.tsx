@@ -132,7 +132,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         {isUploading ? (
           <div className="flex flex-col items-center">
             <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-            <p className="text-sm text-gray-600">Uploading document{files?.length > 1 ? 's' : ''}...</p>
+            <p className="text-sm text-gray-600">Uploading document{filesLength > 1 ? 's' : ''}...</p>
           </div>
         ) : (
           <button 
