@@ -124,7 +124,7 @@ const Settings = () => {
   }, [user, getAuthToken]);
 
   const fetchUserProfile = async () => {
-    if (user) {
+    if (user && user.id) {
       try {
         const { data, error } = await customSupabase
           .from('profiles')
@@ -135,7 +135,10 @@ const Settings = () => {
         if (error) throw error;
         
         if (data?.phone_number) {
+          console.log("Fetched phone number from profile:", data.phone_number);
           setPhoneNumber(data.phone_number);
+        } else {
+          console.log("No phone number found in profile");
         }
       } catch (error) {
         console.error("Failed to fetch user profile:", error);
@@ -144,7 +147,9 @@ const Settings = () => {
   };
 
   useEffect(() => {
-    fetchUserProfile();
+    if (user && user.id) {
+      fetchUserProfile();
+    }
   }, [user]);
 
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
@@ -300,10 +305,9 @@ const Settings = () => {
     }
   };
 
-  const saveUserProfile = async () => {
-    if (!user) return;
+  const updatePhoneNumber = async (newPhoneNumber: string): Promise<void> => {
+    if (!user) return Promise.reject(new Error("No user logged in"));
     
-    setSavingProfile(true);
     try {
       const token = await getAuthToken();
       if (!token) throw new Error("No auth token available");
@@ -315,7 +319,7 @@ const Settings = () => {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          phoneNumber
+          phoneNumber: newPhoneNumber
         })
       });
 
@@ -323,17 +327,14 @@ const Settings = () => {
         throw new Error("Failed to update profile");
       }
 
+      const data = await response.json();
+      console.log("Phone number update response:", data);
+
       await fetchUserProfile(); // Refresh the profile data
-      toast.success("Profile Updated", {
-        description: "Your profile has been successfully updated."
-      });
+      return Promise.resolve();
     } catch (error) {
-      console.error("Error updating profile:", error);
-      toast.error("Update Failed", {
-        description: "Failed to update your profile. Please try again."
-      });
-    } finally {
-      setSavingProfile(false);
+      console.error("Error updating phone number:", error);
+      return Promise.reject(error);
     }
   };
 
@@ -374,37 +375,7 @@ const Settings = () => {
 
             <PhoneNumberField 
               initialValue={phoneNumber}
-              onUpdate={async (newPhoneNumber) => {
-                setPhoneNumber(newPhoneNumber);
-                setSavingProfile(true);
-                try {
-                  const token = await getAuthToken();
-                  if (!token) throw new Error("No auth token available");
-            
-                  const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/update-user-account-info", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "Authorization": `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                      phoneNumber: newPhoneNumber
-                    })
-                  });
-            
-                  if (!response.ok) {
-                    throw new Error("Failed to update profile");
-                  }
-            
-                  await fetchUserProfile(); // Refresh the profile data
-                  return Promise.resolve();
-                } catch (error) {
-                  console.error("Error updating phone number:", error);
-                  return Promise.reject(error);
-                } finally {
-                  setSavingProfile(false);
-                }
-              }}
+              onUpdate={updatePhoneNumber}
             />
           </CardContent>
         </Card>
