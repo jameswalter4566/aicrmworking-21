@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -20,12 +19,10 @@ interface PitchDeck {
   created_at: string;
   last_sent_to?: string;
   last_sent_at?: string;
-}
-
-interface Template {
-  name: string;
-  slides: number;
-  description: string;
+  client_info?: {
+    firstName?: string;
+    lastName?: string;
+  };
 }
 
 const PitchDeckPro = () => {
@@ -38,14 +35,12 @@ const PitchDeckPro = () => {
   const [selectedPitchDeck, setSelectedPitchDeck] = useState<PitchDeck | null>(null);
   const [isSendModalOpen, setIsSendModalOpen] = useState(false);
 
-  // Redirect if not mortgage industry
   useEffect(() => {
     if (activeIndustry !== "mortgage") {
       navigate("/settings");
     }
   }, [activeIndustry, navigate]);
 
-  // Fetch existing pitch decks
   useEffect(() => {
     const fetchPitchDecks = async () => {
       setLoading(true);
@@ -72,7 +67,6 @@ const PitchDeckPro = () => {
     fetchPitchDecks();
   }, []);
 
-  // Template types for different scenarios
   const templates = {
     purchase: [
       { name: "First-Time Homebuyer", slides: 12, description: "Perfect for clients new to the homebuying process" },
@@ -91,7 +85,6 @@ const PitchDeckPro = () => {
     ],
   };
 
-  // Handle creating a new pitch deck
   const createPitchDeck = async (template: Template) => {
     setCreatingDeck(true);
     try {
@@ -122,7 +115,6 @@ const PitchDeckPro = () => {
     }
   };
 
-  // Handle pitch deck download
   const handleDownloadPDF = async (pitchDeckId: string) => {
     try {
       const { data, error } = await supabase.functions.invoke("save-pitch-deck", {
@@ -137,11 +129,9 @@ const PitchDeckPro = () => {
       }
       
       if (data && data.pdfData) {
-        // Find the deck to get the title
         const deck = pitchDecks.find(d => d.id === pitchDeckId);
         const title = deck ? deck.title : "pitch-deck";
         
-        // Create a download link for the PDF
         const link = document.createElement("a");
         link.href = data.pdfData;
         link.download = `${title.replace(/\s+/g, "_")}.pdf`;
@@ -157,7 +147,6 @@ const PitchDeckPro = () => {
     }
   };
 
-  // Open the send pitch deck modal
   const handleOpenSendModal = (pitchDeck: PitchDeck) => {
     setSelectedPitchDeck(pitchDeck);
     setIsSendModalOpen(true);
@@ -247,7 +236,14 @@ const PitchDeckPro = () => {
                       'bg-purple-500'
                     }`} />
                     <CardContent className="pt-4">
-                      <h3 className="font-semibold text-lg">{deck.title}</h3>
+                      <h3 className="font-semibold text-lg">
+                        {deck.title}
+                        {deck.client_info?.lastName && (
+                          <span className="text-sm text-gray-500 ml-2">
+                            ({deck.client_info.lastName})
+                          </span>
+                        )}
+                      </h3>
                       <p className="text-sm text-gray-500 mb-2 line-clamp-2">{deck.description}</p>
                       <div className="flex items-center justify-between mt-2">
                         <Badge variant="secondary" className="text-xs">
@@ -314,7 +310,6 @@ const PitchDeckPro = () => {
         </Card>
       </div>
       
-      {/* Send to client modal */}
       <SendPitchDeckModal
         isOpen={isSendModalOpen}
         onClose={() => setIsSendModalOpen(false)} 
