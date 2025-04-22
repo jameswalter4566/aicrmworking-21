@@ -1,13 +1,43 @@
 
-[functions]
-[functions.update-user-account-info]
-verify_jwt = true
+project_id = "imrmboyczebjlbnkgjns"
 
-[functions.loan-onboarding-completed]
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+
+[realtime]
+enabled = true
+
+[analytics]
+enabled = true
+
+[vector]
+enabled = true
+
+[functions.twilio-token]
 verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.twilio-token]
+[functions.store-document]
+verify_jwt = false
+
+[functions.retrieve-documents]
 verify_jwt = false
