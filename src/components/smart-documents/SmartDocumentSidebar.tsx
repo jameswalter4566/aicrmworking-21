@@ -4,7 +4,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
-// Rainbow/varied solid color backgrounds for each category (no gradients)
 const categoryColors = [
   "bg-[#ea384c] text-white", // red
   "bg-[#F97316] text-white", // orange
@@ -23,16 +22,13 @@ const categoryColors = [
   "bg-[#34d399] text-white"  // emerald green
 ];
 
-// Inserted at the top
 const DROPBOX_OPTION = {
   isDropbox: true,
   name: "Dropbox",
   icon: Box,
 };
 
-// Document structure as before
 const DOCUMENT_STRUCTURE = [
-  // starts at index 1 for colors, since index 0 = Dropbox
   {
     name: "Identification",
     subcategories: [
@@ -179,7 +175,6 @@ const DOCUMENT_STRUCTURE = [
   }
 ];
 
-// For simplicity, fake uploaded docs for demo (You will hook this into backend later)
 const fakeUploads = {
   "Pay Stubs": true,
   "Driver’s License": true,
@@ -214,7 +209,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
     );
   };
 
-  // Combine Dropbox at the top with normal categories
   const allCategories = [
     DROPBOX_OPTION,
     ...DOCUMENT_STRUCTURE.map((cat, i) => ({
@@ -235,7 +229,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
         borderTopRightRadius: "2rem",
       }}
     >
-      {/* Back Button + Label */}
       <div className="flex items-center pl-1 pb-3 mb-2 gap-2 select-none text-white">
         <button
           className="flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition w-10 h-10 text-white border border-white/30 shadow-md"
@@ -247,7 +240,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
         </button>
         <span className="ml-2 text-xl font-extrabold text-white tracking-wide">File Manager</span>
       </div>
-      {/* Filter Checkbox */}
       <div className="flex items-center mb-6 pl-2 text-white">
         <Checkbox
           id="show-with-files"
@@ -260,7 +252,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
       </div>
       <nav className="flex-1 overflow-y-auto pr-1">
         <div className="flex flex-col gap-4">
-          {/* Dropbox category */}
           <div
             key="Dropbox"
             className={cn(
@@ -280,7 +271,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
               </span>
             </button>
           </div>
-          {/* Document categories */}
           {DOCUMENT_STRUCTURE.map((cat, idx) => {
             const colorClass = categoryColors[(idx + 1) % categoryColors.length];
             const isOpen = openCategories.includes(cat.name);
@@ -315,20 +305,20 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                         <button
                           onClick={() => onSelect?.(cat.name, sub)}
                           className={cn(
-                            "flex items-center w-full px-4 py-2 rounded-xl font-medium text-base border-2 outline-none transition-transform duration-150 group",
+                            "flex items-center w-full px-4 py-2 rounded-xl font-medium text-base border-2 outline-none transition-transform duration-150 group hover:bg-white hover:text-black focus:bg-white focus:text-black",
                             activeSubcategory === sub
-                              ? "border-white bg-white/20 ring-2 ring-white/70 scale-[1.025] font-bold"
-                              : "border-[#8E9196] bg-white/10 hover:bg-white/15 hover:scale-[1.01]",
+                              ? "bg-white text-black border-black ring-2 ring-black scale-[1.025] font-bold"
+                              : "border-[#8E9196] bg-white/10 text-white hover:scale-[1.01]",
                             colorClass
                           )}
                           style={{
-                            textShadow: "0 1px 8px rgba(20,26,84,0.18)",
+                            textShadow: activeSubcategory === sub ? undefined : "0 1px 8px rgba(20,26,84,0.18)",
                           }}
                         >
-                          <FileText className="h-4 w-4 mr-2 opacity-90" />
+                          <FileText className={cn("h-4 w-4 mr-2 opacity-90", activeSubcategory === sub || undefined ? "text-black" : "")} />
                           {sub}
                           {fakeUploads[sub] && (
-                            <CheckSquare className="ml-auto h-4 w-4 text-green-300" />
+                            <CheckSquare className={cn("ml-auto h-4 w-4", activeSubcategory === sub ? "text-green-500" : "text-green-300")} />
                           )}
                         </button>
                       </li>
