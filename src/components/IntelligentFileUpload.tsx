@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext"; // Import useAuth hook
 
 interface IntelligentFileUploadProps {
   onImportComplete: (importedLeads: any[]) => void;
@@ -19,6 +20,7 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [fileInfo, setFileInfo] = useState<{name: string, size: string} | null>(null);
   const [processingStage, setProcessingStage] = useState<'reading' | 'analyzing' | 'mapping'>('reading');
+  const { getAuthToken } = useAuth(); // Get auth token helper
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -191,28 +193,37 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
             setProgress(100);
             
             if (importedLeads.length > 0) {
-              // Store leads directly using our store-leads function instead of thoughtly
+              // Store leads using storeImportedLeads function from bulkLeadUpdates
               try {
-                const response = await fetch(
-                  "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      leads: importedLeads,
-                      leadType: "csv-import"
-                    }),
-                  }
-                );
+                // Get the authentication token
+                const token = await getAuthToken();
                 
-                const responseData = await response.json();
-                console.log("Store leads response:", responseData);
-                
-                if (!response.ok) {
-                  throw new Error(responseData.error || "Failed to store leads");
+                if (!token) {
+                  throw new Error("Authentication required. Please sign in to store leads.");
                 }
+                
+                console.log("Using authentication token for storing leads from import");
+                
+                // Use the supabase client to invoke the edge function with auth token
+                const storeResponse = await supabase.functions.invoke('store-leads', {
+                  body: {
+                    leads: importedLeads,
+                    leadType: "csv-import"
+                  },
+                  headers: {
+                    Authorization: `Bearer ${token}`
+                  }
+                });
+                
+                if (storeResponse.error) {
+                  throw new Error(storeResponse.error.message || "Failed to store leads");
+                }
+                
+                if (storeResponse.data?.error) {
+                  throw new Error(storeResponse.data.error || "Failed to store leads");
+                }
+                
+                console.log("Successfully stored imported leads:", storeResponse);
                 
                 setUploadStatus('success');
                 toast.success(`Successfully imported ${importedLeads.length} leads`);
@@ -234,27 +245,34 @@ const IntelligentFileUpload: React.FC<IntelligentFileUploadProps> = ({
             const importedLeads = processCSVData(content);
             
             if (importedLeads.length > 0) {
-              // Store leads directly using our store-leads function instead of thoughtly
+              // Store leads using auth token
               try {
-                const response = await fetch(
-                  "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
-                  {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      leads: importedLeads,
-                      leadType: "csv-import-fallback"
-                    }),
+                // Get the authentication token
+                const token = await getAuthToken();
+                
+                if (!token) {
+                  throw new Error("Authentication required. Please sign in to store leads.");
+                }
+                
+                console.log("Using authentication token for storing leads from fallback import");
+                
+                // Use the supabase client to invoke the edge function with auth token
+                const storeResponse = await supabase.functions.invoke('store-leads', {
+                  body: {
+                    leads: importedLeads,
+                    leadType: "csv-import-fallback"
+                  },
+                  headers: {
+                    Authorization: `Bearer ${token}`
                   }
-                );
+                });
                 
-                const responseData = await response.json();
-                console.log("Store leads response:", responseData);
+                if (storeResponse.error) {
+                  throw new Error(storeResponse.error.message || "Failed to store leads");
+                }
                 
-                if (!response.ok) {
-                  throw new Error(responseData.error || "Failed to store leads");
+                if (storeResponse.data?.error) {
+                  throw new Error(storeResponse.data.error || "Failed to store leads");
                 }
                 
                 setProgress(100);
