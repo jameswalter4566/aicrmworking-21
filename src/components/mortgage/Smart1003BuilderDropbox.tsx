@@ -24,6 +24,7 @@ interface Smart1003BuilderDropboxProps {
   returnUrl?: string;
   preserveMortgageStatus?: boolean;
   isClientPortal?: boolean;
+  onProcessingComplete?: () => void;
 }
 
 const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ 
@@ -31,7 +32,8 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
   dropboxId, 
   returnUrl,
   preserveMortgageStatus = true,
-  isClientPortal = false
+  isClientPortal = false,
+  onProcessingComplete
 }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -101,6 +103,10 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
   };
 
   const handleFinish = () => {
+    if (onProcessingComplete) {
+      onProcessingComplete();
+    }
+    
     if (isClientPortal && slug) {
       const token = searchParams.get('token');
       if (token) {
@@ -172,6 +178,11 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
           setMissingFields(data?.missingFields || []);
           setProcessingComplete(true);
           setIsProcessing(false);
+          
+          if (onProcessingComplete) {
+            onProcessingComplete();
+          }
+          
           return;
         }
         
