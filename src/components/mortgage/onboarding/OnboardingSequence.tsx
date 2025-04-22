@@ -155,9 +155,18 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
       } else if (pitchDeckResponse?.success) {
         console.log("Pitch deck generated successfully:", pitchDeckResponse);
         toast.success('Pitch deck generated successfully');
-      } else {
-        console.warn("Pitch deck generation returned no error but may not have completed successfully:", pitchDeckResponse);
-        toast.success('Onboarding complete!');
+      }
+
+      // Send notification about completed onboarding
+      const { error: notificationError } = await supabase.functions.invoke('loan-onboarding-completed', {
+        body: { 
+          leadId,
+          createdBy: initialData?.created_by || null
+        }
+      });
+
+      if (notificationError) {
+        console.error('Error sending completion notification:', notificationError);
       }
       
       onComplete(onboardingData);
