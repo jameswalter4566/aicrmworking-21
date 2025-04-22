@@ -161,7 +161,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
       const { error: notificationError } = await supabase.functions.invoke('loan-onboarding-completed', {
         body: { 
           leadId,
-          createdBy: initialData?.created_by || null
+          createdBy: initialData?.createdBy || null
         }
       });
 
