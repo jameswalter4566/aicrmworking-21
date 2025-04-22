@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Settings as SettingsIcon, UserRound, Home, Building, DollarSign, Mail, AlertCircle, Phone } from "lucide-react";
@@ -11,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { customSupabase } from "@/utils/supabase-custom-client";
+import { CompanySettingsCard } from "@/components/settings/CompanySettings";
 
 const SUPABASE_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
 const REDIRECT_URL = "https://preview--aicrmworking.lovable.app/settings";
