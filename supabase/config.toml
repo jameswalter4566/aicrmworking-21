@@ -8,3 +8,5 @@ verify_jwt = false
 verify_jwt = false
 [functions.store-leads]
 verify_jwt = false
+[functions.smart-1003-builder]
+verify_jwt = false

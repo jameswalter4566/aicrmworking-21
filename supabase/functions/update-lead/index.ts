@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
       // Fetch the current lead to get the old disposition value
       const { data: currentLead, error: fetchError } = await supabase
         .from('leads')
-        .select('disposition')
+        .select('disposition, is_mortgage_lead, added_to_pipeline_at')
         .eq('id', leadId)
         .single();
       
@@ -44,12 +44,22 @@ Deno.serve(async (req) => {
         console.error('Error fetching current lead:', fetchError.message);
       } else if (currentLead) {
         oldDisposition = currentLead.disposition;
+        
+        // Preserve mortgage lead status if not explicitly set in the update
+        if (leadData.isMortgageLead === undefined && currentLead.is_mortgage_lead !== undefined) {
+          leadData.isMortgageLead = currentLead.is_mortgage_lead;
+        }
+        
+        // Preserve pipeline timestamp if not explicitly set in the update
+        if (leadData.addedToPipelineAt === undefined && currentLead.added_to_pipeline_at) {
+          leadData.addedToPipelineAt = currentLead.added_to_pipeline_at;
+        }
       }
     }
 
     // Add handling for mortgage lead designation
-    const isMortgageLead = leadData.isMortgageLead || false;
-    const addedToPipelineAt = isMortgageLead ? new Date().toISOString() : null;
+    const isMortgageLead = leadData.isMortgageLead !== undefined ? leadData.isMortgageLead : false;
+    const addedToPipelineAt = leadData.addedToPipelineAt || (isMortgageLead ? new Date().toISOString() : null);
 
     // Transform the lead data from camelCase to snake_case for database
     const transformedData: any = {
@@ -154,8 +164,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update the lead in the database
-    transformedData.is_mortgage_lead = isMortgageLead;
+    // Update the lead in the database - ALWAYS preserve isMortgageLead status if present in database
+    // and not explicitly changed in this update
+    if (isMortgageLead || leadData.isMortgageLead) {
+      transformedData.is_mortgage_lead = true;
+    }
+    
     if (addedToPipelineAt) {
       transformedData.added_to_pipeline_at = addedToPipelineAt;
     }
@@ -236,7 +250,9 @@ Deno.serve(async (req) => {
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       createdBy: data.created_by,
-      mortgageData: data.mortgage_data
+      mortgageData: data.mortgage_data,
+      isMortgageLead: data.is_mortgage_lead,
+      addedToPipelineAt: data.added_to_pipeline_at
     };
 
     // Return the updated lead

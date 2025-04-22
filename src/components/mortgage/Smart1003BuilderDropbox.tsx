@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,9 +22,15 @@ interface Smart1003BuilderDropboxProps {
   leadId: string;
   dropboxId?: string;
   returnUrl?: string;
+  preserveMortgageStatus?: boolean; // Added prop to preserve mortgage status
 }
 
-const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadId, dropboxId, returnUrl }) => {
+const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ 
+  leadId, 
+  dropboxId, 
+  returnUrl,
+  preserveMortgageStatus = true // Default to true to preserve mortgage status
+}) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -125,7 +132,8 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
           body: { 
             fileUrls, 
             leadId,
-            dropboxId 
+            dropboxId,
+            preserveMortgageStatus // Pass the flag to preserve mortgage status
           },
         });
         

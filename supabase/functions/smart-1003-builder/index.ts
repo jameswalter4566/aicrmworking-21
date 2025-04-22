@@ -26,7 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    const { fileUrls, leadId } = await req.json();
+    const { fileUrls, leadId, preserveMortgageStatus = true } = await req.json();
     
     if (!fileUrls || !Array.isArray(fileUrls) || fileUrls.length === 0) {
       throw new Error('No file URLs provided');
@@ -37,15 +37,33 @@ serve(async (req) => {
     }
 
     console.log(`Processing ${fileUrls.length} documents for lead ${leadId}`);
+    console.log(`Preserve mortgage status: ${preserveMortgageStatus}`);
 
-    // Step 1: Extract data from uploaded documents
+    // Step 1: If preserving mortgage status, get the current lead status
+    let currentLeadData = null;
+    if (preserveMortgageStatus) {
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select('is_mortgage_lead, added_to_pipeline_at')
+        .eq('id', leadId)
+        .single();
+        
+      if (leadError) {
+        console.error('Error fetching current lead status:', leadError.message);
+      } else {
+        currentLeadData = leadData;
+        console.log('Current lead data:', currentLeadData);
+      }
+    }
+
+    // Step 2: Extract data from uploaded documents
     const extractedDocData = await processDocuments(fileUrls);
     
-    // Step 2: Use OpenAI to analyze the extracted data and map to 1003 fields
+    // Step 3: Use OpenAI to analyze the extracted data and map to 1003 fields
     const processedFormData = await analyzeDataWithOpenAI(extractedDocData);
     
-    // Step 3: Update lead with the extracted mortgage data
-    await updateLeadWithFormData(leadId, processedFormData);
+    // Step 4: Update lead with the extracted mortgage data, preserving mortgage status if needed
+    await updateLeadWithFormData(leadId, processedFormData, currentLeadData);
     
     // Return success response with identified fields and missing fields
     return new Response(
@@ -412,7 +430,7 @@ async function analyzeDataWithOpenAI(extractedDocData) {
 /**
  * Update lead with extracted form data
  */
-async function updateLeadWithFormData(leadId, formData) {
+async function updateLeadWithFormData(leadId, formData, currentLeadData = null) {
   try {
     console.log(`Updating lead ${leadId} with extracted form data`);
     
@@ -421,6 +439,7 @@ async function updateLeadWithFormData(leadId, formData) {
     
     console.log("Processed fields:", JSON.stringify(processedFields));
     console.log("Missing fields:", JSON.stringify(missingFields));
+    console.log("Current lead data:", currentLeadData);
     
     // Format mortgage data to match the expected structure in update-lead
     // Create the base structure with personalInfo - this is critical to avoid the error
@@ -464,6 +483,21 @@ async function updateLeadWithFormData(leadId, formData) {
       };
     }
     
+    // Prepare the data to update with, preserving mortgage status if needed
+    const updateData = {
+      mortgageData: structuredMortgageData
+    };
+    
+    // If we have current lead data and want to preserve mortgage status, include it
+    if (currentLeadData) {
+      if (currentLeadData.is_mortgage_lead) {
+        updateData.isMortgageLead = true;
+        updateData.addedToPipelineAt = currentLeadData.added_to_pipeline_at;
+      }
+    }
+    
+    console.log("Update data to send:", JSON.stringify(updateData));
+    
     // Update the lead using the update-lead function
     const updateLeadUrl = `${supabaseUrl}/functions/v1/update-lead`;
     const response = await fetch(updateLeadUrl, {
@@ -474,7 +508,7 @@ async function updateLeadWithFormData(leadId, formData) {
       },
       body: JSON.stringify({
         leadId,
-        leadData: { mortgageData: structuredMortgageData }
+        leadData: updateData
       })
     });
     
