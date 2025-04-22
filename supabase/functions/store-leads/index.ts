@@ -1,4 +1,3 @@
-
 // Follow the REST architecture for edge functions
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
@@ -246,6 +245,7 @@ async function storeLeadsInSupabase(leads, userId) {
     return data || processedLeads;
   } catch (error) {
     console.error(`Error storing leads in Supabase database: ${error.message}`);
+    console.error(`Stack trace: ${error.stack}`);
     throw error;
   }
 }
