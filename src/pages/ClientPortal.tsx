@@ -301,11 +301,13 @@ const HomeTab = ({ clientData }: { clientData: ClientData }) => {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-xl text-mortgage-darkPurple">Recent Alerts</CardTitle>
+          <CardTitle className="text-xl text-mortgage-darkPurple">
+            <span className="enhanced-glow-text text-blue-600">Recent Alerts</span>
+          </CardTitle>
           <CardDescription>Your most recent important notifications</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-3 text-gray-500 bg-blue-50 border border-blue-200 rounded-lg animate-pulse shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+          <div className="text-center py-3 text-gray-500 bg-blue-50 border border-blue-200 rounded-lg animate-pulse-glow shadow-[0_0_15px_rgba(59,130,246,0.5)] transition-all duration-300 hover:shadow-[0_0_30px_rgba(59,130,246,0.7)]">
             No urgent alerts at this time
           </div>
         </CardContent>
