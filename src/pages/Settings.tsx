@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Settings as SettingsIcon, UserRound, Home, Building, DollarSign, Mail, AlertCircle } from "lucide-react";
@@ -11,8 +12,6 @@ import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { customSupabase } from "@/utils/supabase-custom-client";
 import { CompanySettingsCard } from "@/components/settings/CompanySettings";
-import { Input } from "@/components/ui/input";
-import { Loader2 } from "@/components/ui/loader";
 
 const SUPABASE_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
 const REDIRECT_URL = "https://preview--aicrmworking.lovable.app/settings";
@@ -25,9 +24,7 @@ const Settings = () => {
   const [outlookConnected, setOutlookConnected] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [processingOAuth, setProcessingOAuth] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-
+  
   useEffect(() => {
     const processOAuthCallback = async () => {
       const url = new URL(window.location.href);
@@ -130,24 +127,6 @@ const Settings = () => {
     checkExistingConnections();
     processOAuthCallback();
   }, [user, getAuthToken]);
-
-  useEffect(() => {
-    const loadUserProfile = async () => {
-      if (user) {
-        const { data: profile } = await customSupabase
-          .from('profiles')
-          .select('phone_number')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile?.phone_number) {
-          setPhoneNumber(profile.phone_number);
-        }
-      }
-    };
-    
-    loadUserProfile();
-  }, [user]);
 
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
     if (isChecked) {
@@ -318,35 +297,6 @@ const Settings = () => {
     }
   };
 
-  const handleUpdateProfile = async () => {
-    if (!user) return;
-    
-    setIsSaving(true);
-    try {
-      const { error } = await supabase.functions.invoke('update-user-account-info', {
-        body: { phoneNumber }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Profile Updated",
-        description: "Your phone number has been saved successfully.",
-        duration: 3000,
-      });
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update your profile. Please try again.",
-        variant: "destructive",
-        duration: 3000,
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -380,34 +330,6 @@ const Settings = () => {
             <div className="space-y-1">
               <Label className="text-sm font-medium">Email Address</Label>
               <div className="text-sm">{user?.email || "Not available"}</div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-sm font-medium">Phone Number</Label>
-              <div className="flex space-x-2">
-                <Input
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Enter your phone number"
-                  className="flex-1"
-                />
-                <Button 
-                  onClick={handleUpdateProfile}
-                  disabled={isSaving}
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save'
-                  )}
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                We'll use this number for important updates about your pipeline.
-              </p>
             </div>
           </CardContent>
         </Card>
