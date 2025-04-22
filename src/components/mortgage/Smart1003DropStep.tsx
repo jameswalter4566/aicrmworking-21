@@ -2,13 +2,36 @@
 import React from "react";
 import Smart1003BuilderDropbox from "./Smart1003BuilderDropbox";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Smart1003DropStepProps {
   leadId: string | number;
   onContinue: () => void;
+  returnUrl?: string;
 }
 
-const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinue }) => {
+const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinue, returnUrl }) => {
+  const handleDocumentsProcessed = async () => {
+    try {
+      // Generate pitch deck after documents are processed
+      const { error: pitchDeckError } = await supabase.functions.invoke('generate-pitch-deck', {
+        body: { leadId }
+      });
+
+      if (pitchDeckError) {
+        console.error('Error generating pitch deck:', pitchDeckError);
+        toast.error('Could not generate pitch deck automatically');
+      } else {
+        toast.success('Pitch deck generated successfully');
+      }
+    } catch (error) {
+      console.error('Error in document processing completion:', error);
+    }
+    
+    onContinue();
+  };
+
   return (
     <div className="flex flex-col items-center w-full">
       <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-blue-800">
@@ -18,7 +41,13 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
         Upload your documents to auto-fill the application, or continue to fill it out manually.
       </p>
       <div className="mb-6 w-full max-w-lg">
-        <Smart1003BuilderDropbox leadId={String(leadId)} />
+        <Smart1003BuilderDropbox 
+          leadId={String(leadId)} 
+          returnUrl={returnUrl} 
+          preserveMortgageStatus={true}
+          isClientPortal={true}
+          onProcessingComplete={handleDocumentsProcessed}
+        />
       </div>
       <Button
         variant="default"

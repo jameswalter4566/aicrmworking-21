@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import Smart1003DropStep from "./steps/Smart1003DropStep";
 import { LeadProfile } from '@/services/leadProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
 
 type TransactionType = "buy_home" | "refinance" | "cash_out";
 
@@ -137,6 +137,27 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
     }
   };
 
+  const handleOnboardingComplete = async (onboardingData: any) => {
+    try {
+      // Generate pitch deck after successful onboarding
+      const { data: pitchDeckResponse, error: pitchDeckError } = await supabase.functions.invoke('generate-pitch-deck', {
+        body: { leadId }
+      });
+
+      if (pitchDeckError) {
+        console.error('Error generating pitch deck:', pitchDeckError);
+        toast.error('Could not generate pitch deck automatically');
+      } else {
+        toast.success('Pitch deck generated successfully');
+      }
+      
+      onComplete(onboardingData);
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      toast.error('Error saving your information');
+    }
+  };
+
   // ---- PROGRESS LOGIC ----
   // Progress bar displayed *starting on* WelcomeStep (currentStep >= 1)
   const stepsTotal = 7; // Updated for the new step
@@ -187,7 +208,7 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   ];
 
   if (currentStep >= steps.length) {
-    onComplete(leadData);
+    handleOnboardingComplete(leadData);
     return null;
   }
 
