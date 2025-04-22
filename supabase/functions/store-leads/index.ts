@@ -45,34 +45,72 @@ Deno.serve(async (req) => {
     // Extract JWT token from Authorization header to identify the user
     const authHeader = req.headers.get('Authorization');
     let userId = null;
-    let isAuthenticated = false;
     
-    // Try to authenticate with the token if it exists
-    if (authHeader) {
-      try {
-        // Extract token from Bearer token format
-        const token = authHeader.replace('Bearer ', '');
-        console.log('Token extracted from header');
-        
-        // Verify the token and get user information
-        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-        
-        if (authError) {
-          console.error('Auth error:', authError.message);
-          // Continue with anonymous user instead of returning an error
-          console.log('Continuing as anonymous user despite auth error');
-        } else if (user) {
-          userId = user.id;
-          isAuthenticated = true;
-          console.log(`Request authenticated from user: ${userId}`);
+    // Require authentication for storing leads
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Authentication required. Please sign in to store leads.'
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
         }
-      } catch (tokenError) {
-        console.error('Token parsing error:', tokenError);
-        // Continue with anonymous user instead of returning an error
-        console.log('Continuing as anonymous user despite token error');
+      );
+    }
+    
+    // Authenticate with the token
+    try {
+      // Extract token from Bearer token format
+      const token = authHeader.replace('Bearer ', '');
+      console.log('Token extracted from header');
+      
+      // Verify the token and get user information
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      
+      if (authError) {
+        console.error('Auth error:', authError.message);
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Authentication failed: ' + authError.message
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 401,
+          }
+        );
       }
-    } else {
-      console.log('No Authorization header present, continuing as anonymous user');
+      
+      if (!user) {
+        console.error('No user found in the token');
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Authentication failed: Invalid user token'
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 401,
+          }
+        );
+      }
+      
+      userId = user.id;
+      console.log(`Request authenticated from user: ${userId}`);
+    } catch (tokenError) {
+      console.error('Token parsing error:', tokenError);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Authentication failed: ' + tokenError.message
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 401,
+        }
+      );
     }
     
     // Parse the request body
@@ -110,10 +148,10 @@ Deno.serve(async (req) => {
       );
     }
     
-    console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'} for user: ${userId || 'anonymous'}`);
+    console.log(`Storing ${leads.length} leads with type: ${leadType || 'default'} for user: ${userId}`);
     console.log('Sample lead data:', JSON.stringify(leads[0], null, 2));
     
-    // Store leads directly in Supabase database
+    // Store leads directly in Supabase database, ensuring they're associated with the authenticated user
     const result = await storeLeadsInSupabase(leads, userId);
     
     return new Response(
@@ -121,8 +159,7 @@ Deno.serve(async (req) => {
         success: true, 
         message: `Successfully stored ${leads.length} leads`, 
         data: result,
-        userId: userId || 'anonymous',
-        isAuthenticated
+        userId: userId
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -173,14 +210,14 @@ async function storeLeadsInSupabase(leads, userId) {
         tags: lead.tags || [],
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        // Track which user created this lead (can be null for anonymous)
+        // Always associate leads with the authenticated user
         created_by: userId
       };
     });
     
     console.log('Processed leads for database storage');
     console.log('First processed lead:', JSON.stringify(processedLeads[0], null, 2));
-    console.log(`Using user ID: ${userId || 'anonymous'} for created_by field`);
+    console.log(`Using authenticated user ID: ${userId} for created_by field`);
     
     // Insert leads into the leads table in Supabase database
     const { data, error } = await supabase
@@ -195,7 +232,7 @@ async function storeLeadsInSupabase(leads, userId) {
       throw new Error(`Failed to store leads in Supabase database: ${error.message}`);
     }
     
-    console.log(`Successfully stored ${processedLeads.length} leads in Supabase database for user: ${userId || 'anonymous'}`);
+    console.log(`Successfully stored ${processedLeads.length} leads in Supabase database for user: ${userId}`);
     
     return data || processedLeads;
   } catch (error) {
