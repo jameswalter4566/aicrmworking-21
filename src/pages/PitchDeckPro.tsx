@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -12,14 +11,63 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import SendPitchDeckModal from "@/components/pitch-deck/SendPitchDeckModal";
 
-// Define the Template interface that was missing
 interface Template {
   name: string;
   slides: number;
   description: string;
 }
 
-// Update PitchDeck interface to match expected types
+interface ClientInfo {
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+interface LoanOfficerInfo {
+  name: string;
+  nmls_id: string;
+  company: string;
+  phone: string;
+  email: string;
+}
+
+interface MortgageData {
+  propertyValue?: number;
+  currentLoan?: {
+    balance: number;
+    rate: number;
+    payment: number;
+    term: number;
+    type: string;
+    paymentBreakdown?: {
+      principal: number;
+      interest: number;
+      taxes: number;
+      insurance: number;
+    };
+  };
+  proposedLoan?: {
+    amount: number;
+    rate: number;
+    payment: number;
+    term: number;
+    type: string;
+    paymentBreakdown?: {
+      principal: number;
+      interest: number;
+      taxes: number;
+      insurance: number;
+    };
+  };
+  savings?: {
+    monthly: number;
+    lifetime: number;
+  };
+}
+
 interface PitchDeck {
   id: string;
   title: string;
@@ -28,16 +76,9 @@ interface PitchDeck {
   created_at: string;
   last_sent_to?: string;
   last_sent_at?: string;
-  client_info?: {
-    firstName?: string;
-    lastName?: string;
-    name?: string;
-    email?: string;
-    phone?: string;
-    address?: string;
-  };
-  loan_officer_info?: any;
-  mortgage_data?: any;
+  client_info?: Partial<ClientInfo>;
+  loan_officer_info?: Partial<LoanOfficerInfo>;
+  mortgage_data?: Partial<MortgageData>;
 }
 
 const PitchDeckPro = () => {
