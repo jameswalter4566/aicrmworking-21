@@ -1,25 +1,32 @@
+
 import React, { useState } from "react";
-import { ChevronDown, ChevronUp, FileText, FolderClosed, CheckSquare, Square, ArrowLeft, Upload } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, FolderClosed, CheckSquare, Square, ArrowLeft } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
+// Transparent blue background (tailwind: bg-blue-500/60), text-white, rounded top-right, shadow
+const sidebarBg = "bg-blue-500/60";
+const roundedTopRight = "rounded-tr-3xl";
+const whiteText = "text-white";
+
+// Solid background color for each category
 const categoryColors = [
-  "bg-gradient-to-r from-blue-700 via-purple-500 to-pink-500",
-  "bg-gradient-to-r from-green-600 via-lime-400 to-green-300",
-  "bg-gradient-to-r from-yellow-500 via-amber-400 to-orange-400",
-  "bg-gradient-to-r from-cyan-800 via-teal-500 to-emerald-300",
-  "bg-gradient-to-r from-indigo-900 via-blue-600 to-blue-400",
-  "bg-gradient-to-r from-red-800 via-orange-500 to-yellow-400",
-  "bg-gradient-to-r from-fuchsia-900 via-pink-600 to-pink-200",
-  "bg-gradient-to-r from-teal-900 via-green-700 to-emerald-300",
-  "bg-gradient-to-r from-rose-700 via-pink-500 to-purple-500",
-  "bg-gradient-to-r from-sky-800 via-blue-500 to-indigo-300",
-  "bg-gradient-to-r from-violet-800 via-purple-500 to-fuchsia-400",
-  "bg-gradient-to-r from-lime-900 via-yellow-400 to-amber-200",
-  "bg-gradient-to-r from-gray-900 via-gray-600 to-gray-400",
-  "bg-gradient-to-r from-orange-900 via-yellow-500 to-pink-200",
-  "bg-gradient-to-r from-slate-700 via-slate-500 to-slate-300"
+  "bg-[#394268]", // deep blue for contrast (adjust as needed)
+  "bg-[#3b2b63]",
+  "bg-[#3C6997]",
+  "bg-[#1A1F2C]",
+  "bg-[#4A5E80]",
+  "bg-[#335C81]",
+  "bg-[#2F4858]",
+  "bg-[#183153]",
+  "bg-[#255C99]",
+  "bg-[#3A506B]",
+  "bg-[#1A535C]",
+  "bg-[#235789]",
+  "bg-[#1F4068]",
+  "bg-[#374785]",
+  "bg-[#24305E]"
 ];
 
 const DOCUMENT_STRUCTURE = [
@@ -169,6 +176,7 @@ const DOCUMENT_STRUCTURE = [
   }
 ];
 
+// For simplicity, fake uploaded docs for demo (You will hook this into backend later)
 const fakeUploads = {
   "Pay Stubs": true,
   "Driver’s License": true,
@@ -188,7 +196,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
 }) => {
   const [openCategories, setOpenCategories] = useState<string[]>([]);
   const [onlyShowWithFiles, setOnlyShowWithFiles] = useState(false);
-  const [showDropbox, setShowDropbox] = useState(false);
   const navigate = useNavigate();
 
   const isUploaded = (subcategory: string) => {
@@ -208,15 +215,17 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
     <aside
       className={cn(
         "w-80 min-w-[16rem] max-w-xs h-full pt-7 px-3 pb-6 flex flex-col border-r border-neutral-200 shadow-2xl",
-        "bg-blue-500/60",
-        "rounded-tr-3xl"
+        sidebarBg,
+        roundedTopRight
       )}
       style={{
+        // Add a subtle glass effect, blue transparency
         backdropFilter: "blur(7px)",
         WebkitBackdropFilter: "blur(7px)",
         borderTopRightRadius: "2rem",
       }}
     >
+      {/* Back Button + Label */}
       <div className="flex items-center pl-1 pb-3 mb-2 gap-2 select-none">
         <button
           className="flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition w-10 h-10 text-white border border-white/30 shadow-md"
@@ -224,84 +233,22 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
           aria-label="Go Back"
           type="button"
         >
+          {/* Left Arrow, horizontal */}
           <ArrowLeft className="h-6 w-6" />
         </button>
         <span className="ml-2 text-xl font-extrabold text-white tracking-wide">File Manager</span>
       </div>
-
-      <div className="flex items-center gap-3 mb-4 pl-2">
-        <button
-          className={cn(
-            "flex items-center gap-2 rounded-xl px-4 py-2 bg-gradient-to-r from-blue-400 to-pink-400 shadow transition", 
-            showDropbox ? "ring-2 ring-pink-100" : ""
-          )}
-          style={{
-            color: "#fff",
-            fontWeight: 700,
-          }}
-          onClick={() => setShowDropbox((s) => !s)}
-        >
-          <Upload className="h-5 w-5 mr-2" />
-          Dropbox
-        </button>
-      </div>
-      {showDropbox && (
-        <div className="mb-5 px-2">
-          <div className="rounded-xl border-4 border-pink-200 bg-white/20 hover:bg-white/30 transition-colors flex items-center justify-center py-8 flex-col gap-2">
-            <Upload className="text-pink-400 h-12 w-12 mb-2" />
-            <div className="text-white text-lg font-semibold">Drop PDF or image files here</div>
-            <button className="mt-2 px-4 py-2 rounded-full bg-pink-500/70 text-white shadow hover:bg-pink-600 transition">
-              Browse Files
-            </button>
-            <div className="text-xs text-white/60 mt-2">You can also drag and drop files to upload multiple at once.</div>
-          </div>
-        </div>
-      )}
-
+      {/* Filter Checkbox */}
       <div className="flex items-center mb-6 pl-2">
-        <label 
-          htmlFor="show-with-files" 
-          className="flex items-center gap-3 select-none"
-        >
-          <span 
-            className="relative flex items-center justify-center"
-            style={{ width: 28, height: 28 }}
-          >
-            <input
-              id="show-with-files"
-              type="checkbox"
-              checked={onlyShowWithFiles}
-              onChange={() => setOnlyShowWithFiles(!onlyShowWithFiles)}
-              className={cn(
-                "appearance-none absolute w-full h-full cursor-pointer",
-                "z-10"
-              )}
-              style={{ zIndex: 10 }}
-            />
-            <span
-              className={cn(
-                "block rounded-lg border-4 border-white/70",
-                "w-7 h-7",
-                "bg-blue-200/20",
-                "transition-colors"
-              )}
-              style={{
-                boxShadow: onlyShowWithFiles
-                  ? "0 0 0 3px #60A5FA88"
-                  : undefined,
-                borderWidth: "3px",
-              }}
-            />
-            {onlyShowWithFiles && (
-              <CheckSquare className="absolute text-blue-400 h-6 w-6 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-            )}
-          </span>
-          <span className="ml-1 font-medium text-base text-white">
-            Only show documents that contain files
-          </span>
+        <Checkbox
+          id="show-with-files"
+          checked={onlyShowWithFiles}
+          onCheckedChange={(checked) => setOnlyShowWithFiles(!!checked)}
+        />
+        <label htmlFor="show-with-files" className="ml-2 font-medium text-sm text-white select-none">
+          Only show documents that contain files
         </label>
       </div>
-
       <nav className="flex-1 overflow-y-auto pr-1">
         <div className="flex flex-col gap-4">
           {DOCUMENT_STRUCTURE.map((cat, idx) => {
@@ -317,11 +264,12 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                   isOpen ? "ring-2 ring-white/80" : ""
                 )}
               >
+                {/* Category Header */}
                 <button
                   onClick={() => handleCategoryClick(cat.name)}
                   className={cn(
                     "flex items-center w-full px-5 py-3 rounded-2xl text-lg font-bold justify-between focus:outline-none",
-                    "text-white",
+                    whiteText,
                     isOpen ? "border-b-2 border-white/30" : "border-0",
                     colorClass
                   )}
@@ -332,6 +280,7 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                   </span>
                   {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </button>
+                {/* Subcategory List */}
                 {isOpen && (
                   <ul className="py-3 px-3 flex flex-col gap-3">
                     {cat.subcategories.filter(isUploaded).map((sub) => (
@@ -339,11 +288,11 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                         <button
                           onClick={() => onSelect?.(cat.name, sub)}
                           className={cn(
-                            "flex items-center w-full px-4 py-3 rounded-xl font-medium text-base border-2 outline-none transition-transform duration-150 group",
-                            "text-white",
+                            "flex items-center w-full px-4 py-2 rounded-xl font-medium text-base border-2 outline-none transition-transform duration-150 group",
+                            whiteText,
                             activeSubcategory === sub
                               ? "border-white bg-white/20 ring-2 ring-white/70 scale-[1.025] font-bold"
-                              : "border-white/40 bg-white/10 hover:bg-white/15 hover:scale-[1.01]",
+                              : "border-[#8E9196] bg-white/10 hover:bg-white/15 hover:scale-[1.01]",
                             colorClass
                           )}
                           style={{
@@ -375,3 +324,4 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
 };
 
 export default SmartDocumentSidebar;
+
