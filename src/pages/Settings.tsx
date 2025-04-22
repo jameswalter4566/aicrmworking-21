@@ -1,9 +1,9 @@
-
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
-import { Settings as SettingsIcon, UserRound, Home, Building, DollarSign, Mail, AlertCircle } from "lucide-react";
+import { Settings as SettingsIcon, UserRound, Home, Building, DollarSign, Mail, AlertCircle, Phone } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { ColoredSwitch } from "@/components/ui/colored-switch";
 import { useIndustry, IndustryType } from "@/context/IndustryContext";
 import { useAuth } from "@/context/AuthContext";
@@ -11,7 +11,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { customSupabase } from "@/utils/supabase-custom-client";
-import { CompanySettingsCard } from "@/components/settings/CompanySettings";
 
 const SUPABASE_URL = "https://imrmboyczebjlbnkgjns.supabase.co";
 const REDIRECT_URL = "https://preview--aicrmworking.lovable.app/settings";
@@ -24,7 +23,9 @@ const Settings = () => {
   const [outlookConnected, setOutlookConnected] = useState(false);
   const [emailAddress, setEmailAddress] = useState("");
   const [processingOAuth, setProcessingOAuth] = useState(false);
-  
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
   useEffect(() => {
     const processOAuthCallback = async () => {
       const url = new URL(window.location.href);
@@ -127,6 +128,30 @@ const Settings = () => {
     checkExistingConnections();
     processOAuthCallback();
   }, [user, getAuthToken]);
+
+  const fetchUserProfile = async () => {
+    if (user) {
+      try {
+        const { data, error } = await customSupabase
+          .from('profiles')
+          .select('phone_number')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) throw error;
+        
+        if (data?.phone_number) {
+          setPhoneNumber(data.phone_number);
+        }
+      } catch (error) {
+        console.error("Failed to fetch user profile:", error);
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, [user]);
 
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
     if (isChecked) {
@@ -297,6 +322,47 @@ const Settings = () => {
     }
   };
 
+  const saveUserProfile = async () => {
+    if (!user) return;
+    
+    setSavingProfile(true);
+    try {
+      const token = await getAuthToken();
+      if (!token) throw new Error("No auth token available");
+
+      const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/update-user-account-info", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          phoneNumber
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update profile");
+      }
+
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been successfully updated.",
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      toast({
+        title: "Update Failed",
+        description: "Failed to update your profile. Please try again.",
+        variant: "destructive",
+        duration: 3000,
+      });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -330,6 +396,29 @@ const Settings = () => {
             <div className="space-y-1">
               <Label className="text-sm font-medium">Email Address</Label>
               <div className="text-sm">{user?.email || "Not available"}</div>
+            </div>
+
+            <div className="space-y-1">
+              <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+              <div className="flex space-x-2">
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="Enter your phone number"
+                  className="flex-1"
+                />
+                <Button 
+                  onClick={saveUserProfile}
+                  disabled={savingProfile}
+                >
+                  {savingProfile ? "Saving..." : "Save"}
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Used for important updates about your account and pipeline
+              </p>
             </div>
           </CardContent>
         </Card>
