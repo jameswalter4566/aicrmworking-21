@@ -70,26 +70,21 @@ const Settings = () => {
           if (data.success) {
             setGoogleConnected(true);
             setEmailAddress(data.email);
-            toast({
-              title: "Google Email Connected",
-              description: "Your Google email has been successfully connected.",
-              duration: 3000,
+            toast.success("Google Email Connected", {
+              description: "Your Google email has been successfully connected."
             });
           } else {
-            toast({
-              title: "Connection Failed",
+            toast.error("Connection Failed", {
               description: data.error || "Failed to connect Google account.",
-              variant: "destructive",
-              duration: 3000,
+              variant: "destructive"
             });
           }
         } catch (error) {
           console.error("Error processing OAuth callback:", error);
-          toast({
+          toast.error("Connection Error", {
             title: "Connection Error",
             description: "There was a problem connecting your Google account.",
-            variant: "destructive",
-            duration: 3000,
+            variant: "destructive"
           });
         } finally {
           setProcessingOAuth(false);
@@ -158,17 +153,13 @@ const Settings = () => {
   const handleIndustryChange = (industry: IndustryType, isChecked: boolean) => {
     if (isChecked) {
       setActiveIndustry(industry);
-      toast({
-        title: "Industry Mode Changed",
-        description: `${getIndustryName(industry)} mode has been activated.`,
-        duration: 3000,
+      toast.success("Industry Mode Changed", {
+        description: `${getIndustryName(industry)} mode has been activated.`
       });
     } else if (activeIndustry === industry) {
       setActiveIndustry(null);
-      toast({
-        title: "Industry Mode Deactivated",
-        description: "Industry mode has been turned off.",
-        duration: 3000,
+      toast.success("Industry Mode Deactivated", {
+        description: "Industry mode has been turned off."
       });
     }
   };
@@ -224,11 +215,10 @@ const Settings = () => {
       }
     } catch (error) {
       console.error("Error initiating Google OAuth flow:", error);
-      toast({
+      toast.error("Connection Error", {
         title: "Connection Error",
         description: "Failed to start the Google connection process. Please try again later.",
-        variant: "destructive",
-        duration: 3000,
+        variant: "destructive"
       });
       setLoading(false);
     }
@@ -243,10 +233,8 @@ const Settings = () => {
         setEmailAddress("user@outlook.com");
       }
       setLoading(false);
-      toast({
-        title: "Microsoft Outlook Connected",
-        description: "Your Microsoft Outlook email has been successfully connected.",
-        duration: 3000,
+      toast.success("Microsoft Outlook Connected", {
+        description: "Your Microsoft Outlook email has been successfully connected."
       });
     }, 1500);
   };
@@ -289,21 +277,18 @@ const Settings = () => {
       if (data.success) {
         setGoogleConnected(false);
         setEmailAddress("");
-        toast({
-          title: "Google Email Disconnected",
-          description: "Your Google email has been disconnected.",
-          duration: 3000,
+        toast.success("Google Email Disconnected", {
+          description: "Your Google email has been disconnected."
         });
       } else {
         throw new Error(data.error || "Failed to disconnect");
       }
     } catch (error) {
       console.error("Error disconnecting Google account:", error);
-      toast({
+      toast.error("Disconnection Error", {
         title: "Disconnection Error",
         description: "Failed to disconnect your Google account. Please try again later.",
-        variant: "destructive",
-        duration: 3000,
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -316,10 +301,8 @@ const Settings = () => {
       if (!googleConnected) {
         setEmailAddress("");
       }
-      toast({
-        title: "Microsoft Outlook Disconnected",
-        description: "Your Microsoft Outlook email has been disconnected.",
-        duration: 3000,
+      toast.success("Microsoft Outlook Disconnected", {
+        description: "Your Microsoft Outlook email has been disconnected."
       });
     }
   };
@@ -347,18 +330,14 @@ const Settings = () => {
         throw new Error("Failed to update profile");
       }
 
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been successfully updated.",
-        duration: 3000,
+      await fetchUserProfile(); // Refresh the profile data
+      toast.success("Profile Updated", {
+        description: "Your profile has been successfully updated."
       });
     } catch (error) {
       console.error("Error updating profile:", error);
-      toast({
-        title: "Update Failed",
-        description: "Failed to update your profile. Please try again.",
-        variant: "destructive",
-        duration: 3000,
+      toast.error("Update Failed", {
+        description: "Failed to update your profile. Please try again."
       });
     } finally {
       setSavingProfile(false);
