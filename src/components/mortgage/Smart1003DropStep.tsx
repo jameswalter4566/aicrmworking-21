@@ -15,15 +15,24 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
   const handleDocumentsProcessed = async () => {
     try {
       // Generate pitch deck after documents are processed
-      const { error: pitchDeckError } = await supabase.functions.invoke('generate-pitch-deck', {
-        body: { leadId }
+      console.log("Smart1003DropStep: Attempting to generate pitch deck for lead ID:", leadId);
+      const { data, error: pitchDeckError } = await supabase.functions.invoke('generate-pitch-deck', {
+        body: { 
+          leadId,
+          source: "smart1003_documents_processed",
+          timestamp: new Date().toISOString()
+        }
       });
 
       if (pitchDeckError) {
         console.error('Error generating pitch deck:', pitchDeckError);
         toast.error('Could not generate pitch deck automatically');
-      } else {
+      } else if (data?.success) {
+        console.log("Pitch deck generated successfully:", data);
         toast.success('Pitch deck generated successfully');
+      } else {
+        console.warn("Pitch deck generation returned no error but may have incomplete data:", data);
+        toast.success('Documents processed');
       }
     } catch (error) {
       console.error('Error in document processing completion:', error);

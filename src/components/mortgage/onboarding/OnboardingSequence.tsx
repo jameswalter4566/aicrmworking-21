@@ -140,15 +140,24 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   const handleOnboardingComplete = async (onboardingData: any) => {
     try {
       // Generate pitch deck after successful onboarding
+      console.log("Attempting to generate pitch deck for lead ID:", leadId);
       const { data: pitchDeckResponse, error: pitchDeckError } = await supabase.functions.invoke('generate-pitch-deck', {
-        body: { leadId }
+        body: { 
+          leadId,
+          source: "onboarding_completion",
+          timestamp: new Date().toISOString()
+        }
       });
 
       if (pitchDeckError) {
         console.error('Error generating pitch deck:', pitchDeckError);
         toast.error('Could not generate pitch deck automatically');
-      } else {
+      } else if (pitchDeckResponse?.success) {
+        console.log("Pitch deck generated successfully:", pitchDeckResponse);
         toast.success('Pitch deck generated successfully');
+      } else {
+        console.warn("Pitch deck generation returned no error but may not have completed successfully:", pitchDeckResponse);
+        toast.success('Onboarding complete!');
       }
       
       onComplete(onboardingData);
