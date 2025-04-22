@@ -295,6 +295,7 @@ function App() {
                 <Route path="/mortgage/smart-1003-builder/:leadId" element={<ProtectedRoute><Smart1003Builder /></ProtectedRoute>} />
                 
                 <Route path="/smart-document-manager" element={<SmartDocumentManager />} />
+                <Route path="/smart-document-manager/:id" element={<SmartDocumentManager />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>

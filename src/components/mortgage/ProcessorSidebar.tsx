@@ -177,18 +177,16 @@ const ProcessorSidebar = ({
 
               <SidebarMenuItem>
                 <SidebarMenuButton
-                  asChild
                   isActive={activeSection === "smartDocManager"}
                   tooltip="Smart Document Manager"
                   className={cn(
                     "text-blue-900 transition-colors hover:bg-blue-50",
                     activeSection === "smartDocManager" ? "bg-blue-100 font-medium" : "bg-blue-25"
                   )}
+                  onClick={() => navigate(`/smart-document-manager/${leadId}`)}
                 >
-                  <a href={`/smart-document-manager${leadId ? `?leadId=${leadId}` : ""}`}>
-                    <FolderClosed className="h-5 w-5" />
-                    <span>Smart Document Manager</span>
-                  </a>
+                  <FolderClosed className="h-5 w-5" />
+                  <span>Smart Document Manager</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
