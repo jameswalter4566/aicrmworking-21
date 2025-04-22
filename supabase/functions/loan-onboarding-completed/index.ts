@@ -39,7 +39,7 @@ serve(async (req) => {
       // Fallback to admin notification if no specific lead creator found
       const { data: adminProfiles, error: adminsError } = await supabaseClient
         .from('profiles')
-        .select('phone_number')
+        .select('phone_number, email')
         .eq('role', 'admin')
         .not('phone_number', 'is', null);
         
@@ -90,22 +90,59 @@ serve(async (req) => {
     let phoneNumbers = [];
     
     if (leadData.created_by) {
-      // Try to get the creator's phone number
+      console.log(`Looking up profile for creator ID: ${leadData.created_by}`);
+      
+      // First try to get the creator's phone number
       const { data: profile, error: profileError } = await supabaseClient
         .from('profiles')
-        .select('phone_number')
+        .select('phone_number, email')
         .eq('id', leadData.created_by)
         .single();
 
       if (!profileError && profile?.phone_number) {
+        console.log(`Found phone number for creator: ${profile.phone_number}`);
         phoneNumbers.push(profile.phone_number);
       } else {
         console.warn(`Could not find phone number for lead creator: ${leadData.created_by}`);
+        
+        // Log more details about the profile query
+        if (profileError) {
+          console.error(`Profile query error: ${profileError.message}`);
+        } else if (!profile) {
+          console.error(`No profile found for user ID: ${leadData.created_by}`);
+        } else {
+          console.error(`Profile found but has no phone_number: ${JSON.stringify(profile)}`);
+        }
+
+        // Attempt to update the creator's phone_number if we have their email
+        if (profile && profile.email) {
+          console.log(`Found email for creator: ${profile.email}`);
+          
+          // Query any users with the same email who might have a phone number
+          const { data: emailProfiles, error: emailProfilesError } = await supabaseClient
+            .from('profiles')
+            .select('phone_number')
+            .eq('email', profile.email)
+            .not('phone_number', 'is', null);
+            
+          if (!emailProfilesError && emailProfiles && emailProfiles.length > 0) {
+            const validPhoneNumbers = emailProfiles
+              .map(p => p.phone_number)
+              .filter(phone => phone && phone.trim() !== '');
+              
+            if (validPhoneNumbers.length > 0) {
+              console.log(`Found ${validPhoneNumbers.length} phone numbers from email match`);
+              phoneNumbers.push(...validPhoneNumbers);
+            }
+          }
+        }
       }
     }
     
     // If no phone numbers found, fallback to admin users
     if (phoneNumbers.length === 0) {
+      console.log('No phone numbers found for lead creator, falling back to admin users');
+      
       const { data: adminProfiles, error: adminsError } = await supabaseClient
         .from('profiles')
         .select('phone_number')
@@ -134,6 +171,7 @@ serve(async (req) => {
     // Send SMS to each phone number
     for (const phoneNumber of phoneNumbers) {
       try {
+        console.log(`Attempting to send SMS to ${phoneNumber}`);
         const smsResult = await sendSMS(phoneNumber, message);
         
         if (smsResult.success) {
