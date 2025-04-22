@@ -19,6 +19,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -60,6 +61,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     if (files.length === 0) return;
     
     setIsUploading(true);
+    setUploadingFiles(files);
+    
     const totalFiles = files.length;
     let successCount = 0;
     
@@ -105,6 +108,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
       toast.error("An unexpected error occurred during upload.");
     } finally {
       setIsUploading(false);
+      setUploadingFiles([]);
     }
   };
 
@@ -132,7 +136,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
         {isUploading ? (
           <div className="flex flex-col items-center">
             <Loader2 className="h-8 w-8 text-blue-500 animate-spin mb-2" />
-            <p className="text-sm text-gray-600">Uploading document{filesLength > 1 ? 's' : ''}...</p>
+            <p className="text-sm text-gray-600">Uploading document{uploadingFiles.length > 1 ? 's' : ''}...</p>
           </div>
         ) : (
           <button 
