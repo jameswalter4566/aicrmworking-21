@@ -9,6 +9,7 @@ import {
   CheckCircle,
   Loader2
 } from "lucide-react";
+import NextStepsStrip from "@/components/mortgage/client-portal/NextStepsStrip";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
