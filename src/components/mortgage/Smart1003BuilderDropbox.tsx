@@ -1,11 +1,11 @@
-
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { FileUp, FileText, CheckCircle2, Loader2 } from "lucide-react";
+import { FileUp, FileText, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 const createFileURL = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -38,6 +38,8 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [processingComplete, setProcessingComplete] = useState(false);
+  const [processedFields, setProcessedFields] = useState({});
+  const [missingFields, setMissingFields] = useState([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -150,7 +152,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             description: "Your documents have been analyzed and your loan application has been updated.",
           });
           
-          // Instead of redirecting or returning, set the processing complete state
           setProcessingComplete(true);
           setIsProcessing(false);
           return;
@@ -192,33 +193,130 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
     }
   };
 
-  // Success view for client portal
   if (isClientPortal && processingComplete) {
     return (
-      <Card className="border-2 border-green-300 bg-green-50">
-        <CardHeader className="bg-green-100">
-          <CardTitle className="text-green-700 flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5" />
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green-500" />
             Processing Complete
           </CardTitle>
-          <CardDescription className="text-green-600">
+          <CardDescription>
             We've analyzed your documents and filled out your 1003 form
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-6 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">
-            <CheckCircle2 className="h-8 w-8 text-green-600" />
+        <CardContent>
+          <div className="space-y-6">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start">
+              <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <h3 className="font-medium text-green-800">Form Auto-Fill Complete</h3>
+                <p className="text-sm text-green-700">
+                  We've successfully extracted information from your documents and filled out your 1003 form.
+                </p>
+              </div>
+            </div>
+            
+            <div>
+              <h3 className="font-medium text-lg mb-3">Successfully Extracted Fields</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(processedFields).map(([sectionKey, sectionData]) => {
+                  if (!sectionData || typeof sectionData !== 'object') return null;
+                  
+                  const sectionTitle = {
+                    borrower: 'Borrower Information',
+                    employment: 'Employment & Income',
+                    assets: 'Assets & Accounts',
+                    liabilities: 'Liabilities & Debts',
+                    property: 'Property Information'
+                  }[sectionKey];
+
+                  if (!sectionTitle) return null;
+
+                  return (
+                    <Card key={sectionKey} className="bg-green-50">
+                      <CardHeader className="py-3 px-4">
+                        <CardTitle className="text-sm">{sectionTitle}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="py-2 px-4">
+                        <div className="space-y-2">
+                          {Object.entries(sectionData).length > 0 ? (
+                            Object.entries(sectionData).map(([key, value]) => {
+                              if (typeof value === 'object') return null;
+                              return (
+                                <div key={key} className="flex items-center">
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600 mr-2" />
+                                  <p className="text-sm">
+                                    <span className="font-medium">{key}: </span>
+                                    <span className="text-gray-700">{value?.toString()}</span>
+                                  </p>
+                                </div>
+                              );
+                            })
+                          ) : (
+                            <p className="text-sm text-gray-500">No fields extracted for this section</p>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+            
+            {missingFields.length > 0 && (
+              <div>
+                <h3 className="font-medium text-lg mb-3 flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-amber-500 mr-2" />
+                  Missing Fields
+                </h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  The following fields could not be extracted from your documents and need to be filled out manually.
+                </p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <Accordion type="multiple" className="space-y-2">
+                    {missingFields.map((field) => {
+                      const key = `${field.section}__${field.field}`;
+                      return (
+                        <AccordionItem value={key} key={key} className="border-b border-red-200">
+                          <AccordionTrigger className="hover:no-underline">
+                            <span className="flex items-center text-red-800">
+                              <AlertTriangle className="h-3.5 w-3.5 text-red-500 mr-2" />
+                              <span className="text-sm font-medium">{field.label}</span>
+                              <span className="text-xs text-red-600 ml-2">
+                                ({field.section})
+                              </span>
+                            </span>
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-2 pb-3">
+                            <p className="text-sm text-gray-600 pl-6">
+                              This field needs to be completed in your loan application.
+                            </p>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                  </Accordion>
+                </div>
+              </div>
+            )}
+            
+            <div className="flex justify-between items-center gap-4 pt-4">
+              <Button 
+                variant="outline"
+                onClick={() => setProcessingComplete(false)}
+                className="w-full sm:w-auto"
+              >
+                Upload More Documents
+              </Button>
+              <Button 
+                className="w-full sm:w-auto"
+                onClick={() => navigate('/client-portal')}
+              >
+                Return to Application
+              </Button>
+            </div>
           </div>
-          <h3 className="font-medium text-lg mb-2 text-green-800">Form Auto-Fill Complete</h3>
-          <p className="text-gray-600 mb-4">
-            We've successfully extracted information from your documents and filled out your 1003 form.
-          </p>
-          <Button 
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => setProcessingComplete(false)}
-          >
-            Upload More Documents
-          </Button>
         </CardContent>
       </Card>
     );
