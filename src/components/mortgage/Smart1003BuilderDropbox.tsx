@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -22,14 +21,16 @@ interface Smart1003BuilderDropboxProps {
   leadId: string;
   dropboxId?: string;
   returnUrl?: string;
-  preserveMortgageStatus?: boolean; // Added prop to preserve mortgage status
+  preserveMortgageStatus?: boolean;
+  isClientPortal?: boolean;
 }
 
 const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ 
   leadId, 
   dropboxId, 
   returnUrl,
-  preserveMortgageStatus = true // Default to true to preserve mortgage status
+  preserveMortgageStatus = true,
+  isClientPortal = false
 }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -133,25 +134,33 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             fileUrls, 
             leadId,
             dropboxId,
-            preserveMortgageStatus // Pass the flag to preserve mortgage status
+            preserveMortgageStatus
           },
         });
         
         if (error) {
           throw new Error(error.message);
         }
+
+        if (isClientPortal) {
+          toast({
+            title: "Documents processed successfully",
+            description: "Your documents have been analyzed and your loan application has been updated.",
+          });
+          if (returnUrl) {
+            navigate(returnUrl);
+          }
+          return;
+        }
         
         let redirectParams = '';
-        
         if (returnUrl) {
           redirectParams = `?origin=${encodeURIComponent(returnUrl)}`;
-        } 
-        else if (dropboxId) {
+        } else if (dropboxId) {
           redirectParams = `?origin=${encodeURIComponent(dropboxId)}`;
         }
         
         const redirectUrl = `/mortgage/smart-1003-builder/${leadId}${redirectParams}`;
-        
         navigate(redirectUrl);
         
         toast({

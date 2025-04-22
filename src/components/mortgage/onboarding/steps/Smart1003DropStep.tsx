@@ -22,7 +22,8 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
         <Smart1003BuilderDropbox 
           leadId={String(leadId)} 
           returnUrl={returnUrl} 
-          preserveMortgageStatus={true} // Explicitly preserve mortgage status
+          preserveMortgageStatus={true}
+          isClientPortal={true} // Add this prop
         />
       </div>
       <Button
