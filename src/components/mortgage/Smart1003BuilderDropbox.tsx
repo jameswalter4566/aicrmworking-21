@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -309,19 +309,12 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
               </div>
             )}
             
-            <div className="flex justify-between items-center gap-4 pt-4">
-              <Button 
-                variant="outline"
-                onClick={() => setProcessingComplete(false)}
-                className="w-full sm:w-auto"
-              >
-                Upload More Documents
-              </Button>
+            <div className="flex justify-center items-center gap-4 pt-4">
               <Button 
                 className="w-full sm:w-auto"
                 onClick={() => navigate('/client-portal')}
               >
-                Return to Application
+                Finish
               </Button>
             </div>
           </div>
