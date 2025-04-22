@@ -1,14 +1,9 @@
-
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 import { 
-  UserCircle2, FileText, Briefcase, DollarSign, Building2, Clipboard, 
-  RefreshCw, Check, FileUp, AlertCircle
+  UserCircle2, FileText, Briefcase, DollarSign, Building2, Clipboard
 } from "lucide-react";
 import { PersonalInfoForm } from "./1003/PersonalInfoForm";
 import { EmploymentIncomeForm } from "./1003/EmploymentIncomeForm";
@@ -17,7 +12,6 @@ import { LiabilityInformationForm } from "./1003/LiabilityInformationForm";
 import { RealEstateOwnedForm } from "./1003/RealEstateOwnedForm";
 import { LoanInformationForm } from "./1003/LoanInformationForm";
 import { HousingExpensesForm } from "./1003/HousingExpensesForm";
-import IntelligentFileUpload from "@/components/IntelligentFileUpload";
 import { leadProfileService } from "@/services/leadProfile";
 
 interface Mortgage1003FormProps {
@@ -37,10 +31,8 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
   const [isConsolidating, setIsConsolidating] = useState(false);
   const [hasDocuments, setHasDocuments] = useState(false);
   
-  // Get mortgage data or empty object if none exists
   const mortgageData = lead?.mortgageData || {};
   
-  // Helper to check if data exists in different possible structures
   const checkForDocuments = () => {
     const documents = mortgageData.documents || 
                      (mortgageData.borrower?.data?.documents) || [];
@@ -48,7 +40,6 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
   };
   
   useEffect(() => {
-    // Check if we have documents to consolidate
     setHasDocuments(checkForDocuments());
     console.log("Mortgage data in 1003 Form:", mortgageData);
   }, [mortgageData]);
@@ -76,7 +67,6 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
     }
   };
   
-  // Helper function to check for documents in mortgage data
   const getDocumentsList = () => {
     return mortgageData.documents || 
           (mortgageData.borrower?.data?.documents) || [];
@@ -95,59 +85,9 @@ const Mortgage1003Form: React.FC<Mortgage1003FormProps> = ({
               Uniform Residential Loan Application
             </CardDescription>
           </div>
-          
-          {hasDocuments && (
-            <Button
-              variant="outline"
-              onClick={handleConsolidateData}
-              disabled={isConsolidating || isSaving}
-              className="flex items-center gap-2"
-            >
-              {isConsolidating ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Consolidate Document Data
-            </Button>
-          )}
         </div>
       </CardHeader>
       <CardContent>
-        {getDocumentsList().length > 0 && (
-          <div className="bg-amber-50 p-4 rounded-lg mb-6 border border-amber-200">
-            <div className="flex gap-3 mb-2">
-              <FileUp className="h-5 w-5 text-amber-600" />
-              <h3 className="font-medium text-amber-800">Uploaded Documents</h3>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {getDocumentsList().map((doc: any, index: number) => (
-                <Badge 
-                  key={index} 
-                  variant="outline" 
-                  className="bg-white border-amber-300 text-amber-800 flex items-center gap-1"
-                >
-                  <FileText className="h-3 w-3" />
-                  {doc.documentType || "Unknown Document"} 
-                </Badge>
-              ))}
-            </div>
-            
-            <div className="mt-4 text-sm text-amber-700 flex gap-2 items-center">
-              <AlertCircle className="h-4 w-4" />
-              <span>
-                Remember to click "Consolidate Document Data" after analyzing documents to merge the extracted information.
-              </span>
-            </div>
-          </div>
-        )}
-        
-        <div className="mb-6">
-          <IntelligentFileUpload 
-            onImportComplete={() => {}}
-          />
-        </div>
-        
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="w-full grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 mb-6">
             <TabsTrigger value="personal" className="flex gap-1">
