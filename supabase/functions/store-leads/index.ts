@@ -40,16 +40,21 @@ Deno.serve(async (req) => {
     // Log detailed request information for debugging
     console.log('Store-leads function called - Path:', req.url);
     console.log('Request method:', req.method);
-    const authHeaderExists = !!req.headers.get('Authorization');
-    console.log('Auth header present:', authHeaderExists);
     
     // Extract JWT token from Authorization header to identify the user
     const authHeader = req.headers.get('Authorization');
+    console.log('Auth header present:', !!authHeader);
+    
+    if (authHeader) {
+      console.log('Auth header format check:', authHeader.startsWith('Bearer '));
+    }
+    
     let userId = null;
     let isAuthenticated = false;
     
     // Check if user is authenticated
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid Authorization header');
       return new Response(
         JSON.stringify({ 
           success: false, 
@@ -66,7 +71,7 @@ Deno.serve(async (req) => {
     try {
       // Extract token from Bearer token format
       const token = authHeader.replace('Bearer ', '');
-      console.log('Token extracted from header');
+      console.log('Token extracted, length:', token.length);
       
       // Verify the token and get user information
       const { data: { user }, error: authError } = await supabase.auth.getUser(token);
