@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4'
 
 // Define CORS headers
@@ -29,40 +30,26 @@ Deno.serve(async (req) => {
     console.log(`Updating lead with ID: ${leadId}`);
     console.log('Update data:', JSON.stringify(leadData));
 
-    // First fetch the current lead data to preserve important fields
-    const { data: currentLead, error: fetchError } = await supabase
-      .from('leads')
-      .select('disposition, is_mortgage_lead, added_to_pipeline_at')
-      .eq('id', leadId)
-      .single();
-    
-    if (fetchError) {
-      console.error('Error fetching current lead:', fetchError.message);
-      throw new Error(`Failed to fetch current lead data: ${fetchError.message}`);
-    }
-
     // Check if disposition is being updated
     let oldDisposition = null;
     if (leadData.disposition) {
-      oldDisposition = currentLead.disposition;
+      // Fetch the current lead to get the old disposition value
+      const { data: currentLead, error: fetchError } = await supabase
+        .from('leads')
+        .select('disposition')
+        .eq('id', leadId)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching current lead:', fetchError.message);
+      } else if (currentLead) {
+        oldDisposition = currentLead.disposition;
+      }
     }
 
-    // Preserve mortgage lead status if not explicitly changing it
-    const isMortgageLead = leadData.isMortgageLead !== undefined 
-      ? leadData.isMortgageLead 
-      : currentLead.is_mortgage_lead;
-    
-    // Preserve addedToPipelineAt timestamp if lead is in mortgage pipeline
-    let addedToPipelineAt = null;
-    
-    // Only set a new timestamp if changing from non-mortgage to mortgage lead
-    if (leadData.isMortgageLead === true && !currentLead.is_mortgage_lead) {
-      addedToPipelineAt = new Date().toISOString();
-    } 
-    // Otherwise preserve the existing timestamp if the lead is already in the pipeline
-    else if (isMortgageLead && currentLead.added_to_pipeline_at) {
-      addedToPipelineAt = currentLead.added_to_pipeline_at;
-    }
+    // Add handling for mortgage lead designation
+    const isMortgageLead = leadData.isMortgageLead || false;
+    const addedToPipelineAt = isMortgageLead ? new Date().toISOString() : null;
 
     // Transform the lead data from camelCase to snake_case for database
     const transformedData: any = {
@@ -168,15 +155,10 @@ Deno.serve(async (req) => {
     }
 
     // Update the lead in the database
-    // CRITICAL FIX: Always preserve mortgage pipeline status
     transformedData.is_mortgage_lead = isMortgageLead;
-    
     if (addedToPipelineAt) {
       transformedData.added_to_pipeline_at = addedToPipelineAt;
     }
-
-    console.log('Pipeline status being set to:', isMortgageLead);
-    console.log('Added to pipeline timestamp:', addedToPipelineAt);
 
     // Filter out undefined values to prevent nullifying existing data
     Object.keys(transformedData).forEach(key => {
@@ -254,9 +236,7 @@ Deno.serve(async (req) => {
       createdAt: data.created_at,
       updatedAt: data.updated_at,
       createdBy: data.created_by,
-      mortgageData: data.mortgage_data,
-      isMortgageLead: data.is_mortgage_lead,
-      addedToPipelineAt: data.added_to_pipeline_at
+      mortgageData: data.mortgage_data
     };
 
     // Return the updated lead

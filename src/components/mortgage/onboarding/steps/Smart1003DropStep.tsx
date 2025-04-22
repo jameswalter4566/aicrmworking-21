@@ -19,11 +19,7 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
         Upload your documents to auto-fill the application, or continue to fill it out manually.
       </p>
       <div className="mb-6 w-full max-w-lg">
-        <Smart1003BuilderDropbox 
-          leadId={String(leadId)} 
-          returnUrl={returnUrl} 
-          preserveMortgageStatus={true} // Add this prop to ensure mortgage status is preserved
-        />
+        <Smart1003BuilderDropbox leadId={String(leadId)} returnUrl={returnUrl} />
       </div>
       <Button
         variant="default"

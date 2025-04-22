@@ -1,201 +1,305 @@
-
-import React, { useState, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
-import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { FileUp, FileText, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
-import { useAuth } from "@/context/AuthContext";
+
+const createFileURL = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      resolve(e.target?.result as string || '');
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 interface Smart1003BuilderDropboxProps {
   leadId: string;
+  dropboxId?: string;
   returnUrl?: string;
-  preserveMortgageStatus?: boolean;
 }
 
-const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ 
-  leadId, 
-  returnUrl,
-  preserveMortgageStatus = true
-}) => {
-  const [file, setFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [processing, setProcessing] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadId, dropboxId, returnUrl }) => {
+  const [files, setFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const navigate = useNavigate();
-  const { getAuthToken } = useAuth();
+  const { toast } = useToast();
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      const selectedFile = acceptedFiles[0];
-      if (selectedFile.type !== 'application/pdf') {
-        setError('Only PDF files are accepted');
-        return;
-      }
-      setFile(selectedFile);
-      setError(null);
-    }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf']
-    },
-    maxFiles: 1
-  });
-
-  const clearFile = () => {
-    setFile(null);
-    setError(null);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
-  const processDocument = async () => {
-    if (!file) return;
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const newFiles = Array.from(e.dataTransfer.files).filter(file => 
+        file.type === 'application/pdf' || 
+        file.type === 'image/jpeg' || 
+        file.type === 'image/png'
+      );
+      
+      if (newFiles.length === 0) {
+        toast({
+          title: "Invalid files",
+          description: "Only PDF, JPEG, and PNG files are accepted.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files).filter(file => 
+        file.type === 'application/pdf' || 
+        file.type === 'image/jpeg' || 
+        file.type === 'image/png'
+      );
+      
+      if (newFiles.length === 0) {
+        toast({
+          title: "Invalid files",
+          description: "Only PDF, JPEG, and PNG files are accepted.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setFiles(prev => [...prev, ...newFiles]);
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleProcessFiles = async () => {
+    if (files.length === 0) {
+      toast({
+        title: "No files selected",
+        description: "Please select at least one file to process.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
-      setUploading(true);
-      setError(null);
-
-      // Generate a unique filename
-      const timestamp = Date.now();
-      const fileName = `smart1003_${timestamp}_${file.name.replace(/\s+/g, '_')}`;
+      setIsUploading(true);
       
-      // Upload the file to Supabase storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('borrower-documents')
-        .upload(`leads/${leadId}/${fileName}`, file);
-
-      if (uploadError) {
-        throw new Error(`Error uploading file: ${uploadError.message}`);
-      }
-
-      // Get the URL of the uploaded file
-      const { data: { publicUrl } } = supabase.storage
-        .from('borrower-documents')
-        .getPublicUrl(`leads/${leadId}/${fileName}`);
-
-      setUploading(false);
-      setProcessing(true);
-
-      const token = await getAuthToken();
-      console.log("Starting Smart 1003 Builder process with auth token");
-
-      // Process with smart 1003 builder edge function
-      const { data: extractionData, error: extractionError } = await supabase.functions.invoke('smart-1003-builder', {
-        body: { 
-          fileUrl: publicUrl, 
-          fileName: fileName,
-          leadId, 
-          preserveMortgageStatus  // Pass this flag to ensure mortgage status is preserved
-        },
-        headers: token ? {
-          Authorization: `Bearer ${token}`
-        } : undefined
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 300);
+      
+      const fileUrls = await Promise.all(files.map(file => createFileURL(file)));
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      setIsUploading(false);
+      setIsProcessing(true);
+      
+      toast({
+        title: "Processing documents",
+        description: "Analyzing your documents to fill out the 1003 form...",
       });
-
-      if (extractionError || (extractionData && !extractionData.success)) {
-        throw new Error(extractionError?.message || extractionData?.error || 'Error processing document');
-      }
-
-      setSuccess(true);
-      toast.success('Document processed successfully!');
       
-      // Allow viewing the success state briefly before navigating
-      setTimeout(() => {
-        // If returnUrl is provided, use that, otherwise construct default URL
-        if (returnUrl) {
-          navigate(returnUrl);
-        } else {
-          navigate(`/loan-application/${leadId}`);
+      try {
+        const { data, error } = await supabase.functions.invoke('smart-1003-builder', {
+          body: { 
+            fileUrls, 
+            leadId,
+            dropboxId 
+          },
+        });
+        
+        if (error) {
+          throw new Error(error.message);
         }
-      }, 1500);
-
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during processing');
-      console.error('Error in Smart 1003 Builder:', err);
-      toast.error('Failed to process document');
-    } finally {
-      setUploading(false);
-      setProcessing(false);
+        
+        let redirectParams = '';
+        
+        if (returnUrl) {
+          redirectParams = `?origin=${encodeURIComponent(returnUrl)}`;
+        } 
+        else if (dropboxId) {
+          redirectParams = `?origin=${encodeURIComponent(dropboxId)}`;
+        }
+        
+        const redirectUrl = `/mortgage/smart-1003-builder/${leadId}${redirectParams}`;
+        
+        navigate(redirectUrl);
+        
+        toast({
+          title: "Documents processed successfully",
+          description: "Your documents have been analyzed and your 1003 form is being filled out."
+        });
+        
+      } catch (error: any) {
+        console.error("Error calling edge function:", error);
+        toast({
+          title: "Processing failed",
+          description: error?.message || "There was an error processing your documents. Please try again.",
+          variant: "destructive"
+        });
+        setIsProcessing(false);
+      }
+    } catch (error: any) {
+      console.error("Error processing files:", error);
+      toast({
+        title: "Processing failed",
+        description: error?.message || "There was an error processing your documents. Please try again.",
+        variant: "destructive"
+      });
+      setIsUploading(false);
+      setIsProcessing(false);
     }
   };
 
   return (
-    <div className="w-full">
-      {!file && (
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-            isDragActive 
-              ? 'border-blue-500 bg-blue-50' 
-              : 'border-gray-300 hover:border-blue-400 hover:bg-gray-50'
-          }`}
-        >
-          <input {...getInputProps()} />
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <Upload className="h-10 w-10 text-blue-500" />
-            <p className="text-lg font-medium">
-              {isDragActive ? 'Drop the PDF here' : 'Drag & drop your 1003 PDF here'}
-            </p>
-            <p className="text-gray-500 text-sm">
-              or click to select a file
-            </p>
-          </div>
-        </div>
-      )}
-
-      {file && !success && (
-        <div className="border rounded-lg p-4">
-          <div className="flex items-center">
-            <FileText className="h-8 w-8 text-blue-500 mr-3" />
-            <div className="flex-1">
-              <p className="font-medium truncate">{file.name}</p>
-              <p className="text-sm text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+    <Card className="border-2 border-dashed border-blue-300 hover:border-blue-500 transition-colors">
+      <CardHeader className="bg-blue-50">
+        <CardTitle className="text-blue-700 flex items-center gap-2">
+          <FileUp className="h-5 w-5" />
+          Smart 1003 Builder
+        </CardTitle>
+        <CardDescription>
+          Upload your financial documents to automatically fill out your loan application
+        </CardDescription>
+      </CardHeader>
+      
+      <CardContent className="p-0">
+        {files.length === 0 && (
+          <div 
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            className="p-8 flex flex-col items-center justify-center text-center cursor-pointer hover:bg-blue-50 transition-colors"
+            onClick={() => document.getElementById('file-upload')?.click()}
+          >
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+              <FileUp className="h-8 w-8 text-blue-600" />
             </div>
-            {!uploading && !processing && (
-              <Button variant="ghost" size="sm" onClick={clearFile}>
-                <XCircle className="h-5 w-5 text-gray-500" />
-              </Button>
-            )}
-          </div>
-
-          {error && (
-            <div className="mt-3 p-2 bg-red-50 text-red-700 rounded text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-4">
-            <Button 
-              onClick={processDocument} 
-              disabled={uploading || processing || !!error}
-              className="w-full"
-            >
-              {uploading && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {processing && (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              )}
-              {uploading ? 'Uploading...' : processing ? 'Processing Document...' : 'Process Document'}
+            <h3 className="font-medium text-lg mb-2">Upload Your Documents</h3>
+            <p className="text-gray-500 mb-4">Drag and drop your documents here or click to browse</p>
+            <Button size="sm" variant="outline" className="border-blue-300">
+              Select Files
             </Button>
+            <input 
+              type="file" 
+              id="file-upload" 
+              multiple 
+              accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" 
+              className="hidden"
+              onChange={handleFileInputChange}
+            />
+            <p className="text-xs text-gray-400 mt-4">
+              Supported formats: PDF, JPEG, PNG
+            </p>
           </div>
-        </div>
-      )}
-
-      {success && (
-        <div className="border rounded-lg p-6 text-center bg-green-50 border-green-200">
-          <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-          <h3 className="text-lg font-medium text-green-700">Document Processed Successfully!</h3>
-          <p className="text-green-600 mt-1">
-            The information has been extracted and your loan application is being updated.
-          </p>
-        </div>
-      )}
-    </div>
+        )}
+        
+        {files.length > 0 && (
+          <div className="p-4">
+            <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+              {files.map((file, index) => (
+                <div key={index} className="flex items-center justify-between bg-blue-50 p-3 rounded-md">
+                  <div className="flex items-center">
+                    <FileText className="h-5 w-5 text-blue-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium truncate">{file.name}</p>
+                      <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                    </div>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-8 w-8 p-0" 
+                    onClick={() => handleRemoveFile(index)}
+                    disabled={isUploading || isProcessing}
+                  >
+                    &times;
+                  </Button>
+                </div>
+              ))}
+            </div>
+            
+            <div className="flex items-center justify-between mb-4">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-sm"
+                onClick={() => document.getElementById('file-upload')?.click()}
+                disabled={isUploading || isProcessing}
+              >
+                <FileUp className="h-4 w-4 mr-1" />
+                Add More Files
+              </Button>
+              
+              <p className="text-sm text-gray-500">
+                {files.length} file{files.length !== 1 ? 's' : ''} selected
+              </p>
+            </div>
+            
+            {isUploading && (
+              <div className="mb-4">
+                <div className="h-2 w-full bg-blue-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-blue-500 transition-all duration-300 ease-out" 
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                <p className="text-xs text-center mt-1 text-gray-500">
+                  Uploading... {uploadProgress}%
+                </p>
+              </div>
+            )}
+            
+            <Button 
+              className="w-full" 
+              onClick={handleProcessFiles}
+              disabled={isUploading || isProcessing}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing Documents...
+                </>
+              ) : isUploading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Process Documents & Build 1003
+                </>
+              )}
+            </Button>
+            
+            <p className="text-xs text-center mt-2 text-gray-500">
+              Your documents will be securely processed to auto-fill your 1003 form
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 };
 
