@@ -1,25 +1,32 @@
+
 import React, { useState } from "react";
-import { ChevronDown, ChevronUp, FileText, FolderClosed, CheckSquare, Square } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, FolderClosed, CheckSquare, Square, ArrowLeft } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import { useNavigate } from "react-router-dom";
 
-// Color palette
+// Transparent blue background (tailwind: bg-blue-500/60), text-white, rounded top-right, shadow
+const sidebarBg = "bg-blue-500/60";
+const roundedTopRight = "rounded-tr-3xl";
+const whiteText = "text-white";
+
+// Solid background color for each category
 const categoryColors = [
-  "bg-[#9b87f5]", // Primary Purple
-  "bg-[#7E69AB]",
-  "bg-[#8E9196]",
+  "bg-[#394268]", // deep blue for contrast (adjust as needed)
+  "bg-[#3b2b63]",
+  "bg-[#3C6997]",
   "bg-[#1A1F2C]",
-  "bg-[#F1F1F1] text-[#1A1F2C]",
-  "bg-sky-200",
-  "bg-pink-200",
-  "bg-green-200",
-  "bg-yellow-200",
-  "bg-teal-200",
-  "bg-orange-200",
-  "bg-gray-200",
-  "bg-purple-300",
-  "bg-emerald-200",
-  "bg-orange-100"
+  "bg-[#4A5E80]",
+  "bg-[#335C81]",
+  "bg-[#2F4858]",
+  "bg-[#183153]",
+  "bg-[#255C99]",
+  "bg-[#3A506B]",
+  "bg-[#1A535C]",
+  "bg-[#235789]",
+  "bg-[#1F4068]",
+  "bg-[#374785]",
+  "bg-[#24305E]"
 ];
 
 const DOCUMENT_STRUCTURE = [
@@ -189,10 +196,9 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
 }) => {
   const [openCategories, setOpenCategories] = useState<string[]>([]);
   const [onlyShowWithFiles, setOnlyShowWithFiles] = useState(false);
+  const navigate = useNavigate();
 
-  // For real implementation, you would check uploads based on available data.
   const isUploaded = (subcategory: string) => {
-    // Placeholder: stub logic
     if (!onlyShowWithFiles) return true;
     return !!fakeUploads[subcategory];
   };
@@ -206,84 +212,116 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
   };
 
   return (
-    <aside className="w-80 min-w-[16rem] max-w-xs h-full p-3 flex flex-col bg-[#F1F1F1] border-r border-neutral-200">
+    <aside
+      className={cn(
+        "w-80 min-w-[16rem] max-w-xs h-full pt-7 px-3 pb-6 flex flex-col border-r border-neutral-200 shadow-2xl",
+        sidebarBg,
+        roundedTopRight
+      )}
+      style={{
+        // Add a subtle glass effect, blue transparency
+        backdropFilter: "blur(7px)",
+        WebkitBackdropFilter: "blur(7px)",
+        borderTopRightRadius: "2rem",
+      }}
+    >
+      {/* Back Button + Label */}
+      <div className="flex items-center pl-1 pb-3 mb-2 gap-2 select-none">
+        <button
+          className="flex items-center justify-center rounded-full bg-white/20 hover:bg-white/40 transition w-10 h-10 text-white border border-white/30 shadow-md"
+          onClick={() => navigate(-1)}
+          aria-label="Go Back"
+          type="button"
+        >
+          {/* Left Arrow, horizontal */}
+          <ArrowLeft className="h-6 w-6" />
+        </button>
+        <span className="ml-2 text-xl font-extrabold text-white tracking-wide">File Manager</span>
+      </div>
       {/* Filter Checkbox */}
-      <div className="flex items-center mb-4 pl-2">
+      <div className="flex items-center mb-6 pl-2">
         <Checkbox
           id="show-with-files"
           checked={onlyShowWithFiles}
           onCheckedChange={(checked) => setOnlyShowWithFiles(!!checked)}
         />
-        <label htmlFor="show-with-files" className="ml-2 font-medium text-sm text-[#7E69AB]">
+        <label htmlFor="show-with-files" className="ml-2 font-medium text-sm text-white select-none">
           Only show documents that contain files
         </label>
       </div>
-      <nav className="flex-1 overflow-y-auto pb-6 pr-1">
-        {DOCUMENT_STRUCTURE.map((cat, idx) => {
-          const colorClass = categoryColors[idx % categoryColors.length];
-          const isOpen = openCategories.includes(cat.name);
-          return (
-            <div
-              key={cat.name}
-              className={cn(
-                "rounded-xl mb-4 transition-shadow shadow-sm",
-                colorClass,
-                isOpen ? "ring-2 ring-[#9b87f5]" : ""
-              )}
-            >
-              {/* Category Header */}
-              <button
-                onClick={() => handleCategoryClick(cat.name)}
+      <nav className="flex-1 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-4">
+          {DOCUMENT_STRUCTURE.map((cat, idx) => {
+            const colorClass = categoryColors[idx % categoryColors.length];
+            const isOpen = openCategories.includes(cat.name);
+
+            return (
+              <div
+                key={cat.name}
                 className={cn(
-                  "flex items-center w-full px-4 py-3 rounded-xl text-base font-semibold justify-between focus:outline-none",
+                  "rounded-2xl shadow-lg transition-shadow",
                   colorClass,
-                  isOpen
-                    ? "border-b-2 border-[#7E69AB]"
-                    : "border-0"
+                  isOpen ? "ring-2 ring-white/80" : ""
                 )}
               >
-                <span className="flex items-center gap-2 text-inherit">
-                  <FolderClosed className="h-5 w-5" />
-                  {cat.name}
-                </span>
-                {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-              </button>
-              {/* Subcategory List */}
-              {isOpen && (
-                <ul className="py-2 pl-10 pr-2">
-                  {cat.subcategories.filter(isUploaded).map((sub) => (
-                    <li key={sub} className="mb-2 last:mb-0">
-                      <button
-                        onClick={() => onSelect?.(cat.name, sub)}
-                        className={cn(
-                          "flex items-center w-full px-3 py-1.5 rounded-md text-[15px] font-medium transition-colors",
-                          colorClass,
-                          activeSubcategory === sub
-                            ? "outline-none ring-2 ring-[#7E69AB] bg-opacity-90"
-                            : "opacity-90 hover:bg-opacity-70"
-                        )}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        {sub}
-                        {/* Demo: show uploaded icon if present */}
-                        {fakeUploads[sub] && (
-                          <CheckSquare className="ml-auto h-4 w-4 text-green-500" />
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                  {/* If no items after filtering, show empty state */}
-                  {cat.subcategories.filter(isUploaded).length === 0 && (
-                    <li className="text-xs text-gray-500 italic py-2 px-2">No documents uploaded</li>
+                {/* Category Header */}
+                <button
+                  onClick={() => handleCategoryClick(cat.name)}
+                  className={cn(
+                    "flex items-center w-full px-5 py-3 rounded-2xl text-lg font-bold justify-between focus:outline-none",
+                    whiteText,
+                    isOpen ? "border-b-2 border-white/30" : "border-0",
+                    colorClass
                   )}
-                </ul>
-              )}
-            </div>
-          );
-        })}
+                >
+                  <span className="flex items-center gap-2">
+                    <FolderClosed className="h-5 w-5" />
+                    {cat.name}
+                  </span>
+                  {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </button>
+                {/* Subcategory List */}
+                {isOpen && (
+                  <ul className="py-3 px-3 flex flex-col gap-3">
+                    {cat.subcategories.filter(isUploaded).map((sub) => (
+                      <li key={sub}>
+                        <button
+                          onClick={() => onSelect?.(cat.name, sub)}
+                          className={cn(
+                            "flex items-center w-full px-4 py-2 rounded-xl font-medium text-base border-2 outline-none transition-transform duration-150 group",
+                            whiteText,
+                            activeSubcategory === sub
+                              ? "border-white bg-white/20 ring-2 ring-white/70 scale-[1.025] font-bold"
+                              : "border-[#8E9196] bg-white/10 hover:bg-white/15 hover:scale-[1.01]",
+                            colorClass
+                          )}
+                          style={{
+                            textShadow: "0 1px 8px rgba(20,26,84,0.18)",
+                          }}
+                        >
+                          <FileText className="h-4 w-4 mr-2 opacity-90" />
+                          {sub}
+                          {fakeUploads[sub] && (
+                            <CheckSquare className="ml-auto h-4 w-4 text-green-300" />
+                          )}
+                        </button>
+                      </li>
+                    ))}
+                    {cat.subcategories.filter(isUploaded).length === 0 && (
+                      <li className="text-xs text-white/60 italic py-2 px-2">
+                        No documents uploaded
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </nav>
     </aside>
   );
 };
 
 export default SmartDocumentSidebar;
+
