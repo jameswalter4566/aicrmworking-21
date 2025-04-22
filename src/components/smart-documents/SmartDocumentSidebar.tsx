@@ -1,35 +1,39 @@
 
 import React, { useState } from "react";
-import { ChevronDown, ChevronUp, FileText, FolderClosed, CheckSquare, Square, ArrowLeft } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, FolderClosed, CheckSquare, ArrowLeft, Box } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 
-// Transparent blue background (tailwind: bg-blue-500/60), text-white, rounded top-right, shadow
-const sidebarBg = "bg-blue-500/60";
-const roundedTopRight = "rounded-tr-3xl";
-const whiteText = "text-white";
-
-// Solid background color for each category
+// Rainbow/varied solid color backgrounds for each category (no gradients)
 const categoryColors = [
-  "bg-[#394268]", // deep blue for contrast (adjust as needed)
-  "bg-[#3b2b63]",
-  "bg-[#3C6997]",
-  "bg-[#1A1F2C]",
-  "bg-[#4A5E80]",
-  "bg-[#335C81]",
-  "bg-[#2F4858]",
-  "bg-[#183153]",
-  "bg-[#255C99]",
-  "bg-[#3A506B]",
-  "bg-[#1A535C]",
-  "bg-[#235789]",
-  "bg-[#1F4068]",
-  "bg-[#374785]",
-  "bg-[#24305E]"
+  "bg-[#ea384c]", // red
+  "bg-[#F97316]", // orange
+  "bg-[#FEF7CD] text-black", // yellow (dark text)
+  "bg-[#63e6be]", // green
+  "bg-[#33C3F0]", // sky blue
+  "bg-[#3B82F6]", // blue
+  "bg-[#8B5CF6]", // vivid purple
+  "bg-[#D946EF]", // magenta pink
+  "bg-[#36cfc9]", // teal-aqua
+  "bg-[#f472b6]", // pink
+  "bg-[#60a5fa]", // cornflower blue
+  "bg-[#e879f9]", // light purple
+  "bg-[#fde68a] text-black", // pale yellow (dark text)
+  "bg-[#fbbf24]", // gold
+  "bg-[#34d399]"  // emerald green
 ];
 
+// Inserted at the top
+const DROPBOX_OPTION = {
+  isDropbox: true,
+  name: "Dropbox",
+  icon: Box,
+};
+
+// Document structure as before
 const DOCUMENT_STRUCTURE = [
+  // starts at index 1 for colors, since index 0 = Dropbox
   {
     name: "Identification",
     subcategories: [
@@ -184,7 +188,7 @@ const fakeUploads = {
 };
 
 type SmartDocumentSidebarProps = {
-  onSelect?: (category: string, subcategory: string) => void;
+  onSelect?: (category: string, subcategory: string | null) => void;
   activeCategory?: string;
   activeSubcategory?: string;
 };
@@ -211,15 +215,22 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
     );
   };
 
+  // Combine Dropbox at the top with normal categories
+  const allCategories = [
+    DROPBOX_OPTION,
+    ...DOCUMENT_STRUCTURE.map((cat, i) => ({
+      ...cat,
+      colorClass: categoryColors[(i + 1) % categoryColors.length],
+      index: i + 1
+    }))
+  ];
+
   return (
     <aside
       className={cn(
-        "w-80 min-w-[16rem] max-w-xs h-full pt-7 px-3 pb-6 flex flex-col border-r border-neutral-200 shadow-2xl",
-        sidebarBg,
-        roundedTopRight
+        "w-80 min-w-[16rem] max-w-xs h-full pt-7 px-3 pb-6 flex flex-col border-r border-neutral-200 shadow-2xl bg-blue-500/60 rounded-tr-3xl"
       )}
       style={{
-        // Add a subtle glass effect, blue transparency
         backdropFilter: "blur(7px)",
         WebkitBackdropFilter: "blur(7px)",
         borderTopRightRadius: "2rem",
@@ -233,7 +244,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
           aria-label="Go Back"
           type="button"
         >
-          {/* Left Arrow, horizontal */}
           <ArrowLeft className="h-6 w-6" />
         </button>
         <span className="ml-2 text-xl font-extrabold text-white tracking-wide">File Manager</span>
@@ -245,14 +255,35 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
           checked={onlyShowWithFiles}
           onCheckedChange={(checked) => setOnlyShowWithFiles(!!checked)}
         />
-        <label htmlFor="show-with-files" className="ml-2 font-medium text-sm text-white select-none">
+        <label htmlFor="show-with-files" className="ml-4 font-semibold text-base text-white select-none">
           Only show documents that contain files
         </label>
       </div>
       <nav className="flex-1 overflow-y-auto pr-1">
         <div className="flex flex-col gap-4">
+          {/* Dropbox category */}
+          <div
+            key="Dropbox"
+            className={cn(
+              "rounded-2xl shadow-lg transition-shadow bg-[#0ea5e9] hover:bg-[#0369a1] text-white font-bold border-2 border-blue-100",
+              activeCategory === "Dropbox" ? "ring-2 ring-white/80 scale-[1.01]" : ""
+            )}
+          >
+            <button
+              onClick={() => onSelect?.("Dropbox", null)}
+              className={cn(
+                "flex items-center w-full px-5 py-4 rounded-2xl text-lg font-bold justify-between focus:outline-none"
+              )}
+            >
+              <span className="flex items-center gap-3">
+                <Box className="h-5 w-5" />
+                Dropbox
+              </span>
+            </button>
+          </div>
+          {/* Document categories */}
           {DOCUMENT_STRUCTURE.map((cat, idx) => {
-            const colorClass = categoryColors[idx % categoryColors.length];
+            const colorClass = categoryColors[(idx + 1) % categoryColors.length];
             const isOpen = openCategories.includes(cat.name);
 
             return (
@@ -264,12 +295,10 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                   isOpen ? "ring-2 ring-white/80" : ""
                 )}
               >
-                {/* Category Header */}
                 <button
                   onClick={() => handleCategoryClick(cat.name)}
                   className={cn(
                     "flex items-center w-full px-5 py-3 rounded-2xl text-lg font-bold justify-between focus:outline-none",
-                    whiteText,
                     isOpen ? "border-b-2 border-white/30" : "border-0",
                     colorClass
                   )}
@@ -280,7 +309,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                   </span>
                   {isOpen ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                 </button>
-                {/* Subcategory List */}
                 {isOpen && (
                   <ul className="py-3 px-3 flex flex-col gap-3">
                     {cat.subcategories.filter(isUploaded).map((sub) => (
@@ -289,7 +317,6 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
                           onClick={() => onSelect?.(cat.name, sub)}
                           className={cn(
                             "flex items-center w-full px-4 py-2 rounded-xl font-medium text-base border-2 outline-none transition-transform duration-150 group",
-                            whiteText,
                             activeSubcategory === sub
                               ? "border-white bg-white/20 ring-2 ring-white/70 scale-[1.025] font-bold"
                               : "border-[#8E9196] bg-white/10 hover:bg-white/15 hover:scale-[1.01]",
@@ -324,4 +351,3 @@ export const SmartDocumentSidebar: React.FC<SmartDocumentSidebarProps> = ({
 };
 
 export default SmartDocumentSidebar;
-
