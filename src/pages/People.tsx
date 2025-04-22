@@ -342,35 +342,28 @@ const People = () => {
     };
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      
-      if (!token) {
-        toast.error("Authentication required. Please sign in to add a lead.");
-        return;
-      }
-      
-      const response = await supabase.functions.invoke('store-leads', {
-        body: {
-          leads: [newLead],
-          leadType: "custom"
-        },
-        headers: {
-          Authorization: `Bearer ${token}`
+      const response = await fetch(
+        "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/store-leads",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            leads: [newLead],
+            leadType: "custom"
+          }),
         }
-      });
+      );
 
-      if (response.error) {
-        console.error("API error response:", response.error);
-        throw new Error(response.error.message || "Failed to store lead");
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error("API error response:", errorData);
+        throw new Error(errorData.error || "Failed to store lead");
       }
       
-      if (response.data?.error) {
-        console.error("API error in response data:", response.data.error);
-        throw new Error(response.data.error || "Failed to store lead");
-      }
-      
-      console.log("API success response:", response.data);
+      const responseData = await response.json();
+      console.log("API success response:", responseData);
       
       setLeads([...leads, newLead]);
       setIsAddLeadOpen(false);
@@ -378,7 +371,7 @@ const People = () => {
       toast.success("Lead added successfully");
     } catch (error) {
       console.error("Failed to add lead:", error);
-      toast.error(`Failed to add lead: ${error instanceof Error ? error.message : "Please try again."}`);
+      toast.error("Failed to add lead. Please try again.");
     }
   };
 

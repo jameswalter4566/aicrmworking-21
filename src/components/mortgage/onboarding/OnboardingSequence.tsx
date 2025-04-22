@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -149,11 +148,6 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
   const mainBlue = "text-[#1769aa]"; // deep blue 
 
   // --- STEPS ---
-  // Determine the return URL for the Smart1003Builder
-  const currentPath = window.location.pathname;
-  const isClientPortal = currentPath.includes('client-portal');
-  const returnUrl = isClientPortal ? '/client-portal' : `/loan-application/${leadId}`;
-  
   // We add Smart1003DropStep after TransactionTypeStep and before WelcomeStep
   const steps = [
     <TransactionTypeStep
@@ -168,7 +162,6 @@ export const OnboardingSequence = ({ leadId, initialData, onComplete }: Onboardi
       key="smart-1003-dropbox"
       leadId={leadId}
       onContinue={() => setCurrentStep(2)}
-      returnUrl={returnUrl}
     />,
     <WelcomeStep
       key="welcome"
