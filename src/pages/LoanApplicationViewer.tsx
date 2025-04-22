@@ -535,6 +535,12 @@ const LoanApplicationViewer = () => {
 
       <LoanProgressTracker leadId={id || ''} showLoader={true} />
       
+      <div className="bg-white px-8 py-4 border-b">
+        <PDFDropZone 
+          onFileAccepted={handleFileAccepted} 
+          className="max-w-3xl mx-auto"
+        />
+      </div>
 
       <div className="flex flex-1 overflow-hidden">
         <LoanApplicationSidebar 
