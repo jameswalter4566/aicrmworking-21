@@ -132,7 +132,7 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
     { id: "pitchDeck", name: "Pitch Deck Pro", icon: Presentation },
     { id: "aiLoanOfficer", name: "AI Loan Officer", icon: Brain },
     { id: "fees", name: "Fees", icon: FileBox },
-    { id: "documents", name: "Document Manager", icon: FolderClosed },
+    { id: "smartDocManager", name: "Smart Document Manager", icon: FolderClosed },
     { id: "conditions", name: "Conditions", icon: CheckCircle },
     { id: "withdraw", name: "Withdraw / Cancel", icon: XCircle },
   ];
@@ -236,6 +236,25 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
               );
             }
             
+            if (tab.id === "smartDocManager") {
+              return (
+                <li key={tab.id}>
+                  <a
+                    href={`/smart-document-manager${leadId ? `?leadId=${leadId}` : ""}`}
+                    className={cn(
+                      "flex items-center w-full px-4 py-3 text-left text-sm transition-colors rounded-md",
+                      isActive 
+                        ? "bg-mortgage-lightPurple text-mortgage-darkPurple font-medium border-r-4 border-mortgage-purple" 
+                        : "text-gray-700 hover:bg-gray-100"
+                    )}
+                  >
+                    <Icon className={cn("mr-3 h-5 w-5", isActive ? "text-mortgage-purple" : "text-gray-500")} />
+                    <span>{tab.name}</span>
+                  </a>
+                </li>
+              );
+            }
+
             return (
               <li key={tab.id}>
                 <button

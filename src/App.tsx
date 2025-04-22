@@ -45,6 +45,7 @@ import Dialer from "./pages/Dialer";
 import DialerSession from "./pages/DialerSession";
 import ClientPortalOnboarding from './pages/ClientPortalOnboarding';
 import Smart1003Builder from "./pages/Smart1003Builder";
+import SmartDocumentManager from "@/pages/SmartDocumentManager";
 
 const queryClient = new QueryClient();
 
@@ -292,6 +293,8 @@ function App() {
                 <Route path="/dialer-session" element={<DialerSession />} />
                 
                 <Route path="/mortgage/smart-1003-builder/:leadId" element={<ProtectedRoute><Smart1003Builder /></ProtectedRoute>} />
+                
+                <Route path="/smart-document-manager" element={<SmartDocumentManager />} />
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
