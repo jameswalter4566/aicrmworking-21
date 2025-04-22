@@ -40,7 +40,8 @@ Deno.serve(async (req) => {
     // Log detailed request information for debugging
     console.log('Store-leads function called - Path:', req.url);
     console.log('Request method:', req.method);
-    console.log('Auth header present:', !!req.headers.get('Authorization'));
+    const authHeaderExists = !!req.headers.get('Authorization');
+    console.log('Auth header present:', authHeaderExists);
     
     // Extract JWT token from Authorization header to identify the user
     const authHeader = req.headers.get('Authorization');
