@@ -19,10 +19,10 @@ serve(async (req) => {
 
     console.log(`Processing onboarding completion notification for lead ID: ${leadId}, client: ${clientName}`);
 
-    // Create Supabase client
+    // Create Supabase client with service role key for full access
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
@@ -42,9 +42,8 @@ serve(async (req) => {
         .select('phone_number, email')
         .eq('role', 'admin')
         .not('phone_number', 'is', null);
-        
+      
       if (adminsError || !adminProfiles || adminProfiles.length === 0) {
-        console.error('No admin users found to send SMS');
         throw new Error('No recipients found to send SMS notification');
       }
 
@@ -53,15 +52,14 @@ serve(async (req) => {
         .filter(phone => phone && phone.trim() !== '');
 
       console.log(`Found ${phoneNumbers.length} admin users to notify as fallback`);
-
+      
       // Send SMS to admin users
       const message = `Onboarding completed for a lead (ID: ${leadId}) without a specific creator. Check the system.`;
-      
       let successCount = 0;
+      
       for (const phoneNumber of phoneNumbers) {
         try {
           const smsResult = await sendSMS(phoneNumber, message);
-          
           if (smsResult.success) {
             successCount++;
             console.log(`Fallback SMS sent successfully to ${phoneNumber}`);
@@ -86,114 +84,46 @@ serve(async (req) => {
       );
     }
 
-    // If lead creator found, proceed with normal notification flow
-    let phoneNumbers = [];
-    
+    // Direct profile lookup from profiles table for creator's phone number
     if (leadData.created_by) {
       console.log(`Looking up profile for creator ID: ${leadData.created_by}`);
       
-      // First try to get the creator's phone number
-      const { data: profile, error: profileError } = await supabaseClient
+      const { data: profile } = await supabaseClient
         .from('profiles')
-        .select('phone_number, email')
+        .select('phone_number')
         .eq('id', leadData.created_by)
         .single();
 
-      if (!profileError && profile?.phone_number) {
-        console.log(`Found phone number for creator: ${profile.phone_number}`);
-        phoneNumbers.push(profile.phone_number);
-      } else {
-        console.warn(`Could not find phone number for lead creator: ${leadData.created_by}`);
+      if (profile?.phone_number) {
+        console.log(`Successfully found phone number for creator: ${profile.phone_number}`);
         
-        // Log more details about the profile query
-        if (profileError) {
-          console.error(`Profile query error: ${profileError.message}`);
-        } else if (!profile) {
-          console.error(`No profile found for user ID: ${leadData.created_by}`);
-        } else {
-          console.error(`Profile found but has no phone_number: ${JSON.stringify(profile)}`);
-        }
+        // Construct message with more context
+        const message = `${clientName || leadData.first_name || 'A client'} has completed their 1003! I have already built a Pitch Deck draft so you can get them some numbers immediately! I have also already sent them a checklist of all of the documents they have missed for submission. Go get em!`;
 
-        // Attempt to update the creator's phone_number if we have their email
-        if (profile && profile.email) {
-          console.log(`Found email for creator: ${profile.email}`);
-          
-          // Query any users with the same email who might have a phone number
-          const { data: emailProfiles, error: emailProfilesError } = await supabaseClient
-            .from('profiles')
-            .select('phone_number')
-            .eq('email', profile.email)
-            .not('phone_number', 'is', null);
-            
-          if (!emailProfilesError && emailProfiles && emailProfiles.length > 0) {
-            const validPhoneNumbers = emailProfiles
-              .map(p => p.phone_number)
-              .filter(phone => phone && phone.trim() !== '');
-              
-            if (validPhoneNumbers.length > 0) {
-              console.log(`Found ${validPhoneNumbers.length} phone numbers from email match`);
-              phoneNumbers.push(...validPhoneNumbers);
-            }
+        // Send SMS
+        try {
+          const smsResult = await sendSMS(profile.phone_number, message);
+          if (smsResult.success) {
+            console.log(`Successfully sent SMS to creator's phone: ${profile.phone_number}`);
+            return new Response(
+              JSON.stringify({ 
+                success: true, 
+                notifiedNumber: profile.phone_number,
+                leadCreatorId: leadData.created_by
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          } else {
+            throw new Error(`Failed to send SMS: ${smsResult.error}`);
           }
+        } catch (smsError) {
+          console.error(`Error sending SMS to ${profile.phone_number}:`, smsError);
+          throw smsError;
         }
       }
     }
-    
-    // If no phone numbers found, fallback to admin users
-    if (phoneNumbers.length === 0) {
-      console.log('No phone numbers found for lead creator, falling back to admin users');
-      
-      const { data: adminProfiles, error: adminsError } = await supabaseClient
-        .from('profiles')
-        .select('phone_number')
-        .eq('role', 'admin')
-        .not('phone_number', 'is', null);
-        
-      if (!adminsError && adminProfiles && adminProfiles.length > 0) {
-        phoneNumbers = adminProfiles
-          .map(profile => profile.phone_number)
-          .filter(phone => phone && phone.trim() !== '');
-        
-        console.log(`Found ${phoneNumbers.length} admin users to notify as fallback`);
-      }
-    }
 
-    if (phoneNumbers.length === 0) {
-      console.error('No recipients found to send SMS notification');
-      throw new Error('No recipients found to send SMS notification');
-    }
-
-    // Construct message with more context
-    const message = `${clientName || leadData.first_name || 'A client'} has completed their 1003! I have already built a Pitch Deck draft so you can get them some numbers immediately! I have also already sent them a checklist of all of the documents they have missed for submission. Go get em!`;
-
-    let successCount = 0;
-    
-    // Send SMS to each phone number
-    for (const phoneNumber of phoneNumbers) {
-      try {
-        console.log(`Attempting to send SMS to ${phoneNumber}`);
-        const smsResult = await sendSMS(phoneNumber, message);
-        
-        if (smsResult.success) {
-          successCount++;
-          console.log(`SMS sent successfully to ${phoneNumber}`);
-        } else {
-          console.error(`Failed to send SMS to ${phoneNumber}: ${smsResult.error}`);
-        }
-      } catch (smsError) {
-        console.error(`Error sending SMS to ${phoneNumber}:`, smsError);
-      }
-    }
-
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        notifiedCount: successCount,
-        totalRecipients: phoneNumbers.length,
-        leadCreatorId: leadData.created_by
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    throw new Error('No valid phone number found for notification');
 
   } catch (error) {
     console.error('Error in loan-onboarding-completed:', error);
