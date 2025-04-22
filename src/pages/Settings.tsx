@@ -130,7 +130,7 @@ const Settings = () => {
           .from('profiles')
           .select('phone_number')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         if (error) throw error;
         
@@ -139,6 +139,7 @@ const Settings = () => {
           setPhoneNumber(data.phone_number);
         } else {
           console.log("No phone number found in profile");
+          setPhoneNumber("");
         }
       } catch (error) {
         console.error("Failed to fetch user profile:", error);
@@ -312,6 +313,8 @@ const Settings = () => {
       const token = await getAuthToken();
       if (!token) throw new Error("No auth token available");
 
+      console.log("Updating phone number:", newPhoneNumber);
+      
       const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/update-user-account-info", {
         method: "POST",
         headers: {
@@ -324,13 +327,20 @@ const Settings = () => {
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Error response:", errorText);
         throw new Error("Failed to update profile");
       }
 
       const data = await response.json();
       console.log("Phone number update response:", data);
 
-      await fetchUserProfile(); // Refresh the profile data
+      setPhoneNumber(newPhoneNumber);
+      
+      setTimeout(() => {
+        fetchUserProfile();
+      }, 500);
+      
       return Promise.resolve();
     } catch (error) {
       console.error("Error updating phone number:", error);

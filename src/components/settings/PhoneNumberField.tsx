@@ -15,7 +15,7 @@ export const PhoneNumberField = ({ initialValue, onUpdate }: PhoneNumberFieldPro
   const [saving, setSaving] = useState(false);
   const [lastSavedNumber, setLastSavedNumber] = useState(initialValue || '');
 
-  // Update local state when initialValue changes
+  // Update local state when initialValue prop changes (e.g., after fetch)
   useEffect(() => {
     if (initialValue) {
       setPhoneNumber(initialValue);
@@ -81,7 +81,7 @@ export const PhoneNumberField = ({ initialValue, onUpdate }: PhoneNumberFieldPro
           type="tel"
           value={phoneNumber}
           onChange={handleChange}
-          placeholder={lastSavedNumber || "(555) 555-5555"}
+          placeholder={(lastSavedNumber || "(555) 555-5555")}
           className="flex-1"
         />
         <Button 

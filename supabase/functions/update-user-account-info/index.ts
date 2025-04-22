@@ -19,7 +19,7 @@ serve(async (req) => {
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
         auth: {
           autoRefreshToken: false,
@@ -51,18 +51,47 @@ serve(async (req) => {
     // Normalize phone number format (remove any non-digits if necessary)
     const normalizedPhoneNumber = phoneNumber ? phoneNumber.trim() : null;
     
-    // Update user profile
-    const { data, error: updateError } = await supabaseClient
+    // Verify if profile exists first
+    const { data: existingProfile, error: profileCheckError } = await supabaseClient
       .from('profiles')
-      .update({ 
-        phone_number: normalizedPhoneNumber,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', user.id);
+      .select('id')
+      .eq('id', user.id)
+      .maybeSingle();
 
-    if (updateError) {
-      console.error("Database update error:", updateError.message);
-      throw updateError;
+    if (profileCheckError) {
+      console.error("Error checking profile:", profileCheckError.message);
+      throw profileCheckError;
+    }
+
+    let updateResult;
+    
+    // If profile doesn't exist, create it
+    if (!existingProfile) {
+      console.log(`Creating new profile for user ${user.id}`);
+      updateResult = await supabaseClient
+        .from('profiles')
+        .insert({ 
+          id: user.id,
+          phone_number: normalizedPhoneNumber,
+          email: user.email,
+          updated_at: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        });
+    } else {
+      // Update existing profile
+      console.log(`Updating profile for user ${user.id}`);
+      updateResult = await supabaseClient
+        .from('profiles')
+        .update({ 
+          phone_number: normalizedPhoneNumber,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+    }
+
+    if (updateResult.error) {
+      console.error("Database update error:", updateResult.error.message);
+      throw updateResult.error;
     }
 
     // Verify the update was successful
