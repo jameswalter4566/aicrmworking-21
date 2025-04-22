@@ -1,67 +1,10 @@
 
-project_id = "crm"
+project_id = "imrmboyczebjlbnkgjns"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage", "graphql_public"]
-
-[db]
-port = 54322
-shadow_port = 54320
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://localhost"
-
-[inbucket]
-enabled = true
-port = 54324
-
-[storage]
-enabled = true
-port = 54325
-
-[auth]
-enabled = true
-port = 54326
-
-[realtime]
-enabled = true
-port = 54327
-
-[analytics]
-enabled = true
-port = 54328
-
-[pooler]
-enabled = true
-port = 54329
-connection_string = "postgresql://postgres:postgres@localhost:54322/postgres"
-
-[vector]
-enabled = true
-port = 54330
-
-[functions.retrieve-conditions]
-verify_jwt = false
-
-[functions.lead-profile]
-verify_jwt = false
-
+[functions]
 [functions.twilio-token]
 verify_jwt = false
-
 [functions.twilio-voice]
 verify_jwt = false
-
-[functions.test-edgefunction]
+[functions.store-leads]
 verify_jwt = false
-
-[functions.smart-1003-builder]
-verify_jwt = false
-
-[functions.update-lead]
-verify_jwt = false
-

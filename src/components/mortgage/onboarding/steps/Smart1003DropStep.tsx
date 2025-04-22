@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 interface Smart1003DropStepProps {
   leadId: string | number;
   onContinue: () => void;
+  returnUrl?: string;
 }
 
-const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinue }) => {
+const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinue, returnUrl }) => {
   return (
     <div className="flex flex-col items-center w-full">
       <h2 className="text-2xl md:text-3xl font-bold text-center mb-4 text-blue-800">
@@ -18,7 +19,7 @@ const Smart1003DropStep: React.FC<Smart1003DropStepProps> = ({ leadId, onContinu
         Upload your documents to auto-fill the application, or continue to fill it out manually.
       </p>
       <div className="mb-6 w-full max-w-lg">
-        <Smart1003BuilderDropbox leadId={String(leadId)} />
+        <Smart1003BuilderDropbox leadId={String(leadId)} returnUrl={returnUrl} />
       </div>
       <Button
         variant="default"

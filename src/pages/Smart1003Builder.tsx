@@ -56,9 +56,17 @@ const Smart1003Builder = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [origin, setOrigin] = useState<string | null>(null);
+  const [isClientPortal, setIsClientPortal] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
+    const isInClientPortal = window.location.pathname.includes('client-portal');
+    setIsClientPortal(isInClientPortal);
+    
+    const params = new URLSearchParams(location.search);
+    const o = params.get("origin");
+    setOrigin(o);
+
     const fetchData = async () => {
       try {
         const leadData = await leadProfileService.getLeadById(leadId || '');
@@ -182,13 +190,7 @@ const Smart1003Builder = () => {
     };
     
     fetchData();
-  }, [leadId, toast]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const o = params.get("origin");
-    setOrigin(o);
-  }, [location.search]);
+  }, [leadId, toast, location.search]);
 
   const fieldKey = (section: string, field: string) => `${section}__${field}`;
 
@@ -384,16 +386,25 @@ const Smart1003Builder = () => {
   };
 
   const handleGoToForm = () => {
-    if (origin) {
+    if (isClientPortal) {
+      navigate('/client-portal');
+      toast({
+        title: "1003 Form Updated",
+        description: "Your information has been saved to your loan application."
+      });
+    } else if (origin) {
       navigate(origin.startsWith("/") ? origin : `/${origin}`);
+      toast({
+        title: "1003 Form Updated",
+        description: "Your information has been saved to the 1003 form."
+      });
     } else {
-      navigate(`/people/${leadId}`);
+      navigate(`/loan-application/${leadId}`);
+      toast({
+        title: "1003 Form Updated",
+        description: "Your information has been saved to the 1003 form."
+      });
     }
-
-    toast({
-      title: "1003 Form Updated",
-      description: "Your information has been saved to the 1003 form."
-    });
   };
 
   return (

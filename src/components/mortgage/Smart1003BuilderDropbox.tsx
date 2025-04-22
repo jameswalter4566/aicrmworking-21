@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { FileUp, FileText, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
-// Function to create a data URL from a File object
 const createFileURL = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -22,9 +20,10 @@ const createFileURL = (file: File): Promise<string> => {
 interface Smart1003BuilderDropboxProps {
   leadId: string;
   dropboxId?: string;
+  returnUrl?: string;
 }
 
-const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadId, dropboxId }) => {
+const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadId, dropboxId, returnUrl }) => {
   const [files, setFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -99,7 +98,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
     try {
       setIsUploading(true);
       
-      // Show upload progress animation
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
@@ -110,7 +108,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
         });
       }, 300);
       
-      // Convert files to data URLs for processing
       const fileUrls = await Promise.all(files.map(file => createFileURL(file)));
       
       clearInterval(progressInterval);
@@ -124,7 +121,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
       });
       
       try {
-        // Call the edge function to process the documents
         const { data, error } = await supabase.functions.invoke('smart-1003-builder', {
           body: { 
             fileUrls, 
@@ -137,11 +133,17 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({ leadI
           throw new Error(error.message);
         }
         
-        // Encode origin parameter for redirect back to this dropbox
-        const encodedOrigin = dropboxId ? encodeURIComponent(dropboxId) : "";
-        const redirectUrl = `/mortgage/smart-1003-builder/${leadId}${encodedOrigin ? `?origin=${encodedOrigin}` : ""}`;
+        let redirectParams = '';
         
-        // Navigate to the smart builder results page
+        if (returnUrl) {
+          redirectParams = `?origin=${encodeURIComponent(returnUrl)}`;
+        } 
+        else if (dropboxId) {
+          redirectParams = `?origin=${encodeURIComponent(dropboxId)}`;
+        }
+        
+        const redirectUrl = `/mortgage/smart-1003-builder/${leadId}${redirectParams}`;
+        
         navigate(redirectUrl);
         
         toast({
