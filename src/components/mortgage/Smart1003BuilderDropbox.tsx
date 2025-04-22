@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,9 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
   const [processedFields, setProcessedFields] = useState<Record<string, any>>({});
   const [missingFields, setMissingFields] = useState<Array<any>>([]);
   const navigate = useNavigate();
+  const location = useLocation();
+  const { slug } = useParams();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -95,6 +98,19 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
 
   const handleRemoveFile = (index: number) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFinish = () => {
+    if (isClientPortal && slug) {
+      const token = searchParams.get('token');
+      if (token) {
+        navigate(`/client-portal/dashboard/${slug}?token=${token}`);
+      } else {
+        navigate(`/client-portal/dashboard/${slug}`);
+      }
+    } else {
+      navigate('/client-portal');
+    }
   };
 
   const handleProcessFiles = async () => {
@@ -312,7 +328,7 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             <div className="flex justify-center items-center gap-4 pt-4">
               <Button 
                 className="w-full sm:w-auto"
-                onClick={() => navigate('/client-portal')}
+                onClick={handleFinish}
               >
                 Finish
               </Button>
