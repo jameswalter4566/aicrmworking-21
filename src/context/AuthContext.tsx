@@ -54,6 +54,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, currentSession) => {
+        console.log("Auth state changed:", event);
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
@@ -68,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      console.log("Retrieved session:", currentSession ? "Session exists" : "No session");
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
@@ -90,7 +92,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Helper function to get the authentication token
   const getAuthToken = async (): Promise<string | null> => {
     const { data } = await supabase.auth.getSession();
-    return data?.session?.access_token || null;
+    const token = data?.session?.access_token || null;
+    console.log("Getting auth token:", token ? "Token exists" : "No token");
+    return token;
   };
 
   return (

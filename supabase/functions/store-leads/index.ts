@@ -45,8 +45,9 @@ Deno.serve(async (req) => {
     // Extract JWT token from Authorization header to identify the user
     const authHeader = req.headers.get('Authorization');
     let userId = null;
+    let isAuthenticated = false;
     
-    // Require authentication for storing leads
+    // Check if user is authenticated
     if (!authHeader) {
       return new Response(
         JSON.stringify({ 
@@ -98,6 +99,7 @@ Deno.serve(async (req) => {
       }
       
       userId = user.id;
+      isAuthenticated = true;
       console.log(`Request authenticated from user: ${userId}`);
     } catch (tokenError) {
       console.error('Token parsing error:', tokenError);
@@ -159,7 +161,8 @@ Deno.serve(async (req) => {
         success: true, 
         message: `Successfully stored ${leads.length} leads`, 
         data: result,
-        userId: userId
+        userId: userId,
+        isAuthenticated: isAuthenticated
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
