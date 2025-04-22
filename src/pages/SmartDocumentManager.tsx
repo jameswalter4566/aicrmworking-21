@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { FilePlus, FolderOpenIcon, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,8 @@ import SmartDocumentSidebar from "@/components/smart-documents/SmartDocumentSide
 import DropboxUploader from "@/components/smart-documents/DropboxUploader";
 import DocumentUploader from "@/components/smart-documents/DocumentUploader";
 import DocumentList from "@/components/smart-documents/DocumentList";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const SmartDocumentManager: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
@@ -14,6 +14,15 @@ const SmartDocumentManager: React.FC = () => {
   const [refreshDocuments, setRefreshDocuments] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const { id: leadId } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    // If no leadId is provided in the URL, redirect to the leads list
+    if (!leadId) {
+      toast.error("No lead ID provided");
+      navigate('/leads');
+    }
+  }, [leadId, navigate]);
   
   // Handle when documents have been uploaded to trigger a refresh
   const handleDocumentsUploaded = () => {
