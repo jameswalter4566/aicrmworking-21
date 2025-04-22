@@ -75,16 +75,13 @@ const Settings = () => {
             });
           } else {
             toast.error("Connection Failed", {
-              description: data.error || "Failed to connect Google account.",
-              variant: "destructive"
+              description: data.error || "Failed to connect Google account."
             });
           }
         } catch (error) {
           console.error("Error processing OAuth callback:", error);
           toast.error("Connection Error", {
-            title: "Connection Error",
-            description: "There was a problem connecting your Google account.",
-            variant: "destructive"
+            description: "There was a problem connecting your Google account."
           });
         } finally {
           setProcessingOAuth(false);
@@ -216,9 +213,7 @@ const Settings = () => {
     } catch (error) {
       console.error("Error initiating Google OAuth flow:", error);
       toast.error("Connection Error", {
-        title: "Connection Error",
-        description: "Failed to start the Google connection process. Please try again later.",
-        variant: "destructive"
+        description: "Failed to start the Google connection process. Please try again later."
       });
       setLoading(false);
     }
@@ -286,9 +281,7 @@ const Settings = () => {
     } catch (error) {
       console.error("Error disconnecting Google account:", error);
       toast.error("Disconnection Error", {
-        title: "Disconnection Error",
-        description: "Failed to disconnect your Google account. Please try again later.",
-        variant: "destructive"
+        description: "Failed to disconnect your Google account. Please try again later."
       });
     } finally {
       setLoading(false);
@@ -379,28 +372,40 @@ const Settings = () => {
               <div className="text-sm">{user?.email || "Not available"}</div>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
-              <div className="flex space-x-2">
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
-                  placeholder="Enter your phone number"
-                  className="flex-1"
-                />
-                <Button 
-                  onClick={saveUserProfile}
-                  disabled={savingProfile}
-                >
-                  {savingProfile ? "Saving..." : "Save"}
-                </Button>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Used for important updates about your account and pipeline
-              </p>
-            </div>
+            <PhoneNumberField 
+              initialValue={phoneNumber}
+              onUpdate={async (newPhoneNumber) => {
+                setPhoneNumber(newPhoneNumber);
+                setSavingProfile(true);
+                try {
+                  const token = await getAuthToken();
+                  if (!token) throw new Error("No auth token available");
+            
+                  const response = await fetch("https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/update-user-account-info", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                      phoneNumber: newPhoneNumber
+                    })
+                  });
+            
+                  if (!response.ok) {
+                    throw new Error("Failed to update profile");
+                  }
+            
+                  await fetchUserProfile(); // Refresh the profile data
+                  return Promise.resolve();
+                } catch (error) {
+                  console.error("Error updating phone number:", error);
+                  return Promise.reject(error);
+                } finally {
+                  setSavingProfile(false);
+                }
+              }}
+            />
           </CardContent>
         </Card>
 
