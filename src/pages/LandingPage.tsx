@@ -249,13 +249,25 @@ const LandingPage = () => {
     <div
       className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
-        min-h-[85vh] 
+        min-h-[85vh]
         relative z-40 border border-gray-100 transition-shadow
         -top-1
       "
     >
       <div className="w-full px-10 py-20 flex flex-col items-center justify-center h-full">
-        <h2 className="text-4xl font-bold text-gray-800 mb-8">Section 2 Placeholder</h2>
+        <img
+          src="/realestatesalesprolandingpagepic.jpg"
+          alt="Real Estate Sales Pro"
+          className="mx-auto object-contain rounded-xl shadow-lg"
+          style={{
+            maxWidth: "550px",
+            width: "100%",
+            maxHeight: "420px",
+            background: "#fff",
+            border: "1px solid #f0f0f0",
+          }}
+        />
+        <h2 className="text-4xl font-bold text-gray-800 mb-8 mt-12">Section 2 Placeholder</h2>
         <p className="text-lg text-gray-500 text-center">
           This is a large all-white, rounded-edge section. The background of the main landing page stays visible at the sides.
           Top ~5% of this section should always be visible at the bottom of the first section as a scroll cue.
