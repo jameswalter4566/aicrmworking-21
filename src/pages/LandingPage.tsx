@@ -466,7 +466,7 @@ const LandingPage = () => {
             aria-hidden="true"
             className="pointer-events-none select-none flex justify-center absolute left-0 right-0 w-full"
             style={{
-              bottom: -80, // Changed from -32 to move it down further
+              bottom: -180, // Changed from -32 to move it down further
               zIndex: 30,
             }}
           >
