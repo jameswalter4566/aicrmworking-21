@@ -8,6 +8,30 @@ import { Phone, Bot, LineChart, MessageSquare, Zap, Inbox } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
 
+const CategoryCard = ({
+  bgColor,
+  title,
+  subtitle,
+  description,
+  icon,
+}: {
+  bgColor: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  icon?: React.ReactNode;
+}) => (
+  <div
+    className={`rounded-2xl p-8 shadow-lg text-white flex flex-col items-start transition-transform duration-200 hover:scale-105`}
+    style={{ background: bgColor }}
+  >
+    <div className="mb-4 text-3xl">{icon}</div>
+    <div className="font-bold text-2xl mb-2">{title}</div>
+    <div className="mb-2 text-sm opacity-80">{subtitle}</div>
+    <div className="text-white/90">{description}</div>
+  </div>
+);
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const [featuresVisible, setFeaturesVisible] = useState(false);
@@ -454,6 +478,30 @@ const LandingPage = () => {
             }}
           >
             {section2Content}
+          </div>
+
+          <div className="max-w-6xl w-full mx-auto mt-10 px-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
+              <CategoryCard
+                bgColor="#1EAEDB"
+                title="Mortgage CRM"
+                subtitle="For Modern Mortgage Teams"
+                description="Automate nurture, compliance, and lead follow-up across multiple channels. Seamlessly manage borrowers, agents, and pipeline from prospect to funded."
+                // icon can be added via lucide-react as fallback if wanted
+              />
+              <CategoryCard
+                bgColor="linear-gradient(135deg, #b993d6 0%, #8ca6db 100%)"
+                title="Real Estate CRM"
+                subtitle="Built for Real Estate Agents"
+                description="Centralize all prospects and automate open house follow-up, appointment reminders, and client communication. Track deals with real-time analytics."
+              />
+              <CategoryCard
+                bgColor="linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
+                title="Debt Settlement CRM"
+                subtitle="Empower Debt Relief Teams"
+                description="Organize client onboarding, automate document collection, and streamline settlement offer management—all in one place."
+              />
+            </div>
           </div>
         </section>
       </div>
