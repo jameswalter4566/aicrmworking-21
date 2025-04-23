@@ -8,6 +8,7 @@ import { Phone, Bot, LineChart, MessageSquare, Zap, Inbox } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
 import { MockCRMInterface } from "@/components/demo/MockCRMInterface";
+import { Switch } from "@/components/ui/switch";
 
 const CategoryCard = ({
   bgColor,
@@ -290,6 +291,17 @@ const LandingPage = () => {
     </div>
   );
 
+  const handleIndustryToggle = (industry: 'mortgage' | 'realEstate' | 'debtSettlement') => {
+    setSelectedIndustry((current) => current === industry ? industry : industry);
+    
+    // Disable other switches when one is enabled
+    document.querySelectorAll('[data-industry]').forEach((el) => {
+      if (el.getAttribute('data-industry') !== industry) {
+        (el as HTMLInputElement).checked = false;
+      }
+    });
+  };
+
   return (
     <div
       className="min-h-screen w-full overflow-x-hidden"
@@ -484,29 +496,61 @@ const LandingPage = () => {
 
           <div className="max-w-6xl w-full mx-auto mt-10 px-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
-              <div onClick={() => setSelectedIndustry('mortgage')} className="cursor-pointer">
-                <CategoryCard
-                  bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'}
-                  title="Mortgage CRM"
-                  subtitle="For Modern Mortgage Teams"
-                  description="Automate nurture, compliance, and lead follow-up across multiple channels. Seamlessly manage borrowers, agents, and pipeline from prospect to funded."
-                />
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-semibold text-white">Mortgage CRM</h3>
+                  <Switch
+                    data-industry="mortgage"
+                    checked={selectedIndustry === 'mortgage'}
+                    onCheckedChange={() => handleIndustryToggle('mortgage')}
+                  />
+                </div>
+                <div onClick={() => handleIndustryToggle('mortgage')} className="cursor-pointer">
+                  <CategoryCard
+                    bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'}
+                    title="Mortgage CRM"
+                    subtitle="For Modern Mortgage Teams"
+                    description="Automate nurture, compliance, and lead follow-up across multiple channels. Seamlessly manage borrowers, agents, and pipeline from prospect to funded."
+                  />
+                </div>
               </div>
-              <div onClick={() => setSelectedIndustry('realEstate')} className="cursor-pointer">
-                <CategoryCard
-                  bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'}
-                  title="Real Estate CRM"
-                  subtitle="Built for Real Estate Agents"
-                  description="Centralize all prospects and automate open house follow-up, appointment reminders, and client communication. Track deals with real-time analytics."
-                />
+
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-semibold text-white">Real Estate CRM</h3>
+                  <Switch
+                    data-industry="realEstate"
+                    checked={selectedIndustry === 'realEstate'}
+                    onCheckedChange={() => handleIndustryToggle('realEstate')}
+                  />
+                </div>
+                <div onClick={() => handleIndustryToggle('realEstate')} className="cursor-pointer">
+                  <CategoryCard
+                    bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'}
+                    title="Real Estate CRM"
+                    subtitle="Built for Real Estate Agents"
+                    description="Centralize all prospects and automate open house follow-up, appointment reminders, and client communication. Track deals with real-time analytics."
+                  />
+                </div>
               </div>
-              <div onClick={() => setSelectedIndustry('debtSettlement')} className="cursor-pointer">
-                <CategoryCard
-                  bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'}
-                  title="Debt Settlement CRM"
-                  subtitle="Empower Debt Relief Teams"
-                  description="Organize client onboarding, automate document collection, and streamline settlement offer management—all in one place."
-                />
+
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-xl font-semibold text-white">Debt Settlement CRM</h3>
+                  <Switch
+                    data-industry="debtSettlement"
+                    checked={selectedIndustry === 'debtSettlement'}
+                    onCheckedChange={() => handleIndustryToggle('debtSettlement')}
+                  />
+                </div>
+                <div onClick={() => handleIndustryToggle('debtSettlement')} className="cursor-pointer">
+                  <CategoryCard
+                    bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'}
+                    title="Debt Settlement CRM"
+                    subtitle="Empower Debt Relief Teams"
+                    description="Organize client onboarding, automate document collection, and streamline settlement offer management—all in one place."
+                  />
+                </div>
               </div>
             </div>
           </div>
