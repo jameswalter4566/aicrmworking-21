@@ -7,6 +7,7 @@ import { FeatureCard } from "@/components/FloatingCards";
 import { Phone, Bot, LineChart, MessageSquare, Zap, Inbox } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
+import { MockCRMInterface } from "@/components/demo/MockCRMInterface";
 
 const CategoryCard = ({
   bgColor,
@@ -37,7 +38,8 @@ const LandingPage = () => {
   const [featuresVisible, setFeaturesVisible] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isActive, setIsActive] = useState(false);
-  
+  const [selectedIndustry, setSelectedIndustry] = useState<'mortgage' | 'realEstate' | 'debtSettlement'>('mortgage');
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setFeaturesVisible(true);
@@ -278,12 +280,12 @@ const LandingPage = () => {
         -top-1
       "
     >
-      <div className="w-full px-10 py-20 flex flex-col items-center justify-center h-full">
-        <h2 className="text-4xl font-bold text-gray-800 mb-8">Section 2 Placeholder</h2>
-        <p className="text-lg text-gray-500 text-center">
-          This is a large all-white, rounded-edge section. The background of the main landing page stays visible at the sides.
-          Top ~5% of this section should always be visible at the bottom of the first section as a scroll cue.
+      <div className="w-full px-6 py-12 flex flex-col items-center justify-center h-full">
+        <h2 className="text-3xl font-bold text-gray-800 mb-8">Experience Our Industry-Specific CRM</h2>
+        <p className="text-lg text-gray-500 text-center mb-8 max-w-2xl">
+          See how our CRM adapts to different industries. Click on the cards below to preview each version.
         </p>
+        <MockCRMInterface industry={selectedIndustry} />
       </div>
     </div>
   );
@@ -482,25 +484,30 @@ const LandingPage = () => {
 
           <div className="max-w-6xl w-full mx-auto mt-10 px-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
-              <CategoryCard
-                bgColor="#1EAEDB"
-                title="Mortgage CRM"
-                subtitle="For Modern Mortgage Teams"
-                description="Automate nurture, compliance, and lead follow-up across multiple channels. Seamlessly manage borrowers, agents, and pipeline from prospect to funded."
-                // icon can be added via lucide-react as fallback if wanted
-              />
-              <CategoryCard
-                bgColor="linear-gradient(135deg, #b993d6 0%, #8ca6db 100%)"
-                title="Real Estate CRM"
-                subtitle="Built for Real Estate Agents"
-                description="Centralize all prospects and automate open house follow-up, appointment reminders, and client communication. Track deals with real-time analytics."
-              />
-              <CategoryCard
-                bgColor="linear-gradient(135deg, #11998e 0%, #38ef7d 100%)"
-                title="Debt Settlement CRM"
-                subtitle="Empower Debt Relief Teams"
-                description="Organize client onboarding, automate document collection, and streamline settlement offer management—all in one place."
-              />
+              <div onClick={() => setSelectedIndustry('mortgage')} className="cursor-pointer">
+                <CategoryCard
+                  bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'}
+                  title="Mortgage CRM"
+                  subtitle="For Modern Mortgage Teams"
+                  description="Automate nurture, compliance, and lead follow-up across multiple channels. Seamlessly manage borrowers, agents, and pipeline from prospect to funded."
+                />
+              </div>
+              <div onClick={() => setSelectedIndustry('realEstate')} className="cursor-pointer">
+                <CategoryCard
+                  bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'}
+                  title="Real Estate CRM"
+                  subtitle="Built for Real Estate Agents"
+                  description="Centralize all prospects and automate open house follow-up, appointment reminders, and client communication. Track deals with real-time analytics."
+                />
+              </div>
+              <div onClick={() => setSelectedIndustry('debtSettlement')} className="cursor-pointer">
+                <CategoryCard
+                  bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'}
+                  title="Debt Settlement CRM"
+                  subtitle="Empower Debt Relief Teams"
+                  description="Organize client onboarding, automate document collection, and streamline settlement offer management—all in one place."
+                />
+              </div>
             </div>
           </div>
         </section>
