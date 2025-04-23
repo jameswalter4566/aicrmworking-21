@@ -29,11 +29,9 @@ serve(async (req) => {
     const category = formData.get("category") as string;
     const subcategory = formData.get("subcategory") as string;
     
-    // Validate input parameters
-    if (!file) throw new Error("No file uploaded");
-    if (!leadId || leadId === 'undefined') throw new Error("Invalid lead ID");
-    if (!category) throw new Error("Category is required");
-    if (!subcategory) throw new Error("Subcategory is required");
+    if (!file || !leadId || !category || !subcategory) {
+      throw new Error("Missing required fields: file, leadId, category, subcategory");
+    }
 
     // Create document path format: lead_id/category/subcategory/filename
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;

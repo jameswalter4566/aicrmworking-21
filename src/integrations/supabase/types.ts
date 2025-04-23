@@ -243,48 +243,6 @@ export type Database = {
           },
         ]
       }
-      document_files: {
-        Row: {
-          category: string
-          created_at: string | null
-          file_name: string
-          file_path: string
-          file_size: number
-          file_type: string
-          id: number
-          lead_id: string
-          original_name: string
-          subcategory: string
-          updated_at: string | null
-        }
-        Insert: {
-          category: string
-          created_at?: string | null
-          file_name: string
-          file_path: string
-          file_size: number
-          file_type: string
-          id?: number
-          lead_id: string
-          original_name: string
-          subcategory: string
-          updated_at?: string | null
-        }
-        Update: {
-          category?: string
-          created_at?: string | null
-          file_name?: string
-          file_path?: string
-          file_size?: number
-          file_type?: string
-          id?: number
-          lead_id?: string
-          original_name?: string
-          subcategory?: string
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
       docusign_envelopes: {
         Row: {
           condition_id: string
