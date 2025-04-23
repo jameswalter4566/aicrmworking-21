@@ -1,5 +1,4 @@
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import MetricsGrid from "@/components/dashboard/MetricsGrid";
 import ActivityTable from "@/components/dashboard/ActivityTable";
@@ -9,8 +8,9 @@ import { FilterX, Settings } from "lucide-react";
 import { useIndustry } from "@/context/IndustryContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
+import NotificationStrip, { Notification } from "@/components/dashboard/NotificationStrip";
+import { supabase } from "@/integrations/supabase/client";
 
-// Sample data
 const contacts = [
   {
     id: 1,
@@ -26,7 +26,59 @@ const contacts = [
 
 const Index = () => {
   const { activeIndustry } = useIndustry();
-  
+
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const addNotification = (notification: Notification) => {
+    setNotifications((prev) =>
+      prev.some((n) => n.id === notification.id) ? prev : [...prev, notification]
+    );
+  };
+
+  const clearNotification = (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  useEffect(() => {
+    const leadsChannel = supabase.channel("dashboard-onboarding")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "leads" },
+        (payload) => {
+          const first = payload.new?.first_name || "A client";
+          const last = payload.new?.last_name ? ` ${payload.new.last_name}` : "";
+          addNotification({
+            id: `onboarding-${payload.new.id || Math.random()}`,
+            type: "onboarding",
+            message: `${first}${last} has completed their onboarding.`,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      )
+      .subscribe();
+
+    const docChannel = supabase.channel("dashboard-docs")
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "document_files" },
+        (payload) => {
+          const fname = payload.new?.original_name || "A new document";
+          addNotification({
+            id: `doc-${payload.new.id || Math.random()}`,
+            type: "document",
+            message: `A new document has been uploaded: ${fname}`,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(leadsChannel);
+      supabase.removeChannel(docChannel);
+    };
+  }, []);
+
   return (
     <MainLayout>
       {!activeIndustry && (
@@ -57,6 +109,15 @@ const Index = () => {
       </div>
       
       <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-4">
+        <div className="flex flex-col gap-2 mb-4">
+          {notifications.map((notification) => (
+            <NotificationStrip
+              key={notification.id}
+              notification={notification}
+              onClear={clearNotification}
+            />
+          ))}
+        </div>
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold text-gray-700 uppercase text-sm">Recent Activity</h2>
           <Button variant="outline" size="sm" className="text-xs">
