@@ -7,13 +7,11 @@ import { FeatureCard } from "@/components/FloatingCards";
 import { Phone, Bot, LineChart, MessageSquare, Zap, Inbox } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
-
 const LandingPage = () => {
   const navigate = useNavigate();
   const [featuresVisible, setFeaturesVisible] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isActive, setIsActive] = useState(false);
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setFeaturesVisible(true);
@@ -24,7 +22,6 @@ const LandingPage = () => {
       setIsActive(false);
     };
   }, []);
-
   useEffect(() => {
     if (!isActive) return;
     let animationId: number;
@@ -45,13 +42,11 @@ const LandingPage = () => {
       cancelAnimationFrame(animationId);
     };
   }, [isActive]);
-
   const rotatingTexts = ["Mortgage Loan Officers", "Real Estate Agents", "Debt Officers"];
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
   const navigateToAuth = () => {
     navigate("/auth");
   };
-
   const floatingFeatureCards = React.useMemo(() => [{
     id: 1,
     component: <div onClick={navigateToAuth} className="cursor-pointer">
@@ -119,7 +114,6 @@ const LandingPage = () => {
     delay: 200,
     zIndex: 10
   }], []);
-
   const getLoadingPosition = React.useCallback((progress: number) => {
     const width = 300;
     const height = 56;
@@ -167,14 +161,11 @@ const LandingPage = () => {
       y
     };
   }, []);
-
   const loadingPos = isActive ? getLoadingPosition(loadingProgress) : {
     x: 0,
     y: 0
   };
-
   const trailSegments = 20;
-
   const section2Content = <div className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
         min-h-[85vh]
@@ -187,11 +178,11 @@ const LandingPage = () => {
       }}>
           <img src="/realestatesalesprolandingpagepic.jpg" alt="Real Estate Sales Pro" style={{
           width: "90%",
-          height: "57vh",
-          minHeight: "396px",
+          height: "52vh",
+          minHeight: "360px",
           minWidth: "340px",
           maxWidth: "96%",
-          maxHeight: "68vh",
+          maxHeight: "62vh",
           background: "#fff",
           border: "1px solid #f0f0f0",
           display: "block",
@@ -204,7 +195,6 @@ const LandingPage = () => {
         </p>
       </div>
     </div>;
-
   return <div className="min-h-screen w-full overflow-x-hidden" style={{
     background: "linear-gradient(to bottom, #1e3a8a 0%, #111827 100%)"
   }}>
@@ -354,5 +344,4 @@ const LandingPage = () => {
       </div>
     </div>;
 };
-
 export default LandingPage;
