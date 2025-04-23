@@ -264,17 +264,18 @@ const LandingPage = () => {
           <img
             src="/realestatesalesprolandingpagepic.jpg"
             alt="Real Estate Sales Pro"
-            className="mx-auto object-contain rounded-xl shadow-lg"
+            className="mx-auto rounded-xl shadow-lg object-fill"
             style={{
-              maxWidth: "95%",
-              maxHeight: "95%",
-              width: "auto",
-              height: "auto",
-              minWidth: "280px",
-              minHeight: "200px",
+              width: "90%",
+              height: "88vh",
+              minHeight: "540px",
+              minWidth: "340px",
+              maxWidth: "96%",
+              maxHeight: "92vh",
               background: "#fff",
               border: "1px solid #f0f0f0",
               display: "block",
+              objectFit: "fill",
             }}
           />
         </div>
