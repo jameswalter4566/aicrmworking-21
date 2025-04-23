@@ -276,7 +276,7 @@ const LandingPage = () => {
     <div
       className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
-        min-h-[70vh] 
+        min-h-[75vh] 
         relative z-40 border border-gray-100 transition-shadow
         -top-1
       "
@@ -477,9 +477,10 @@ const LandingPage = () => {
         </section>
         
         <section
-          className="relative flex flex-col items-center pt-0 snap-start"
+          className="relative flex flex-col items-center pt-0 snap-start bg-slate-900"
           style={{
             minHeight: "100vh",
+            marginTop: '-1px' // This prevents the white strip from showing
           }}
         >
           <div 
