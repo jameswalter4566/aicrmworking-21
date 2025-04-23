@@ -132,11 +132,14 @@ async function createExtractionJob(accessToken: string, apiBase: string, assetID
   try {
     console.log(`Creating extraction job for asset ID: ${assetID}`);
     
-    // Configure the extraction request
+    // Configure the extraction request - THIS IS THE KEY CHANGE
+    // The Adobe API is strict about the format of the elementsToExtract array
     const extractionRequest: any = {
-      "assetID": assetID,
-      "elementsToExtract": ["text", "tables"]
+      "assetID": assetID
     };
+    
+    // Always include the elementsToExtract array with proper format
+    extractionRequest.elementsToExtract = ["text", "tables"];
     
     // If limiting to first 3 pages
     if (limitToFirstThreePages) {
@@ -145,6 +148,8 @@ async function createExtractionJob(accessToken: string, apiBase: string, assetID
         "endPage": 3
       }];
     }
+    
+    console.log("Extraction request payload:", JSON.stringify(extractionRequest));
     
     const extractUrl = buildAdobeApiUrl(apiBase, '/operation/extractpdf');
     const extractResponse = await fetch(extractUrl, {
@@ -159,9 +164,10 @@ async function createExtractionJob(accessToken: string, apiBase: string, assetID
     
     console.log(`Extract response status: ${extractResponse.status}`);
     
-    // Accept both 201 (Created) and 202 (Accepted) status codes as successful responses
+    // Log error response for debugging
     if (![201, 202].includes(extractResponse.status)) {
       const errorBody = await extractResponse.text();
+      console.error(`Failed extraction response: ${errorBody}`);
       throw new Error(`Failed to create extraction job: ${errorBody}`);
     }
     
@@ -520,6 +526,64 @@ ${categoriesList}`
   }
 }
 
+// Add a fallback document classification function that uses patterns and filename
+function classifyDocumentByPatterns(fileName: string): { category: string, subcategory: string } | null {
+  fileName = fileName.toLowerCase();
+  
+  // Tax document patterns - more specific first
+  // W-2 pattern detection (high priority)
+  if (fileName.includes('w-2') || fileName.includes('w2') || fileName.includes('wage') && fileName.includes('tax')) {
+    return {
+      category: "Income",
+      subcategory: "W-2 / 1099"
+    };
+  }
+  
+  // 1099 pattern detection
+  if (fileName.includes('1099')) {
+    return {
+      category: "Income",
+      subcategory: "W-2 / 1099"
+    };
+  }
+  
+  // Tax returns pattern detection
+  if (fileName.includes('1040') || fileName.includes('tax') && fileName.includes('return')) {
+    return {
+      category: "Income",
+      subcategory: "Tax Returns (1040s, K-1s)"
+    };
+  }
+  
+  // Pay stubs pattern detection
+  if ((fileName.includes('pay') && (fileName.includes('stub') || fileName.includes('statement'))) || 
+      fileName.includes('paystub')) {
+    return {
+      category: "Income",
+      subcategory: "Pay Stubs"
+    };
+  }
+  
+  // Bank statements pattern detection
+  if (fileName.includes('bank') && fileName.includes('statement')) {
+    return {
+      category: "Assets",
+      subcategory: "Bank Statements"
+    };
+  }
+
+  // ID documents pattern detection
+  if (fileName.includes('driver') || fileName.includes('license') || fileName.includes('id card')) {
+    return {
+      category: "Identification",
+      subcategory: "Driver's License"
+    };
+  }
+  
+  // No pattern match found
+  return null;
+}
+
 /**
  * Process the document and store it in the appropriate category
  */
@@ -534,8 +598,41 @@ async function processAndOrganizeDocument(
   try {
     console.log(`Processing document: ${fileName}`);
     
-    // Download the file
-    console.log("Downloading file from:", fileUrl);
+    // First try pattern-based classification by filename
+    const patternClassification = classifyDocumentByPatterns(fileName);
+    if (patternClassification) {
+      console.log(`Pattern-based classification found: ${patternClassification.category} > ${patternClassification.subcategory}`);
+      
+      // Store the document with the pattern-based classification
+      console.log(`Storing document using pattern classification: ${patternClassification.category}/${patternClassification.subcategory}`);
+      
+      // Create form data for the store-document function
+      const formData = new FormData();
+      formData.append("file", originalFile);
+      formData.append("leadId", leadId);
+      formData.append("category", patternClassification.category);
+      formData.append("subcategory", patternClassification.subcategory);
+      
+      // Call the store-document function
+      const { data, error } = await supabase.functions.invoke("store-document", {
+        body: formData,
+      });
+      
+      if (error) {
+        console.error("Error storing document:", error);
+        throw error;
+      }
+      
+      console.log("Document successfully stored via pattern matching:", data);
+      return {
+        success: true,
+        classification: patternClassification,
+        data: data
+      };
+    }
+    
+    // Download the file if pattern matching didn't work
+    console.log("No pattern match found. Downloading file from:", fileUrl);
     const fileResponse = await fetch(fileUrl);
     if (!fileResponse.ok) {
       throw new Error(`Failed to download file: ${fileResponse.statusText}`);
@@ -578,11 +675,14 @@ async function processAndOrganizeDocument(
         }
       } catch (extractionError) {
         console.error("Error extracting PDF content:", extractionError);
-        // Continue with default classification if extraction fails
+        // Continue with OpenAI classification using just the filename
+        console.log("Falling back to OpenAI classification with just filename...");
+        documentClassification = await identifyDocumentType(fileName);
       }
     } else {
-      console.log("Non-PDF file detected, skipping text extraction");
-      // For non-PDF files, use default classification
+      console.log("Non-PDF file detected, classifying based on filename");
+      // For non-PDF files, use OpenAI to classify based on filename
+      documentClassification = await identifyDocumentType(fileName);
     }
     
     // Store the document in the identified category and subcategory
