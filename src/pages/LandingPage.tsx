@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
-import { Phone, Bot, LineChart, MessageSquare, FileCheck, Zap, Inbox } from "lucide-react";
+import { Phone, Bot, LineChart, MessageSquare, Zap, Inbox } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
 
@@ -245,164 +245,196 @@ const LandingPage = () => {
 
   const trailSegments = 20;
 
+  const section2Content = (
+    <div
+      className="
+        w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl
+        mx-auto my-0 flex flex-col items-center justify-center
+        min-h-[85vh]
+        relative z-40
+        border border-gray-100
+        transition-shadow
+        "
+      style={{
+        marginTop: '-5vh',
+      }}
+    >
+      <div className="w-full px-10 py-20 flex flex-col items-center justify-center h-full">
+        <h2 className="text-4xl font-bold text-gray-800 mb-8">Section 2 Placeholder</h2>
+        <p className="text-lg text-gray-500">
+          This is a large all-white, rounded-edge section. The background of the main landing page stays visible at the sides. 
+          Top ~5% of this section should always be visible at the bottom of the first section as a scroll cue.
+        </p>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen flex flex-col">
-      <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
-        <div className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4 px-6">
-          <div className="container mx-auto flex justify-center items-center">
-            <div className="flex items-center absolute left-6" onClick={navigateToAuth}>
-              <div className="h-10 w-10 flex items-center justify-center bg-crm-blue text-white rounded cursor-pointer">
-                <span className="font-bold text-sm">CRM</span>
+    <div
+      className="min-h-screen w-full overflow-x-hidden"
+      style={{
+        background: "linear-gradient(to bottom, #1e3a8a 0%, #111827 100%)",
+      }}
+    >
+      <div
+        className="
+          h-screen w-full overflow-y-scroll snap-y snap-mandatory
+          scrollbar-none
+          "
+        style={{ scrollBehavior: "smooth" }}
+      >
+        <section className="min-h-screen w-full flex flex-col snap-start">
+          <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
+            <div className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4 px-6">
+              <div className="container mx-auto flex justify-center items-center">
+                <div className="flex items-center absolute left-6" onClick={navigateToAuth}>
+                  <div className="h-10 w-10 flex items-center justify-center bg-crm-blue text-white rounded cursor-pointer">
+                    <span className="font-bold text-sm">CRM</span>
+                  </div>
+                  <span className="ml-2 text-lg font-semibold text-white enhanced-glow-text cursor-pointer">SalesPro</span>
+                </div>
+                
+                <NavigationMenu className="hidden md:flex">
+                  <NavigationMenuList className="space-x-8">
+                    {["How It Works", "Features", "Plans", "Mortgage", "Real Estate", "Debt Settlement"].map((text) => (
+                      <NavigationMenuItem key={text}>
+                        <NavigationMenuLink 
+                          onClick={navigateToAuth}
+                          className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text cursor-pointer"
+                        >
+                          {text}
+                        </NavigationMenuLink>
+                      </NavigationMenuItem>
+                    ))}
+                    <NavigationMenuItem>
+                      <Button 
+                        onClick={navigateToAuth} 
+                        variant="outline" 
+                        className="bg-transparent text-white border-white hover:bg-white/10"
+                      >
+                        Sign In
+                      </Button>
+                    </NavigationMenuItem>
+                  </NavigationMenuList>
+                </NavigationMenu>
               </div>
-              <span className="ml-2 text-lg font-semibold text-white enhanced-glow-text cursor-pointer">SalesPro</span>
+            </div>
+
+            <div className="absolute inset-0 z-0">
+              <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.2)_0%,rgba(30,58,138,0)_70%)] z-0"></div>
+              <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-slate-900 to-transparent z-10"></div>
+              <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-slate-900 to-transparent z-10"></div>
             </div>
             
-            <NavigationMenu className="hidden md:flex">
-              <NavigationMenuList className="space-x-8">
-                {["How It Works", "Features", "Plans", "Mortgage", "Real Estate", "Debt Settlement"].map((text) => (
-                  <NavigationMenuItem key={text}>
-                    <NavigationMenuLink 
-                      onClick={navigateToAuth}
-                      className="text-white hover:text-blue-200 transition-colors nav-link enhanced-glow-text cursor-pointer"
-                    >
-                      {text}
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                ))}
-                <NavigationMenuItem>
-                  <Button 
-                    onClick={navigateToAuth} 
-                    variant="outline" 
-                    className="bg-transparent text-white border-white hover:bg-white/10"
-                  >
-                    Sign In
-                  </Button>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          </div>
-        </div>
-
-        <div className="absolute inset-0 z-0">
-          <div className="absolute w-full h-full bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.2)_0%,rgba(30,58,138,0)_70%)] z-0"></div>
-          <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-slate-900 to-transparent z-10"></div>
-          <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-slate-900 to-transparent z-10"></div>
-        </div>
-        
-        <div className="absolute inset-0 z-10 pointer-events-none">
-          {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
-        </div>
-        
-        <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-20 flex flex-col items-center justify-center">
-          <div className="flex justify-center mb-6">
-            <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl flex-shrink-0">
-              <span className="font-bold text-2xl">CRM</span>
+            <div className="absolute inset-0 z-10 pointer-events-none">
+              {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
-            <span className="ml-2 self-center text-xl font-semibold text-white enhanced-glow-text">SalesPro</span>
-          </div>
-          
-          <div className="flex flex-col items-center space-y-4">
-            <h1 className="text-4xl md:text-6xl font-bold text-white enhanced-glow-text">
-              Best CRM for:
-            </h1>
-            <AnimatedText texts={rotatingTexts} colors={textColors} />
-          </div>
-          
-          <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto mt-8">
-            CRM, dialer, LOS, and intelligent automation agents that move every transaction from lead to close
-          </p>
-          
-          <div className="pt-6">
-            <div className="relative mx-auto w-[300px]">
-              <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
-              
-              {isActive && [...Array(trailSegments)].map((_, i) => {
-                const trailSegmentOffset = i * (400 / trailSegments);
-                const trailPos = getLoadingPosition((loadingProgress - trailSegmentOffset + 400) % 400);
-                
-                return (
-                  <div 
-                    key={i}
-                    className="absolute rounded-full z-20"
-                    style={{
-                      left: `${trailPos.x}px`,
-                      top: `${trailPos.y}px`,
-                      width: `${Math.max(5 - i * 0.15, 1.2)}px`,
-                      height: `${Math.max(5 - i * 0.15, 1.2)}px`,
-                      opacity: `${Math.max(1 - i * 0.04, 0)}`,
-                      transform: `translate(-50%, -50%)`,
-                      background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 50%, rgba(51,195,240,0) 100%)",
-                      boxShadow: i < 10 ? `0 0 ${25 - i * 0.8}px ${12 - i * 0.3}px rgba(51,195,240,${Math.max(0.95 - i * 0.04, 0)})` : 'none',
-                      willChange: i < 5 ? 'left, top' : 'auto',
-                    }}
-                  ></div>
-                );
-              })}
-
-              <Button 
-                onClick={navigateToAuth}
-                className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)]"
-              >
-                Start Calling
-              </Button>
-            </div>
-          </div>
-          
-          <div className="pt-16" id="features">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[
-                {
-                  title: "Integrated Dialer",
-                  description: "Streamline your workflow with our powerful auto-dialing system that increases productivity.",
-                  icon: <Phone size={28} className="text-white" />,
-                  gradient: "bg-purple-glow",
-                  delay: "delay-1"
-                },
-                {
-                  title: "AI Assistance",
-                  description: "Leverage cutting-edge AI to automate tasks and gain valuable insights from customer interactions.",
-                  icon: <Bot size={28} className="text-white" />,
-                  gradient: "bg-green-glow",
-                  delay: "delay-2"
-                },
-                {
-                  title: "Sales Analytics",
-                  description: "Track performance metrics and visualize your sales pipeline with comprehensive analytics.",
-                  icon: <LineChart size={28} className="text-white" />,
-                  gradient: "bg-blue-glow",
-                  delay: "delay-3"
-                }
-              ].map((card) => (
-                <div key={card.title} onClick={navigateToAuth} className="cursor-pointer">
-                  <GlowingCard
-                    title={card.title}
-                    description={card.description}
-                    icon={card.icon}
-                    gradient={card.gradient}
-                    delay={card.delay}
-                  />
+            
+            <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-20 flex flex-col items-center justify-center">
+              <div className="flex justify-center mb-6">
+                <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl flex-shrink-0">
+                  <span className="font-bold text-2xl">CRM</span>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <footer className="bg-gray-900 text-white py-8 px-4">
-        <div className="container mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center mb-4 md:mb-0" onClick={navigateToAuth}>
-              <div className="h-10 w-10 flex items-center justify-center bg-white text-crm-blue rounded cursor-pointer">
-                <span className="font-bold text-sm">CRM</span>
+                <span className="ml-2 self-center text-xl font-semibold text-white enhanced-glow-text">SalesPro</span>
               </div>
-              <span className="ml-2 text-lg font-semibold cursor-pointer">SalesPro</span>
-            </div>
-            <div className="text-sm text-gray-400">
-              © {new Date().getFullYear()} SalesPro CRM. All rights reserved.
+              
+              <div className="flex flex-col items-center space-y-4">
+                <h1 className="text-4xl md:text-6xl font-bold text-white enhanced-glow-text">
+                  Best CRM for:
+                </h1>
+                <AnimatedText texts={rotatingTexts} colors={textColors} />
+              </div>
+              
+              <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto mt-8">
+                CRM, dialer, LOS, and intelligent automation agents that move every transaction from lead to close
+              </p>
+              
+              <div className="pt-6">
+                <div className="relative mx-auto w-[300px]">
+                  <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
+                  
+                  {isActive && [...Array(trailSegments)].map((_, i) => {
+                    const trailSegmentOffset = i * (400 / trailSegments);
+                    const trailPos = getLoadingPosition((loadingProgress - trailSegmentOffset + 400) % 400);
+                    
+                    return (
+                      <div 
+                        key={i}
+                        className="absolute rounded-full z-20"
+                        style={{
+                          left: `${trailPos.x}px`,
+                          top: `${trailPos.y}px`,
+                          width: `${Math.max(5 - i * 0.15, 1.2)}px`,
+                          height: `${Math.max(5 - i * 0.15, 1.2)}px`,
+                          opacity: `${Math.max(1 - i * 0.04, 0)}`,
+                          transform: `translate(-50%, -50%)`,
+                          background: "radial-gradient(circle, rgba(51,195,240,1) 0%, rgba(51,195,240,0.7) 50%, rgba(51,195,240,0) 100%)",
+                          boxShadow: i < 10 ? `0 0 ${25 - i * 0.8}px ${12 - i * 0.3}px rgba(51,195,240,${Math.max(0.95 - i * 0.04, 0)})` : 'none',
+                          willChange: i < 5 ? 'left, top' : 'auto',
+                        }}
+                      ></div>
+                    );
+                  })}
+
+                  <Button 
+                    onClick={navigateToAuth}
+                    className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)]"
+                  >
+                    Start Calling
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="pt-16" id="features">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {[
+                    {
+                      title: "Integrated Dialer",
+                      description: "Streamline your workflow with our powerful auto-dialing system that increases productivity.",
+                      icon: <Phone size={28} className="text-white" />,
+                      gradient: "bg-purple-glow",
+                      delay: "delay-1"
+                    },
+                    {
+                      title: "AI Assistance",
+                      description: "Leverage cutting-edge AI to automate tasks and gain valuable insights from customer interactions.",
+                      icon: <Bot size={28} className="text-white" />,
+                      gradient: "bg-green-glow",
+                      delay: "delay-2"
+                    },
+                    {
+                      title: "Sales Analytics",
+                      description: "Track performance metrics and visualize your sales pipeline with comprehensive analytics.",
+                      icon: <LineChart size={28} className="text-white" />,
+                      gradient: "bg-blue-glow",
+                      delay: "delay-3"
+                    }
+                  ].map((card) => (
+                    <div key={card.title} onClick={navigateToAuth} className="cursor-pointer">
+                      <GlowingCard
+                        title={card.title}
+                        description={card.description}
+                        icon={card.icon}
+                        gradient={card.gradient}
+                        delay={card.delay}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </footer>
+        </section>
+
+        <section
+          className="relative flex flex-col items-center pt-[5vh] snap-start"
+          style={{
+            minHeight: "100vh",
+          }}
+        >
+          {section2Content}
+        </section>
+      </div>
     </div>
   );
 };
