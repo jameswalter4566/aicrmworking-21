@@ -63,16 +63,18 @@ serve(async (req) => {
     
     console.log(`Lead exists: ${JSON.stringify(leadExists)}`);
 
-    // Check documents table for this leadId
-    const { data: countCheck, error: countError } = await supabase
+    // Check documents table for this leadId - Fixed bug with count handling
+    const countResult = await supabase
       .from('document_files')
       .select('*', { count: 'exact', head: true })
       .eq('lead_id', leadId);
       
-    if (countError) {
-      console.error("Error checking document count:", countError);
+    if (countResult.error) {
+      console.error("Error checking document count:", countResult.error);
     } else {
-      console.log(`Total documents for leadId ${leadId}: ${countCheck.count || 0}`);
+      // Safe access to count property
+      const count = countResult.count !== null ? countResult.count : 0;
+      console.log(`Total documents for leadId ${leadId}: ${count}`);
     }
 
     // Build the query with detailed logging

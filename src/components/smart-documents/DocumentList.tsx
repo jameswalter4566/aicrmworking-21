@@ -74,6 +74,10 @@ const DocumentList: React.FC<DocumentListProps> = ({
 
       console.log(`Retrieved ${data.data?.length || 0} documents`);
       setDocuments(data.data || []);
+      
+      if (data.data?.length === 0) {
+        toast.info(`No documents found for lead ID: ${leadId} in category: ${category}/${subcategory}`);
+      }
     } catch (err: any) {
       console.error("Error fetching documents:", err);
       setError(err.message || "An unexpected error occurred");
@@ -146,6 +150,7 @@ const DocumentList: React.FC<DocumentListProps> = ({
         <div className="p-8 text-center text-gray-500">
           <p>No documents found in this category</p>
           <p className="text-sm mt-2">Upload documents to see them here</p>
+          <p className="text-xs mt-4 text-amber-600">Lead ID: {leadId}</p>
         </div>
       ) : (
         <div className="space-y-3 mt-4">
