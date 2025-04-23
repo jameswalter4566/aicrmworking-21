@@ -119,6 +119,38 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
     }
   };
 
+  const handleStoreDocumentsInManager = async (files: File[], leadId: string) => {
+    if (!files.length || !leadId) return;
+    const formData = new FormData();
+    formData.append("leadId", String(leadId));
+    formData.append("fileCount", files.length.toString());
+    files.forEach((file, idx) => {
+      formData.append(`file${idx}`, file);
+    });
+    try {
+      const { data, error } = await supabase.functions.invoke("smart-document-manager", {
+        body: formData,
+      });
+      if (error) {
+        console.error("[SmartDocManager] Error storing docs:", error);
+        toast({
+          title: "Document backup failed",
+          description: "Documents were not stored in your document manager, but 1003 auto-fill continues.",
+          variant: "destructive"
+        });
+      } else {
+        console.log("[SmartDocManager] Documents stored:", data);
+      }
+    } catch (e:any) {
+      console.error("[SmartDocManager] Unexpected error:", e);
+      toast({
+        title: "Document backup failed",
+        description: "Unexpected error while storing docs for smart doc manager.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const handleProcessFiles = async () => {
     if (files.length === 0) {
       toast({
