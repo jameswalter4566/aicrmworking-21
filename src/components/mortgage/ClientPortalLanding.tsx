@@ -181,10 +181,10 @@ const ClientPortalLanding = () => {
               alt="Client Portal Interface" 
               className="w-full h-auto rounded-lg"
               style={{
-                transform: "scale(1.3)",
+                transform: "scale(1.5)",
                 transformOrigin: "center top",
-                marginBottom: "-5rem",
-                marginTop: "-2rem",
+                marginBottom: "-7rem",
+                marginTop: "-3rem",
                 transition: "transform 0.3s",
               }}
             />
