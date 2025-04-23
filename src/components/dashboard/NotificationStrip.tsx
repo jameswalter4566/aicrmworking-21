@@ -41,7 +41,7 @@ const NotificationStrip: React.FC<NotificationStripProps> = ({
         );
 
   return (
-    <div className={`flex items-center justify-between border-l-4 rounded-md px-4 py-3 mb-2 shadow-sm ${colors}`}>
+    <div className={`flex items-center justify-between border-l-4 rounded-md px-4 py-3 shadow-sm ${colors} transition-all hover:shadow-md`}>
       <div className="flex items-center">
         {icon}
         <div>
@@ -50,7 +50,7 @@ const NotificationStrip: React.FC<NotificationStripProps> = ({
         </div>
       </div>
       <button
-        className="ml-4 p-1 rounded hover:bg-gray-100"
+        className="ml-4 p-1 rounded hover:bg-gray-100 transition-colors"
         onClick={() => onClear(notification.id)}
         aria-label="Clear notification"
       >

@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import MetricsGrid from "@/components/dashboard/MetricsGrid";
 import ActivityTable from "@/components/dashboard/ActivityTable";
 import FilterBar from "@/components/dashboard/FilterBar";
 import { Button } from "@/components/ui/button";
-import { FilterX, Settings } from "lucide-react";
+import { BellRing, FilterX, Settings } from "lucide-react";
 import { useIndustry } from "@/context/IndustryContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Link } from "react-router-dom";
@@ -37,6 +38,11 @@ const Index = () => {
 
   const clearNotification = (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+  };
+
+  // Clear all notifications
+  const clearAllNotifications = () => {
+    setNotifications([]);
   };
 
   useEffect(() => {
@@ -79,6 +85,16 @@ const Index = () => {
     };
   }, []);
 
+  // Add test notification function for development purposes
+  const addTestNotification = () => {
+    addNotification({
+      id: `test-${Math.random()}`,
+      type: "document",
+      message: "Test notification: A new document was uploaded",
+      createdAt: new Date().toISOString(),
+    });
+  };
+
   return (
     <MainLayout>
       {!activeIndustry && (
@@ -108,16 +124,31 @@ const Index = () => {
         <MetricsGrid />
       </div>
       
-      <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-4">
-        <div className="flex flex-col gap-2 mb-4">
-          {notifications.map((notification) => (
-            <NotificationStrip
-              key={notification.id}
-              notification={notification}
-              onClear={clearNotification}
-            />
-          ))}
+      {/* Dedicated Notifications Container */}
+      {notifications.length > 0 && (
+        <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-semibold text-gray-700 uppercase text-sm flex items-center">
+              <BellRing className="h-4 w-4 mr-2 text-blue-600" />
+              Notifications
+            </h2>
+            <Button variant="outline" size="sm" className="text-xs" onClick={clearAllNotifications}>
+              Clear All
+            </Button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {notifications.map((notification) => (
+              <NotificationStrip
+                key={notification.id}
+                notification={notification}
+                onClear={clearNotification}
+              />
+            ))}
+          </div>
         </div>
+      )}
+      
+      <div className="bg-white p-4 rounded-2xl border border-gray-200 mb-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-semibold text-gray-700 uppercase text-sm">Recent Activity</h2>
           <Button variant="outline" size="sm" className="text-xs">
@@ -133,6 +164,13 @@ const Index = () => {
             View all people
           </Button>
         </div>
+      </div>
+      
+      {/* For testing purposes - you can remove this button in production */}
+      <div className="mb-4">
+        <Button variant="outline" size="sm" onClick={addTestNotification}>
+          Test Notification
+        </Button>
       </div>
     </MainLayout>
   );
