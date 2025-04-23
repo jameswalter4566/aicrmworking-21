@@ -251,6 +251,7 @@ const LandingPage = () => {
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
         min-h-[85vh] 
         relative z-40 border border-gray-100 transition-shadow
+        -top-1
       "
     >
       <div className="w-full px-10 py-20 flex flex-col items-center justify-center h-full">
