@@ -386,6 +386,19 @@ const LandingPage = () => {
             </div>
           </div>
         </div>
+
+        <div
+          className="w-[90vw] mx-auto relative z-30 rounded-3xl bg-white shadow-2xl min-h-[80vh] flex flex-col items-center justify-center"
+          style={{
+            marginTop: '-4vh',
+            boxShadow: '0 20px 40px rgba(30,41,59,0.07)'
+          }}
+        >
+          <div className="w-full flex flex-col items-center justify-center min-h-[65vh]">
+            <span className="block text-gray-300 font-bold text-lg mt-6">This is your new large white section.</span>
+            <span className="text-gray-400 mt-2">(Add content here next)</span>
+          </div>
+        </div>
       </div>
       
       <footer className="bg-gray-900 text-white py-8 px-4">
