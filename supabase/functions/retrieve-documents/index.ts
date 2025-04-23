@@ -21,13 +21,14 @@ serve(async (req) => {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY is not set');
     }
 
-    // Create Supabase client with service role key for admin privileges
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { leadId, category, subcategory } = await req.json();
+    const body = await req.json();
+    const { leadId, category, subcategory } = body;
 
-    if (!leadId) {
-      throw new Error("Missing required field: leadId");
+    // Validate leadId
+    if (!leadId || leadId === 'undefined') {
+      throw new Error("Invalid or missing lead ID");
     }
 
     let query = supabase
