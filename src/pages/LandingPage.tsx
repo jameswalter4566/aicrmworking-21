@@ -257,7 +257,7 @@ const LandingPage = () => {
         transition-shadow
         "
       style={{
-        marginTop: '-5vh', // Adjusted to create more visibility at the bottom of section 1
+        marginTop: '-10vh', // Increased from -5vh to -10vh to make more of the container visible
       }}
     >
       <div className="w-full px-10 py-20 flex flex-col items-center justify-center h-full">
@@ -284,7 +284,7 @@ const LandingPage = () => {
           "
         style={{ scrollBehavior: "smooth" }}
       >
-        <section className="min-h-screen w-full flex flex-col snap-start">
+        <section className="min-h-screen w-full flex flex-col snap-start relative">
           <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
             <div className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4 px-6">
               <div className="container mx-auto flex justify-center items-center">
@@ -424,6 +424,11 @@ const LandingPage = () => {
                 </div>
               </div>
             </div>
+          </div>
+          
+          {/* Scroll indicator - added to make it more obvious there's content below */}
+          <div className="absolute bottom-8 left-0 right-0 flex justify-center z-50 animate-bounce">
+            <div className="w-8 h-8 border-2 border-white border-b-0 border-r-0 rotate-[225deg]"></div>
           </div>
         </section>
 
