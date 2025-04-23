@@ -9,22 +9,56 @@ import DocumentList from "@/components/smart-documents/DocumentList";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { supabase } from "@/integrations/supabase/client";
 
 const SmartDocumentManager: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | undefined>();
   const [refreshDocuments, setRefreshDocuments] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const { id: leadId } = useParams<{ id: string }>();
+  const [isLoading, setIsLoading] = useState(true);
+  const [validLeadId, setValidLeadId] = useState<string | null>(null);
+  const { id: routeLeadId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   
   useEffect(() => {
-    // If no valid leadId is provided in the URL, show error and provide navigation options
-    if (!leadId || leadId === "undefined") {
-      toast.error("No valid lead ID provided");
+    async function validateAndGetLead() {
+      setIsLoading(true);
+      
+      try {
+        // Try to get a valid lead ID from our edge function
+        const { data, error } = await supabase.functions.invoke('get-lead-for-document-manager', {
+          body: { leadId: routeLeadId }
+        });
+        
+        if (error) {
+          console.error("Error validating lead:", error);
+          toast.error("Failed to validate lead");
+          setValidLeadId(null);
+        } else if (data.success && data.data?.leadId) {
+          // We got a valid lead ID
+          setValidLeadId(data.data.leadId);
+          
+          // If the route ID is different from the valid one, update the URL
+          if (routeLeadId !== data.data.leadId) {
+            navigate(`/smart-document-manager/${data.data.leadId}`, { replace: true });
+          }
+        } else {
+          // No valid lead ID found
+          setValidLeadId(null);
+          toast.error(data.error || "No valid lead found");
+        }
+      } catch (err) {
+        console.error("Error fetching lead:", err);
+        toast.error("Failed to fetch lead information");
+        setValidLeadId(null);
+      } finally {
+        setIsLoading(false);
+      }
     }
-  }, [leadId, navigate]);
+    
+    validateAndGetLead();
+  }, [routeLeadId, navigate]);
   
   // Handle when documents have been uploaded to trigger a refresh
   const handleDocumentsUploaded = () => {
@@ -36,13 +70,20 @@ const SmartDocumentManager: React.FC = () => {
     setSelectedSubcategory(sub ?? undefined);
   };
 
-  // Helper function to check if lead ID is valid
-  const isValidLeadId = (id: string | undefined): boolean => {
-    return !!id && id !== "undefined" && id !== "null";
-  };
+  // If we're still loading, show a spinner
+  if (isLoading) {
+    return (
+      <div className="flex h-[calc(100vh-60px)] bg-white">
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+          <h3 className="text-xl font-medium text-gray-700">Loading document manager...</h3>
+        </div>
+      </div>
+    );
+  }
 
-  // If we don't have a valid lead ID, show a search/entry form
-  if (!isValidLeadId(leadId)) {
+  // If no valid lead ID was found, show an error/search page
+  if (!validLeadId) {
     return (
       <div className="flex h-[calc(100vh-60px)] bg-white">
         <div className="flex-1 overflow-auto p-6">
@@ -111,42 +152,34 @@ const SmartDocumentManager: React.FC = () => {
           </div>
         ) : selectedCategory && selectedSubcategory ? (
           <div>
-            {isLoading ? (
-              <div className="flex justify-center items-center h-64">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <div className="mb-6">
+              <h1 className="text-2xl font-bold text-gray-800 flex items-center">
+                <FolderOpenIcon className="h-6 w-6 mr-3 text-blue-600" />
+                {selectedCategory}: {selectedSubcategory}
+              </h1>
+              <p className="mt-1 text-gray-600">
+                Upload and manage documents in this category.
+              </p>
+            </div>
+            
+            <div className="space-y-6">
+              <DocumentUploader
+                leadId={validLeadId}
+                category={selectedCategory}
+                subcategory={selectedSubcategory}
+                onUploadComplete={handleDocumentsUploaded}
+              />
+              
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <h2 className="text-lg font-semibold mb-4">Documents</h2>
+                <DocumentList
+                  leadId={validLeadId}
+                  category={selectedCategory}
+                  subcategory={selectedSubcategory}
+                  refresh={refreshDocuments}
+                />
               </div>
-            ) : (
-              <>
-                <div className="mb-6">
-                  <h1 className="text-2xl font-bold text-gray-800 flex items-center">
-                    <FolderOpenIcon className="h-6 w-6 mr-3 text-blue-600" />
-                    {selectedCategory}: {selectedSubcategory}
-                  </h1>
-                  <p className="mt-1 text-gray-600">
-                    Upload and manage documents in this category.
-                  </p>
-                </div>
-                
-                <div className="space-y-6">
-                  <DocumentUploader
-                    leadId={leadId}
-                    category={selectedCategory}
-                    subcategory={selectedSubcategory}
-                    onUploadComplete={handleDocumentsUploaded}
-                  />
-                  
-                  <div className="bg-gray-50 p-6 rounded-lg">
-                    <h2 className="text-lg font-semibold mb-4">Documents</h2>
-                    <DocumentList
-                      leadId={leadId}
-                      category={selectedCategory}
-                      subcategory={selectedSubcategory}
-                      refresh={refreshDocuments}
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+            </div>
           </div>
         ) : (
           <>

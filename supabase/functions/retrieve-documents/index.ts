@@ -31,6 +31,28 @@ serve(async (req) => {
       throw new Error("Invalid or missing leadId");
     }
 
+    // Verify the lead actually exists in the database
+    const { data: leadExists, error: leadError } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('id', leadId)
+      .maybeSingle();
+
+    if (leadError) {
+      console.error("Error checking lead:", leadError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Error validating leadId" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    if (!leadExists) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Lead not found" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
     let query = supabase
       .from('document_files')
       .select('*')

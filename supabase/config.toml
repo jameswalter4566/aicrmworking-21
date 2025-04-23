@@ -1,34 +1,23 @@
 
+# project_id is required
 project_id = "imrmboyczebjlbnkgjns"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "storage"]
+# This is a base template for Supabase Edge Functions
+[build]
+builder = "supabase/functions-js"
+command = ""
 
-[db]
-port = 54322
+[deploy]
+provider = "supabase"
 
-[studio]
-port = 54323
+[functions.analyze-csv-data]
+verify_jwt = true
 
-[inbucket]
-port = 54324
+[functions.retrieve-documents]
+verify_jwt = false
 
-[storage]
-enabled = true
-
-[auth]
-enabled = true
-
-[realtime]
-enabled = true
-
-[analytics]
-enabled = true
-
-[vector]
-enabled = true
+[functions.store-document]
+verify_jwt = false
 
 [functions.twilio-token]
 verify_jwt = false
@@ -36,8 +25,5 @@ verify_jwt = false
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.store-document]
-verify_jwt = false
-
-[functions.retrieve-documents]
+[functions.get-lead-for-document-manager]
 verify_jwt = false
