@@ -276,14 +276,14 @@ const LandingPage = () => {
     <div
       className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
-        min-h-[85vh] 
+        min-h-[70vh] 
         relative z-40 border border-gray-100 transition-shadow
         -top-1
       "
     >
-      <div className="w-full px-6 py-12 flex flex-col items-center justify-center h-full">
-        <h2 className="text-3xl font-bold text-gray-800 mb-8">Experience Our Industry-Specific CRM</h2>
-        <p className="text-lg text-gray-500 text-center mb-8 max-w-2xl">
+      <div className="w-full px-6 py-8 flex flex-col items-center justify-center h-full">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6">Experience Our Industry-Specific CRM</h2>
+        <p className="text-lg text-gray-500 text-center mb-6 max-w-2xl">
           See how our CRM adapts to different industries. Click on the cards below to preview each version.
         </p>
         <MockCRMInterface industry={selectedIndustry} />
