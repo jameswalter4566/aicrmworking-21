@@ -29,8 +29,17 @@ serve(async (req) => {
     const category = formData.get("category") as string;
     const subcategory = formData.get("subcategory") as string;
     
-    if (!file || !leadId || !category || !subcategory) {
-      throw new Error("Missing required fields: file, leadId, category, subcategory");
+    // Validate leadId is not undefined, null, or "undefined" string
+    if (!file) {
+      throw new Error("Missing required file");
+    }
+    
+    if (!leadId || leadId === "undefined" || leadId === "null") {
+      throw new Error("Invalid or missing leadId");
+    }
+    
+    if (!category || !subcategory) {
+      throw new Error("Missing required fields: category, subcategory");
     }
 
     // Create document path format: lead_id/category/subcategory/filename
@@ -93,7 +102,7 @@ serve(async (req) => {
       JSON.stringify({ success: false, error: error.message }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+        status: 400,
       }
     );
   }

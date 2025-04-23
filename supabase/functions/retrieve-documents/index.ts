@@ -26,8 +26,9 @@ serve(async (req) => {
 
     const { leadId, category, subcategory } = await req.json();
 
-    if (!leadId) {
-      throw new Error("Missing required field: leadId");
+    // Validate leadId is not undefined, null, or "undefined" string
+    if (!leadId || leadId === "undefined" || leadId === "null") {
+      throw new Error("Invalid or missing leadId");
     }
 
     let query = supabase
@@ -76,7 +77,7 @@ serve(async (req) => {
       JSON.stringify({ success: false, error: error.message }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+        status: 400,
       }
     );
   }

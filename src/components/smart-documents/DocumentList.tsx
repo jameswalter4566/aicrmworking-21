@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from "react";
-import { FileText, DownloadCloud, Loader2, Eye } from "lucide-react";
+import { FileText, DownloadCloud, Loader2, Eye, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -32,8 +32,18 @@ const DocumentList: React.FC<DocumentListProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Check if lead ID is valid
+  const isValidLeadId = (id: string | undefined | null): boolean => {
+    return !!id && id !== "undefined" && id !== "null";
+  };
+
   useEffect(() => {
-    fetchDocuments();
+    if (isValidLeadId(leadId)) {
+      fetchDocuments();
+    } else {
+      setError("Invalid lead ID");
+      setIsLoading(false);
+    }
   }, [leadId, category, subcategory, refresh]);
 
   const fetchDocuments = async () => {
@@ -72,6 +82,15 @@ const DocumentList: React.FC<DocumentListProps> = ({
     else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     else return (bytes / 1048576).toFixed(1) + ' MB';
   };
+
+  if (!isValidLeadId(leadId)) {
+    return (
+      <div className="p-4 border border-amber-200 rounded-lg bg-amber-50 text-amber-700 flex items-center">
+        <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
+        <p>Cannot retrieve documents: Invalid lead ID</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

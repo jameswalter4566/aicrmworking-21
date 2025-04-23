@@ -57,8 +57,19 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
     }
   };
 
+  // Check if lead ID is valid
+  const isValidLeadId = (id: string | undefined | null): boolean => {
+    return !!id && id !== "undefined" && id !== "null";
+  };
+
   const uploadFiles = async (files: File[]) => {
     if (files.length === 0) return;
+    
+    // Validate lead ID before proceeding
+    if (!isValidLeadId(leadId)) {
+      toast.error("Cannot upload: Invalid or missing lead ID");
+      return;
+    }
     
     setIsUploading(true);
     setUploadingFiles(files);
@@ -84,8 +95,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({
           body: formData,
         });
 
-        if (error || !data.success) {
-          console.error("Upload error:", error || data.error);
+        if (error || !data?.success) {
+          console.error("Upload error:", error || data?.error);
           toast.error(`Failed to upload ${file.name}: ${error?.message || data?.error || 'Unknown error'}`);
         } else {
           successCount++;
