@@ -490,13 +490,7 @@ const LandingPage = () => {
             {section2Content}
           </div>
           
-          <div 
-            className="w-[90vw] max-w-6xl mx-auto flex flex-col md:flex-row gap-4 relative z-30"
-            style={{
-              position: 'absolute',
-              top: '300px'
-            }}
-          >
+          <div className="w-[90vw] max-w-6xl mx-auto mt-[375px] flex flex-col md:flex-row gap-4 relative z-30">
             <div className="flex-1 h-[72px]">
               <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
                 <div className="flex-1">
