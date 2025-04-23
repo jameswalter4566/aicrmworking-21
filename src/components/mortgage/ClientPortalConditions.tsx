@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { toast } from "sonner";
 import { ConditionItem } from "./ConditionItem";
 import DropboxUploader from "@/components/smart-documents/DropboxUploader"; // <-- import
+import { supabase } from "@/integrations/supabase/client"; // <-- Re-added this import
 
 interface ClientPortalConditionsProps {
   leadId: string | number;
