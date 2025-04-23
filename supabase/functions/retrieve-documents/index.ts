@@ -36,9 +36,7 @@ serve(async (req) => {
       throw new Error("Invalid or missing leadId");
     }
     
-    console.log(`Retrieving documents for leadId: ${leadId}`, 
-      category ? `, category: ${category}` : "",
-      subcategory ? `, subcategory: ${subcategory}` : "");
+    console.log(`Retrieving documents for leadId: ${leadId}${category ? `, category: ${category}` : ""}${subcategory ? `, subcategory: ${subcategory}` : ""}`);
 
     // Verify the lead actually exists in the database
     const { data: leadExists, error: leadError } = await supabase
@@ -65,6 +63,19 @@ serve(async (req) => {
     
     console.log(`Lead exists: ${JSON.stringify(leadExists)}`);
 
+    // Check documents table for this leadId
+    const { data: countCheck, error: countError } = await supabase
+      .from('document_files')
+      .select('*', { count: 'exact', head: true })
+      .eq('lead_id', leadId);
+      
+    if (countError) {
+      console.error("Error checking document count:", countError);
+    } else {
+      console.log(`Total documents for leadId ${leadId}: ${countCheck.count || 0}`);
+    }
+
+    // Build the query with detailed logging
     let query = supabase
       .from('document_files')
       .select('*')
@@ -93,6 +104,19 @@ serve(async (req) => {
     }
     
     console.log(`Query returned ${data ? data.length : 0} documents`);
+
+    if (data && data.length === 0) {
+      // No documents found, look for documents with similar leadId for debugging
+      const { data: similarDocs } = await supabase
+        .from('document_files')
+        .select('lead_id')
+        .ilike('lead_id', `%${leadId.slice(-4)}%`)
+        .limit(5);
+        
+      if (similarDocs && similarDocs.length > 0) {
+        console.log(`Found similar leadIds: ${similarDocs.map(d => d.lead_id).join(', ')}`);
+      }
+    }
 
     // Generate URLs for each file
     const documentsWithUrls = data?.map(doc => {
