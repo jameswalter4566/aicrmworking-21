@@ -13,24 +13,20 @@ import { Switch } from "@/components/ui/switch";
 const CategoryCard = ({
   bgColor,
   title,
-  subtitle,
   description,
-  icon,
 }: {
   bgColor: string;
   title: string;
-  subtitle: string;
   description: string;
-  icon?: React.ReactNode;
 }) => (
   <div
-    className={`rounded-2xl p-8 shadow-lg text-white flex flex-col items-start transition-transform duration-200 hover:scale-105`}
+    className={`rounded-lg p-4 shadow-lg text-white flex justify-between items-center transition-transform duration-200 hover:scale-[1.02]`}
     style={{ background: bgColor }}
   >
-    <div className="mb-4 text-3xl">{icon}</div>
-    <div className="font-bold text-2xl mb-2">{title}</div>
-    <div className="mb-2 text-sm opacity-80">{subtitle}</div>
-    <div className="text-white/90">{description}</div>
+    <div>
+      <div className="font-semibold text-lg">{title}</div>
+      <div className="text-sm text-white/80 line-clamp-1">{description}</div>
+    </div>
   </div>
 );
 
@@ -276,15 +272,15 @@ const LandingPage = () => {
     <div
       className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
-        min-h-[75vh] 
+        min-h-[60vh] 
         relative z-40 border border-gray-100 transition-shadow
         -top-1
       "
     >
-      <div className="w-full px-6 py-8 flex flex-col items-center justify-center h-full">
-        <h2 className="text-3xl font-bold text-gray-800 mb-6">Experience Our Industry-Specific CRM</h2>
-        <p className="text-lg text-gray-500 text-center mb-6 max-w-2xl">
-          See how our CRM adapts to different industries. Click on the cards below to preview each version.
+      <div className="w-full px-6 py-6 flex flex-col items-center justify-center h-full">
+        <h2 className="text-3xl font-bold text-gray-800 mb-4">Experience Our Industry-Specific CRM</h2>
+        <p className="text-lg text-gray-500 text-center mb-4 max-w-2xl">
+          See how our CRM adapts to different industries. Toggle between views to preview each version.
         </p>
         <MockCRMInterface industry={selectedIndustry} />
       </div>
@@ -498,61 +494,58 @@ const LandingPage = () => {
             {section2Content}
           </div>
 
-          <div className="max-w-6xl w-full mx-auto mt-10 px-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
+          <div className="max-w-6xl w-full mx-auto mt-8 px-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-semibold text-white">Mortgage CRM</h3>
+                <div className="flex items-center justify-between p-4 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg">
+                  <div className="flex-1">
+                    <CategoryCard
+                      bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'}
+                      title="Mortgage CRM"
+                      description="For modern mortgage teams - automate nurture, compliance, and lead follow-up"
+                    />
+                  </div>
                   <Switch
                     data-industry="mortgage"
                     checked={selectedIndustry === 'mortgage'}
                     onCheckedChange={() => handleIndustryToggle('mortgage')}
-                  />
-                </div>
-                <div onClick={() => handleIndustryToggle('mortgage')} className="cursor-pointer">
-                  <CategoryCard
-                    bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'}
-                    title="Mortgage CRM"
-                    subtitle="For Modern Mortgage Teams"
-                    description="Automate nurture, compliance, and lead follow-up across multiple channels. Seamlessly manage borrowers, agents, and pipeline from prospect to funded."
+                    className="ml-4"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-semibold text-white">Real Estate CRM</h3>
+                <div className="flex items-center justify-between p-4 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg">
+                  <div className="flex-1">
+                    <CategoryCard
+                      bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'}
+                      title="Real Estate CRM"
+                      description="Built for real estate agents - centralize prospects and automate follow-up"
+                    />
+                  </div>
                   <Switch
                     data-industry="realEstate"
                     checked={selectedIndustry === 'realEstate'}
                     onCheckedChange={() => handleIndustryToggle('realEstate')}
-                  />
-                </div>
-                <div onClick={() => handleIndustryToggle('realEstate')} className="cursor-pointer">
-                  <CategoryCard
-                    bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'}
-                    title="Real Estate CRM"
-                    subtitle="Built for Real Estate Agents"
-                    description="Centralize all prospects and automate open house follow-up, appointment reminders, and client communication. Track deals with real-time analytics."
+                    className="ml-4"
                   />
                 </div>
               </div>
 
               <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-xl font-semibold text-white">Debt Settlement CRM</h3>
+                <div className="flex items-center justify-between p-4 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg">
+                  <div className="flex-1">
+                    <CategoryCard
+                      bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'}
+                      title="Debt Settlement CRM"
+                      description="Empower debt relief teams - organize client onboarding and automate processes"
+                    />
+                  </div>
                   <Switch
                     data-industry="debtSettlement"
                     checked={selectedIndustry === 'debtSettlement'}
                     onCheckedChange={() => handleIndustryToggle('debtSettlement')}
-                  />
-                </div>
-                <div onClick={() => handleIndustryToggle('debtSettlement')} className="cursor-pointer">
-                  <CategoryCard
-                    bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'}
-                    title="Debt Settlement CRM"
-                    subtitle="Empower Debt Relief Teams"
-                    description="Organize client onboarding, automate document collection, and streamline settlement offer management—all in one place."
+                    className="ml-4"
                   />
                 </div>
               </div>
