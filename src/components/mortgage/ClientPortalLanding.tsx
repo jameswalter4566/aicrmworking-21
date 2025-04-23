@@ -175,19 +175,8 @@ const ClientPortalLanding = () => {
         </div>
         
         <div className="absolute -bottom-24 md:-bottom-36 left-0 right-0 w-full flex justify-center px-4">
-          <div className="max-w-6xl w-full bg-white rounded-2xl shadow-2xl p-4 transform transition-all duration-500 ease-in-out hover:scale-[1.02]" style={{ overflow: 'visible' }}>
-            <img 
-              src="/clientportalscreenshot.jpg" 
-              alt="Client Portal Interface" 
-              className="w-full h-auto rounded-lg"
-              style={{
-                transform: "scale(1.5)",
-                transformOrigin: "center top",
-                marginBottom: "-7rem",
-                marginTop: "-3rem",
-                transition: "transform 0.3s",
-              }}
-            />
+          <div className="max-w-6xl w-full bg-white rounded-2xl shadow-2xl p-4 transform transition-all duration-500 ease-in-out hover:scale-[1.02]">
+            <img src="/clientportalscreenshot.jpg" alt="Client Portal Interface" className="w-full h-auto rounded-lg" />
           </div>
         </div>
       </section>
