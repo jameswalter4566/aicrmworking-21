@@ -295,29 +295,28 @@ async function classifyDocument(text: string, fileName: string) {
   const openAiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openAiKey) throw new Error("OpenAI API key not set.");
   
-  // Create a more specific prompt with enhanced instruction for accurate classification
-  const systemPrompt = `You are a professional mortgage document classifier specializing in accurate document type identification. 
-Your task is to assign each document to one of the EXACT subcategories below.
+  // More explicit, strict, zero-compromise prompt for US mortgage docs
+  const systemPrompt = `
+You are a professional US MORTGAGE document classifier and you must be EXTREMELY strict about matching.
+DO NOT use "Miscellaneous" or "Supporting Docs Not Elsewhere Categorized" unless there is no absolutely possible match.
+When you see US tax forms (like W-2, 1040, 1099 etc.), you MUST classify them as the exact subcategory (e.g., "W-2 / 1099" for W-2 or 1099, "Tax Returns (1040s, K-1s)" for 1040).
+ALWAYS pay close attention to both the full filename (${fileName}) and extracted text. If the filename contains clues (like "w2", "W-2", "1040" etc.), give these heavy weight.
+If you spot "Driver's License", "passport", "pay stub" etc. either in text or filename, pick the correct subcategory listed below.
+DO NOT label as "Other / Miscellaneous" or "Supporting Docs Not Elsewhere Categorized" unless truly nothing matches—if you do, include a "reason" explaining why.
+You must output ONLY a JSON with "category" and "subcategory" fields.
 
-IMPORTANT INSTRUCTIONS:
-1. Pay close attention to document title, headers and key phrases
-2. For tax documents, look for form numbers (W-2, 1040, Schedule C, etc.)
-3. Pay special attention to the document structure and formatting
-4. Consider the filename as an important clue
-5. When in doubt about specific subcategories, at least get the main category correct
-
-Respond ONLY with JSON of the form: {"category": "...", "subcategory": "..."}
-
-The filename of this document is: "${fileName}" - use this as an important clue.
-
-Here are the available categories and subcategories:
+Here are all allowed US mortgage document categories and subcategories:
 
 ${categoryDescriptions}
 
-Classify the following text:`;
+Be clinical, strict, and conservative. Pay close attention to form numbers, document headers, and filename clues.
+`;
+
+  const userPrompt = `Filename: ${fileName}
+Extracted Text Start:\n${text.substring(0, 8000)}
   
-  const userPrompt = `Document filename: ${fileName}\n\nDocument text:\n${text.substring(0, 8000)}`;
-  
+Classify this document strictly per the above. If you pick "Other / Miscellaneous" or "Supporting Docs Not Elsewhere Categorized", provide a "reason" in your JSON answer explaining why, otherwise just give category and subcategory.`;
+
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
@@ -327,14 +326,19 @@ Classify the following text:`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      temperature: 0.2,
+      temperature: 0.05,
       response_format: { type: "json_object" }
     }),
   });
   if (!response.ok) throw new Error(await response.text());
   const result = await response.json();
   try {
-    return JSON.parse(result.choices?.[0]?.message?.content ?? "{}");
+    // Parse and return only category/subcategory (ignore "reason" if present)
+    const out = JSON.parse(result.choices?.[0]?.message?.content ?? "{}");
+    return {
+      category: out.category || "Other / Miscellaneous",
+      subcategory: out.subcategory || "Supporting Docs Not Elsewhere Categorized"
+    };
   } catch (e) {
     return { category: "Other / Miscellaneous", subcategory: "Supporting Docs Not Elsewhere Categorized" };
   }
