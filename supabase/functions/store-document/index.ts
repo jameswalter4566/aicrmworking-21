@@ -67,14 +67,43 @@ serve(async (req) => {
     // Create document path format: lead_id/category/subcategory/filename
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
     
-    // Sanitize path segments to avoid storage errors
-    const sanitizedCategory = category.replace(/[/\\?%*:|"<>]/g, '-');
-    const sanitizedSubcategory = subcategory.replace(/[/\\?%*:|"<>]/g, '-');
+    // Enhanced sanitization for path segments to avoid storage errors
+    // Replace all special characters and spaces with hyphens
+    const sanitizedCategory = category.replace(/[^a-zA-Z0-9]/g, '-');
+    const sanitizedSubcategory = subcategory.replace(/[^a-zA-Z0-9]/g, '-');
     
     // Create storage path with sanitized segments
     const filePath = `${leadId}/${sanitizedCategory}/${sanitizedSubcategory}/${fileName}`;
     
     console.log(`Storing file at path: ${filePath}`);
+    
+    // First, check if the 'documents' bucket exists, if not, create it
+    const { data: buckets, error: bucketsError } = await supabase
+      .storage
+      .listBuckets();
+      
+    if (bucketsError) {
+      console.error("Error checking buckets:", bucketsError);
+      throw new Error(`Error checking storage buckets: ${bucketsError.message}`);
+    }
+    
+    const documentsBucketExists = buckets.some(b => b.name === 'documents');
+    
+    if (!documentsBucketExists) {
+      console.log("Creating 'documents' bucket");
+      const { error: createBucketError } = await supabase
+        .storage
+        .createBucket('documents', {
+          public: true,
+          fileSizeLimit: 50971520, // 50MB
+          allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg']
+        });
+        
+      if (createBucketError) {
+        console.error("Error creating bucket:", createBucketError);
+        throw new Error(`Error creating storage bucket: ${createBucketError.message}`);
+      }
+    }
 
     // Upload file to storage
     const { data: fileData, error: uploadError } = await supabase
@@ -86,6 +115,7 @@ serve(async (req) => {
       });
 
     if (uploadError) {
+      console.error("Upload error details:", uploadError);
       throw new Error(`Error uploading file: ${uploadError.message}`);
     }
 
