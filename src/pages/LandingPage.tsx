@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -256,7 +257,7 @@ const LandingPage = () => {
         transition-shadow
         "
       style={{
-        marginTop: '-5vh',
+        marginTop: '-5vh', // Adjusted to create more visibility at the bottom of section 1
       }}
     >
       <div className="w-full px-10 py-20 flex flex-col items-center justify-center h-full">
