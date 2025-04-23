@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { FilePlus, FolderOpenIcon, Loader2 } from "lucide-react";
+import { FilePlus, FolderOpenIcon, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import SmartDocumentSidebar from "@/components/smart-documents/SmartDocumentSidebar";
 import DropboxUploader from "@/components/smart-documents/DropboxUploader";
@@ -8,6 +8,7 @@ import DocumentUploader from "@/components/smart-documents/DocumentUploader";
 import DocumentList from "@/components/smart-documents/DocumentList";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 const SmartDocumentManager: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
@@ -17,12 +18,13 @@ const SmartDocumentManager: React.FC = () => {
   const { id: leadId } = useParams<{ id?: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchLeadId, setSearchLeadId] = useState<string>("");
   
   useEffect(() => {
-    // If no leadId is provided or is 'undefined', redirect to leads list
+    // If no leadId is provided or is 'undefined', show search UI instead of redirecting
     if (!leadId || leadId === 'undefined') {
-      toast.error("Invalid or missing lead ID");
-      navigate('/leads');
+      console.log("No valid lead ID detected");
+      // Don't redirect immediately, let the user search for a lead
     }
   }, [leadId, navigate]);
   
@@ -36,9 +38,51 @@ const SmartDocumentManager: React.FC = () => {
     setSelectedSubcategory(sub ?? undefined);
   };
 
-  // If leadId is invalid, return null or a loading state
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchLeadId || searchLeadId.trim() === '') {
+      toast.error("Please enter a valid lead ID");
+      return;
+    }
+    navigate(`/smart-document-manager/${searchLeadId.trim()}`);
+  };
+
+  // If leadId is invalid, show search interface
   if (!leadId || leadId === 'undefined') {
-    return null;
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-60px)] bg-white p-6">
+        <div className="max-w-md w-full text-center">
+          <h1 className="text-3xl font-bold text-blue-700 mb-6">Smart Document Manager</h1>
+          <p className="text-gray-600 mb-8">
+            Enter a lead ID to manage documents for that lead.
+          </p>
+          
+          <form onSubmit={handleSearchSubmit} className="flex flex-col gap-4">
+            <div className="flex items-center">
+              <Input 
+                type="text" 
+                placeholder="Enter Lead ID" 
+                value={searchLeadId}
+                onChange={(e) => setSearchLeadId(e.target.value)}
+                className="flex-1"
+              />
+              <Button type="submit" className="ml-2">
+                <Search className="h-4 w-4 mr-2" />
+                Search
+              </Button>
+            </div>
+          </form>
+          
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/leads')}
+            className="mt-8"
+          >
+            Go to Leads List
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
