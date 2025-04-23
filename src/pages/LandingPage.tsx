@@ -480,7 +480,9 @@ const LandingPage = () => {
           className="relative flex flex-col items-center pt-0 snap-start bg-slate-900"
           style={{
             minHeight: "100vh",
-            marginTop: '-1px' // This prevents the white strip from showing
+            marginTop: '-2px', // Increased to ensure no gap
+            position: 'relative',
+            zIndex: 30,
           }}
         >
           <div 
