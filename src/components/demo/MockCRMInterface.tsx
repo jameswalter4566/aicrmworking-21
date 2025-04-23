@@ -9,7 +9,7 @@ interface MockCRMInterfaceProps {
 
 export const MockCRMInterface = ({ industry }: MockCRMInterfaceProps) => {
   return (
-    <div className="bg-white rounded-lg shadow-xl overflow-hidden border border-gray-200 flex w-full">
+    <div className="bg-white rounded-lg shadow-xl overflow-hidden border border-gray-200 flex max-w-[1200px] mx-auto mt-8">
       <MockSidebar industry={industry} />
       <MockContent />
     </div>
