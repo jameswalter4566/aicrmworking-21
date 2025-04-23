@@ -66,7 +66,13 @@ serve(async (req) => {
 
     // Create document path format: lead_id/category/subcategory/filename
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-    const filePath = `${leadId}/${category}/${subcategory}/${fileName}`;
+    
+    // Sanitize path segments to avoid storage errors
+    const sanitizedCategory = category.replace(/[/\\?%*:|"<>]/g, '-');
+    const sanitizedSubcategory = subcategory.replace(/[/\\?%*:|"<>]/g, '-');
+    
+    // Create storage path with sanitized segments
+    const filePath = `${leadId}/${sanitizedCategory}/${sanitizedSubcategory}/${fileName}`;
     
     console.log(`Storing file at path: ${filePath}`);
 
