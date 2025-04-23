@@ -458,11 +458,9 @@ const LandingPage = () => {
             </div>
           </div>
           
-          {/* Bouncing arrow - Making it contained within section 1 only */}
           <div className="absolute bottom-8 left-0 right-0 flex justify-center z-50 animate-bounce">
             <div className="w-8 h-8 border-2 border-white border-b-0 border-r-0 rotate-[225deg]"></div>
           </div>
-
           <div 
             aria-hidden="true"
             className="pointer-events-none select-none flex justify-center absolute left-0 right-0 w-full"
