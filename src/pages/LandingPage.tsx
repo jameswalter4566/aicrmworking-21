@@ -300,17 +300,27 @@ const LandingPage = () => {
             </div>
             <span className="ml-2 self-center text-xl font-semibold text-white enhanced-glow-text">SalesPro</span>
           </div>
-          
+
           <div className="flex flex-col items-center space-y-4">
             <h1 className="text-4xl md:text-6xl font-bold text-white enhanced-glow-text">
-              Best CRM for:
+              Built for Brokers. Powered by AI.<br className="hidden md:block" />
+              Designed to Close Faster.
             </h1>
+            <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto mt-3 font-medium">
+              CRM, dialer, LOS, and intelligent automation{' '}
+              <span className="inline-block align-middle">
+                <AnimatedText texts={rotatingTexts} colors={textColors} />
+              </span>{' '}
+              agents that move every transaction from lead to close — without manual intervention.
+            </p>
+          </div>
+
+          <div className="flex flex-col items-center space-y-4 mt-10">
+            <h2 className="text-4xl md:text-5xl font-bold text-white enhanced-glow-text">
+              Best CRM for:
+            </h2>
             <AnimatedText texts={rotatingTexts} colors={textColors} />
           </div>
-          
-          <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto mt-8">
-            The all-in-one CRM platform for managing leads, calls, and closing more deals.
-          </p>
           
           <div className="pt-6">
             <div className="relative mx-auto w-[300px]">
