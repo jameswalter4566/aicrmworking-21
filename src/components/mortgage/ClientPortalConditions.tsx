@@ -1,12 +1,9 @@
 
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Upload, FileText, CheckCircle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ConditionItem } from "./ConditionItem";
+import DropboxUploader from "@/components/smart-documents/DropboxUploader"; // <-- import
 
 interface ClientPortalConditionsProps {
   leadId: string | number;
@@ -71,11 +68,9 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
   const handleFileUpload = async (file: File) => {
     try {
       console.log("File uploaded:", file.name);
-      
       toast.success("Document uploaded successfully", {
         description: `${file.name} has been uploaded and will be reviewed.`
       });
-      
       setTimeout(refreshData, 1000);
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -92,10 +87,10 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
         {conditions?.length > 0 ? (
           <div className="space-y-2">
             {conditions.map((condition, index) => (
-              <ConditionItem 
+              <ConditionItem
                 key={condition.id || index}
                 condition={condition}
-                leadId={String(leadId)} // Convert leadId to string
+                leadId={String(leadId)}
               />
             ))}
           </div>
@@ -124,6 +119,22 @@ export const ClientPortalConditions = ({ leadId, refreshData }: ClientPortalCond
         {renderConditionsList(conditions?.generalConditions || [], "General Conditions")}
         {renderConditionsList(conditions?.priorToFinalConditions || [], "Prior to Final Conditions")}
         {renderConditionsList(conditions?.complianceConditions || [], "Compliance Conditions")}
+      </div>
+      {/* Insert DropboxUploader under compliance conditions */}
+      <div className="mt-8">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-blue-900 flex items-center gap-2">
+              Upload Additional Supporting Document(s)
+            </CardTitle>
+            <CardDescription>
+              Use the drop box below to upload any document you want AI to automatically categorize and add to your file. All common document types are supported.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DropboxUploader leadId={String(leadId)} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
