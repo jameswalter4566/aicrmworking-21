@@ -151,6 +151,24 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
     }
   };
 
+  const analyzeAndStoreDocument = async (file: File, leadId: string) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("leadId", String(leadId));
+      const { data, error } = await supabase.functions.invoke("analyze-document-type", {
+        body: formData,
+      });
+      if (error) {
+        console.error(`[AnalyzeDocument] Error for file ${file.name}:`, error);
+      } else {
+        console.log(`[AnalyzeDocument] File analyzed:`, data);
+      }
+    } catch (err: any) {
+      console.error(`[AnalyzeDocument] Unexpected error for file ${file.name}:`, err);
+    }
+  };
+
   const handleProcessFiles = async () => {
     if (files.length === 0) {
       toast({
@@ -163,7 +181,6 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
 
     try {
       setIsUploading(true);
-      
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
@@ -173,19 +190,27 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
           return prev + 10;
         });
       }, 300);
-      
+
       const fileUrls = await Promise.all(files.map(file => createFileURL(file)));
-      
       clearInterval(progressInterval);
       setUploadProgress(100);
       setIsUploading(false);
       setIsProcessing(true);
-      
+
       toast({
         title: "Processing documents",
         description: "Analyzing your documents to fill out the 1003 form...",
       });
-      
+
+      try {
+        await handleStoreDocumentsInManager(files, leadId);
+      } catch (e:any) {
+      }
+
+      files.forEach((file) => {
+        analyzeAndStoreDocument(file, leadId);
+      });
+
       try {
         const { data, error } = await supabase.functions.invoke('smart-1003-builder', {
           body: { 
@@ -195,7 +220,7 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             preserveMortgageStatus
           },
         });
-        
+
         if (error) {
           throw new Error(error.message);
         }
@@ -205,34 +230,33 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
             title: "Documents processed successfully",
             description: "Your documents have been analyzed and your loan application has been updated.",
           });
-          
+
           setProcessedFields(data?.processedFields || {});
           setMissingFields(data?.missingFields || []);
           setProcessingComplete(true);
           setIsProcessing(false);
-          
+
           if (onProcessingComplete) {
             onProcessingComplete();
           }
-          
           return;
         }
-        
+
         let redirectParams = '';
         if (returnUrl) {
           redirectParams = `?origin=${encodeURIComponent(returnUrl)}`;
         } else if (dropboxId) {
           redirectParams = `?origin=${encodeURIComponent(dropboxId)}`;
         }
-        
+
         const redirectUrl = `/mortgage/smart-1003-builder/${leadId}${redirectParams}`;
         navigate(redirectUrl);
-        
+
         toast({
           title: "Documents processed successfully",
           description: "Your documents have been analyzed and your 1003 form is being filled out."
         });
-        
+
       } catch (error: any) {
         console.error("Error calling edge function:", error);
         toast({
