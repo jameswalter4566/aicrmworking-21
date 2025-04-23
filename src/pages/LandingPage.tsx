@@ -309,7 +309,9 @@ const LandingPage = () => {
           </div>
           
           <p className="text-xl md:text-2xl text-gray-300 max-w-2xl mx-auto mt-8">
-            The all-in-one CRM platform for managing leads, calls, and closing more deals.
+            Built for Brokers. Powered by AI. Designed to Close Faster.
+            <br />
+            CRM, dialer, LOS, and intelligent automation agents that move every transaction from lead to close
           </p>
           
           <div className="pt-6">
