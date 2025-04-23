@@ -42,6 +42,28 @@ serve(async (req) => {
       throw new Error("Missing required fields: category, subcategory");
     }
 
+    // ENHANCEMENT: Re-validate leadId by querying the leads table
+    const { data: leadExists, error: leadError } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('id', leadId)
+      .maybeSingle();
+
+    if (leadError) {
+      console.error("Error checking lead:", leadError);
+      return new Response(
+        JSON.stringify({ success: false, error: "Error validating leadId" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
+    if (!leadExists) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Lead not found" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
+      );
+    }
+
     // Create document path format: lead_id/category/subcategory/filename
     const fileName = `${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
     const filePath = `${leadId}/${category}/${subcategory}/${fileName}`;
