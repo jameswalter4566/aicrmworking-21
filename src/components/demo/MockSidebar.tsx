@@ -1,3 +1,4 @@
+
 import React from "react";
 import { 
   Home, 
@@ -65,14 +66,14 @@ export const MockSidebar = ({ industry }: MockSidebarProps) => {
   const backgroundColor = getIndustryColor(industry);
   
   return (
-    <div className={`w-64 ${backgroundColor} h-[600px] flex-shrink-0 rounded-tr-2xl`}>
+    <div className={`w-64 ${backgroundColor} h-full flex-shrink-0 rounded-tl-xl`}>
       <div className="flex items-center h-16 px-6 border-b border-white/20">
         <div className="h-8 w-8 bg-white rounded flex items-center justify-center">
           <span className="text-black text-sm font-bold">CRM</span>
         </div>
         <span className="ml-3 font-semibold text-white">SalesPro</span>
       </div>
-      <nav className="p-4 space-y-1">
+      <nav className="p-4 space-y-1 flex flex-col">
         {menuItems.map((item) => (
           <div
             key={item.label}
