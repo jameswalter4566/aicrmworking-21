@@ -470,7 +470,7 @@ const LandingPage = () => {
                 </div>
               </div>
               
-              <div className="pt-16 pb-16" id="features"> {/* Added pb-16 to increase bottom padding */}
+              <div className="pt-16 pb-16" id="features">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {[
                     {
@@ -518,7 +518,7 @@ const LandingPage = () => {
             aria-hidden="true"
             className="pointer-events-none select-none flex justify-center absolute left-0 right-0 w-full"
             style={{
-              bottom: -180, // Changed from -32 to move it down further
+              bottom: -180,
               zIndex: 30,
             }}
           >
