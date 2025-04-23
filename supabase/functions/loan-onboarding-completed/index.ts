@@ -11,20 +11,29 @@ serve(async (req) => {
   }
 
   try {
+    const requestId = crypto.randomUUID();
+    console.log(`[${requestId}] ====== LOAN ONBOARDING COMPLETED FUNCTION START ======`);
+    
     const { leadId, clientName } = await req.json();
 
     if (!leadId) {
+      console.error(`[${requestId}] Missing required parameter: leadId`);
       throw new Error('Lead ID is required');
     }
 
-    console.log(`Processing onboarding completion notification for lead ID: ${leadId}, client: ${clientName}`);
+    console.log(`[${requestId}] Processing onboarding completion notification for lead ID: ${leadId}, client: ${clientName || 'Unknown'}`);
 
     // Create Supabase client with service role key for full access
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error(`[${requestId}] Missing Supabase configuration`);
+      throw new Error("Supabase configuration is missing");
+    }
+    
+    console.log(`[${requestId}] Creating Supabase client with service role key`);
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
 
     // Enhanced: Fetch both lead and creator information in one query
     const { data: leadData, error: leadError } = await supabaseClient
@@ -34,7 +43,7 @@ serve(async (req) => {
       .single();
 
     if (leadError || !leadData) {
-      console.warn(`Error finding lead or no lead found for ID: ${leadId}. ${leadError?.message || 'No details available'}`);
+      console.warn(`[${requestId}] Error finding lead or no lead found for ID: ${leadId}. ${leadError?.message || 'No details available'}`);
       
       // Fallback to admin notification if no specific lead creator found
       const { data: adminProfiles, error: adminsError } = await supabaseClient
@@ -44,6 +53,7 @@ serve(async (req) => {
         .not('phone_number', 'is', null);
       
       if (adminsError || !adminProfiles || adminProfiles.length === 0) {
+        console.error(`[${requestId}] No recipients found to send SMS notification`);
         throw new Error('No recipients found to send SMS notification');
       }
 
@@ -51,7 +61,7 @@ serve(async (req) => {
         .map(profile => profile.phone_number)
         .filter(phone => phone && phone.trim() !== '');
 
-      console.log(`Found ${phoneNumbers.length} admin users to notify as fallback`);
+      console.log(`[${requestId}] Found ${phoneNumbers.length} admin users to notify as fallback`);
       
       // Send SMS to admin users
       const message = `Onboarding completed for a lead (ID: ${leadId}) without a specific creator. Check the system.`;
@@ -62,12 +72,12 @@ serve(async (req) => {
           const smsResult = await sendSMS(phoneNumber, message);
           if (smsResult.success) {
             successCount++;
-            console.log(`Fallback SMS sent successfully to ${phoneNumber}`);
+            console.log(`[${requestId}] Fallback SMS sent successfully to ${phoneNumber}`);
           } else {
-            console.error(`Failed to send fallback SMS to ${phoneNumber}: ${smsResult.error}`);
+            console.error(`[${requestId}] Failed to send fallback SMS to ${phoneNumber}: ${smsResult.error}`);
           }
         } catch (smsError) {
-          console.error(`Error sending fallback SMS to ${phoneNumber}:`, smsError);
+          console.error(`[${requestId}] Error sending fallback SMS to ${phoneNumber}:`, smsError);
         }
       }
 
@@ -86,7 +96,7 @@ serve(async (req) => {
 
     // Direct profile lookup from profiles table for creator's phone number
     if (leadData.created_by) {
-      console.log(`Looking up profile for creator ID: ${leadData.created_by}`);
+      console.log(`[${requestId}] Looking up profile for creator ID: ${leadData.created_by}`);
       
       const { data: profile } = await supabaseClient
         .from('profiles')
@@ -95,7 +105,7 @@ serve(async (req) => {
         .single();
 
       if (profile?.phone_number) {
-        console.log(`Successfully found phone number for creator: ${profile.phone_number}`);
+        console.log(`[${requestId}] Successfully found phone number for creator: ${profile.phone_number}`);
         
         // Construct message with more context
         const message = `${clientName || leadData.first_name || 'A client'} has completed their 1003! I have already built a Pitch Deck draft so you can get them some numbers immediately! I have also already sent them a checklist of all of the documents they have missed for submission. Go get em!`;
@@ -104,7 +114,7 @@ serve(async (req) => {
         try {
           const smsResult = await sendSMS(profile.phone_number, message);
           if (smsResult.success) {
-            console.log(`Successfully sent SMS to creator's phone: ${profile.phone_number}`);
+            console.log(`[${requestId}] Successfully sent SMS to creator's phone: ${profile.phone_number}`);
             return new Response(
               JSON.stringify({ 
                 success: true, 
@@ -114,15 +124,17 @@ serve(async (req) => {
               { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           } else {
+            console.error(`[${requestId}] Failed to send SMS: ${smsResult.error}`);
             throw new Error(`Failed to send SMS: ${smsResult.error}`);
           }
         } catch (smsError) {
-          console.error(`Error sending SMS to ${profile.phone_number}:`, smsError);
+          console.error(`[${requestId}] Error sending SMS to ${profile.phone_number}:`, smsError);
           throw smsError;
         }
       }
     }
 
+    console.error(`[${requestId}] No valid phone number found for notification`);
     throw new Error('No valid phone number found for notification');
 
   } catch (error) {
