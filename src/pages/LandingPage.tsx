@@ -9,15 +9,14 @@ import GlowingCard from "@/components/GlowingCard";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
 import { MockCRMInterface } from "@/components/demo/MockCRMInterface";
 import { Switch } from "@/components/ui/switch";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const CategoryCard = ({
   bgColor,
   title,
-  description,
 }: {
   bgColor: string;
   title: string;
-  description: string;
 }) => (
   <div
     className={`rounded-lg p-4 shadow-lg text-white flex justify-between items-center transition-transform duration-200 hover:scale-[1.02]`}
@@ -25,7 +24,6 @@ const CategoryCard = ({
   >
     <div>
       <div className="font-semibold text-lg">{title}</div>
-      <div className="text-sm text-white/80 line-clamp-1">{description}</div>
     </div>
   </div>
 );
@@ -36,6 +34,7 @@ const LandingPage = () => {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isActive, setIsActive] = useState(false);
   const [selectedIndustry, setSelectedIndustry] = useState<'mortgage' | 'realEstate' | 'debtSettlement'>('mortgage');
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -273,7 +272,6 @@ const LandingPage = () => {
       className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
         min-h-[50vh] relative z-40 border border-gray-100 transition-shadow
-        -top-1
       "
     >
       <div className="w-full px-6 py-6 flex flex-col items-center justify-center h-full">
@@ -492,14 +490,13 @@ const LandingPage = () => {
             {section2Content}
           </div>
           
-          <div className="w-[90vw] max-w-6xl mx-auto mt-8 flex flex-row gap-4">
-            <div className="flex-1">
-              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-[72px]">
+          <div className="w-[90vw] max-w-6xl mx-auto mt-8 flex flex-col md:flex-row gap-4">
+            <div className="flex-1 h-[72px]">
+              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
                 <div className="flex-1">
                   <CategoryCard
                     bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'}
                     title="Mortgage CRM"
-                    description=""
                   />
                 </div>
                 <Switch
@@ -511,13 +508,12 @@ const LandingPage = () => {
               </div>
             </div>
 
-            <div className="flex-1">
-              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-[72px]">
+            <div className="flex-1 h-[72px]">
+              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
                 <div className="flex-1">
                   <CategoryCard
                     bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'}
                     title="Real Estate CRM"
-                    description=""
                   />
                 </div>
                 <Switch
@@ -529,13 +525,12 @@ const LandingPage = () => {
               </div>
             </div>
 
-            <div className="flex-1">
-              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-[72px]">
+            <div className="flex-1 h-[72px]">
+              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
                 <div className="flex-1">
                   <CategoryCard
                     bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'}
                     title="Debt Settlement CRM"
-                    description=""
                   />
                 </div>
                 <Switch
@@ -547,6 +542,8 @@ const LandingPage = () => {
               </div>
             </div>
           </div>
+          
+          <div className="pb-16"></div>
         </section>
       </div>
     </div>
