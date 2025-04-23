@@ -10,8 +10,8 @@ const corsHeaders = {
 
 const categoryDescriptions = `
 🪪 Identification
-Driver’s License – A photo ID issued by a state DMV. Contains name, DOB, issue/expiration date, address, and photo.
-Social Security Card – Federal document with the borrower’s full legal name and SSN. No expiration or photo.
+Driver's License – A photo ID issued by a state DMV. Contains name, DOB, issue/expiration date, address, and photo.
+Social Security Card – Federal document with the borrower's full legal name and SSN. No expiration or photo.
 Passport – Federal document with name, DOB, nationality, photo, and passport number. May include visa stamps.
 
 💵 Income
@@ -66,7 +66,7 @@ Initial & Final Disclosures – Combined set of all required consumer-facing for
 Divorce Decree – Court-issued document detailing spousal support, asset division, and custodial terms.
 Child Support Order – Court ruling specifying payment amount, frequency, and recipient.
 Bankruptcy Discharge – Federal court documentation of completed bankruptcy.
-Power of Attorney – Legal authorization allowing another individual to sign on the borrower’s behalf.
+Power of Attorney – Legal authorization allowing another individual to sign on the borrower's behalf.
 Trust Documentation – Living or irrevocable trust paperwork indicating property ownership or control.
 
 🏘️ HOA Documents
@@ -102,6 +102,87 @@ Pre-Funding QC Review – Checklist confirming data/doc quality before closing.
 Post-Closing Audit Docs – Audit findings or corrections after loan funding.
 Fraud Check / Compliance Reports – Reports from tools like FraudGuard, Mavent, etc.
 `;
+
+// Add new document pattern recognition helper
+const documentPatterns = {
+  // Tax related patterns
+  w2Pattern: /\b(W-2|W2|Form W-2|Wage and Tax Statement|W2 Form)\b|\bW[\s-]?2\b/i,
+  taxReturnPattern: /\b(1040|Form 1040|Tax Return|Tax Filing|Schedule [A-Z]|IRS Form)\b/i,
+  
+  // Bank related patterns
+  bankStatementPattern: /\b(Bank Statement|Account Statement|Statement of Account|Monthly Statement)\b/i,
+  
+  // Identification patterns
+  driverLicensePattern: /\b(Driver'?s License|DL|Driver License|Driver ID|Operator'?s License)\b/i,
+  
+  // Credit related patterns
+  creditReportPattern: /\b(Credit Report|Credit Bureau|Credit Score|FICO|Experian|TransUnion|Equifax)\b/i,
+  
+  // Pay related patterns
+  payStubPattern: /\b(Pay ?Stub|Pay ?Statement|Earnings Statement|Salary Statement|Wage Statement)\b/i
+};
+
+// Add document classifier helper based on filename and context clues
+function classifyByFilenameAndContent(filename: string, extractedText: string) {
+  filename = filename.toLowerCase();
+  
+  // Check for W-2 forms first in both filename and content
+  if (filename.includes('w-2') || filename.includes('w2') || 
+      documentPatterns.w2Pattern.test(extractedText)) {
+    return {
+      category: "Income",
+      subcategory: "W-2 / 1099"
+    };
+  }
+
+  // Check for tax returns
+  if (filename.includes('1040') || filename.includes('tax return') || 
+      documentPatterns.taxReturnPattern.test(extractedText)) {
+    return {
+      category: "Income", 
+      subcategory: "Tax Returns (1040s, K-1s)"
+    };
+  }
+  
+  // Check for bank statements
+  if ((filename.includes('bank') && filename.includes('statement')) || 
+      documentPatterns.bankStatementPattern.test(extractedText)) {
+    return {
+      category: "Assets",
+      subcategory: "Bank Statements"
+    };
+  }
+  
+  // Check for driver's license
+  if (filename.includes('license') || filename.includes('driver') || 
+      documentPatterns.driverLicensePattern.test(extractedText)) {
+    return {
+      category: "Identification",
+      subcategory: "Driver's License"
+    };
+  }
+  
+  // Check for pay stubs
+  if ((filename.includes('pay') && (filename.includes('stub') || filename.includes('statement'))) || 
+      documentPatterns.payStubPattern.test(extractedText)) {
+    return {
+      category: "Income",
+      subcategory: "Pay Stubs"
+    };
+  }
+  
+  // Check for credit reports
+  if ((filename.includes('credit') && filename.includes('report')) || 
+      documentPatterns.creditReportPattern.test(extractedText)) {
+    return {
+      category: "Credit & Liabilities",
+      subcategory: "Credit Report"
+    };
+  }
+  
+  // No match found, return null to allow AI to classify
+  return null;
+}
 
 async function getAdobeAccessToken() {
   const clientId = Deno.env.get('ADOBE_PDF_SERVICES_CLIENT_ID');
@@ -202,20 +283,41 @@ async function extractPdfText(pdfBuffer: ArrayBuffer) {
   return await downloadExtractedContent(downloadUri);
 }
 
-async function classifyDocument(text: string) {
+async function classifyDocument(text: string, fileName: string) {
+  // First try to classify based on filename and text patterns
+  const patternClassification = classifyByFilenameAndContent(fileName, text);
+  if (patternClassification) {
+    console.log(`Document classified based on pattern matching: ${patternClassification.category} > ${patternClassification.subcategory}`);
+    return patternClassification;
+  }
+
+  // If pattern matching doesn't work, use OpenAI
   const openAiKey = Deno.env.get('OPENAI_API_KEY');
   if (!openAiKey) throw new Error("OpenAI API key not set.");
-  const systemPrompt = `You are a professional mortgage doc classifier. 
-Your job is to assign each document to one of the EXACT subcategories/descriptions below.
+  
+  // Create a more specific prompt with enhanced instruction for accurate classification
+  const systemPrompt = `You are a professional mortgage document classifier specializing in accurate document type identification. 
+Your task is to assign each document to one of the EXACT subcategories below.
+
+IMPORTANT INSTRUCTIONS:
+1. Pay close attention to document title, headers and key phrases
+2. For tax documents, look for form numbers (W-2, 1040, Schedule C, etc.)
+3. Pay special attention to the document structure and formatting
+4. Consider the filename as an important clue
+5. When in doubt about specific subcategories, at least get the main category correct
 
 Respond ONLY with JSON of the form: {"category": "...", "subcategory": "..."}
 
-Pick the closest match, even if unsure. Here are category/subcategory definitions:
+The filename of this document is: "${fileName}" - use this as an important clue.
+
+Here are the available categories and subcategories:
 
 ${categoryDescriptions}
 
 Classify the following text:`;
-  const userPrompt = text.substring(0, 8000);
+  
+  const userPrompt = `Document filename: ${fileName}\n\nDocument text:\n${text.substring(0, 8000)}`;
+  
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
@@ -278,13 +380,13 @@ serve(async (req) => {
             ? extraction.elements.filter((e: any) => e.Text).map((e: any) => e.Text).join("\n")
             : "";
       } else {
-        // Fallback: for images/etc, pass no raw text (let OpenAI see filename)
+        // Fallback: for images/etc, pass filename for pattern recognition
         extractedText = file.name;
       }
 
-      // Call OpenAI for classification
+      // Call classification with both text content and filename
       if (extractedText) {
-        determinedCategory = await classifyDocument(extractedText);
+        determinedCategory = await classifyDocument(extractedText, file.name);
       }
 
       // Compose final form for storing doc
