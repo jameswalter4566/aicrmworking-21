@@ -276,11 +276,17 @@ async function downloadExtractedContent(downloadUri: string) {
 }
 
 async function extractPdfText(pdfBuffer: ArrayBuffer) {
-  const { access_token, api_base } = await getAdobeAccessToken();
-  const assetID = await uploadPdfToAdobe(access_token, api_base, pdfBuffer);
-  const extractionJob = await createExtractionJob(access_token, api_base, assetID);
-  const downloadUri = await pollJobStatus(access_token, extractionJob);
-  return await downloadExtractedContent(downloadUri);
+  try {
+    const { access_token, api_base } = await getAdobeAccessToken();
+    const assetID = await uploadPdfToAdobe(access_token, api_base, pdfBuffer);
+    const extractionJob = await createExtractionJob(access_token, api_base, assetID);
+    const downloadUri = await pollJobStatus(access_token, extractionJob);
+    return await downloadExtractedContent(downloadUri);
+  } catch (error) {
+    console.error("PDF extraction error:", error);
+    // Return a minimal structure for fallback
+    return { elements: [] };
+  }
 }
 
 async function classifyDocument(text: string, fileName: string) {
@@ -292,11 +298,12 @@ async function classifyDocument(text: string, fileName: string) {
   }
 
   // If pattern matching doesn't work, use OpenAI
-  const openAiKey = Deno.env.get('OPENAI_API_KEY');
-  if (!openAiKey) throw new Error("OpenAI API key not set.");
-  
-  // More explicit, strict, zero-compromise prompt for US mortgage docs
-  const systemPrompt = `
+  try {
+    const openAiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiKey) throw new Error("OpenAI API key not set.");
+    
+    // More explicit, strict, zero-compromise prompt for US mortgage docs
+    const systemPrompt = `
 You are a professional US MORTGAGE DOCUMENT CLASSIFIER. Your task is to analyze uploaded files and classify them with absolute precision into a category and subcategory based on U.S. mortgage documentation standards. You must use EXTREME strictness in your matching and avoid vague classifications at all costs.
 
 Here are your core rules and expectations:
@@ -322,8 +329,8 @@ Here are your core rules and expectations:
 - 'Wages, tips, other compensation'
 - Box 1, Box 2, Box 3, Box 12
 - 'Employer Identification Number (EIN)'
-- 'Employer’s name, address, and ZIP code'
-- 'Employee’s Social Security Number'
+- 'Employer's name, address, and ZIP code'
+- 'Employee's Social Security Number'
 - 'Federal income tax withheld'
 - 'Social Security wages'
 - 'Medicare wages'
@@ -335,24 +342,24 @@ If multiple fields match, it is highly likely to be a W-2.
 
 ### 🔎 **Other Identifiable Keywords & Routing Cues**
 
-**Driver’s License**  
-→ Keywords: “Driver License”, “DL Number”, “Date of Birth”, state seal or state abbreviation  
-→ Category: Identification → Driver’s License  
+**Driver's License**  
+→ Keywords: "Driver License", "DL Number", "Date of Birth", state seal or state abbreviation  
+→ Category: Identification → Driver's License  
 
 **Pay Stubs**  
-→ Keywords: “Earnings Statement”, “Gross Pay”, “Net Pay”, “Pay Period”, “YTD”, “Hours Worked”, “Deductions”  
+→ Keywords: "Earnings Statement", "Gross Pay", "Net Pay", "Pay Period", "YTD", "Hours Worked", "Deductions"  
 → Category: Income → Pay Stubs  
 
 **Bank Statement**  
-→ Keywords: “Statement Period”, “Available Balance”, “Deposits”, “Withdrawals”, “Account Number”, “Bank of America”, “Chase”, etc.  
+→ Keywords: "Statement Period", "Available Balance", "Deposits", "Withdrawals", "Account Number", "Bank of America", "Chase", etc.  
 → Category: Assets → Bank Statements  
 
 **Letter of Explanation (LOE)**  
-→ Keywords: “Letter of Explanation”, “To whom it may concern”, often handwritten or typed freeform  
+→ Keywords: "Letter of Explanation", "To whom it may concern", often handwritten or typed freeform  
 → Category: Underwriting Conditions → Letter of Explanation  
 
 **Purchase Agreement**  
-→ Keywords: “Real Estate Purchase Agreement”, “Buyer/Seller”, “Earnest Money”, “Contract Date”, “Closing Date”  
+→ Keywords: "Real Estate Purchase Agreement", "Buyer/Seller", "Earnest Money", "Contract Date", "Closing Date"  
 → Category: Property Documents → Purchase Agreement  
 
 ---
@@ -360,7 +367,6 @@ If multiple fields match, it is highly likely to be a W-2.
 ### 🧾 **Return Format**
 ALWAYS return your answer in JSON like this:
 
-```json
 {
   "category": "Income",
   "subcategory": "W-2 / 1099"
@@ -372,35 +378,48 @@ ${categoryDescriptions}
 Be clinical, strict, and conservative. Pay close attention to form numbers, document headers, and filename clues.
 `;
 
-  const userPrompt = `Filename: ${fileName}
+    const userPrompt = `Filename: ${fileName}
 Extracted Text Start:\n${text.substring(0, 8000)}
   
 Classify this document strictly per the above. If you pick "Other / Miscellaneous" or "Supporting Docs Not Elsewhere Categorized", provide a "reason" in your JSON answer explaining why, otherwise just give category and subcategory.`;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.05,
-      response_format: { type: "json_object" }
-    }),
-  });
-  if (!response.ok) throw new Error(await response.text());
-  const result = await response.json();
-  try {
-    // Parse and return only category/subcategory (ignore "reason" if present)
-    const out = JSON.parse(result.choices?.[0]?.message?.content ?? "{}");
-    return {
-      category: out.category || "Other / Miscellaneous",
-      subcategory: out.subcategory || "Supporting Docs Not Elsewhere Categorized"
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.05,
+        response_format: { type: "json_object" }
+      }),
+    });
+    
+    if (!response.ok) throw new Error(await response.text());
+    const result = await response.json();
+    try {
+      // Parse and return only category/subcategory (ignore "reason" if present)
+      const out = JSON.parse(result.choices?.[0]?.message?.content ?? "{}");
+      return {
+        category: out.category || "Other / Miscellaneous",
+        subcategory: out.subcategory || "Supporting Docs Not Elsewhere Categorized"
+      };
+    } catch (e) {
+      console.error("Error parsing OpenAI response:", e);
+      return { 
+        category: "Other / Miscellaneous", 
+        subcategory: "Supporting Docs Not Elsewhere Categorized"
+      };
+    }
+  } catch (error) {
+    console.error("Error classifying document with OpenAI:", error);
+    // Fallback if AI classification fails
+    return { 
+      category: "Other / Miscellaneous", 
+      subcategory: "Supporting Docs Not Elsewhere Categorized"
     };
-  } catch (e) {
-    return { category: "Other / Miscellaneous", subcategory: "Supporting Docs Not Elsewhere Categorized" };
   }
 }
 
@@ -434,31 +453,48 @@ serve(async (req) => {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       let extractedText: string = "";
-      let determinedCategory = { category: "Other / Miscellaneous", subcategory: "Supporting Docs Not Elsewhere Categorized" };
+      let determinedCategory = { 
+        category: "Other / Miscellaneous", 
+        subcategory: "Supporting Docs Not Elsewhere Categorized" 
+      };
 
-      // If PDF, use Adobe extraction (only first 3 pages)
-      if (file.type === "application/pdf") {
-        const extraction = await extractPdfText(await file.arrayBuffer());
-        extractedText =
-          extraction && extraction.elements
-            ? extraction.elements.filter((e: any) => e.Text).map((e: any) => e.Text).join("\n")
-            : "";
+      // First, try pattern-based classification using just the filename
+      const initialClassification = classifyByFilenameAndContent(file.name, file.name);
+      if (initialClassification) {
+        determinedCategory = initialClassification;
+        console.log(`Quick classification by filename: ${file.name} -> ${determinedCategory.category}/${determinedCategory.subcategory}`);
       } else {
-        // Fallback: for images/etc, pass filename for pattern recognition
-        extractedText = file.name;
-      }
+        // If filename-only classification fails, try PDF extraction (for PDFs only)
+        if (file.type === "application/pdf") {
+          try {
+            const extraction = await extractPdfText(await file.arrayBuffer());
+            extractedText =
+              extraction && extraction.elements && Array.isArray(extraction.elements)
+                ? extraction.elements.filter((e: any) => e.Text).map((e: any) => e.Text).join("\n")
+                : "";
+                
+            console.log(`Extracted ${extractedText.length} chars of text from PDF`);
+          } catch (error) {
+            console.error("PDF extraction failed:", error);
+            extractedText = file.name; // Fallback to just using filename
+          }
+        } else {
+          // Fallback: for images/etc, pass filename for pattern recognition
+          extractedText = file.name;
+        }
 
-      // Call classification with both text content and filename
-      if (extractedText) {
-        determinedCategory = await classifyDocument(extractedText, file.name);
+        // Attempt classification with whatever text we have
+        if (extractedText) {
+          determinedCategory = await classifyDocument(extractedText, file.name);
+        }
       }
 
       // Compose final form for storing doc
       const storeForm = new FormData();
       storeForm.append("file", file);
       storeForm.append("leadId", leadId.toString());
-      storeForm.append("category", determinedCategory.category || "Other / Miscellaneous");
-      storeForm.append("subcategory", determinedCategory.subcategory || "Supporting Docs Not Elsewhere Categorized");
+      storeForm.append("category", determinedCategory.category);
+      storeForm.append("subcategory", determinedCategory.subcategory);
 
       // Store doc using store-document function (order preserved)
       const { data, error } = await supabase.functions.invoke("store-document", { body: storeForm });
