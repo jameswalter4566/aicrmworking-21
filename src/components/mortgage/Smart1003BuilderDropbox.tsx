@@ -164,6 +164,8 @@ const Smart1003BuilderDropbox: React.FC<Smart1003BuilderDropboxProps> = ({
     try {
       setIsUploading(true);
       
+      handleStoreDocumentsInManager(files, leadId);
+      
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
