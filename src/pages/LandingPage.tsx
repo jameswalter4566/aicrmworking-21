@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -249,21 +248,15 @@ const LandingPage = () => {
   const section2Content = (
     <div
       className="
-        w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl
-        mx-auto my-0 flex flex-col items-center justify-center
-        min-h-[85vh]
-        relative z-40
-        border border-gray-100
-        transition-shadow
-        "
-      style={{
-        marginTop: '-10vh', // Increased from -5vh to -10vh to make more of the container visible
-      }}
+        w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
+        min-h-[85vh] 
+        relative z-40 border border-gray-100 transition-shadow
+      "
     >
       <div className="w-full px-10 py-20 flex flex-col items-center justify-center h-full">
         <h2 className="text-4xl font-bold text-gray-800 mb-8">Section 2 Placeholder</h2>
-        <p className="text-lg text-gray-500">
-          This is a large all-white, rounded-edge section. The background of the main landing page stays visible at the sides. 
+        <p className="text-lg text-gray-500 text-center">
+          This is a large all-white, rounded-edge section. The background of the main landing page stays visible at the sides.
           Top ~5% of this section should always be visible at the bottom of the first section as a scroll cue.
         </p>
       </div>
@@ -281,7 +274,7 @@ const LandingPage = () => {
         className="
           h-screen w-full overflow-y-scroll snap-y snap-mandatory
           scrollbar-none
-          "
+        "
         style={{ scrollBehavior: "smooth" }}
       >
         <section className="min-h-screen w-full flex flex-col snap-start relative">
@@ -426,19 +419,41 @@ const LandingPage = () => {
             </div>
           </div>
           
-          {/* Scroll indicator - added to make it more obvious there's content below */}
           <div className="absolute bottom-8 left-0 right-0 flex justify-center z-50 animate-bounce">
             <div className="w-8 h-8 border-2 border-white border-b-0 border-r-0 rotate-[225deg]"></div>
           </div>
+          <div 
+            aria-hidden="true"
+            className="pointer-events-none select-none flex justify-center absolute left-0 right-0 w-full"
+            style={{
+              bottom: -32,
+              zIndex: 100,
+            }}
+          >
+            <div
+              className="w-[90vw] max-w-6xl h-8 rounded-t-3xl border-x border-t border-gray-100 bg-white shadow-2xl"
+              style={{ opacity: 0.97, borderBottom: "none" }}
+            ></div>
+          </div>
         </section>
-
+        
         <section
-          className="relative flex flex-col items-center pt-[5vh] snap-start"
+          className="relative flex flex-col items-center pt-0 snap-start"
           style={{
             minHeight: "100vh",
           }}
         >
-          {section2Content}
+          <div 
+            className="w-full flex justify-center items-start"
+            style={{
+              marginTop: '-6vh',
+              position: 'sticky',
+              top: '5vh',
+              zIndex: 40,
+            }}
+          >
+            {section2Content}
+          </div>
         </section>
       </div>
     </div>
