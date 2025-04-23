@@ -418,7 +418,7 @@ const LandingPage = () => {
                 </div>
               </div>
               
-              <div className="pt-16" id="features">
+              <div className="pt-8 md:pt-0" id="features">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   {[
                     {
@@ -458,7 +458,9 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <div className="absolute bottom-8 left-0 right-0 flex justify-center z-50 animate-bounce">
+          <div 
+            className="absolute bottom-8 left-0 right-0 flex justify-center z-50 animate-bounce"
+          >
             <div className="w-8 h-8 border-2 border-white border-b-0 border-r-0 rotate-[225deg]"></div>
           </div>
 
