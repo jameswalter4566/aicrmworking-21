@@ -267,11 +267,11 @@ const LandingPage = () => {
             className="mx-auto rounded-xl shadow-lg object-fill"
             style={{
               width: "90%",
-              height: "88vh",
-              minHeight: "540px",
+              height: "52vh",
+              minHeight: "360px",
               minWidth: "340px",
               maxWidth: "96%",
-              maxHeight: "92vh",
+              maxHeight: "62vh",
               background: "#fff",
               border: "1px solid #f0f0f0",
               display: "block",
