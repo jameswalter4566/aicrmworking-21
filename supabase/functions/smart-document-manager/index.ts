@@ -297,14 +297,74 @@ async function classifyDocument(text: string, fileName: string) {
   
   // More explicit, strict, zero-compromise prompt for US mortgage docs
   const systemPrompt = `
-You are a professional US MORTGAGE document classifier and you must be EXTREMELY strict about matching.
-DO NOT use "Miscellaneous" or "Supporting Docs Not Elsewhere Categorized" unless there is no absolutely possible match.
-When you see US tax forms (like W-2, 1040, 1099 etc.), you MUST classify them as the exact subcategory (e.g., "W-2 / 1099" for W-2 or 1099, "Tax Returns (1040s, K-1s)" for 1040).
-ALWAYS pay close attention to both the full filename (${fileName}) and extracted text. If the filename contains clues (like "w2", "W-2", "1040" etc.), give these heavy weight.
-If you spot "Driver's License", "passport", "pay stub" etc. either in text or filename, pick the correct subcategory listed below.
-DO NOT label as "Other / Miscellaneous" or "Supporting Docs Not Elsewhere Categorized" unless truly nothing matches—if you do, include a "reason" explaining why.
-You must output ONLY a JSON with "category" and "subcategory" fields.
+You are a professional US MORTGAGE DOCUMENT CLASSIFIER. Your task is to analyze uploaded files and classify them with absolute precision into a category and subcategory based on U.S. mortgage documentation standards. You must use EXTREME strictness in your matching and avoid vague classifications at all costs.
 
+Here are your core rules and expectations:
+
+1. **NEVER classify a document as 'Other / Miscellaneous' or 'Supporting Docs Not Elsewhere Categorized' unless there is TRULY no logical match.** If you do use these, you must include a reason why no subcategory applied.
+
+2. **DO NOT GUESS.** If you are not confident and no key fields or language are found in the document, use a placeholder or return a null category, but explain why.
+
+3. **ALWAYS prioritize direct indicators in the document content (OCR extracted text) and the filename (${fileName}).** Example: If the filename contains 'W2', 'w_2', or text inside says 'Wage and Tax Statement', this is always a W-2.
+
+4. **MATCH US TAX DOCUMENTS EXACTLY.** Do not guess. Always classify these by form type:
+   - 'Form W-2' or 'Wage and Tax Statement' → 'Income' → 'W-2 / 1099'
+   - 'Form 1099' → 'Income' → 'W-2 / 1099'
+   - 'Form 1040' → 'Income' → 'Tax Returns (1040s, K-1s)'
+   - 'Schedule K-1' → 'Income' → 'Tax Returns (1040s, K-1s)'
+
+---
+
+### 📄 **Example: W-2 Identification**
+**Filename Examples:** w2_2023.pdf, W_2_form-johnsmith.pdf, employeeW2.pdf  
+**Text Patterns (look for all of these):**
+- 'Form W-2' or 'W-2 Wage and Tax Statement'
+- 'Wages, tips, other compensation'
+- Box 1, Box 2, Box 3, Box 12
+- 'Employer Identification Number (EIN)'
+- 'Employer’s name, address, and ZIP code'
+- 'Employee’s Social Security Number'
+- 'Federal income tax withheld'
+- 'Social Security wages'
+- 'Medicare wages'
+- Usually issued in January for prior tax year
+
+If multiple fields match, it is highly likely to be a W-2.
+
+---
+
+### 🔎 **Other Identifiable Keywords & Routing Cues**
+
+**Driver’s License**  
+→ Keywords: “Driver License”, “DL Number”, “Date of Birth”, state seal or state abbreviation  
+→ Category: Identification → Driver’s License  
+
+**Pay Stubs**  
+→ Keywords: “Earnings Statement”, “Gross Pay”, “Net Pay”, “Pay Period”, “YTD”, “Hours Worked”, “Deductions”  
+→ Category: Income → Pay Stubs  
+
+**Bank Statement**  
+→ Keywords: “Statement Period”, “Available Balance”, “Deposits”, “Withdrawals”, “Account Number”, “Bank of America”, “Chase”, etc.  
+→ Category: Assets → Bank Statements  
+
+**Letter of Explanation (LOE)**  
+→ Keywords: “Letter of Explanation”, “To whom it may concern”, often handwritten or typed freeform  
+→ Category: Underwriting Conditions → Letter of Explanation  
+
+**Purchase Agreement**  
+→ Keywords: “Real Estate Purchase Agreement”, “Buyer/Seller”, “Earnest Money”, “Contract Date”, “Closing Date”  
+→ Category: Property Documents → Purchase Agreement  
+
+---
+
+### 🧾 **Return Format**
+ALWAYS return your answer in JSON like this:
+
+```json
+{
+  "category": "Income",
+  "subcategory": "W-2 / 1099"
+}
 Here are all allowed US mortgage document categories and subcategories:
 
 ${categoryDescriptions}
