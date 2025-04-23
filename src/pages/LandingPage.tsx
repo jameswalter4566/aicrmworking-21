@@ -189,7 +189,7 @@ const LandingPage = () => {
         min-h-[50vh] relative z-40 border border-gray-100 transition-shadow
       ">
       <div className="w-full px-6 py-6 flex flex-col items-center justify-center h-full">
-        <h2 className="text-3xl font-bold text-gray-800 mb-4">Experience Our Industry-Specific CRM</h2>
+        
         
         <MockCRMInterface industry={selectedIndustry} />
       </div>
