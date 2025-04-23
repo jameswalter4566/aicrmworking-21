@@ -462,13 +462,12 @@ const LandingPage = () => {
             <div className="w-8 h-8 border-2 border-white border-b-0 border-r-0 rotate-[225deg]"></div>
           </div>
 
-          {/* This is the element causing the issue - modified to be contained within section 1's context */}
           <div 
             aria-hidden="true"
             className="pointer-events-none select-none flex justify-center absolute left-0 right-0 w-full"
             style={{
               bottom: -32,
-              zIndex: 30, // Reduced z-index to be below section 2
+              zIndex: 30,
             }}
           >
             <div
@@ -482,17 +481,17 @@ const LandingPage = () => {
           className="relative flex flex-col items-center pt-0 snap-start bg-slate-900"
           style={{
             minHeight: "100vh",
-            marginTop: '-2px', // Increased to ensure no gap
+            marginTop: '-2px',
             position: 'relative',
-            zIndex: 40, // Increased z-index to be above the white border element
+            zIndex: 40,
           }}
         >
           <div 
             className="w-full flex justify-center items-start"
             style={{
-              marginTop: '-6vh',
+              marginTop: '-12vh',
               position: 'sticky',
-              top: '5vh',
+              top: '10vh',
               zIndex: 40,
             }}
           >
