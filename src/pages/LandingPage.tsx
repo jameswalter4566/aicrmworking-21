@@ -549,64 +549,6 @@ const LandingPage = () => {
           >
             {section2Content}
           </div>
-
-          <div className="max-w-6xl w-full mx-auto mt-8 px-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <div className="flex items-center justify-between p-4 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg">
-                  <div className="flex-1">
-                    <CategoryCard
-                      bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'}
-                      title="Mortgage CRM"
-                      description="For modern mortgage teams - automate nurture, compliance, and lead follow-up"
-                    />
-                  </div>
-                  <Switch
-                    data-industry="mortgage"
-                    checked={selectedIndustry === 'mortgage'}
-                    onCheckedChange={() => handleIndustryToggle('mortgage')}
-                    className="ml-4"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between p-4 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg">
-                  <div className="flex-1">
-                    <CategoryCard
-                      bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'}
-                      title="Real Estate CRM"
-                      description="Built for real estate agents - centralize prospects and automate follow-up"
-                    />
-                  </div>
-                  <Switch
-                    data-industry="realEstate"
-                    checked={selectedIndustry === 'realEstate'}
-                    onCheckedChange={() => handleIndustryToggle('realEstate')}
-                    className="ml-4"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between p-4 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg">
-                  <div className="flex-1">
-                    <CategoryCard
-                      bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'}
-                      title="Debt Settlement CRM"
-                      description="Empower debt relief teams - organize client onboarding and automate processes"
-                    />
-                  </div>
-                  <Switch
-                    data-industry="debtSettlement"
-                    checked={selectedIndustry === 'debtSettlement'}
-                    onCheckedChange={() => handleIndustryToggle('debtSettlement')}
-                    className="ml-4"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
         </section>
       </div>
     </div>
