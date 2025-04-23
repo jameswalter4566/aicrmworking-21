@@ -6,7 +6,7 @@ import SmartDocumentSidebar from "@/components/smart-documents/SmartDocumentSide
 import DropboxUploader from "@/components/smart-documents/DropboxUploader";
 import DocumentUploader from "@/components/smart-documents/DocumentUploader";
 import DocumentList from "@/components/smart-documents/DocumentList";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useParams, useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,8 @@ const SmartDocumentManager: React.FC = () => {
   const { id: routeLeadId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const queryLeadId = searchParams.get('leadId');
   
   useEffect(() => {
     async function validateAndGetLead() {
@@ -27,26 +29,54 @@ const SmartDocumentManager: React.FC = () => {
       
       try {
         // Try to get a valid lead ID from our edge function
+        // First check route param, then query param
+        const leadIdToCheck = routeLeadId || queryLeadId;
+        
+        // If nothing found, try to get by email or name
+        const paramsToSend: any = {};
+        
+        if (leadIdToCheck) {
+          paramsToSend.leadId = leadIdToCheck;
+        } else {
+          // We could add search by email/name here if available
+          const email = searchParams.get('email');
+          const name = searchParams.get('name');
+          
+          if (email) paramsToSend.email = email;
+          if (name) paramsToSend.name = name;
+        }
+        
+        console.log("Checking lead with params:", paramsToSend);
+        
         const { data, error } = await supabase.functions.invoke('get-lead-for-document-manager', {
-          body: { leadId: routeLeadId }
+          body: paramsToSend
         });
+        
+        console.log("Lead validation response:", data, error);
         
         if (error) {
           console.error("Error validating lead:", error);
           toast.error("Failed to validate lead");
           setValidLeadId(null);
-        } else if (data.success && data.data?.leadId) {
+        } else if (data && data.success && data.data?.leadId) {
           // We got a valid lead ID
           setValidLeadId(data.data.leadId);
           
-          // If the route ID is different from the valid one, update the URL
           if (routeLeadId !== data.data.leadId) {
+            // If the route ID is different from the valid one, update the URL
             navigate(`/smart-document-manager/${data.data.leadId}`, { replace: true });
+          }
+          
+          // Show a confirmation message with the lead name if available
+          if (data.data.firstName || data.data.lastName) {
+            toast.success(`Documents for ${data.data.firstName || ''} ${data.data.lastName || ''}`);
+          } else {
+            toast.success("Valid lead ID found and connected");
           }
         } else {
           // No valid lead ID found
           setValidLeadId(null);
-          toast.error(data.error || "No valid lead found");
+          toast.error(data?.error || "No valid lead found. Please select a lead first.");
         }
       } catch (err) {
         console.error("Error fetching lead:", err);
@@ -58,7 +88,7 @@ const SmartDocumentManager: React.FC = () => {
     }
     
     validateAndGetLead();
-  }, [routeLeadId, navigate]);
+  }, [routeLeadId, queryLeadId, navigate, searchParams]);
   
   // Handle when documents have been uploaded to trigger a refresh
   const handleDocumentsUploaded = () => {
@@ -148,7 +178,7 @@ const SmartDocumentManager: React.FC = () => {
               <FilePlus className="h-7 w-7 mr-2 text-blue-600" />
               Dropbox: Upload Your Documents
             </h2>
-            <DropboxUploader />
+            <DropboxUploader leadId={validLeadId} />
           </div>
         ) : selectedCategory && selectedSubcategory ? (
           <div>

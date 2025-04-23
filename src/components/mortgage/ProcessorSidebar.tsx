@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { 
@@ -59,6 +60,9 @@ const ProcessorSidebar = ({
   const [isLoanSubmitted, setIsLoanSubmitted] = useState(false);
   const { updateLoanProgress, isUpdating } = useLoanProgress();
 
+  // Use either the provided leadId or fallback to the id from the URL params
+  const currentLeadId = leadId || id;
+
   useEffect(() => {
     const checkLoanStatus = async () => {
       const loanLeadId = leadId || id;
@@ -115,6 +119,15 @@ const ProcessorSidebar = ({
   const handleDownload34 = () => {
     toast.info("Downloading 3.4 form... This is a placeholder for the actual download functionality");
     setIsDialogOpen(false);
+  };
+
+  // Function to handle navigation to Smart Document Manager
+  const handleDocumentManagerClick = () => {
+    if (currentLeadId) {
+      navigate(`/smart-document-manager/${currentLeadId}`);
+    } else {
+      toast.error("Lead ID is missing. Cannot open document manager.");
+    }
   };
 
   return (
@@ -183,7 +196,7 @@ const ProcessorSidebar = ({
                     "text-blue-900 transition-colors hover:bg-blue-50",
                     activeSection === "smartDocManager" ? "bg-blue-100 font-medium" : "bg-blue-25"
                   )}
-                  onClick={() => navigate(`/smart-document-manager/${leadId}`)}
+                  onClick={handleDocumentManagerClick}
                 >
                   <FolderClosed className="h-5 w-5" />
                   <span>Smart Document Manager</span>

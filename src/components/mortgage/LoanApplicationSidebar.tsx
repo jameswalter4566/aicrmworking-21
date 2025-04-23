@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { 
@@ -36,6 +37,7 @@ import {
 import { toast } from "sonner";
 import { useLoanProgress } from "@/hooks/use-loan-progress";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 
 interface LoanApplicationSidebarProps {
   activeTab: string;
@@ -52,6 +54,7 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isLoanSubmitted, setIsLoanSubmitted] = useState(false);
   const { updateLoanProgress, isUpdating } = useLoanProgress();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const checkLoanStatus = async () => {
@@ -239,10 +242,16 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
             if (tab.id === "smartDocManager") {
               return (
                 <li key={tab.id}>
-                  <a
-                    href={`/smart-document-manager${leadId ? `?leadId=${leadId}` : ""}`}
+                  <button
+                    onClick={() => {
+                      if (leadId) {
+                        navigate(`/smart-document-manager/${leadId}`);
+                      } else {
+                        toast.error("Lead ID is missing. Cannot open document manager.");
+                      }
+                    }}
                     className={cn(
-                      "flex items-center w-full px-4 py-3 text-left text-sm transition-colors rounded-md",
+                      "flex items-center w-full px-4 py-3 text-left text-sm transition-colors",
                       isActive 
                         ? "bg-mortgage-lightPurple text-mortgage-darkPurple font-medium border-r-4 border-mortgage-purple" 
                         : "text-gray-700 hover:bg-gray-100"
@@ -250,7 +259,7 @@ const LoanApplicationSidebar: React.FC<LoanApplicationSidebarProps> = ({
                   >
                     <Icon className={cn("mr-3 h-5 w-5", isActive ? "text-mortgage-purple" : "text-gray-500")} />
                     <span>{tab.name}</span>
-                  </a>
+                  </button>
                 </li>
               );
             }
