@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
@@ -31,7 +30,6 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Check for auth callback in URL
   useEffect(() => {
     const handleAuthCallback = async () => {
       const hashParams = new URLSearchParams(location.hash.substring(1));
@@ -131,7 +129,6 @@ const Auth = () => {
 
       if (error) throw error;
 
-      // If we have a URL to redirect to, do it now
       if (data?.url) {
         window.location.href = data.url;
       }
