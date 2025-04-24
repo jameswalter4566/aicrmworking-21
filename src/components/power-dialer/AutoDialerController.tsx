@@ -158,8 +158,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         if (error) {
           console.error('Error calling get_next_session_lead:', error);
           
-          // If we still have the ambiguous column error, try the direct SQL approach
-          if ((error.message?.includes('ambiguous') || error.code === '42702') && fixAttemptCount < 3) {
+          if (error.message?.includes('ambiguous') && error.code === '42702' && fixAttemptCount < 3) {
             setFixAttemptCount(count => count + 1);
             const fixed = await fixDatabaseFunction();
             
@@ -366,20 +365,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           description: "Could not initialize browser phone. Please refresh and try again.",
           variant: "destructive",
         });
-        
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: 'Browser phone initialization failed'
-            })
-          })
-          .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
         return;
       }
 
@@ -390,20 +375,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           description: "Please allow microphone access to make calls through your browser.",
           variant: "destructive",
         });
-        
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: 'Microphone access denied or unavailable'
-            })
-          })
-          .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
         return;
       }
 
@@ -420,26 +391,10 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           description: "Twilio Device not available. Please refresh the page.",
           variant: "destructive",
         });
-        
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: 'Twilio Device not available'
-            })
-          })
-          .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
         return;
       }
 
       try {
-        console.log(`Making browser-based call to ${formattedPhoneNumber} for lead ${lead.lead_id}`);
-        
         const call = await window.Twilio.Device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
@@ -448,8 +403,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         });
 
         if (call) {
-          console.log(`Call connected with SID: ${call.sid}`);
-          
           await supabase
             .from('dialing_session_leads')
             .update({
@@ -485,10 +438,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             })
           })
           .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
-        return;
       }
 
     } catch (error) {
