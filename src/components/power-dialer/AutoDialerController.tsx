@@ -58,8 +58,21 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   // Track phone validation errors
   const phoneValidationErrors = useRef<Record<string, boolean>>({});
 
-  // Add a cooldown between call attempts to prevent rate limiting 
-  const callCooldownMs = 3000; // 3 second cooldown between call attempts
+  // Add a longer cooldown between call attempts to prevent rate limiting 
+  const callCooldownMs = 5000; // 5 second cooldown between call attempts
+  const errorCooldownMs = 10000; // 10 second cooldown after errors
+  const sessionCooldownMs = 30000; // 30 second cooldown after session changes
+
+  // Use a debounce mechanism for API calls
+  const debounceTimeouts = useRef<Record<string, number>>({});
+  
+  // Rate limiting for the current session
+  const sessionRateLimits = useRef({
+    callCount: 0,
+    callsPerMinute: 10, // Max 10 calls per minute
+    sessionStartTime: Date.now(),
+    callHistory: [] as number[], // Timestamps of calls
+  });
 
   const fixDatabaseFunction = useCallback(async () => {
     try {
@@ -170,6 +183,19 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     // Check minimum length (10 digits for US numbers)
     if (digitsOnly.length < 10) {
       console.log(`Phone number ${phone} is too short (${digitsOnly.length} digits), needs at least 10`);
+      phoneValidationErrors.current[phone] = true;
+      return false;
+    }
+    
+    // Prevent known invalid patterns (all zeros, all ones, etc)
+    const invalidPatterns = [
+      /^0{10,}$/, // All zeros
+      /^1{10,}$/, // All ones
+      /^(.)\1{9,}$/ // Same digit repeated 10+ times
+    ];
+    
+    if (invalidPatterns.some(pattern => pattern.test(digitsOnly))) {
+      console.log(`Phone number ${phone} matches an invalid pattern`);
       phoneValidationErrors.current[phone] = true;
       return false;
     }
@@ -413,8 +439,24 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     const now = Date.now();
     const timeSinceLastAttempt = now - callStateRef.current.lastAttemptTime;
     
-    // Ensure we're respecting the cooldown period to prevent rate limiting
-    return timeSinceLastAttempt > callCooldownMs;
+    // Check if we're respecting the cooldown period to prevent rate limiting
+    if (timeSinceLastAttempt < callCooldownMs) {
+      console.log(`Cooling down... ${callCooldownMs - timeSinceLastAttempt}ms remaining`);
+      return false;
+    }
+
+    // Check session rate limits
+    const oneMinuteAgo = now - 60000;
+    sessionRateLimits.current.callHistory = sessionRateLimits.current.callHistory.filter(
+      timestamp => timestamp > oneMinuteAgo
+    );
+
+    if (sessionRateLimits.current.callHistory.length >= sessionRateLimits.current.callsPerMinute) {
+      console.log(`Session rate limit reached: ${sessionRateLimits.current.callHistory.length} calls in the last minute`);
+      return false;
+    }
+    
+    return true;
   }, [callCooldownMs]);
 
   const processNextLead = useCallback(async () => {
@@ -432,6 +474,16 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     // Check if we need to wait before making another call (cooldown period)
     if (!isTimeToDial()) {
       console.log('Waiting for call cooldown period before dialing next lead...');
+      const timeToNextCall = callCooldownMs - (Date.now() - callStateRef.current.lastAttemptTime);
+      
+      // Schedule next attempt after cooldown
+      if (timeToNextCall > 0) {
+        setTimeout(() => {
+          if (isActive && !isProcessingCall && !noMoreLeads && !dialingPaused) {
+            processNextLead();
+          }
+        }, timeToNextCall + 100); // Add a small buffer
+      }
       return;
     }
     
@@ -533,6 +585,10 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         callAttempts: 0,
         lastAttemptTime: Date.now(),
       };
+      
+      // Update session rate limiting
+      sessionRateLimits.current.callHistory.push(Date.now());
+      sessionRateLimits.current.callCount++;
 
       // Initialize Twilio and make the call
       await twilioService.initializeTwilioDevice();
@@ -544,7 +600,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         // Check if this is a blacklist error based on error message
         const isBlacklistedError = 
           callResult.error?.includes('blacklisted') || 
-          callResult.error?.includes('13225');
+          callResult.error?.includes('13225') ||
+          (callResult.twilioErrorCode === 13225);
           
         if (isBlacklistedError) {
           console.log(`Phone number ${phoneNumber} is blacklisted by Twilio, adding to blacklist`);
@@ -573,6 +630,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           
           await updateLeadStatus(lead.id, 'failed', callResult.error || "Unknown error");
         }
+        
+        // Use a longer cooldown after errors
+        callStateRef.current.lastAttemptTime = Date.now() - callCooldownMs + errorCooldownMs;
         
         setIsProcessingCall(false);
         onCallComplete();
@@ -610,14 +670,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   }, [
     isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, 
     toast, onCallComplete, noMoreLeads, processedPhoneNumbers, isValidPhoneNumber,
-    blacklistedNumbers, dialingPaused, isTimeToDial
+    blacklistedNumbers, dialingPaused, isTimeToDial, errorCooldownMs, callCooldownMs
   ]);
 
-  const handleCallCompletion = useCallback(async (errorCode?: number) => {
+  const handleCallCompletion = useCallback(async (error?: { code?: number }) => {
     if (callStateRef.current.currentLeadId) {
       // If we have an error code that indicates blacklisted number, add to blacklist
-      if ((errorCode === 13225 || (errorCode && errorCode.toString().includes('13225'))) && callStateRef.current.currentPhoneNumber) {
-        console.log(`Adding phone number ${callStateRef.current.currentPhoneNumber} to blacklist due to error code ${errorCode}`);
+      if ((error?.code === 13225 || (error?.code && error.code.toString().includes('13225'))) && callStateRef.current.currentPhoneNumber) {
+        console.log(`Adding phone number ${callStateRef.current.currentPhoneNumber} to blacklist due to error code ${error.code}`);
         
         const formattedPhone = callStateRef.current.currentPhoneNumber.replace(/\D/g, '');
         setBlacklistedNumbers(prev => {
@@ -633,7 +693,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         await updateLeadStatus(
           callStateRef.current.currentLeadId, 
           'failed', 
-          `Phone number blacklisted: Twilio error ${errorCode}`
+          `Phone number blacklisted: Twilio error ${error.code}`
         );
       } else {
         // Regular call completion
@@ -643,6 +703,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       setCurrentLeadId(null);
       callStateRef.current.isActiveCall = false;
     }
+    
+    // Use a standard cooldown after call completion
+    callStateRef.current.lastAttemptTime = Date.now();
     
     setIsProcessingCall(false);
     onCallComplete();
@@ -657,7 +720,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       // Add a small delay to ensure we don't immediately redial
       setTimeout(async () => {
-        await handleCallCompletion(error?.code);
+        await handleCallCompletion(error);
       }, 1000);
     };
     
@@ -700,40 +763,57 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       .subscribe();
 
     // Start the dialer if it's not already processing a call and there are leads
-    if (!isProcessingCall && !noMoreLeads && isTimeToDial()) {
-      processNextLead();
-    } else if (!isTimeToDial()) {
-      // Schedule next attempt after cooldown period
-      const timeToNextCall = callCooldownMs - (Date.now() - callStateRef.current.lastAttemptTime);
+    if (!isProcessingCall && !noMoreLeads) {
+      // Add initial delay when starting a new session to prevent spamming
+      const initialDelay = sessionRateLimits.current.callCount === 0 ? 1000 : 0;
+      
       setTimeout(() => {
-        if (isActive && !isProcessingCall && !noMoreLeads) {
+        if (isActive && !isProcessingCall && !noMoreLeads && isTimeToDial()) {
           processNextLead();
         }
-      }, Math.max(100, timeToNextCall));
+      }, initialDelay);
     }
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, isActive, processNextLead, isProcessingCall, noMoreLeads, isTimeToDial, callCooldownMs]);
+  }, [sessionId, isActive, processNextLead, isProcessingCall, noMoreLeads, isTimeToDial]);
 
   // Reset the processed phone numbers when session changes
   useEffect(() => {
     if (sessionId) {
+      // Reset tracking information when changing sessions
       setProcessedPhoneNumbers(new Set());
       setBlacklistedNumbers(new Set());
       setNoMoreLeads(false);
       setDialingPaused(false);
+      
+      // Reset call state reference
       callStateRef.current = {
         isActiveCall: false,
         currentLeadId: null,
         currentPhoneNumber: null,
         callStartTime: 0,
         callAttempts: 0,
-        lastAttemptTime: 0,
+        // Set last attempt time to enforce cooldown between session changes
+        lastAttemptTime: Date.now() - callCooldownMs + sessionCooldownMs,
       };
+      
+      // Reset session rate limits
+      sessionRateLimits.current = {
+        callCount: 0,
+        callsPerMinute: 10,
+        sessionStartTime: Date.now(),
+        callHistory: []
+      };
+      
+      console.log(`Auto-dialer initialized with new session: ${sessionId}`);
+      console.log(`Call cooldown set to: ${callCooldownMs}ms`);
+      console.log(`Error cooldown set to: ${errorCooldownMs}ms`);
+      console.log(`Session cooldown set to: ${sessionCooldownMs}ms`);
+      console.log(`Rate limit: ${sessionRateLimits.current.callsPerMinute} calls/minute`);
     }
-  }, [sessionId]);
+  }, [sessionId, callCooldownMs, sessionCooldownMs]);
 
   return null;
 };

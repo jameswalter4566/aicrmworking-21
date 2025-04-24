@@ -9,7 +9,7 @@ export interface TwilioCallResult {
   conferenceName?: string;
   message?: string;
   error?: string;
-  twilioErrorCode?: number;  // Added this property
+  twilioErrorCode?: number;
   leadId?: string | number;
 }
 
@@ -20,7 +20,11 @@ class TwilioService {
   private activeCalls: any[] = [];
   private isCleaningUp: boolean = false;
   private soundsInitialized: boolean = false;
-  private callDisconnectListeners: Array<() => void> = [];
+  private callDisconnectListeners: Array<(error?: any) => void> = [];
+  private retryCount: number = 0;
+  private maxRetries: number = 2;
+  private lastCallTime: number = 0;
+  private callCooldownMs: number = 2000; // 2 second cooldown between calls
 
   async initializeAudioContext(): Promise<boolean> {
     try {
@@ -138,6 +142,13 @@ class TwilioService {
         this.device.on("disconnect", (call: any) => {
           console.log(`Call disconnected: ${call.sid || 'unknown'}`);
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          // Notify all registered listeners about the disconnect
+          const errorData = call.parameters && call.parameters.CallStatus === 'failed' 
+            ? { code: call.parameters.ErrorCode, message: call.parameters.ErrorMessage } 
+            : undefined;
+            
+          this.callDisconnectListeners.forEach(listener => listener(errorData));
         });
 
         this.device.on("cancel", (call: any) => {
@@ -148,6 +159,11 @@ class TwilioService {
             title: "Call Canceled",
             description: "The call was canceled or not answered.",
           });
+          
+          // Notify disconnect listeners
+          this.callDisconnectListeners.forEach(listener => 
+            listener({ code: 'cancel', message: "Call was canceled or not answered" })
+          );
         });
 
         this.device.on("incoming", (call: any) => {
@@ -168,16 +184,29 @@ class TwilioService {
             call.on('error', (error: any) => {
               console.error('Call error:', error);
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+              
+              // Notify disconnect listeners
+              this.callDisconnectListeners.forEach(listener => 
+                listener({ code: error.code, message: error.message })
+              );
             });
             
             call.on('disconnect', () => {
               console.log('Call disconnected');
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+              
+              // Notify disconnect listeners
+              this.callDisconnectListeners.forEach(listener => listener());
             });
             
             call.on('cancel', () => {
               console.log('Call was cancelled');
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+              
+              // Notify disconnect listeners
+              this.callDisconnectListeners.forEach(listener => 
+                listener({ code: 'cancel', message: "Call was canceled" })
+              );
             });
           } else {
             console.log("Incoming call without phone number target, rejecting");
@@ -260,7 +289,21 @@ class TwilioService {
         console.error("Twilio device not initialized.");
         return { success: false, error: "Twilio device not initialized." };
       }
-
+      
+      // Enforce a cooldown between calls to prevent spamming
+      const now = Date.now();
+      const timeSinceLastCall = now - this.lastCallTime;
+      
+      if (timeSinceLastCall < this.callCooldownMs) {
+        console.warn(`Call attempted too soon after previous call (${timeSinceLastCall}ms). Enforcing cooldown.`);
+        return { 
+          success: false, 
+          error: "Call rate limit exceeded. Please wait before trying again.",
+          twilioErrorCode: 20003 // Rate limit error code
+        };
+      }
+      
+      this.lastCallTime = now;
       this.activeCalls = [];
 
       let formattedPhoneNumber = phoneNumber;
@@ -288,7 +331,8 @@ class TwilioService {
         const call = await this.device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
-            leadId: leadId.toString()
+            leadId: leadId.toString(),
+            sessionId: 'browser-' + Date.now() + '-' + Math.random().toString(36).substring(2),
           }
         });
         
@@ -296,7 +340,10 @@ class TwilioService {
         
         console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
         
+        let twilioErrorCode: number | undefined = undefined;
+        
         call.on('error', (error: any) => {
+          twilioErrorCode = error.code;
           console.error('Call error:', error);
           toast({
             title: "Call Error",
@@ -331,7 +378,9 @@ class TwilioService {
           
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
           
-          this.callDisconnectListeners.forEach(listener => listener());
+          this.callDisconnectListeners.forEach(listener => {
+            listener(twilioErrorCode ? { code: twilioErrorCode } : undefined);
+          });
         });
         
         call.on('cancel', () => {
@@ -343,7 +392,9 @@ class TwilioService {
           
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
           
-          this.callDisconnectListeners.forEach(listener => listener());
+          this.callDisconnectListeners.forEach(listener => {
+            listener({ code: 'cancel', message: 'Call cancelled or not answered' });
+          });
         });
         
         return { 
@@ -353,8 +404,17 @@ class TwilioService {
         };
       } catch (deviceError: any) {
         console.warn("Browser-based call initiation failed. Error:", deviceError);
+        
+        // Check for specific error codes
+        let errorCode: number | undefined = undefined;
+        if (deviceError && deviceError.code) {
+          errorCode = parseInt(deviceError.code, 10);
+          if (isNaN(errorCode)) errorCode = undefined;
+        }
+        
         return {
           success: false,
+          twilioErrorCode: errorCode,
           error: deviceError.message || "Failed to initiate call through the browser"
         };
       }
@@ -489,7 +549,7 @@ class TwilioService {
     return this.activeCalls?.length || 0;
   }
 
-  onCallDisconnect(callback: () => void): () => void {
+  onCallDisconnect(callback: (error?: any) => void): () => void {
     this.callDisconnectListeners.push(callback);
     
     return () => {
