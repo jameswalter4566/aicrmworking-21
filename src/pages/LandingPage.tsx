@@ -10,6 +10,7 @@ import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuL
 import { MockCRMInterface } from "@/components/demo/MockCRMInterface";
 import { Switch } from "@/components/ui/switch";
 import { useIsMobile } from "@/hooks/use-mobile";
+
 const CategoryCard = ({
   bgColor,
   title
@@ -23,6 +24,7 @@ const CategoryCard = ({
       <div className="font-semibold text-lg">{title}</div>
     </div>
   </div>;
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const [featuresVisible, setFeaturesVisible] = useState(false);
@@ -30,6 +32,7 @@ const LandingPage = () => {
   const [isActive, setIsActive] = useState(false);
   const [selectedIndustry, setSelectedIndustry] = useState<'mortgage' | 'realEstate' | 'debtSettlement'>('mortgage');
   const isMobile = useIsMobile();
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setFeaturesVisible(true);
@@ -40,6 +43,7 @@ const LandingPage = () => {
       setIsActive(false);
     };
   }, []);
+
   useEffect(() => {
     if (!isActive) return;
     let animationId: number;
@@ -60,11 +64,14 @@ const LandingPage = () => {
       cancelAnimationFrame(animationId);
     };
   }, [isActive]);
+
   const rotatingTexts = ["Mortgage Loan Officers", "Real Estate Agents", "Debt Officers"];
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
+
   const navigateToAuth = () => {
     navigate("/auth");
   };
+
   const floatingFeatureCards = React.useMemo(() => [{
     id: 1,
     component: <div onClick={navigateToAuth} className="cursor-pointer">
@@ -132,6 +139,7 @@ const LandingPage = () => {
     delay: 200,
     zIndex: 10
   }], []);
+
   const getLoadingPosition = React.useCallback((progress: number) => {
     const width = 300;
     const height = 56;
@@ -179,21 +187,25 @@ const LandingPage = () => {
       y
     };
   }, []);
+
   const loadingPos = isActive ? getLoadingPosition(loadingProgress) : {
     x: 0,
     y: 0
   };
+
   const trailSegments = 20;
-  const section2Content = <div className="
+
+  const section2Content = (
+    <div className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
         min-h-[50vh] relative z-40 border border-gray-100 transition-shadow
       ">
       <div className="w-full px-6 py-6 flex flex-col items-center justify-center h-full">
-        
-        
         <MockCRMInterface industry={selectedIndustry} />
       </div>
-    </div>;
+    </div>
+  );
+
   const handleIndustryToggle = (industry: 'mortgage' | 'realEstate' | 'debtSettlement') => {
     setSelectedIndustry(current => current === industry ? industry : industry);
     document.querySelectorAll('[data-industry]').forEach(el => {
@@ -202,15 +214,17 @@ const LandingPage = () => {
       }
     });
   };
-  return <div className="min-h-screen w-full overflow-x-hidden" style={{
-    background: "linear-gradient(to bottom, #1e3a8a 0%, #111827 100%)"
-  }}>
+
+  return (
+    <div className="min-h-screen w-full overflow-x-hidden" style={{
+      background: "linear-gradient(to bottom, #1e3a8a 0%, #111827 100%)"
+    }}>
       <div className="
           h-screen w-full overflow-y-scroll snap-y snap-mandatory
           scrollbar-none
         " style={{
-      scrollBehavior: "smooth"
-    }}>
+        scrollBehavior: "smooth"
+      }}>
         <section className="min-h-screen w-full flex flex-col snap-start relative overflow-hidden">
           <div className="flex-1 flex flex-col justify-center items-center px-4 md:px-8 py-16 bg-gradient-to-b from-blue-900 to-slate-900 relative overflow-hidden">
             <div className="fixed top-0 left-0 right-0 z-50 bg-transparent py-4 px-6">
@@ -327,28 +341,28 @@ const LandingPage = () => {
           </div>
 
           <div aria-hidden="true" className="pointer-events-none select-none flex justify-center absolute left-0 right-0 w-full" style={{
-          bottom: -180,
-          zIndex: 30
-        }}>
+            bottom: -180,
+            zIndex: 30
+          }}>
             <div className="w-[90vw] max-w-6xl h-8 rounded-t-3xl border-x border-t border-gray-100 bg-white shadow-2xl" style={{
-            opacity: 0.97,
-            borderBottom: "none"
-          }}></div>
+              opacity: 0.97,
+              borderBottom: "none"
+            }}></div>
           </div>
         </section>
         
         <section className="relative flex flex-col items-center pt-0 snap-start bg-slate-900" style={{
-        minHeight: "100vh",
-        marginTop: '-2px',
-        position: 'relative',
-        zIndex: 40
-      }}>
-          <div className="w-full flex justify-center items-start" style={{
-          marginTop: '-12vh',
-          position: 'sticky',
-          top: '10vh',
+          minHeight: "100vh",
+          marginTop: '-2px',
+          position: 'relative',
           zIndex: 40
         }}>
+          <div className="w-full flex justify-center items-start" style={{
+            marginTop: '-12vh',
+            position: 'sticky',
+            top: '10vh',
+            zIndex: 40
+          }}>
             {section2Content}
           </div>
           
@@ -381,9 +395,11 @@ const LandingPage = () => {
             </div>
           </div>
           
-          <div className="pb-16"></div>
+          <div className="pb-32"></div>
         </section>
       </div>
-    </div>;
+    </div>
+  );
 };
+
 export default LandingPage;
