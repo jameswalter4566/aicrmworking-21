@@ -10,29 +10,63 @@ const AuthRedirect = () => {
   useEffect(() => {
     const handleRedirect = async () => {
       try {
-        console.log('Auth redirect page loaded. Checking session...');
+        console.log('Auth redirect page loaded. Processing authentication...');
         
-        // Using getSession for reliable session handling - matches how other working flows handle auth
-        const { data, error } = await supabase.auth.getSession();
+        // First try to extract the session from URL hash parameters (OAuth flow)
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
         
-        if (error) {
-          console.error('Session error:', error);
-          throw error;
-        }
-        
-        if (data?.session) {
-          console.log('Session found, user authenticated:', data.session.user.email);
-          
-          // Clean up the URL without losing the session
-          window.history.replaceState(null, document.title, window.location.pathname);
-          
-          toast({
-            title: 'Successfully signed in',
-            description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
+        if (accessToken) {
+          console.log('Found access token in URL, setting session...');
+          // If we have a hash with access token, we need to set the session
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: hashParams.get('refresh_token') || '',
           });
           
-          navigate('/settings');
-          return;
+          if (error) {
+            console.error('Error setting session from URL:', error);
+            throw error;
+          }
+          
+          if (data?.session) {
+            console.log('Successfully set session from URL parameters');
+            
+            // Clean up the URL
+            window.history.replaceState(null, document.title, window.location.pathname);
+            
+            toast({
+              title: 'Successfully signed in',
+              description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
+            });
+            
+            navigate('/settings');
+            return;
+          }
+        } else {
+          // Fallback to checking for an existing session if no hash params
+          console.log('No access token in URL, checking for existing session...');
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error('Session error:', error);
+            throw error;
+          }
+          
+          if (data?.session) {
+            console.log('Existing session found, user authenticated:', data.session.user.email);
+            
+            // Clean up the URL
+            window.history.replaceState(null, document.title, window.location.pathname);
+            
+            toast({
+              title: 'Successfully signed in',
+              description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
+            });
+            
+            navigate('/settings');
+            return;
+          }
         }
 
         console.log('No session found, redirecting to auth page');

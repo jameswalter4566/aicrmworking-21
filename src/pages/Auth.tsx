@@ -30,6 +30,15 @@ const Auth = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const getCurrentBaseUrl = () => {
+    if (window.location.origin.includes('mortgagesalespro.com')) {
+      return 'https://mortgagesalespro.com';
+    } else if (window.location.origin.includes('lovable.app')) {
+      return 'https://preview--aicrmworking.lovable.app';
+    }
+    return window.location.origin;
+  };
+
   useEffect(() => {
     const handleAuthCallback = async () => {
       const hasHash = location.hash && location.hash.length > 0;
@@ -115,14 +124,15 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const origin = 'https://preview--aicrmworking.lovable.app';
+      const baseUrl = getCurrentBaseUrl();
+      const redirectUrl = `${baseUrl}/auth-redirect`;
       
-      console.log("Starting Google sign-in. Redirect URL will be:", origin + "/auth-redirect");
+      console.log("Starting Google sign-in. Redirect URL will be:", redirectUrl);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth-redirect`,
+          redirectTo: redirectUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
