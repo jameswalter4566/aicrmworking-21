@@ -1100,6 +1100,7 @@ export type Database = {
           status: string
           priority: number
           attempt_count: number
+          notes: string
         }[]
       }
     }
