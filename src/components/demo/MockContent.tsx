@@ -10,13 +10,13 @@ interface StatCardProps {
 }
 
 const StatCard = ({ label, value, icon, color }: StatCardProps) => (
-  <div className="bg-white p-6 rounded-lg border border-gray-200 flex items-start">
-    <div className={`rounded-full p-3 ${color} bg-opacity-10 mr-4`}>
+  <div className="bg-white p-4 md:p-6 rounded-lg border border-gray-200 flex items-start">
+    <div className={`rounded-full p-2 md:p-3 ${color} bg-opacity-10 mr-3 md:mr-4 shrink-0`}>
       {icon}
     </div>
-    <div>
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="text-sm text-gray-600">{label}</div>
+    <div className="min-w-0 flex-1">
+      <div className="text-lg md:text-2xl font-bold truncate">{value}</div>
+      <div className="text-xs md:text-sm text-gray-600 truncate">{label}</div>
     </div>
   </div>
 );
