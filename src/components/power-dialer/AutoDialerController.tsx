@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +12,7 @@ interface AutoDialerControllerProps {
 
 interface SessionLead {
   id: string;
-  lead_id: string;  // This is now expected to be a UUID string
+  lead_id: string;
   session_id: string;
   status: string;
   priority: number;
@@ -152,21 +151,20 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       try {
         const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
-          p_session_id: sessionId
+          p_session_id: sessionId as unknown as any
         });
         
         if (error) {
           console.error('Error calling get_next_session_lead:', error);
           
-          // Handle various error conditions, including the structure mismatch
-          if ((error.message?.includes('ambiguous') || error.code === '42702' || error.code === '42804') && fixAttemptCount < 3) {
+          if (error.message?.includes('ambiguous') && error.code === '42702' && fixAttemptCount < 3) {
             setFixAttemptCount(count => count + 1);
             const fixed = await fixDatabaseFunction();
             
             if (fixed) {
               console.log('Retrying get_next_session_lead after fix...');
               const retryResponse = await supabase.rpc('get_next_session_lead', {
-                p_session_id: sessionId
+                p_session_id: sessionId as unknown as any
               });
               
               if (retryResponse.error) {
@@ -208,10 +206,10 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     } catch (error) {
       console.error('Error getting next lead:', error);
       
-      if (error.message?.includes('ambiguous') || error.code === '42702' || error.code === '42804') {
+      if (error.message?.includes('ambiguous') || error.code === '42702') {
         toast({
           title: "Database Function Error",
-          description: "Attempting to automatically fix the issue...",
+          description: "Attempting to automatically fix the ambiguous column issue",
         });
         
         if (fixAttemptCount < 3) {
@@ -271,46 +269,25 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
-          // If the lead_id is a UUID string, we need to handle it differently
           try {
-            // For numeric IDs in the leads table
-            if (!isNaN(Number(lead.lead_id))) {
-              // If lead_id can be parsed as a number, treat it as a numeric ID
-              const numericId = Number(lead.lead_id);
+            const leadIdAsNumber = parseInt(lead.lead_id);
+            
+            if (!isNaN(leadIdAsNumber)) {
               const { data: leadData, error: leadError } = await supabase
                 .from('leads')
                 .select('id, phone1')
-                .eq('id', numericId)  // Here we provide a number
-                .maybeSingle();
-                
-              if (!leadError && leadData && leadData.phone1) {
-                return { id: leadData.id.toString(), phone1: leadData.phone1 };
-              }
-            } else {
-              // Handle UUID case - use the string directly without converting to number
-              const { data: leadData, error: leadError } = await supabase
-                .from('leads')
-                .select('id, phone1')
-                .eq('id', lead.lead_id)  // Using the string UUID directly
+                .eq('id', leadIdAsNumber)
                 .maybeSingle();
               
               if (!leadError && leadData && leadData.phone1) {
                 return { id: leadData.id.toString(), phone1: leadData.phone1 };
               }
             }
-            
-            // If direct lookup fails, try to parse the notes for more info
-            if (lead.notes) {
-              const notesData = JSON.parse(lead.notes || '{}');
-              if (notesData.phone) {
-                return { id: lead.lead_id, phone1: notesData.phone };
-              }
-            }
           } catch (parseError) {
-            console.error('Error looking up lead details:', parseError);
+            console.error('Error parsing lead_id as number:', parseError);
           }
           
-          return { id: lead.lead_id, phone1: null };
+          return { id: null, phone1: null };
         } catch (error) {
           console.error('Error fetching lead details:', error);
           return { id: null, phone1: null };
@@ -345,7 +322,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           });
           setNoMoreLeads(true);
         }
-        setIsProcessingCall(false);
         return;
       }
 
@@ -379,138 +355,45 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Initialize Twilio Device before attempting call
-      const deviceInitialized = await twilioService.initializeTwilioDevice();
+      await twilioService.initializeTwilioDevice();
       
-      if (!deviceInitialized || !twilioService.isDeviceRegistered()) {
-        toast({
-          title: "Browser Phone Error",
-          description: "Could not initialize browser phone. Please refresh and try again.",
-          variant: "destructive",
-        });
-        
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: 'Browser phone initialization failed'
-            })
-          })
-          .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
-        return;
-      }
-
-      // Check microphone access
-      if (!twilioService.isMicrophoneActive()) {
-        toast({
-          title: "Microphone Required",
-          description: "Please allow microphone access to make calls through your browser.",
-          variant: "destructive",
-        });
-        
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: 'Microphone access denied or unavailable'
-            })
-          })
-          .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
-        return;
-      }
-
-      // Format phone number
-      let formattedPhoneNumber = phoneNumber;
-      if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
-        formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
-      }
-
-      // Directly use Twilio Device for browser-based calling
-      if (!window.Twilio?.Device) {
-        toast({
-          title: "Browser Phone Error",
-          description: "Twilio Device not available. Please refresh the page.",
-          variant: "destructive",
-        });
-        
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: 'Twilio Device not available'
-            })
-          })
-          .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
-        return;
-      }
-
-      try {
-        console.log(`Making browser-based call to ${formattedPhoneNumber} for lead ${lead.lead_id}`);
-        
-        const call = await window.Twilio.Device.connect({
-          params: {
-            phoneNumber: formattedPhoneNumber,
-            leadId: lead.lead_id
-          }
-        });
-
-        if (call) {
-          console.log(`Call connected with SID: ${call.sid}`);
-          
-          await supabase
-            .from('dialing_session_leads')
-            .update({
-              status: 'in_progress',
-              notes: JSON.stringify({
-                ...JSON.parse(lead.notes || '{}'),
-                callSid: call.sid,
-                callStartTime: new Date().toISOString()
-              })
-            })
-            .eq('id', lead.id);
-
-          toast({
-            title: "Call Connected",
-            description: `Calling ${formattedPhoneNumber} through browser`,
-          });
-        }
-      } catch (callError) {
-        console.error('Error making browser call:', callError);
+      console.log(`Initiating call to ${phoneNumber} for lead ID ${lead.lead_id}`);
+      const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
+      
+      if (!callResult.success) {
         toast({
           title: "Call Failed",
-          description: "Could not connect call through browser. Please check your audio settings.",
+          description: callResult.error || "Failed to place call",
           variant: "destructive",
         });
-
+        
         await supabase
           .from('dialing_session_leads')
           .update({
             status: 'failed',
             notes: JSON.stringify({
               ...JSON.parse(lead.notes || '{}'),
-              error: 'Browser call failed: ' + (callError.message || 'Unknown error')
+              error: callResult.error
             })
           })
           .eq('id', lead.id);
-          
-        setIsProcessingCall(false);
-        onCallComplete();
-        return;
+      } else {
+        await supabase
+          .from('dialing_session_leads')
+          .update({
+            status: 'in_progress',
+            notes: JSON.stringify({
+              ...JSON.parse(lead.notes || '{}'),
+              callSid: callResult.callSid,
+              callStartTime: new Date().toISOString()
+            })
+          })
+          .eq('id', lead.id);
+
+        toast({
+          title: "Call Initiated",
+          description: `Calling lead ${lead.lead_id}`
+        });
       }
 
     } catch (error) {
