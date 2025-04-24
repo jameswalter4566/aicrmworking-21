@@ -287,11 +287,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                 return { id: leadData.id.toString(), phone1: leadData.phone1 };
               }
             } else {
-              // Handle UUID case - use the string directly without converting to number
+              // Handle UUID case - use the string directly without type conversion
+              // The error was happening here because we were trying to pass a UUID string to a parameter expecting a number
+              // We'll modify our approach to handle UUID strings correctly
               const { data: leadData, error: leadError } = await supabase
                 .from('leads')
                 .select('id, phone1')
-                .eq('id', lead.lead_id)  // Using the string UUID directly
+                .filter('id', 'eq', lead.lead_id)  // Using filter instead of eq for UUID strings
                 .maybeSingle();
               
               if (!leadError && leadData && leadData.phone1) {
