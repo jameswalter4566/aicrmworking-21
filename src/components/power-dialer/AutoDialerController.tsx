@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
@@ -35,8 +36,17 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const [hasAttemptedFix, setHasAttemptedFix] = useState(false);
   const [fixAttemptCount, setFixAttemptCount] = useState(0);
   const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
+  const [processedPhoneNumbers, setProcessedPhoneNumbers] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { user } = useAuth();
+  
+  // Use a ref to track the current call state
+  const callStateRef = useRef({
+    isActiveCall: false,
+    currentLeadId: null as string | null,
+    currentPhoneNumber: null as string | null,
+    callStartTime: 0,
+  });
 
   const fixDatabaseFunction = useCallback(async () => {
     try {
@@ -300,22 +310,46 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   };
 
   const updateLeadStatus = useCallback(async (leadId: string, status: string) => {
-    if (!leadId) return;
+    if (!leadId) return false;
     
     try {
       console.log(`Updating lead ${leadId} to status: ${status}`);
+      
+      // First, get the current notes
+      const { data: leadData, error: fetchError } = await supabase
+        .from('dialing_session_leads')
+        .select('notes')
+        .eq('id', leadId)
+        .single();
+      
+      if (fetchError) {
+        console.error('Error fetching lead notes:', fetchError);
+        return false;
+      }
+      
+      // Parse existing notes or initialize empty object
+      let notesObj = {};
+      try {
+        if (leadData?.notes) {
+          notesObj = JSON.parse(leadData.notes);
+        }
+      } catch (parseError) {
+        console.error('Error parsing existing notes:', parseError);
+        // Continue with empty object if parsing fails
+      }
+      
+      // Update notes with call completion timestamp
+      const updatedNotes = {
+        ...notesObj,
+        callCompletedAt: new Date().toISOString()
+      };
+      
+      // Update the lead status and notes
       const { error } = await supabase
         .from('dialing_session_leads')
         .update({
           status: status,
-          notes: JSON.stringify({
-            ...JSON.parse((await supabase
-              .from('dialing_session_leads')
-              .select('notes')
-              .eq('id', leadId)
-              .single()).data?.notes || '{}'),
-            callCompletedAt: new Date().toISOString()
-          })
+          notes: JSON.stringify(updatedNotes)
         })
         .eq('id', leadId);
       
@@ -324,6 +358,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return false;
       }
       
+      console.log(`Successfully updated lead ${leadId} to status: ${status}`);
       return true;
     } catch (error) {
       console.error('Error in updateLeadStatus:', error);
@@ -345,11 +380,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     try {
       setIsProcessingCall(true);
       
+      // If a previous lead exists, ensure it's properly marked as completed
       if (currentLeadId) {
         await updateLeadStatus(currentLeadId, 'completed');
         setCurrentLeadId(null);
       }
       
+      // Get next lead
       const lead = await getNextLead();
       
       if (!lead) {
@@ -364,7 +401,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      setCurrentLeadId(lead.id);
+      // Check if we've already processed this phone number
       let phoneNumber = lead.phoneNumber;
       
       if (!phoneNumber && lead.getLeadDetails) {
@@ -385,6 +422,28 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
+      // Skip if we've already called this number
+      if (processedPhoneNumbers.has(phoneNumber)) {
+        console.log(`Already called ${phoneNumber}, marking as completed and skipping`);
+        await updateLeadStatus(lead.id, 'completed');
+        setIsProcessingCall(false);
+        onCallComplete();
+        return;
+      }
+
+      // Track this lead and phone number
+      setCurrentLeadId(lead.id);
+      setProcessedPhoneNumbers(prev => new Set(prev).add(phoneNumber!));
+      
+      // Update call state ref for tracking
+      callStateRef.current = {
+        isActiveCall: true,
+        currentLeadId: lead.id,
+        currentPhoneNumber: phoneNumber,
+        callStartTime: Date.now(),
+      };
+
+      // Initialize Twilio and make the call
       await twilioService.initializeTwilioDevice();
       
       console.log(`Initiating call to ${phoneNumber} for lead ID ${lead.lead_id}`);
@@ -398,22 +457,27 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         });
         
         await updateLeadStatus(lead.id, 'failed');
+        setIsProcessingCall(false);
+        onCallComplete();
+        callStateRef.current.isActiveCall = false;
       } else {
         toast({
           title: "Call Initiated",
           description: `Calling lead ${lead.lead_id}`
         });
         
+        // Set a failsafe timeout to ensure call gets marked as completed
         setTimeout(async () => {
-          const callStatus = twilioService.checkCallStatus(lead.lead_id);
-          
-          if (callStatus === 'no-call' || callStatus === 'closed') {
+          // If the call is still marked as active after 60 seconds, forcibly mark it as completed
+          if (callStateRef.current.currentLeadId === lead.id && callStateRef.current.isActiveCall) {
+            console.log(`Failsafe timeout triggered for lead ${lead.id} - forcing completion`);
             await updateLeadStatus(lead.id, 'completed');
             setCurrentLeadId(null);
             setIsProcessingCall(false);
+            callStateRef.current.isActiveCall = false;
             onCallComplete();
           }
-        }, 10000);
+        }, 60000); // 60 second timeout
       }
 
     } catch (error) {
@@ -426,22 +490,25 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       setIsProcessingCall(false);
       onCallComplete();
     }
-  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads]);
+  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads, processedPhoneNumbers]);
 
   const handleCallCompletion = useCallback(async () => {
-    if (currentLeadId) {
-      await updateLeadStatus(currentLeadId, 'completed');
+    if (callStateRef.current.currentLeadId) {
+      await updateLeadStatus(callStateRef.current.currentLeadId, 'completed');
       setCurrentLeadId(null);
+      callStateRef.current.isActiveCall = false;
     }
     
     setIsProcessingCall(false);
     onCallComplete();
-  }, [currentLeadId, updateLeadStatus, onCallComplete]);
+  }, [updateLeadStatus, onCallComplete]);
 
+  // This effect sets up the call disconnect listener
   useEffect(() => {
     if (!twilioService || !isActive) return;
     
     const handleCallDisconnect = async () => {
+      console.log('Call disconnected event received');
       await handleCallCompletion();
     };
     
@@ -452,9 +519,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     };
   }, [twilioService, isActive, handleCallCompletion]);
 
+  // This effect monitors for session updates and starts the dialer
   useEffect(() => {
     if (!isActive || !sessionId) return;
 
+    // Create a Supabase channel to listen for updates
     const channel = supabase
       .channel('call_status_changes')
       .on(
@@ -475,6 +544,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       )
       .subscribe();
 
+    // Start the dialer if it's not already processing a call and there are leads
     if (!isProcessingCall && !noMoreLeads) {
       processNextLead();
     }
@@ -483,6 +553,20 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       supabase.removeChannel(channel);
     };
   }, [sessionId, isActive, processNextLead, isProcessingCall, noMoreLeads]);
+
+  // Reset the processed phone numbers when session changes
+  useEffect(() => {
+    if (sessionId) {
+      setProcessedPhoneNumbers(new Set());
+      setNoMoreLeads(false);
+      callStateRef.current = {
+        isActiveCall: false,
+        currentLeadId: null,
+        currentPhoneNumber: null,
+        callStartTime: 0,
+      };
+    }
+  }, [sessionId]);
 
   return null;
 };
