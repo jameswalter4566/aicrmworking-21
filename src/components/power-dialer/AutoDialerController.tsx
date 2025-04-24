@@ -271,35 +271,20 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
-          // If the lead_id is a UUID string, we need to handle it differently
+          // If the lead_id is a UUID string, convert it to a numeric ID for the leads table lookup
           try {
-            // For numeric IDs in the leads table
-            if (!isNaN(Number(lead.lead_id))) {
-              // If lead_id can be parsed as a number, treat it as a numeric ID
-              const numericId = Number(lead.lead_id);
-              const { data: leadData, error: leadError } = await supabase
-                .from('leads')
-                .select('id, phone1')
-                .eq('id', numericId)  // Here we provide a number
-                .maybeSingle();
-                
-              if (!leadError && leadData && leadData.phone1) {
-                return { id: leadData.id.toString(), phone1: leadData.phone1 };
-              }
-            } else {
-              // Handle UUID case - use the string directly without converting to number
-              const { data: leadData, error: leadError } = await supabase
-                .from('leads')
-                .select('id, phone1')
-                .eq('id', lead.lead_id)  // Using the string UUID directly
-                .maybeSingle();
-              
-              if (!leadError && leadData && leadData.phone1) {
-                return { id: leadData.id.toString(), phone1: leadData.phone1 };
-              }
+            // We may need to map the UUID to the original lead ID or extract from notes
+            const { data: leadData, error: leadError } = await supabase
+              .from('leads')
+              .select('id, phone1')
+              .eq('id', lead.lead_id)
+              .maybeSingle();
+            
+            if (!leadError && leadData && leadData.phone1) {
+              return { id: leadData.id.toString(), phone1: leadData.phone1 };
             }
             
-            // If direct lookup fails, try to parse the notes for more info
+            // If direct UUID lookup fails, try to parse the notes for more info
             if (lead.notes) {
               const notesData = JSON.parse(lead.notes || '{}');
               if (notesData.phone) {
