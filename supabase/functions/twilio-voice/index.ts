@@ -199,6 +199,13 @@ serve(async (req) => {
       console.log("Detected client-initiated call from:", requestData.From, "to:", requestData.phoneNumber);
     }
     
+    // Handle direct incoming Twilio Voice request without specific action
+    // This is important for handling the webhook callbacks from Twilio
+    if (!action && requestData.From && requestData.From.startsWith('client:')) {
+      action = 'incomingClientRequest';
+      console.log("Detected incoming client request without action from:", requestData.From);
+    }
+    
     console.log("Final action being used:", action);
 
     // Get Twilio credentials
@@ -295,6 +302,45 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
         });
       }
+    }
+    
+    // NEW: Handle direct incoming Twilio Voice requests without specific action
+    if (action === 'incomingClientRequest') {
+      console.log("Handling incoming client request without specific action");
+      
+      // Extract phone number if it exists in the request
+      const phoneNumber = requestData.phoneNumber || requestData.To;
+      const leadId = requestData.leadId || 'unknown';
+      
+      // Create TwiML response for incoming request
+      const twiml = new twilio.twiml.VoiceResponse();
+      
+      if (phoneNumber && phoneNumber.match(/^\+?\d+$/)) {
+        // Format phone number if needed
+        let formattedPhoneNumber = phoneNumber;
+        if (!phoneNumber.startsWith('+')) {
+          formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
+        }
+        
+        twiml.say("Connecting your call. Please wait.");
+        
+        const dial = twiml.dial({
+          callerId: TWILIO_PHONE_NUMBER,
+          timeout: DEFAULT_TIMEOUT
+        });
+        
+        dial.number(formattedPhoneNumber);
+        
+      } else {
+        twiml.say("Thank you for connecting to the system. Your call is being processed.");
+        twiml.pause({ length: 1 });
+      }
+      
+      const twimlString = debugTwiML(twiml);
+      
+      return new Response(twimlString, {
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+      });
     }
 
     // If requesting configuration
@@ -576,9 +622,8 @@ serve(async (req) => {
         if (!phoneNumber) {
           // No phone number provided, just say something and hang up
           console.log("No target phone number provided");
-          twiml.say("No phone number was provided for this call. Please specify a phone number to call.");
-          twiml.pause({ length: 1 });
-          twiml.hangup();
+          twiml.say("Welcome to the phone system. Please wait while we process your request.");
+          twiml.pause({ length: 2 });
         } else {
           // There is a phone number, treat like a client call
           console.log(`Handling incoming client call with phone number: ${phoneNumber}`);
@@ -606,12 +651,15 @@ serve(async (req) => {
       }
       
       // Default response for unknown actions
-      console.log(`Unknown action: ${action}, returning JSON error response`);
+      console.log(`Unknown action: ${action || "none"}, returning simple TwiML response`);
       
-      return new Response(
-        JSON.stringify({ success: false, error: `The requested action ${action} is not supported.` }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // Generate a simple valid TwiML response
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("Thank you for your request. The system is processing it now.");
+      
+      return new Response(twiml.toString(), { 
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
+      });
     }
   } catch (error) {
     console.error('Error in function:', error);
@@ -628,12 +676,12 @@ serve(async (req) => {
       });
     }
     
-    return new Response(
-      JSON.stringify({ success: false, error: error.message || 'An unexpected error occurred' }),
-      { 
-        status: 200, // Changed from 500 to 200 to prevent Twilio retries
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    // For all other errors, return a valid TwiML response instead of JSON
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("We apologize, but there was a system error processing your request.");
+    
+    return new Response(twiml.toString(), { 
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
+    });
   }
 });
