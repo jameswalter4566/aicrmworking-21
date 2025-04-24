@@ -29,8 +29,8 @@ pop3_port = 54326
 file_size_limit = "50MiB"
 
 [auth]
-site_url = "https://example.com"
-additional_redirect_urls = ["https://localhost:3000"]
+site_url = "https://mortgagesalespro.com"
+additional_redirect_urls = ["https://localhost:3000", "https://preview--aicrmworking.lovable.app", "http://localhost:3000"]
 jwt_expiry = 3600
 enable_signup = true
 
@@ -38,6 +38,12 @@ enable_signup = true
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = false
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+# Make sure to set the redirect URL in Google Cloud Console to match your auth callback URL
 
 # Add a configuration block for the twilio-token function
 [functions.twilio-token]

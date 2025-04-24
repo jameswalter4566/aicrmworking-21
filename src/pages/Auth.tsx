@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
@@ -116,10 +117,13 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
+      // Get the current URL to construct proper redirect
+      const origin = window.location.origin;
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth`,
+          redirectTo: `${origin}/auth`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'
@@ -127,12 +131,16 @@ const Auth = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Google signin error:", error);
+        throw error;
+      }
 
       if (data?.url) {
         window.location.href = data.url;
       }
     } catch (error: any) {
+      console.error("Google sign-in failed:", error);
       toast({
         variant: "destructive",
         title: "Error",
