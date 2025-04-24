@@ -1,6 +1,5 @@
 
 import { useEffect, useState } from "react";
-import { preloadAudioAssets } from "@/utils/audioPreloader";
 import { toast } from "./ui/use-toast";
 
 interface TwilioScriptProps {
@@ -8,11 +7,11 @@ interface TwilioScriptProps {
   onError?: (error: Error) => void;
 }
 
-// Use multiple CDNs for better reliability - using Voice SDK 2.x
+// Use CDN for better reliability - using Voice SDK 2.x
+// Using a more recent version (2.9.0) which has better stability
 const TWILIO_SDK_URLS = [
-  'https://sdk.twilio.com/js/voice/2.8.0/twilio.min.js',
-  'https://media.twiliocdn.com/sdk/js/voice/releases/2.8.0/twilio.min.js',
-  'https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.8.0/dist/twilio.min.js'
+  'https://cdn.jsdelivr.net/npm/@twilio/voice-sdk@2.9.0/dist/twilio.min.js',
+  'https://unpkg.com/@twilio/voice-sdk@2.9.0/dist/twilio.min.js'
 ];
 
 const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
@@ -22,9 +21,6 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
-    // Skip audio preload to avoid decoding errors
-    // We'll load sounds dynamically when needed instead
     
     // Check if Twilio is already loaded
     if (window.Twilio && window.Twilio.Device) {
