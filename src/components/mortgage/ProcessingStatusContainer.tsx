@@ -12,18 +12,25 @@ interface ProcessStep {
 }
 
 interface ProcessingStatusContainerProps {
-  steps: ProcessStep[];
+  steps?: ProcessStep[];
+  label?: string;
+  status?: "pending" | "processing" | "completed";
   className?: string;
 }
 
 const ProcessingStatusContainer: React.FC<ProcessingStatusContainerProps> = ({
   steps,
+  label,
+  status = "pending",
   className
 }) => {
+  // If we're passed individual label/status props, convert to steps format
+  const processedSteps = steps || (label ? [{ id: '1', label, status }] : []);
+  
   return (
     <Card className={cn("p-4 mb-4 bg-white/50 backdrop-blur-sm", className)}>
       <div className="space-y-2">
-        {steps.map((step) => (
+        {processedSteps.map((step) => (
           <div key={step.id} className="flex items-center gap-3">
             {step.status === "processing" ? (
               <Loader2 className="h-4 w-4 animate-spin text-mortgage-purple" />
