@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -94,8 +93,9 @@ class TwilioService {
           codecPreferences: ["opus", "pcmu"],
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
-          // Start with no sounds to avoid audio decoding errors
-          disableAudioContextSounds: true
+          // Disable audio context sounds to avoid decoding errors
+          disableAudioContextSounds: true,
+          sounds: {} // Set empty sounds object to avoid decoding errors
         });
 
         // Set up event handlers

@@ -20,7 +20,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Get client identity from request path for outgoing calls
   try {
     let method;
     let formData;
@@ -81,7 +80,7 @@ serve(async (req) => {
       console.log(`Detected Twilio status callback: {
         callSid: "${formData.CallSid}",
         callStatus: "${formData.CallStatus}",
-        callbackSource: "${formData.CallbackSource}"
+        callbackSource: "${formData.CallbackSource || 'unknown'}"
       }`);
       
       // Just acknowledge with a 200 OK and empty TwiML for status callbacks
@@ -94,18 +93,20 @@ serve(async (req) => {
       // Create TwiML to dial the phone number
       const response = new twiml.VoiceResponse();
       
-      // Using the <Dial> verb
+      // Using the <Dial> verb with proper options
       const dial = response.dial({
-        callerId: Deno.env.get("TWILIO_PHONE_NUMBER"),
+        callerId: Deno.env.get("TWILIO_PHONE_NUMBER") || formData.From,
         timeout: 20, // Ring for 20 seconds
         answerOnBridge: true, // Preserve client audio
-        action: `${req.url}?dialStatus=completed`, // URL to be called after dial finishes
-        method: 'POST',
-        // Record this call
-        record: 'record-from-answer',
       });
       
-      dial.number(formData.phoneNumber);
+      // Format the phone number properly
+      let formattedPhone = formData.phoneNumber;
+      if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
+        formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
+      }
+      
+      dial.number(formattedPhone);
       
       console.log("Generated TwiML for outgoing call:", response.toString());
       
@@ -132,7 +133,7 @@ serve(async (req) => {
     response.say("We encountered an error processing your request.");
     
     return new Response(response.toString(), { 
-      status: 500, 
+      status: 200,  // Return 200 even for errors to avoid Twilio retries
       headers: corsHeaders
     });
   }
