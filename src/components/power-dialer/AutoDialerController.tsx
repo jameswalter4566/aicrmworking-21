@@ -13,7 +13,7 @@ interface AutoDialerControllerProps {
 
 interface SessionLead {
   id: string;
-  lead_id: string;
+  lead_id: string;  // This is now expected to be a UUID string
   session_id: string;
   status: string;
   priority: number;
@@ -158,8 +158,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         if (error) {
           console.error('Error calling get_next_session_lead:', error);
           
-          // If we still have the ambiguous column error, try the direct SQL approach
-          if ((error.message?.includes('ambiguous') || error.code === '42702') && fixAttemptCount < 3) {
+          // Handle various error conditions, including the structure mismatch
+          if ((error.message?.includes('ambiguous') || error.code === '42702' || error.code === '42804') && fixAttemptCount < 3) {
             setFixAttemptCount(count => count + 1);
             const fixed = await fixDatabaseFunction();
             
@@ -208,10 +208,10 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     } catch (error) {
       console.error('Error getting next lead:', error);
       
-      if (error.message?.includes('ambiguous') || error.code === '42702') {
+      if (error.message?.includes('ambiguous') || error.code === '42702' || error.code === '42804') {
         toast({
           title: "Database Function Error",
-          description: "Attempting to automatically fix the ambiguous column issue",
+          description: "Attempting to automatically fix the issue...",
         });
         
         if (fixAttemptCount < 3) {
@@ -271,25 +271,31 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
+          // If the lead_id is a UUID string, convert it to a numeric ID for the leads table lookup
           try {
-            const leadIdAsNumber = parseInt(lead.lead_id);
+            // We may need to map the UUID to the original lead ID or extract from notes
+            const { data: leadData, error: leadError } = await supabase
+              .from('leads')
+              .select('id, phone1')
+              .eq('id', lead.lead_id)
+              .maybeSingle();
             
-            if (!isNaN(leadIdAsNumber)) {
-              const { data: leadData, error: leadError } = await supabase
-                .from('leads')
-                .select('id, phone1')
-                .eq('id', leadIdAsNumber)
-                .maybeSingle();
-              
-              if (!leadError && leadData && leadData.phone1) {
-                return { id: leadData.id.toString(), phone1: leadData.phone1 };
+            if (!leadError && leadData && leadData.phone1) {
+              return { id: leadData.id.toString(), phone1: leadData.phone1 };
+            }
+            
+            // If direct UUID lookup fails, try to parse the notes for more info
+            if (lead.notes) {
+              const notesData = JSON.parse(lead.notes || '{}');
+              if (notesData.phone) {
+                return { id: lead.lead_id, phone1: notesData.phone };
               }
             }
           } catch (parseError) {
-            console.error('Error parsing lead_id as number:', parseError);
+            console.error('Error looking up lead details:', parseError);
           }
           
-          return { id: null, phone1: null };
+          return { id: lead.lead_id, phone1: null };
         } catch (error) {
           console.error('Error fetching lead details:', error);
           return { id: null, phone1: null };
@@ -324,6 +330,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           });
           setNoMoreLeads(true);
         }
+        setIsProcessingCall(false);
         return;
       }
 
