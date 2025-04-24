@@ -53,25 +53,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
+      (event, currentSession) => {
         console.log("Auth state changed:", event);
-        
-        // Update session and user states
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
+        // Fetch user role after auth state changes
         if (currentSession?.user) {
-          // Verify session is still valid
-          const { data: { session: verifiedSession } } = await supabase.auth.getSession();
-          if (!verifiedSession) {
-            console.warn("Session verification failed - forcing logout");
-            await supabase.auth.signOut();
-            setSession(null);
-            setUser(null);
-            setUserRole(null);
-          } else {
-            fetchUserRole(currentSession.user.id);
-          }
+          fetchUserRole(currentSession.user.id);
         } else {
           setUserRole(null);
         }
@@ -81,10 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       console.log("Retrieved session:", currentSession ? "Session exists" : "No session");
-      
       setSession(currentSession);
       setUser(currentSession?.user ?? null);
       
+      // Fetch user role for existing session
       if (currentSession?.user) {
         fetchUserRole(currentSession.user.id);
       }
@@ -92,50 +81,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setLoading(false);
     });
 
-    // Check auth session validity periodically
-    const authCheckInterval = setInterval(async () => {
-      const { data } = await supabase.auth.getSession();
-      if (user && !data.session) {
-        console.warn("Session expired - forcing update of auth state");
-        setSession(null);
-        setUser(null);
-        setUserRole(null);
-      }
-    }, 60000); // Check every minute
-
-    return () => {
-      subscription.unsubscribe();
-      clearInterval(authCheckInterval);
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signOut = async () => {
-    console.log("Signing out user");
     await supabase.auth.signOut();
     setUserRole(null);
-    
-    // Redirect is handled by the onAuthStateChange listener
   };
 
   // Helper function to get the authentication token
   const getAuthToken = async (): Promise<string | null> => {
-    try {
-      const { data } = await supabase.auth.getSession();
-      const token = data?.session?.access_token || null;
-      
-      if (!token && user) {
-        console.warn("Token missing but user exists - possible auth state mismatch");
-        // Force reauthentication
-        setUser(null);
-        setSession(null);
-        return null;
-      }
-      
-      return token;
-    } catch (error) {
-      console.error("Error getting auth token:", error);
-      return null;
-    }
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token || null;
+    console.log("Getting auth token:", token ? "Token exists" : "No token");
+    return token;
   };
 
   return (
