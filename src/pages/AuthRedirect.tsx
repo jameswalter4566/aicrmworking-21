@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +12,7 @@ const AuthRedirect = () => {
       try {
         console.log('Auth redirect page loaded. Checking session...');
         
+        // Using getSession instead of getSessionFromUrl for more reliable session handling
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -19,7 +21,9 @@ const AuthRedirect = () => {
         }
         
         if (data?.session) {
-          console.log('Session created, user authenticated');
+          console.log('Session found, user authenticated');
+          
+          // Clean up the URL without losing the session
           window.history.replaceState(null, document.title, window.location.pathname);
           
           toast({

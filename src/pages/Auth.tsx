@@ -135,18 +135,18 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      const origin = window.location.origin;
+      const origin = 'https://preview--aicrmworking.lovable.app';
       
       console.log("Starting Google sign-in. Origin:", origin);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth`, 
+          redirectTo: `${origin}/auth`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            state: new Date().getTime().toString()
+            scope: 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid'
           }
         }
       });
