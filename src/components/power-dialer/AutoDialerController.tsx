@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -278,55 +277,34 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           const leadId = lead.lead_id;
           console.log('Looking up lead details for ID:', leadId);
           
-          // Try to determine if it's a UUID or numeric ID
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
-          
-          if (isUuid) {
-            // For UUID strings, we use a raw query approach since we know the ID column might be bigint
-            console.log('Handling UUID lead ID:', leadId);
-            const { data, error } = await supabase
-              .from('leads')
-              .select('id, phone1')
-              .or(`id.eq.${leadId},id.eq."${leadId}"`)
-              .maybeSingle();
-            
-            if (error) {
-              console.error('Error looking up UUID lead:', error);
-              // Try another approach if the first one fails
-              const { data: alternativeData, error: altError } = await supabase
-                .rpc('find_lead_by_string_id', { 
-                  lead_string_id: leadId 
-                });
+          // Use our new find_lead_by_string_id function
+          const { data: foundLead, error } = await supabase
+            .rpc('find_lead_by_string_id', {
+              lead_string_id: leadId
+            });
               
-              if (!altError && alternativeData && alternativeData.length > 0) {
-                return { 
-                  id: alternativeData[0].id.toString(), 
-                  phone1: alternativeData[0].phone1 
-                };
-              }
-            } else if (data && data.phone1) {
-              return { id: data.id.toString(), phone1: data.phone1 };
-            }
-          } else if (!isNaN(Number(leadId))) {
-            // For numeric IDs
-            console.log('Handling numeric lead ID:', leadId);
-            const numericId = Number(leadId);
-            const { data: leadData, error: leadError } = await supabase
-              .from('leads')
-              .select('id, phone1')
-              .eq('id', numericId)
-              .maybeSingle();
-              
-            if (!leadError && leadData && leadData.phone1) {
-              return { id: leadData.id.toString(), phone1: leadData.phone1 };
-            }
+          if (error) {
+            console.error('Error looking up lead:', error);
+            return { id: null, phone1: null };
           }
           
+          // Check if we found a lead and it has a phone number
+          if (foundLead && foundLead.length > 0 && foundLead[0].phone1) {
+            return { 
+              id: foundLead[0].id.toString(),
+              phone1: foundLead[0].phone1 
+            };
+          }
+
           // If direct lookup fails, try to parse the notes for more info
           if (lead.notes) {
-            const notesData = JSON.parse(lead.notes || '{}');
-            if (notesData.phone) {
-              return { id: lead.lead_id, phone1: notesData.phone };
+            try {
+              const notesData = JSON.parse(lead.notes || '{}');
+              if (notesData.phone) {
+                return { id: lead.lead_id, phone1: notesData.phone };
+              }
+            } catch (parseError) {
+              console.error('Error parsing lead notes:', parseError);
             }
           }
           
