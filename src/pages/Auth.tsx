@@ -36,28 +36,8 @@ const Auth = () => {
       
       if (hasHash) {
         try {
-          console.log("Auth callback detected with hash:", location.hash.substring(0, 20) + "...");
-          
-          const { data, error } = await supabase.auth.getSession();
-          
-          if (error) {
-            console.error("Session error:", error);
-            throw error;
-          }
-          
-          if (data && data.session) {
-            console.log("Session found, user authenticated");
-            
-            window.history.replaceState(null, document.title, window.location.pathname);
-            
-            toast({
-              title: "Successfully signed in",
-              description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
-            });
-            
-            navigate("/settings");
-            return;
-          }
+          console.log("Auth page: Auth callback detected with hash:", location.hash.substring(0, 20) + "...");
+          navigate('/auth-redirect');
         } catch (error: any) {
           console.error("Error handling OAuth callback:", error);
           toast({
@@ -137,12 +117,12 @@ const Auth = () => {
     try {
       const origin = 'https://preview--aicrmworking.lovable.app';
       
-      console.log("Starting Google sign-in. Origin:", origin);
+      console.log("Starting Google sign-in. Redirect URL will be:", origin + "/auth-redirect");
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth`,
+          redirectTo: `${origin}/auth-redirect`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

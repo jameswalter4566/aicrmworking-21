@@ -12,7 +12,7 @@ const AuthRedirect = () => {
       try {
         console.log('Auth redirect page loaded. Checking session...');
         
-        // Using getSession instead of getSessionFromUrl for more reliable session handling
+        // Using getSession for reliable session handling - matches how other working flows handle auth
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -21,7 +21,7 @@ const AuthRedirect = () => {
         }
         
         if (data?.session) {
-          console.log('Session found, user authenticated');
+          console.log('Session found, user authenticated:', data.session.user.email);
           
           // Clean up the URL without losing the session
           window.history.replaceState(null, document.title, window.location.pathname);
