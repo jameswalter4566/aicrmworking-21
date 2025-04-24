@@ -151,8 +151,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       }
       
       try {
-        // Fix TypeScript error: Passing sessionId as any to bypass type checking
-        // The function expects a number but sessionId is a string (UUID)
+        // Fix TypeScript error by using "as any" to bypass type checking
+        // The function expects a UUID but sessionId is a string
         const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
           p_session_id: sessionId as any
         });
