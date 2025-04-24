@@ -1,34 +1,74 @@
 
+# This file controls the configuration for your Supabase project.
+# For more information, see: https://supabase.com/docs/guides/functions
+
 project_id = "imrmboyczebjlbnkgjns"
+app_name = "mortgage-genius"
 
 [api]
-enabled = true
+# Enabled service ports
 port = 54321
 schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
 port = 54322
+shadow_port = 54320
+major_version = 15
 
 [studio]
 port = 54323
 
 [inbucket]
 port = 54324
-
-[auth]
-port = 54325
+smtp_port = 54325
+pop3_port = 54326
 
 [storage]
-port = 54326
+file_size_limit = "50MiB"
 
-[functions]
-port = 54327
+[auth]
+site_url = "https://mortgagesalespro.com"
+additional_redirect_urls = [
+  "https://mortgagesalespro.com",
+  "https://mortgagesalespro.com/auth",
+  "https://mortgagesalespro.com/auth-redirect",
+  "https://mortgagesalespro.com/settings",
+  "https://mortgagesalespro.com/landing",
+  "https://mortgagesalespro.com/home",
+  "http://localhost:3000/settings",
+  "http://localhost:3000/auth-redirect",
+  "http://localhost:8080/auth-redirect",
+  "http://localhost:8080/settings",
+  "https://preview--aicrmworking.lovable.app/auth-redirect",
+  "https://preview--aicrmworking.lovable.app/settings",
+  "https://preview--aicrmworking.lovable.app/auth",
+  "https://imrmboyczebjlbnkgjns.lovableproject.com/auth-redirect",
+  "https://imrmboyczebjlbnkgjns.lovableproject.com/settings"
+]
+jwt_expiry = 3600
+enable_signup = true
 
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+
+[auth.external.google]
+enabled = true
+client_id = "env(GOOGLE_CLIENT_ID)"
+secret = "env(GOOGLE_CLIENT_SECRET)"
+# Make sure to set the redirect URL in Google Cloud Console to match your auth callback URL
+
+# Add a configuration block for the twilio-token function
 [functions.twilio-token]
 verify_jwt = false
 
+# Add a configuration block for the twilio-voice function
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.twilio-stream]
+# We also need to make sure the loan-onboarding-completed function is accessible
+[functions.loan-onboarding-completed]
 verify_jwt = false
