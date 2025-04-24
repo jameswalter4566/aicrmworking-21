@@ -36,7 +36,10 @@ additional_redirect_urls = [
   "https://preview--aicrmworking.lovable.app", 
   "https://preview--aicrmworking.lovable.app/settings",
   "https://mortgagesalespro.com/settings",
-  "http://localhost:3000/settings"
+  "http://localhost:3000/settings",
+  "http://localhost:3000/auth-redirect",
+  "https://preview--aicrmworking.lovable.app/auth-redirect",
+  "https://mortgagesalespro.com/auth-redirect"
 ]
 jwt_expiry = 3600
 enable_signup = true

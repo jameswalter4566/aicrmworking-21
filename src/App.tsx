@@ -46,6 +46,7 @@ import DialerSession from "./pages/DialerSession";
 import ClientPortalOnboarding from './pages/ClientPortalOnboarding';
 import Smart1003Builder from "./pages/Smart1003Builder";
 import SmartDocumentManager from "@/pages/SmartDocumentManager";
+import AuthRedirect from "./pages/AuthRedirect";
 
 const queryClient = new QueryClient();
 
@@ -247,6 +248,7 @@ function App() {
               <Routes>
                 <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
+                <Route path="/auth-redirect" element={<AuthRedirect />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />

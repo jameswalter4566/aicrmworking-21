@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
@@ -32,17 +31,13 @@ const Auth = () => {
   const location = useLocation();
 
   useEffect(() => {
-    // Function to handle OAuth callback
     const handleAuthCallback = async () => {
-      // Handle both full URL and hash params
       const hasHash = location.hash && location.hash.length > 0;
       
-      // If we have hash parameters, this is likely an OAuth redirect
       if (hasHash) {
         try {
           console.log("Auth callback detected with hash:", location.hash.substring(0, 20) + "...");
           
-          // Get the session - this will automatically process the hash
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -53,7 +48,6 @@ const Auth = () => {
           if (data && data.session) {
             console.log("Session found, user authenticated");
             
-            // Clear the hash from the URL to prevent issues on reload
             window.history.replaceState(null, document.title, window.location.pathname);
             
             toast({
@@ -61,7 +55,6 @@ const Auth = () => {
               description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
             });
             
-            // Redirect to the settings page
             navigate("/settings");
             return;
           }
@@ -99,7 +92,7 @@ const Auth = () => {
         
         if (error) throw error;
         
-        navigate("/settings");  // Updated to redirect to /settings
+        navigate("/settings");
       } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email: values.email,
@@ -142,7 +135,6 @@ const Auth = () => {
   const handleGoogleSignIn = async () => {
     setGoogleLoading(true);
     try {
-      // Get the current URL to construct proper redirect
       const origin = window.location.origin;
       
       console.log("Starting Google sign-in. Origin:", origin);
@@ -150,7 +142,7 @@ const Auth = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/settings`,  // Redirect directly to settings page
+          redirectTo: `${origin}/auth-redirect`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'
@@ -165,13 +157,12 @@ const Auth = () => {
 
       if (data?.url) {
         console.log("Redirecting to OAuth URL:", data.url);
-        // Use window.location.href for a full page redirect to the OAuth provider
         window.location.href = data.url;
       } else {
         console.error("No redirect URL received from Supabase");
         throw new Error("Failed to start Google authentication");
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Google sign-in failed:", error);
       toast({
         variant: "destructive",
