@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -356,88 +355,45 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Initialize Twilio Device before attempting call
-      const deviceInitialized = await twilioService.initializeTwilioDevice();
+      await twilioService.initializeTwilioDevice();
       
-      if (!deviceInitialized || !twilioService.isDeviceRegistered()) {
-        toast({
-          title: "Browser Phone Error",
-          description: "Could not initialize browser phone. Please refresh and try again.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Check microphone access
-      if (!twilioService.isMicrophoneActive()) {
-        toast({
-          title: "Microphone Required",
-          description: "Please allow microphone access to make calls through your browser.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Format phone number
-      let formattedPhoneNumber = phoneNumber;
-      if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
-        formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
-      }
-
-      // Directly use Twilio Device for browser-based calling
-      if (!window.Twilio?.Device) {
-        toast({
-          title: "Browser Phone Error",
-          description: "Twilio Device not available. Please refresh the page.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      try {
-        const call = await window.Twilio.Device.connect({
-          params: {
-            phoneNumber: formattedPhoneNumber,
-            leadId: lead.lead_id
-          }
-        });
-
-        if (call) {
-          await supabase
-            .from('dialing_session_leads')
-            .update({
-              status: 'in_progress',
-              notes: JSON.stringify({
-                ...JSON.parse(lead.notes || '{}'),
-                callSid: call.sid,
-                callStartTime: new Date().toISOString()
-              })
-            })
-            .eq('id', lead.id);
-
-          toast({
-            title: "Call Connected",
-            description: `Calling ${formattedPhoneNumber} through browser`,
-          });
-        }
-      } catch (callError) {
-        console.error('Error making browser call:', callError);
+      console.log(`Initiating call to ${phoneNumber} for lead ID ${lead.lead_id}`);
+      const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
+      
+      if (!callResult.success) {
         toast({
           title: "Call Failed",
-          description: "Could not connect call through browser. Please check your audio settings.",
+          description: callResult.error || "Failed to place call",
           variant: "destructive",
         });
-
+        
         await supabase
           .from('dialing_session_leads')
           .update({
             status: 'failed',
             notes: JSON.stringify({
               ...JSON.parse(lead.notes || '{}'),
-              error: 'Browser call failed: ' + (callError.message || 'Unknown error')
+              error: callResult.error
             })
           })
           .eq('id', lead.id);
+      } else {
+        await supabase
+          .from('dialing_session_leads')
+          .update({
+            status: 'in_progress',
+            notes: JSON.stringify({
+              ...JSON.parse(lead.notes || '{}'),
+              callSid: callResult.callSid,
+              callStartTime: new Date().toISOString()
+            })
+          })
+          .eq('id', lead.id);
+
+        toast({
+          title: "Call Initiated",
+          description: `Calling lead ${lead.lead_id}`
+        });
       }
 
     } catch (error) {
