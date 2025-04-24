@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -357,45 +358,45 @@ const LandingPage = () => {
           position: 'relative',
           zIndex: 40
         }}>
-          <div className="w-full flex justify-center items-start" style={{
-            marginTop: '-12vh',
-            position: 'sticky',
-            top: '10vh',
-            zIndex: 40
-          }}>
+          {/* Fixed container for the CRM interface */}
+          <div className="fixed top-[10vh] left-0 right-0 flex justify-center items-center z-40">
             {section2Content}
           </div>
           
-          <div className="w-[90vw] max-w-6xl mx-auto mt-[375px] flex flex-col md:flex-row gap-4 relative z-30">
-            <div className="flex-1 h-[72px]">
-              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
-                <div className="flex-1">
-                  <CategoryCard bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'} title="Mortgage CRM" />
+          {/* Spacer to maintain layout flow */}
+          <div className="w-full" style={{ height: 'calc(100vh + 72px)' }}></div>
+          
+          {/* Fixed category toggles at the bottom */}
+          <div className="fixed bottom-8 left-0 right-0 z-50">
+            <div className="w-[90vw] max-w-6xl mx-auto flex flex-col md:flex-row gap-4">
+              <div className="flex-1 h-[72px]">
+                <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
+                  <div className="flex-1">
+                    <CategoryCard bgColor={selectedIndustry === 'mortgage' ? '#1EAEDB' : 'rgba(30, 174, 219, 0.8)'} title="Mortgage CRM" />
+                  </div>
+                  <Switch data-industry="mortgage" checked={selectedIndustry === 'mortgage'} onCheckedChange={() => handleIndustryToggle('mortgage')} className="ml-4" />
                 </div>
-                <Switch data-industry="mortgage" checked={selectedIndustry === 'mortgage'} onCheckedChange={() => handleIndustryToggle('mortgage')} className="ml-4" />
               </div>
-            </div>
 
-            <div className="flex-1 h-[72px]">
-              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
-                <div className="flex-1">
-                  <CategoryCard bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'} title="Real Estate CRM" />
+              <div className="flex-1 h-[72px]">
+                <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
+                  <div className="flex-1">
+                    <CategoryCard bgColor={selectedIndustry === 'realEstate' ? 'rgb(185, 147, 214)' : 'rgba(185, 147, 214, 0.8)'} title="Real Estate CRM" />
+                  </div>
+                  <Switch data-industry="realEstate" checked={selectedIndustry === 'realEstate'} onCheckedChange={() => handleIndustryToggle('realEstate')} className="ml-4" />
                 </div>
-                <Switch data-industry="realEstate" checked={selectedIndustry === 'realEstate'} onCheckedChange={() => handleIndustryToggle('realEstate')} className="ml-4" />
               </div>
-            </div>
 
-            <div className="flex-1 h-[72px]">
-              <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
-                <div className="flex-1">
-                  <CategoryCard bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'} title="Debt Settlement CRM" />
+              <div className="flex-1 h-[72px]">
+                <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
+                  <div className="flex-1">
+                    <CategoryCard bgColor={selectedIndustry === 'debtSettlement' ? 'rgb(17, 153, 142)' : 'rgba(17, 153, 142, 0.8)'} title="Debt Settlement CRM" />
+                  </div>
+                  <Switch data-industry="debtSettlement" checked={selectedIndustry === 'debtSettlement'} onCheckedChange={() => handleIndustryToggle('debtSettlement')} className="ml-4" />
                 </div>
-                <Switch data-industry="debtSettlement" checked={selectedIndustry === 'debtSettlement'} onCheckedChange={() => handleIndustryToggle('debtSettlement')} className="ml-4" />
               </div>
             </div>
           </div>
-          
-          <div className="pb-32"></div>
         </section>
       </div>
     </div>

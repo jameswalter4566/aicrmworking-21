@@ -83,15 +83,15 @@ export const IndustryFeatures = ({ industry }: IndustryFeaturesProps) => {
   const features = industryFeatures[industry];
   
   return (
-    <div className="p-4 space-y-4">
-      <h2 className="text-lg font-semibold text-gray-900">Key Features</h2>
-      <div className="grid grid-cols-2 gap-4">
+    <div className="p-3 space-y-2">
+      <h2 className="text-sm font-semibold text-gray-900">Key Features</h2>
+      <div className="grid grid-cols-2 gap-3">
         {features.map((feature, index) => (
           <div key={index} className="flex items-start">
-            <div className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-            <div className="ml-2">
-              <h3 className="text-sm font-medium text-gray-900">{feature.title}</h3>
-              <p className="mt-0.5 text-xs text-gray-600 leading-relaxed">{feature.description}</p>
+            <div className="mt-1 w-1 h-1 rounded-full bg-blue-500 shrink-0" />
+            <div className="ml-1.5">
+              <h3 className="text-xs font-medium text-gray-900">{feature.title}</h3>
+              <p className="text-xs text-gray-600 leading-tight">{feature.description}</p>
             </div>
           </div>
         ))}
