@@ -496,8 +496,12 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
       
       if (!callResult.success) {
-        // Check if this is a blacklist error (Twilio error code 13225)
-        if (callResult.error?.includes('blacklisted') || callResult.twilioErrorCode === 13225) {
+        // Check if this is a blacklist error based on error message
+        const isBlacklistedError = 
+          callResult.error?.includes('blacklisted') || 
+          callResult.error?.includes('13225');
+          
+        if (isBlacklistedError) {
           console.log(`Phone number ${phoneNumber} is blacklisted by Twilio, adding to blacklist`);
           
           // Add to blacklisted numbers
@@ -509,7 +513,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             variant: "destructive",
           });
           
-          await updateLeadStatus(lead.id, 'failed', `Phone number blacklisted: ${callResult.error || 'Twilio error 13225'}`);
+          await updateLeadStatus(lead.id, 'failed', `Phone number blacklisted: ${callResult.error || 'Twilio error'}`);
         } else {
           toast({
             title: "Call Failed",
