@@ -256,8 +256,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               const originalLeadId = notesData.originalLeadId;
               
               if (originalLeadId) {
-                console.log('Using originalLeadId from notes:', originalLeadId);
-                // Since originalLeadId from notes is likely numeric, we use eq
                 const { data: leadData, error: leadError } = await supabase
                   .from('leads')
                   .select('id, phone1')
@@ -265,7 +263,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                   .maybeSingle();
                 
                 if (!leadError && leadData && leadData.phone1) {
-                  console.log('Found lead details from originalLeadId:', leadData);
                   return { id: leadData.id.toString(), phone1: leadData.phone1 };
                 }
               }
@@ -274,64 +271,47 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
-          // Here we need to handle lead_id lookup differently depending on whether it's a numeric ID or UUID
-          const leadId = lead.lead_id;
-          console.log('Looking up lead details for ID:', leadId);
-          
-          // Try to determine if it's a UUID or numeric ID
-          const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
-          
-          if (isUuid) {
-            // For UUID strings, we use a raw query approach since we know the ID column might be bigint
-            console.log('Handling UUID lead ID:', leadId);
-            const { data, error } = await supabase
-              .from('leads')
-              .select('id, phone1')
-              .or(`id.eq.${leadId},id.eq."${leadId}"`)
-              .maybeSingle();
-            
-            if (error) {
-              console.error('Error looking up UUID lead:', error);
-              // Try another approach if the first one fails
-              const { data: alternativeData, error: altError } = await supabase
-                .rpc('find_lead_by_string_id', { 
-                  lead_string_id: leadId 
-                });
-              
-              if (!altError && alternativeData && alternativeData.length > 0) {
-                return { 
-                  id: alternativeData[0].id.toString(), 
-                  phone1: alternativeData[0].phone1 
-                };
+          // If the lead_id is a UUID string, we need to handle it differently
+          try {
+            // For numeric IDs in the leads table
+            if (!isNaN(Number(lead.lead_id))) {
+              // If lead_id can be parsed as a number, treat it as a numeric ID
+              const numericId = Number(lead.lead_id);
+              const { data: leadData, error: leadError } = await supabase
+                .from('leads')
+                .select('id, phone1')
+                .eq('id', numericId)  // Here we provide a number
+                .maybeSingle();
+                
+              if (!leadError && leadData && leadData.phone1) {
+                return { id: leadData.id.toString(), phone1: leadData.phone1 };
               }
-            } else if (data && data.phone1) {
-              return { id: data.id.toString(), phone1: data.phone1 };
-            }
-          } else if (!isNaN(Number(leadId))) {
-            // For numeric IDs
-            console.log('Handling numeric lead ID:', leadId);
-            const numericId = Number(leadId);
-            const { data: leadData, error: leadError } = await supabase
-              .from('leads')
-              .select('id, phone1')
-              .eq('id', numericId)
-              .maybeSingle();
+            } else {
+              // Handle UUID case - use the string directly without type conversion
+              // The error was happening here because we were trying to pass a UUID string to a parameter expecting a number
+              // We'll modify our approach to handle UUID strings correctly
+              const { data: leadData, error: leadError } = await supabase
+                .from('leads')
+                .select('id, phone1')
+                .filter('id', 'eq', lead.lead_id)  // Using filter instead of eq for UUID strings
+                .maybeSingle();
               
-            if (!leadError && leadData && leadData.phone1) {
-              return { id: leadData.id.toString(), phone1: leadData.phone1 };
+              if (!leadError && leadData && leadData.phone1) {
+                return { id: leadData.id.toString(), phone1: leadData.phone1 };
+              }
             }
+            
+            // If direct lookup fails, try to parse the notes for more info
+            if (lead.notes) {
+              const notesData = JSON.parse(lead.notes || '{}');
+              if (notesData.phone) {
+                return { id: lead.lead_id, phone1: notesData.phone };
+              }
+            }
+          } catch (parseError) {
+            console.error('Error looking up lead details:', parseError);
           }
           
-          // If direct lookup fails, try to parse the notes for more info
-          if (lead.notes) {
-            const notesData = JSON.parse(lead.notes || '{}');
-            if (notesData.phone) {
-              return { id: lead.lead_id, phone1: notesData.phone };
-            }
-          }
-          
-          // Last fallback - use the lead_id but we couldn't find a phone
-          console.log('Could not find phone number for lead ID:', leadId);
           return { id: lead.lead_id, phone1: null };
         } catch (error) {
           console.error('Error fetching lead details:', error);
