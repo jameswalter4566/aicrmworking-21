@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -379,7 +378,7 @@ class TwilioService {
           callSid: call.sid || 'browser-call',
           leadId: leadId
         };
-      } catch (deviceError) {
+      } catch (deviceError: any) {
         console.warn("Browser-based call initiation failed. Error:", deviceError);
         return {
           success: false,
