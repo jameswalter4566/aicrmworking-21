@@ -121,16 +121,16 @@ const Auth = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}/auth`,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent',
-          },
+            prompt: 'consent'
+          }
         }
       });
-      
+
       if (error) throw error;
-      
+
       // If we have a URL to redirect to, do it now
       if (data?.url) {
         window.location.href = data.url;
@@ -141,6 +141,7 @@ const Auth = () => {
         title: "Error",
         description: error.message || "An error occurred with Google sign in. Please try again.",
       });
+    } finally {
       setGoogleLoading(false);
     }
   };
