@@ -32,7 +32,7 @@ function debugTwiML(twiml: any) {
 
 // Name of the conference room
 const CONFERENCE_ROOM_PREFIX = "Conference_Room_";
-const DEFAULT_HOLD_MUSIC = "https://api.twilio.com/cowbell.mp3"; // Changed to HTTPS
+const DEFAULT_HOLD_MUSIC = "http://com.twilio.music.classical.s3.amazonaws.com/ClockworkWaltz.mp3";
 const DEFAULT_TIMEOUT = 20; // Reduced from 30 to 20 seconds to get faster no-answer responses
 
 serve(async (req) => {
@@ -56,12 +56,9 @@ serve(async (req) => {
     // Parse data from Twilio in various formats
     let requestData: Record<string, any> = {};
     
-    // Extract action and parameters from URL query params
+    // Extract action from URL params
     const url = new URL(req.url);
     let action = url.searchParams.get('action');
-    url.searchParams.forEach((value, key) => {
-      requestData[key] = value;
-    });
     
     // Parse form data from Twilio (application/x-www-form-urlencoded)
     const contentType = req.headers.get('content-type') || '';
@@ -82,9 +79,8 @@ serve(async (req) => {
       try {
         // Clone request to safely read body as JSON
         const reqClone = req.clone();
-        const jsonData = await reqClone.json();
-        Object.assign(requestData, jsonData);
-        console.log("Parsed JSON data:", JSON.stringify(jsonData));
+        requestData = await reqClone.json();
+        console.log("Parsed JSON data:", JSON.stringify(requestData));
       } catch (e) {
         console.error("Failed to parse JSON body:", e);
         
@@ -115,9 +111,8 @@ serve(async (req) => {
         } catch (formErr) {
           // If not form data, try as JSON
           try {
-            const jsonData = JSON.parse(text);
-            Object.assign(requestData, jsonData);
-            console.log("Parsed as JSON:", JSON.stringify(jsonData));
+            requestData = JSON.parse(text);
+            console.log("Parsed as JSON:", JSON.stringify(requestData));
           } catch (jsonErr) {
             console.error("Could not parse request body as form data or JSON");
           }
@@ -126,6 +121,16 @@ serve(async (req) => {
         console.error("Failed to read request body:", e);
       }
     }
+    
+    // Also add URL query parameters to request data
+    url.searchParams.forEach((value, key) => {
+      if (!requestData[key]) {
+        requestData[key] = value;
+      }
+    });
+    
+    console.log("Action from URL params:", url.searchParams.get('action'));
+    console.log("Action from request body:", requestData.action);
     
     // If no action in URL params, try to get it from the request data
     if (!action && requestData.action) {
@@ -161,19 +166,6 @@ serve(async (req) => {
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
     const TWILIO_PHONE_NUMBER = Deno.env.get('TWILIO_PHONE_NUMBER');
     
-    // Handle dial status callback - NEW
-    if (action === 'dialStatus') {
-      const dialStatus = requestData.DialCallStatus ?? 'unknown';
-      const callSid = requestData.CallSid ?? 'n/a';
-      console.log(`Dial status for ${callSid}: ${dialStatus}`);
-      
-      // Always ACK with valid, empty TwiML so Twilio sees 200 OK
-      return new Response('<Response/>', {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
-        status: 200,
-      });
-    }
-    
     // Check if this is a direct call from Twilio's webhook (no specific action)
     // This is the main case we need to handle properly
     if (!action) {
@@ -200,9 +192,7 @@ serve(async (req) => {
         
         const dial = twiml.dial({
           callerId: TWILIO_PHONE_NUMBER,
-          timeout: DEFAULT_TIMEOUT,
-          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=dialStatus&leadId=${leadId}`,
-          method: 'POST'
+          timeout: DEFAULT_TIMEOUT
         });
         
         dial.number(formattedPhoneNumber);
@@ -311,9 +301,7 @@ serve(async (req) => {
         
         const dial = twiml.dial({
           callerId: TWILIO_PHONE_NUMBER,
-          timeout: DEFAULT_TIMEOUT,
-          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?action=dialStatus&leadId=${leadId}`,
-          method: 'POST'
+          timeout: DEFAULT_TIMEOUT
         });
         
         dial.number(formattedPhoneNumber);
@@ -384,20 +372,32 @@ serve(async (req) => {
       }
     }
     else {
-      // Handle unknown actions with a valid 200 response instead of 400
-      console.warn(`Unknown action "${action}" - returning empty TwiML`);
-      return new Response('<Response/>', {
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
-        status: 200,
+      // Default response for unknown actions
+      console.log(`Unknown action "${action}", returning simple TwiML response`);
+      
+      // Generate a simple valid TwiML response
+      const twiml = new twilio.twiml.VoiceResponse();
+      twiml.say("Thank you for your request. The system is processing it now.");
+      
+      return new Response(twiml.toString(), { 
+        headers: { ...corsHeaders, 'Content-Type': 'text/xml' } 
       });
     }
   } catch (error) {
     console.error('Error in function:', error);
     
+    // Check if it's a form parsing issue
+    if (error.message && error.message.includes('JSON')) {
+      // This is likely a form data request that couldn't be parsed as JSON
+      console.log('Detected form data request being incorrectly processed as JSON');
+    }
+    
     // For all errors, still return a valid TwiML response to prevent Twilio errors
-    return new Response('<Response/>', { 
-      headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
-      status: 200
+    const twiml = new twilio.twiml.VoiceResponse();
+    twiml.say("We apologize, but there was a system error processing your request.");
+    
+    return new Response(twiml.toString(), { 
+      headers: { ...corsHeaders, 'Content-Type': 'text/xml' }
     });
   }
 });
