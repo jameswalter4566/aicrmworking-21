@@ -33,20 +33,34 @@ const Auth = () => {
 
   useEffect(() => {
     const handleAuthCallback = async () => {
-      const hashParams = new URLSearchParams(location.hash.substring(1));
-      if (hashParams.get('access_token')) {
+      // Check for hash fragment from OAuth redirect
+      if (location.hash) {
         try {
-          const { data, error } = await supabase.auth.getUser();
-          if (error) throw error;
-          if (data.user) {
+          console.log("Auth callback detected: Handling hash fragment");
+          
+          // This will handle the OAuth redirect with hash params
+          const { data, error } = await supabase.auth.getSession();
+          
+          if (error) {
+            console.error("Session error:", error);
+            throw error;
+          }
+          
+          if (data.session) {
+            console.log("Session found, redirecting to /settings");
             toast({
               title: "Successfully signed in",
-              description: `Welcome${data.user.user_metadata.name ? ', ' + data.user.user_metadata.name : ''}!`,
+              description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
             });
-            navigate("/settings");  // Updated to redirect to /settings
+            navigate("/settings");  // Redirects to settings page
           }
         } catch (error) {
           console.error("Error handling OAuth callback:", error);
+          toast({
+            variant: "destructive",
+            title: "Authentication Error",
+            description: "We couldn't complete the sign-in process. Please try again.",
+          });
         }
       }
     };
@@ -123,7 +137,7 @@ const Auth = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/settings`,  // Updated to redirect to /settings
+          redirectTo: `${origin}/settings`,  // Redirect directly to settings page
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'
@@ -137,6 +151,8 @@ const Auth = () => {
       }
 
       if (data?.url) {
+        // Instead of redirecting and losing state, we can log this for debugging
+        console.log("Redirecting to OAuth URL:", data.url);
         window.location.href = data.url;
       }
     } catch (error: any) {

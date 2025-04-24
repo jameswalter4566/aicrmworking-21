@@ -30,7 +30,13 @@ file_size_limit = "50MiB"
 
 [auth]
 site_url = "https://mortgagesalespro.com"
-additional_redirect_urls = ["https://localhost:3000", "https://preview--aicrmworking.lovable.app", "http://localhost:3000"]
+additional_redirect_urls = [
+  "https://localhost:3000", 
+  "http://localhost:3000", 
+  "https://preview--aicrmworking.lovable.app", 
+  "https://preview--aicrmworking.lovable.app/settings",
+  "https://mortgagesalespro.com/settings"
+]
 jwt_expiry = 3600
 enable_signup = true
 
