@@ -68,6 +68,8 @@ const createTwilioService = (): TwilioService => {
       if (device) {
         console.log("Cleaning up existing Twilio device before initialization");
         try {
+          // await hangupAllCalls();
+          
           if (typeof device.destroy === 'function') {
             await device.destroy();
           }
@@ -83,13 +85,13 @@ const createTwilioService = (): TwilioService => {
       soundsInitialized = false;
       
       console.log("Fetching Twilio token...");
-      
       // Using direct fetch to bypass authorization header requirements
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        }
+        },
+        body: JSON.stringify({})
       });
       
       if (!response.ok) {
@@ -112,8 +114,7 @@ const createTwilioService = (): TwilioService => {
           codecPreferences: ["opus", "pcmu"],
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
-          // Disable Audio Context sounds initially to avoid audio decoding errors
-          disableAudioContextSounds: true
+          // Start with no sounds to avoid audio decoding errors
         });
 
         // Set up event handlers
@@ -226,20 +227,39 @@ const createTwilioService = (): TwilioService => {
           await device.register();
           console.log("Twilio device registered successfully.");
           
-          // Wait a moment before trying to apply sounds
-          setTimeout(() => {
-            try {
-              // Try to apply sound configuration *without* using Audio Context sounds
-              // This avoids encoding errors with corrupt audio files
-              device.updateOptions({
-                disableAudioContextSounds: true,
-              });
-              soundsInitialized = true;
-              console.log("Audio configuration successfully applied");
-            } catch (soundErr) {
-              console.warn("Could not initialize sound options, will continue without sounds:", soundErr);
-            }
-          }, 1000);
+          // Now that device is registered, try to apply sound configuration
+          // But do it with a delay and only if not already done
+          if (!soundsInitialized) {
+            setTimeout(() => {
+              try {
+                // Add sounds after successful registration to avoid initial decode errors
+                device.updateOptions({
+                  // Use our local sound files instead of GitHub URLs
+                  sounds: {
+                    incoming: '/sounds/incoming.mp3',
+                    outgoing: '/sounds/outgoing.mp3',
+                    disconnect: '/sounds/disconnect.mp3',
+                    dtmf0: '/sounds/dtmf-0.mp3',
+                    dtmf1: '/sounds/dtmf-1.mp3',
+                    dtmf2: '/sounds/dtmf-2.mp3',
+                    dtmf3: '/sounds/dtmf-3.mp3',
+                    dtmf4: '/sounds/dtmf-4.mp3',
+                    dtmf5: '/sounds/dtmf-5.mp3',
+                    dtmf6: '/sounds/dtmf-6.mp3',
+                    dtmf7: '/sounds/dtmf-7.mp3',
+                    dtmf8: '/sounds/dtmf-8.mp3',
+                    dtmf9: '/sounds/dtmf-9.mp3',
+                    dtmfs: '/sounds/dtmf-star.mp3',
+                    dtmfh: '/sounds/dtmf-pound.mp3'
+                  }
+                });
+                soundsInitialized = true;
+                console.log("Sound options successfully applied");
+              } catch (soundErr) {
+                console.warn("Could not initialize sound options, will continue without sounds:", soundErr);
+              }
+            }, 1000);
+          }
           
           return true;
         } catch (registerError) {
@@ -290,28 +310,16 @@ const createTwilioService = (): TwilioService => {
 
   const testAudioOutput = async (deviceId?: string): Promise<boolean> => {
     try {
-      // Simple method that doesn't rely on Twilio's sounds
+      if (!device || !device.audio) {
+        console.warn("Twilio device not initialized or audio not available, cannot test audio.");
+        return false;
+      }
+
       const testDevice = deviceId || preferredAudioDevice || 'default';
       console.log(`Testing audio output device: ${testDevice}`);
 
-      const audio = new Audio('/sounds/test-tone.mp3');
-      
-      if ('setSinkId' in audio) {
-        try {
-          await (audio as any).setSinkId(testDevice);
-        } catch (e) {
-          console.warn("Could not set audio sink ID:", e);
-        }
-      }
-      
-      audio.volume = 0.3;
-      await audio.play();
-      
-      setTimeout(() => {
-        audio.pause();
-        audio.remove();
-      }, 1000);
-      
+      // Use a local test tone instead of an external URL
+      await device.audio.speakerDevices.test('/sounds/test-tone.mp3');
       return true;
     } catch (error) {
       console.error("Error testing audio output:", error);
@@ -327,7 +335,7 @@ const createTwilioService = (): TwilioService => {
       }
 
       // First clean up any existing calls
-      await hangupAllCalls();
+      // await hangupAllCalls();
       
       // Make sure we're starting fresh
       activeCalls = [];
@@ -469,11 +477,7 @@ const createTwilioService = (): TwilioService => {
       }
     } catch (error: any) {
       console.error("Error making call:", error);
-      return { 
-        success: false, 
-        error: error.message || "Failed to make call",
-        leadId: leadId 
-      };
+      return { success: false, error: error.message || "Failed to make call" };
     }
   };
 
@@ -530,7 +534,7 @@ const createTwilioService = (): TwilioService => {
       }
       
       isCleaningUp = true;
-      console.log("Hanging up all calls...");
+      console.log("Hanging up all calls..1.");
       
       // First try the client-side approach
       if (device && typeof device.disconnectAll === 'function') {
@@ -657,7 +661,7 @@ const createTwilioService = (): TwilioService => {
 
   const cleanup = () => {
     if (device) {
-      hangupAllCalls().catch(err => console.warn("Error in final hangup:", err)); 
+       hangupAllCalls().catch(err => console.warn("Error in final hangup:", err)); 
       
       if (typeof device.destroy === 'function') {
         device.destroy();

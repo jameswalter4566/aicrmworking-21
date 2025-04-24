@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -274,10 +273,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
+          // Here we need to handle lead_id lookup differently depending on whether it's a numeric ID or UUID
+          const leadId = lead.lead_id;
+          console.log('Looking up lead details for ID:', leadId);
+          
           // Use our new find_lead_by_string_id function
           const { data: foundLead, error } = await supabase
             .rpc('find_lead_by_string_id', {
-              lead_string_id: lead.lead_id
+              lead_string_id: leadId
             });
               
           if (error) {
@@ -306,7 +309,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           }
           
           // Last fallback - use the lead_id but we couldn't find a phone
-          console.log('Could not find phone number for lead ID:', lead.lead_id);
+          console.log('Could not find phone number for lead ID:', leadId);
           return { id: lead.lead_id, phone1: null };
         } catch (error) {
           console.error('Error fetching lead details:', error);
@@ -350,7 +353,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       if (!phoneNumber && lead.getLeadDetails) {
         const leadDetails = await lead.getLeadDetails();
-        phoneNumber = leadDetails?.phone1 || null;
+        phoneNumber = leadDetails.phone1;
       }
 
       if (!phoneNumber) {
@@ -459,11 +462,15 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       try {
         console.log(`Making browser-based call to ${formattedPhoneNumber} for lead ${lead.lead_id}`);
         
-        // Use the twilioService for more robust call handling
-        const callResult = await twilioService.makeCall(formattedPhoneNumber, lead.lead_id);
-        
-        if (callResult.success) {
-          console.log(`Call connected with SID: ${callResult.callSid}`);
+        const call = await window.Twilio.Device.connect({
+          params: {
+            phoneNumber: formattedPhoneNumber,
+            leadId: lead.lead_id
+          }
+        });
+
+        if (call) {
+          console.log(`Call connected with SID: ${call.sid}`);
           
           await supabase
             .from('dialing_session_leads')
@@ -471,7 +478,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               status: 'in_progress',
               notes: JSON.stringify({
                 ...JSON.parse(lead.notes || '{}'),
-                callSid: callResult.callSid,
+                callSid: call.sid,
                 callStartTime: new Date().toISOString()
               })
             })
@@ -481,8 +488,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             title: "Call Connected",
             description: `Calling ${formattedPhoneNumber} through browser`,
           });
-        } else {
-          throw new Error(callResult.error || "Unknown error making call");
         }
       } catch (callError) {
         console.error('Error making browser call:', callError);
