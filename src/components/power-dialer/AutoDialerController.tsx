@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -151,10 +150,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       }
       
       try {
-        // Fix TypeScript error by using "as any" to bypass type checking
-        // The function expects a UUID but sessionId is a string
         const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
-          p_session_id: sessionId as any
+          p_session_id: sessionId as unknown as any
         });
         
         if (error) {
@@ -167,7 +164,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             if (fixed) {
               console.log('Retrying get_next_session_lead after fix...');
               const retryResponse = await supabase.rpc('get_next_session_lead', {
-                p_session_id: sessionId as any
+                p_session_id: sessionId as unknown as any
               });
               
               if (retryResponse.error) {
