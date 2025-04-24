@@ -32,13 +32,17 @@ const Auth = () => {
   const location = useLocation();
 
   useEffect(() => {
+    // Function to handle OAuth callback
     const handleAuthCallback = async () => {
-      // Check for hash fragment from OAuth redirect
-      if (location.hash) {
+      // Handle both full URL and hash params
+      const hasHash = location.hash && location.hash.length > 0;
+      
+      // If we have hash parameters, this is likely an OAuth redirect
+      if (hasHash) {
         try {
-          console.log("Auth callback detected: Handling hash fragment");
+          console.log("Auth callback detected with hash:", location.hash.substring(0, 20) + "...");
           
-          // This will handle the OAuth redirect with hash params
+          // Get the session - this will automatically process the hash
           const { data, error } = await supabase.auth.getSession();
           
           if (error) {
@@ -46,20 +50,27 @@ const Auth = () => {
             throw error;
           }
           
-          if (data.session) {
-            console.log("Session found, redirecting to /settings");
+          if (data && data.session) {
+            console.log("Session found, user authenticated");
+            
+            // Clear the hash from the URL to prevent issues on reload
+            window.history.replaceState(null, document.title, window.location.pathname);
+            
             toast({
               title: "Successfully signed in",
               description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
             });
-            navigate("/settings");  // Redirects to settings page
+            
+            // Redirect to the settings page
+            navigate("/settings");
+            return;
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error("Error handling OAuth callback:", error);
           toast({
             variant: "destructive",
             title: "Authentication Error",
-            description: "We couldn't complete the sign-in process. Please try again.",
+            description: error.message || "We couldn't complete the sign-in process. Please try again.",
           });
         }
       }
@@ -134,6 +145,8 @@ const Auth = () => {
       // Get the current URL to construct proper redirect
       const origin = window.location.origin;
       
+      console.log("Starting Google sign-in. Origin:", origin);
+      
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -151,9 +164,12 @@ const Auth = () => {
       }
 
       if (data?.url) {
-        // Instead of redirecting and losing state, we can log this for debugging
         console.log("Redirecting to OAuth URL:", data.url);
+        // Use window.location.href for a full page redirect to the OAuth provider
         window.location.href = data.url;
+      } else {
+        console.error("No redirect URL received from Supabase");
+        throw new Error("Failed to start Google authentication");
       }
     } catch (error: any) {
       console.error("Google sign-in failed:", error);
