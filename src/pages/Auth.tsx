@@ -43,7 +43,7 @@ const Auth = () => {
               title: "Successfully signed in",
               description: `Welcome${data.user.user_metadata.name ? ', ' + data.user.user_metadata.name : ''}!`,
             });
-            navigate("/");
+            navigate("/settings");  // Updated to redirect to /settings
           }
         } catch (error) {
           console.error("Error handling OAuth callback:", error);
@@ -74,7 +74,7 @@ const Auth = () => {
         
         if (error) throw error;
         
-        navigate("/");
+        navigate("/settings");  // Updated to redirect to /settings
       } else if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email: values.email,
@@ -123,7 +123,7 @@ const Auth = () => {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth`,
+          redirectTo: `${origin}/settings`,  // Updated to redirect to /settings
           queryParams: {
             access_type: 'offline',
             prompt: 'consent'
