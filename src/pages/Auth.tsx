@@ -31,11 +31,18 @@ const Auth = () => {
   const location = useLocation();
 
   const getCurrentBaseUrl = () => {
-    if (window.location.origin.includes('mortgagesalespro.com')) {
+    const hostname = window.location.hostname;
+    
+    if (hostname === 'mortgagesalespro.com') {
       return 'https://mortgagesalespro.com';
-    } else if (window.location.origin.includes('lovable.app')) {
+    } else if (hostname.includes('lovable.app')) {
       return 'https://preview--aicrmworking.lovable.app';
+    } else if (hostname.includes('lovableproject.com')) {
+      return `https://${hostname}`;
+    } else if (hostname === 'localhost') {
+      return `${window.location.protocol}//${window.location.host}`;
     }
+    
     return window.location.origin;
   };
 
@@ -98,7 +105,7 @@ const Auth = () => {
         setMode("signin");
       } else if (mode === "reset") {
         const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-          redirectTo: window.location.origin + "/reset-password",
+          redirectTo: getCurrentBaseUrl() + "/reset-password",
         });
         
         if (error) throw error;
@@ -127,7 +134,12 @@ const Auth = () => {
       const baseUrl = getCurrentBaseUrl();
       const redirectUrl = `${baseUrl}/auth-redirect`;
       
-      console.log("Starting Google sign-in. Redirect URL will be:", redirectUrl);
+      console.log("Starting Google sign-in with", {
+        baseUrl,
+        redirectUrl,
+        hostname: window.location.hostname,
+        origin: window.location.origin
+      });
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
