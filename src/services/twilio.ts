@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -309,11 +310,11 @@ class TwilioService {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // Now we can make the call
+        // Now we can make the call with properly formatted parameters
         const call = await this.device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
-            leadId: leadId
+            leadId: leadId.toString() // Ensure leadId is a string
           }
         });
         
@@ -385,7 +386,7 @@ class TwilioService {
           error: deviceError.message || "Failed to initiate call through the browser"
         };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error making call:", error);
       return {
         success: false,

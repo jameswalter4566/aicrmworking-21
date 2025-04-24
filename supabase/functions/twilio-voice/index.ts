@@ -75,6 +75,40 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
+    } else if (formData.CallStatus === "ringing" && formData.phoneNumber) {
+      // This is the initial request for an outbound call
+      console.log(`Processing outbound call request to phone: ${formData.phoneNumber}`);
+      
+      // Create TwiML to dial the phone number
+      const response = new twiml.VoiceResponse();
+      
+      // Get caller ID from environment or use the From parameter
+      const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
+      
+      // Format the phone number properly if needed
+      let formattedPhone = formData.phoneNumber;
+      if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
+        formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
+      }
+      
+      console.log(`Dialing ${formattedPhone} with caller ID: ${callerId || "default"}`);
+      
+      // Using the <Dial> verb with proper options
+      const dial = response.dial({
+        callerId: callerId || formData.From,
+        timeout: 30, // Ring for 30 seconds
+        answerOnBridge: true, // For better audio quality
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true`,
+        method: "POST",
+      });
+      
+      // Add the number to dial
+      dial.number(formattedPhone);
+      
+      const twimlResponse = response.toString();
+      console.log("Generated TwiML for outgoing call:", twimlResponse);
+      
+      return new Response(twimlResponse, { headers: corsHeaders });
     } else if (formData.CallStatus) {
       // Handle Twilio status callback
       console.log(`Detected Twilio status callback: {
@@ -86,8 +120,15 @@ serve(async (req) => {
       // Just acknowledge with a 200 OK and empty TwiML for status callbacks
       const response = new twiml.VoiceResponse();
       return new Response(response.toString(), { headers: corsHeaders });
+    } else if (formData.dialAction || formData.DialCallStatus) {
+      // Handle dial action callback
+      console.log(`Received dial action callback: ${formData.DialCallStatus || 'unknown'}`);
+      
+      // Return empty TwiML to end the call
+      const response = new twiml.VoiceResponse();
+      return new Response(response.toString(), { headers: corsHeaders });
     } else if (formData.phoneNumber) {
-      // Handle browser client call request
+      // Handle browser client call request - this is catching the JSON request case
       console.log(`Detected browser client call request with phoneNumber: ${formData.phoneNumber}`);
       
       // Create TwiML to dial the phone number
@@ -95,9 +136,11 @@ serve(async (req) => {
       
       // Using the <Dial> verb with proper options
       const dial = response.dial({
-        callerId: Deno.env.get("TWILIO_PHONE_NUMBER") || formData.From,
-        timeout: 20, // Ring for 20 seconds
+        callerId: Deno.env.get("TWILIO_PHONE_NUMBER"),
+        timeout: 30, // Ring for 30 seconds
         answerOnBridge: true, // Preserve client audio
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true`,
+        method: "POST",
       });
       
       // Format the phone number properly
@@ -110,13 +153,6 @@ serve(async (req) => {
       
       console.log("Generated TwiML for outgoing call:", response.toString());
       
-      return new Response(response.toString(), { headers: corsHeaders });
-    } else if (formData.dialStatus) {
-      // Handle dial action callback
-      console.log(`Received dial status callback: ${formData.dialStatus}`);
-      
-      // Return empty TwiML to end the call
-      const response = new twiml.VoiceResponse();
       return new Response(response.toString(), { headers: corsHeaders });
     } else {
       // Default response for unknown requests
