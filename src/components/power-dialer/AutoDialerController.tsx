@@ -226,38 +226,22 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, [sessionId, fixAttemptCount, fixDatabaseFunction, getNextLeadDirectSQL, toast]);
 
-  const extractPhoneNumberFromNotes = (notesStr: string): string | null => {
-    try {
-      // Try to parse the notes as JSON
-      const notesData = JSON.parse(notesStr || '{}');
-      
-      // Check if we have a phone in the notes
-      if (notesData.phone && typeof notesData.phone === 'string') {
-        const phone = notesData.phone.trim();
-        if (phone) return phone;
-      }
-      
-      // Check for mobile phone or any other phone fields
-      if (notesData.mobile) return notesData.mobile;
-      if (notesData.phoneNumber) return notesData.phoneNumber;
-      if (notesData.mobilePhone) return notesData.mobilePhone;
-      if (notesData.cellPhone) return notesData.cellPhone;
-      
-      return null;
-    } catch (e) {
-      console.error('Error parsing lead notes:', e);
-      return null;
-    }
-  };
-
   const processFetchedLead = (lead: SessionLead): ProcessedSessionLead => {
     let phoneNumber = null;
     
-    // First try to extract phone from notes
     if (lead.notes) {
-      phoneNumber = extractPhoneNumberFromNotes(lead.notes);
-      if (phoneNumber) {
-        console.log(`Found phone number ${phoneNumber} in lead notes`);
+      try {
+        const notesData = JSON.parse(lead.notes);
+        phoneNumber = notesData.phone;
+        
+        if (phoneNumber) {
+          return {
+            ...lead,
+            phoneNumber
+          };
+        }
+      } catch (e) {
+        console.error('Error parsing lead notes:', e);
       }
     }
     
@@ -266,7 +250,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       phoneNumber,
       getLeadDetails: async () => {
         try {
-          // First check if we can get original lead ID from notes
           if (lead.notes) {
             try {
               const notesData = JSON.parse(lead.notes);
@@ -291,47 +274,35 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
-          // Try to find by string ID
-          try {
-            const { data: foundLead, error } = await supabase
-              .rpc('find_lead_by_string_id', {
-                lead_string_id: lead.lead_id
-              });
-                
-            if (!error && foundLead && foundLead.length > 0 && foundLead[0].phone1) {
-              console.log('Found lead via find_lead_by_string_id:', foundLead[0]);
-              return { 
-                id: foundLead[0].id.toString(),
-                phone1: foundLead[0].phone1 
-              };
-            }
-          } catch (lookupError) {
-            console.error('Error using find_lead_by_string_id:', lookupError);
+          // Use our new find_lead_by_string_id function
+          const { data: foundLead, error } = await supabase
+            .rpc('find_lead_by_string_id', {
+              lead_string_id: lead.lead_id
+            });
+              
+          if (error) {
+            console.error('Error looking up lead:', error);
+            return { id: null, phone1: null };
+          }
+          
+          // Check if we found a lead and it has a phone number
+          if (foundLead && foundLead.length > 0 && foundLead[0].phone1) {
+            return { 
+              id: foundLead[0].id.toString(),
+              phone1: foundLead[0].phone1 
+            };
           }
 
-          // As a fallback, try direct query on leads table using lead_id
-          try {
-            const { data: directLead, error: directError } = await supabase
-              .from('leads')
-              .select('id, phone1')
-              .eq('id', lead.lead_id)
-              .maybeSingle();
-            
-            if (!directError && directLead && directLead.phone1) {
-              console.log('Found lead via direct query:', directLead);
-              return {
-                id: directLead.id.toString(),
-                phone1: directLead.phone1
-              };
+          // If direct lookup fails, try to parse the notes for more info
+          if (lead.notes) {
+            try {
+              const notesData = JSON.parse(lead.notes || '{}');
+              if (notesData.phone) {
+                return { id: lead.lead_id, phone1: notesData.phone };
+              }
+            } catch (parseError) {
+              console.error('Error parsing lead notes:', parseError);
             }
-          } catch (directError) {
-            console.error('Error with direct lead lookup:', directError);
-          }
-
-          // If all lookups fail, try to use phone from notes as last resort
-          if (phoneNumber) {
-            console.log('Using phone number from notes as fallback');
-            return { id: lead.lead_id, phone1: phoneNumber };
           }
           
           // Last fallback - use the lead_id but we couldn't find a phone
@@ -339,7 +310,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           return { id: lead.lead_id, phone1: null };
         } catch (error) {
           console.error('Error fetching lead details:', error);
-          return { id: null, phone1: phoneNumber || null };
+          return { id: null, phone1: null };
         }
       }
     };
@@ -375,51 +346,34 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Try to get phone number directly from lead
       let phoneNumber = lead.phoneNumber;
       
-      // If we don't have a phone number yet, try to get it from lead details
       if (!phoneNumber && lead.getLeadDetails) {
         const leadDetails = await lead.getLeadDetails();
         phoneNumber = leadDetails?.phone1 || null;
       }
 
-      // If still no phone number, update the lead status and notify
       if (!phoneNumber) {
-        console.log(`No phone number found for lead ${lead.lead_id}`);
+        toast({
+          title: "Missing Phone Number",
+          description: "This lead does not have a valid phone number",
+          variant: "destructive",
+        });
         
-        // When testing, we can use a fallback number instead of failing
-        const useFallbackNumber = true; // Set to false in production
-        
-        if (useFallbackNumber) {
-          phoneNumber = "+15551234567"; // Test number
-          console.log(`Using fallback test number: ${phoneNumber}`);
-          toast({
-            title: "Test Mode",
-            description: "Using test phone number since lead has no phone number",
-          });
-        } else {
-          toast({
-            title: "Missing Phone Number",
-            description: "This lead does not have a valid phone number",
-            variant: "destructive",
-          });
-          
-          await supabase
-            .from('dialing_session_leads')
-            .update({
-              status: 'failed',
-              notes: JSON.stringify({
-                ...JSON.parse(lead.notes || '{}'),
-                error: 'Missing phone number'
-              })
+        await supabase
+          .from('dialing_session_leads')
+          .update({
+            status: 'failed',
+            notes: JSON.stringify({
+              ...JSON.parse(lead.notes || '{}'),
+              error: 'Missing phone number'
             })
-            .eq('id', lead.id);
-            
-          setIsProcessingCall(false);
-          onCallComplete();
-          return;
-        }
+          })
+          .eq('id', lead.id);
+          
+        setIsProcessingCall(false);
+        onCallComplete();
+        return;
       }
 
       // Initialize Twilio Device before attempting call
@@ -472,7 +426,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Format phone number if needed
+      // Format phone number
       let formattedPhoneNumber = phoneNumber;
       if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
         formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
