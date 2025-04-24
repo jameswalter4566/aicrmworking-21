@@ -34,6 +34,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const [noMoreLeads, setNoMoreLeads] = useState(false);
   const [hasAttemptedFix, setHasAttemptedFix] = useState(false);
   const [fixAttemptCount, setFixAttemptCount] = useState(0);
+  const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -298,6 +299,38 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     return processedLead;
   };
 
+  const updateLeadStatus = useCallback(async (leadId: string, status: string) => {
+    if (!leadId) return;
+    
+    try {
+      console.log(`Updating lead ${leadId} to status: ${status}`);
+      const { error } = await supabase
+        .from('dialing_session_leads')
+        .update({
+          status: status,
+          notes: JSON.stringify({
+            ...JSON.parse((await supabase
+              .from('dialing_session_leads')
+              .select('notes')
+              .eq('id', leadId)
+              .single()).data?.notes || '{}'),
+            callCompletedAt: new Date().toISOString()
+          })
+        })
+        .eq('id', leadId);
+      
+      if (error) {
+        console.error('Error updating lead status:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in updateLeadStatus:', error);
+      return false;
+    }
+  }, []);
+
   const processNextLead = useCallback(async () => {
     if (isProcessingCall || !isActive || !sessionId || noMoreLeads) {
       if (noMoreLeads && isActive) {
@@ -312,6 +345,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     try {
       setIsProcessingCall(true);
       
+      if (currentLeadId) {
+        await updateLeadStatus(currentLeadId, 'completed');
+        setCurrentLeadId(null);
+      }
+      
       const lead = await getNextLead();
       
       if (!lead) {
@@ -322,9 +360,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           });
           setNoMoreLeads(true);
         }
+        setIsProcessingCall(false);
         return;
       }
 
+      setCurrentLeadId(lead.id);
       let phoneNumber = lead.phoneNumber;
       
       if (!phoneNumber && lead.getLeadDetails) {
@@ -339,17 +379,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           variant: "destructive",
         });
         
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: 'Missing phone number'
-            })
-          })
-          .eq('id', lead.id);
-          
+        await updateLeadStatus(lead.id, 'failed');
         setIsProcessingCall(false);
         onCallComplete();
         return;
@@ -367,33 +397,23 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           variant: "destructive",
         });
         
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'failed',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              error: callResult.error
-            })
-          })
-          .eq('id', lead.id);
+        await updateLeadStatus(lead.id, 'failed');
       } else {
-        await supabase
-          .from('dialing_session_leads')
-          .update({
-            status: 'in_progress',
-            notes: JSON.stringify({
-              ...JSON.parse(lead.notes || '{}'),
-              callSid: callResult.callSid,
-              callStartTime: new Date().toISOString()
-            })
-          })
-          .eq('id', lead.id);
-
         toast({
           title: "Call Initiated",
           description: `Calling lead ${lead.lead_id}`
         });
+        
+        setTimeout(async () => {
+          const callStatus = twilioService.checkCallStatus(lead.lead_id);
+          
+          if (callStatus === 'no-call' || callStatus === 'closed') {
+            await updateLeadStatus(lead.id, 'completed');
+            setCurrentLeadId(null);
+            setIsProcessingCall(false);
+            onCallComplete();
+          }
+        }, 10000);
       }
 
     } catch (error) {
@@ -403,11 +423,34 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         description: "Failed to process next lead",
         variant: "destructive",
       });
-    } finally {
       setIsProcessingCall(false);
       onCallComplete();
     }
-  }, [isProcessingCall, isActive, sessionId, getNextLead, toast, onCallComplete, noMoreLeads]);
+  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads]);
+
+  const handleCallCompletion = useCallback(async () => {
+    if (currentLeadId) {
+      await updateLeadStatus(currentLeadId, 'completed');
+      setCurrentLeadId(null);
+    }
+    
+    setIsProcessingCall(false);
+    onCallComplete();
+  }, [currentLeadId, updateLeadStatus, onCallComplete]);
+
+  useEffect(() => {
+    if (!twilioService || !isActive) return;
+    
+    const handleCallDisconnect = async () => {
+      await handleCallCompletion();
+    };
+    
+    const cleanupListener = twilioService.onCallDisconnect(handleCallDisconnect);
+    
+    return () => {
+      cleanupListener?.();
+    };
+  }, [twilioService, isActive, handleCallCompletion]);
 
   useEffect(() => {
     if (!isActive || !sessionId) return;

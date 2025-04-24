@@ -18,7 +18,8 @@ class TwilioService {
   private activeCalls: any[] = [];
   private isCleaningUp: boolean = false;
   private soundsInitialized: boolean = false;
-  
+  private callDisconnectListeners: Array<() => void> = [];
+
   async initializeAudioContext(): Promise<boolean> {
     try {
       if (!this.audioContext) {
@@ -45,7 +46,6 @@ class TwilioService {
   
   async initializeTwilioDevice(): Promise<boolean> {
     try {
-      // First, clean up any existing device
       if (this.device) {
         console.log("Cleaning up existing Twilio device before initialization");
         try {
@@ -59,12 +59,10 @@ class TwilioService {
         }
       }
       
-      // Reset the cleaning up flag
       this.isCleaningUp = false;
       this.soundsInitialized = false;
       
       console.log("Fetching Twilio token...");
-      // Using direct fetch to bypass authorization header requirements
       const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-token', {
         method: 'POST',
         headers: {
@@ -88,29 +86,23 @@ class TwilioService {
       }
 
       if (window.Twilio && window.Twilio.Device) {
-        // First initialize with minimal options to avoid audio loading errors
         this.device = new window.Twilio.Device(data.token, {
           codecPreferences: ["opus", "pcmu"],
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
-          // Disable audio context sounds to avoid decoding errors
           disableAudioContextSounds: true,
-          sounds: {} // Set empty sounds object to avoid decoding errors
+          sounds: {}
         });
 
-        // Set up event handlers
         this.device.on("error", (error: any) => {
           console.error("Twilio Device Error:", error);
           
-          // More detailed error reporting
           let errorMessage = error.message || error.toString();
           let errorCode = error.code || "unknown";
           
           if (errorCode === '31005' && errorMessage.includes('HANGUP')) {
             errorMessage = "Call terminated unexpectedly. The line may be busy or a previous call is still active.";
             
-            // Automatically clean up when we get a HANGUP error
-            console.log("Received HANGUP error, performing cleanup");
             if (!this.isCleaningUp) {
               this.isCleaningUp = true;
               setTimeout(() => {
@@ -130,7 +122,6 @@ class TwilioService {
             variant: "destructive",
           });
           
-          // Clean up any zombie calls when we get errors
           try {
             if (this.activeCalls.length > 0) {
               console.log("Cleaning up calls after error");
@@ -144,14 +135,11 @@ class TwilioService {
 
         this.device.on("disconnect", (call: any) => {
           console.log(`Call disconnected: ${call.sid || 'unknown'}`);
-          
-          // Remove from active calls when disconnected
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
         });
 
         this.device.on("cancel", (call: any) => {
           console.log(`Call canceled: ${call.sid || 'unknown'}`);
-          // This is important to handle 'no-answer' scenarios
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
           
           toast({
@@ -163,8 +151,6 @@ class TwilioService {
         this.device.on("incoming", (call: any) => {
           console.log(`Incoming call from: ${call.from || 'unknown'}`);
           
-          // For direct browser calls, we'll automatically accept the call
-          // This is critical to ensure the call is answered and connected
           const params = call.customParameters || new Map();
           const phoneNumber = params.get('phoneNumber');
           const leadId = params.get('leadId') || 'unknown';
@@ -173,28 +159,22 @@ class TwilioService {
             console.log(`Incoming call includes target phone: ${phoneNumber}, leadId: ${leadId}`);
             console.log("Automatically accepting incoming call to connect to target phone");
             
-            // Always accept the call - this is essential to prevent "no answer" errors
             call.accept();
             
-            // Add to active calls tracking
             this.activeCalls.push(call);
             
-            // Set up listeners for this call
             call.on('error', (error: any) => {
               console.error('Call error:', error);
-              // Remove from active calls on error
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
             });
             
             call.on('disconnect', () => {
               console.log('Call disconnected');
-              // Remove from active calls when disconnected
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
             });
             
             call.on('cancel', () => {
               console.log('Call was cancelled');
-              // Remove from active calls
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
             });
           } else {
@@ -264,7 +244,6 @@ class TwilioService {
       const testDevice = deviceId || this.preferredAudioDevice || 'default';
       console.log(`Testing audio output device: ${testDevice}`);
 
-      // Use a local test tone instead of an external URL
       await this.device.audio.speakerDevices.test('/sounds/test-tone.mp3');
       return true;
     } catch (error) {
@@ -280,7 +259,6 @@ class TwilioService {
         return { success: false, error: "Twilio device not initialized." };
       }
 
-      // Make sure we're starting fresh
       this.activeCalls = [];
 
       let formattedPhoneNumber = phoneNumber;
@@ -291,33 +269,27 @@ class TwilioService {
       console.log(`Attempting to call ${formattedPhoneNumber} via browser client`);
       
       try {
-        // Make sure we're not already on a call
         if (this.device.calls && this.device.calls.length > 0) {
           console.warn("Device has active calls before making new call. Cleaning up...");
           this.device.disconnectAll();
           
-          // Small delay to ensure clean state
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // We need to ensure the device is ready before making a call
         if (this.device.state !== 'registered') {
           console.log("Device not registered, attempting to register...");
           await this.device.register();
           
-          // Small delay after registering
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        // Now we can make the call with properly formatted parameters
         const call = await this.device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
-            leadId: leadId.toString() // Ensure leadId is a string
+            leadId: leadId.toString()
           }
         });
         
-        // Add to active calls tracking
         this.activeCalls.push(call);
         
         console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
@@ -330,14 +302,12 @@ class TwilioService {
             variant: "destructive",
           });
           
-          // Remove from active calls on error
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
           
-          // Attempt recovery if we get a connection error
           if (error.code === '31005') {
             console.log("Attempting recovery from connection error");
             setTimeout(() => {
-               this.hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
+              this.hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
             }, 1000);
           }
         });
@@ -357,11 +327,11 @@ class TwilioService {
             description: "The call has been disconnected.",
           });
           
-          // Remove from active calls when disconnected
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          this.callDisconnectListeners.forEach(listener => listener());
         });
         
-        // Listen specifically for no-answer event
         call.on('cancel', () => {
           console.log('Call was cancelled or not answered');
           toast({
@@ -369,8 +339,9 @@ class TwilioService {
             description: "The recipient didn't answer the call.",
           });
           
-          // Remove from active calls
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          this.callDisconnectListeners.forEach(listener => listener());
         });
         
         return { 
@@ -402,7 +373,6 @@ class TwilioService {
       }
       
       if (leadId) {
-        // End specific call for this lead
         const call = this.activeCalls.find((c: any) => {
           const params = c.customParameters || new Map();
           return params.get('leadId') === leadId;
@@ -417,7 +387,6 @@ class TwilioService {
           return false;
         }
       } else {
-        // End all calls
         return await this.hangupAllCalls();
       }
     } catch (error) {
@@ -435,14 +404,12 @@ class TwilioService {
         return false;
       }
       
-      // First try to disconnect via device
       try {
         this.device.disconnectAll();
       } catch (e) {
         console.warn("Error hanging up calls via Device API:", e);
       }
 
-      // Also try via API for any zombie calls
       try {
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
           method: 'POST',
@@ -462,7 +429,6 @@ class TwilioService {
         console.warn("Error calling hangup API:", e);
       }
       
-      // Clear our local tracking of calls
       this.activeCalls = [];
       
       return true;
@@ -473,7 +439,6 @@ class TwilioService {
   }
 
   checkCallStatus(leadId: string): string {
-    // Find call for this lead
     const call = this.activeCalls.find((c: any) => {
       const params = c.customParameters || new Map();
       return params.get('leadId') === leadId;
@@ -491,18 +456,15 @@ class TwilioService {
       return false;
     }
     
-    // Apply to all active calls
     for (const call of this.activeCalls) {
       try {
         if (mute === undefined) {
-          // Toggle current state
           if (call.isMuted()) {
             call.mute(false);
           } else {
             call.mute(true);
           }
         } else {
-          // Set to specific state
           call.mute(mute);
         }
       } catch (e) {
@@ -510,13 +472,10 @@ class TwilioService {
       }
     }
     
-    // Return current mute state of the first call
     return this.activeCalls[0].isMuted();
   }
 
   toggleSpeaker(speakerOn?: boolean): boolean {
-    // This is a placeholder as the Twilio Client SDK doesn't have direct speaker control
-    // Actual implementation would depend on specific UI requirements
     return speakerOn !== undefined ? speakerOn : true;
   }
 
@@ -528,7 +487,20 @@ class TwilioService {
     return this.activeCalls?.length || 0;
   }
 
+  onCallDisconnect(callback: () => void): () => void {
+    this.callDisconnectListeners.push(callback);
+    
+    return () => {
+      this.callDisconnectListeners = this.callDisconnectListeners.filter(
+        listener => listener !== callback
+      );
+    };
+  }
+
   cleanup(): void {
+    this.callDisconnectListeners.forEach(listener => listener());
+    this.callDisconnectListeners = [];
+    
     if (this.device) {
       try {
         this.hangupAllCalls()
@@ -549,5 +521,4 @@ class TwilioService {
   }
 }
 
-// Create a singleton instance
 export const twilioService = new TwilioService();
