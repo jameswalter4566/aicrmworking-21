@@ -83,7 +83,9 @@ class TwilioService {
       this.accessToken = token;
 
       try {
+        // Create device with DISABLED sounds initially to prevent HTTP audio loading issues
         this.twilioDevice = new Device(token, {
+          // Set sounds to false to prevent decoding errors from HTTP sources
           sounds: {
             incoming: false,
             outgoing: false,

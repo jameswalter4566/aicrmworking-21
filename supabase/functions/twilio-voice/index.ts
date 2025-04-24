@@ -167,8 +167,6 @@ serve(async (req) => {
       const callSid = requestData.CallSid ?? 'n/a';
       console.log(`Dial status for ${callSid}: ${dialStatus}`);
       
-      // TODO: if needed, write dialStatus back to Supabase here
-      
       // Always ACK with valid, empty TwiML so Twilio sees 200 OK
       return new Response('<Response/>', {
         headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
