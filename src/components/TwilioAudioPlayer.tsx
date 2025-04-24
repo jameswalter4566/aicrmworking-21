@@ -1,72 +1,95 @@
 
 import React, { useEffect, useRef, useState } from 'react';
+import { toast } from './ui/use-toast';
+import { getPreloadedAudio, playAudio } from '@/utils/audioPreloader';
 
 interface TwilioAudioPlayerProps {
   sound: string;
+  volume?: number;
+  autoPlay?: boolean;
+  loop?: boolean;
+  onEnded?: () => void;
 }
 
-/**
- * A component for playing audio files safely in the Twilio context
- * This avoids AudioContext issues by creating new audio elements each time
- */
-const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({ sound }) => {
-  const [audioLoaded, setAudioLoaded] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({
+  sound,
+  volume = 0.3,
+  autoPlay = false,
+  loop = false,
+  onEnded
+}) => {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(autoPlay);
 
   useEffect(() => {
-    // Create a new audio element each time to avoid reuse issues
-    const playSound = (url: string) => {
-      try {
-        // Clean up any previous audio elements
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
-        
-        // Create a fresh audio element
-        const audio = document.createElement('audio');
-        audio.src = url;
-        audio.preload = 'auto';
-        audio.style.display = 'none';
-        
-        // Add to DOM to ensure it loads
-        if (containerRef.current) {
-          containerRef.current.appendChild(audio);
-        }
+    try {
+      // Get the audio element from preloaded cache
+      const audioElement = getPreloadedAudio(sound);
+      
+      if (audioElement) {
+        // Configure the audio element
+        audioElement.volume = volume;
+        audioElement.loop = loop;
         
         // Set up event handlers
-        audio.oncanplaythrough = () => {
-          setAudioLoaded(true);
+        audioElement.onended = () => {
+          setIsPlaying(false);
+          if (onEnded) onEnded();
         };
         
-        audio.onerror = (event) => {
-          console.error('Audio error:', audio.error);
-          setAudioError(`Error loading audio: ${audio.error?.message || 'Unknown error'}`);
-          setAudioLoaded(false);
+        audioElement.onerror = (e) => {
+          console.error('Audio playback error:', e);
+          toast({
+            title: "Audio Error",
+            description: "Failed to play audio. Please try again.",
+            variant: "destructive",
+          });
         };
         
-        // Just preload for now - don't auto play
-        audio.load();
-      } catch (error) {
-        console.error('Error creating audio element:', error);
-        setAudioError(`Failed to create audio: ${error.message}`);
+        // Store the reference
+        audioRef.current = audioElement;
+        
+        // Auto-play if requested
+        if (autoPlay) {
+          audioElement.play().catch((err) => {
+            console.warn('Autoplay prevented:', err);
+            setIsPlaying(false);
+          });
+        }
       }
-    };
-    
-    if (sound) {
-      playSound(sound);
+    } catch (err) {
+      console.error('Error initializing audio player:', err);
     }
     
-    // Clean up function
+    // Cleanup function
     return () => {
-      if (containerRef.current) {
-        containerRef.current.innerHTML = '';
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.onended = null;
+        audioRef.current.onerror = null;
+        audioRef.current = null;
       }
     };
-  }, [sound]);
-  
-  // Hidden container for audio elements
-  return <div ref={containerRef} style={{ display: 'none' }} />;
+  }, [sound, volume, loop, autoPlay, onEnded]);
+
+  // Play/pause controls
+  const togglePlay = () => {
+    if (!audioRef.current) return;
+    
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play()
+        .then(() => setIsPlaying(true))
+        .catch(err => {
+          console.error('Error playing audio:', err);
+          setIsPlaying(false);
+        });
+    }
+  };
+
+  return null; // This is a non-visual component
 };
 
 export default TwilioAudioPlayer;
