@@ -13,21 +13,34 @@ const AuthRedirect = () => {
       try {
         console.log('Auth redirect page loaded. Checking session...');
         
+        const { data: hashData, error: hashError } = await supabase.auth.getSessionFromUrl();
+        
+        if (hashError) {
+          console.error('Error processing URL hash:', hashError);
+          throw hashError;
+        }
+        
+        if (hashData?.session) {
+          console.log('Session created from URL hash');
+          window.history.replaceState(null, document.title, window.location.pathname);
+          toast({
+            title: 'Successfully signed in',
+            description: `Welcome${hashData.session.user.user_metadata.name ? ', ' + hashData.session.user.user_metadata.name : ''}!`,
+          });
+          navigate('/settings');
+          return;
+        }
+
+        // Fallback to checking current session
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
-          console.error('Error getting session:', error);
-          toast({
-            variant: 'destructive',
-            title: 'Authentication Error',
-            description: error.message || 'Failed to complete authentication.',
-          });
-          navigate('/auth');
-          return;
+          console.error('Session error:', error);
+          throw error;
         }
         
         if (data?.session) {
-          console.log('Session found, redirecting to settings');
+          console.log('Active session found');
           toast({
             title: 'Successfully signed in',
             description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
@@ -37,12 +50,12 @@ const AuthRedirect = () => {
           console.log('No session found, redirecting to auth page');
           navigate('/auth');
         }
-      } catch (error) {
-        console.error('Unexpected error during redirect handling:', error);
+      } catch (error: any) {
+        console.error('Auth redirect error:', error);
         toast({
           variant: 'destructive',
           title: 'Authentication Error',
-          description: 'An unexpected error occurred. Please try signing in again.',
+          description: error.message || 'An unexpected error occurred. Please try signing in again.',
         });
         navigate('/auth');
       }

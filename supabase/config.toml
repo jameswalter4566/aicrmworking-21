@@ -1,4 +1,3 @@
-
 # This file controls the configuration for your Supabase project.
 # For more information, see: https://supabase.com/docs/guides/functions/config
 
@@ -31,10 +30,9 @@ file_size_limit = "50MiB"
 [auth]
 site_url = "https://mortgagesalespro.com"
 additional_redirect_urls = [
-  "https://localhost:3000", 
-  "http://localhost:3000", 
-  "https://preview--aicrmworking.lovable.app", 
-  "https://preview--aicrmworking.lovable.app/settings",
+  "https://mortgagesalespro.com",
+  "https://mortgagesalespro.com/auth",
+  "https://mortgagesalespro.com/auth-redirect",
   "https://mortgagesalespro.com/settings",
   "http://localhost:3000/settings",
   "http://localhost:3000/auth-redirect",

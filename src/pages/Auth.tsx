@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { z } from "zod";
@@ -38,32 +39,45 @@ const Auth = () => {
         try {
           console.log("Auth callback detected with hash:", location.hash.substring(0, 20) + "...");
           
-          const { data, error } = await supabase.auth.getSession();
+          // First try to get session from URL hash
+          const { data: hashData, error: hashError } = await supabase.auth.getSessionFromUrl();
           
-          if (error) {
-            console.error("Session error:", error);
-            throw error;
+          if (hashError) {
+            console.error("Error processing auth callback:", hashError);
+            throw hashError;
           }
           
-          if (data && data.session) {
-            console.log("Session found, user authenticated");
-            
+          if (hashData?.session) {
+            console.log("Session created from URL hash");
             window.history.replaceState(null, document.title, window.location.pathname);
-            
             toast({
               title: "Successfully signed in",
-              description: `Welcome${data.session.user.user_metadata.name ? ', ' + data.session.user.user_metadata.name : ''}!`,
+              description: `Welcome${hashData.session.user.user_metadata.name ? ', ' + hashData.session.user.user_metadata.name : ''}!`,
             });
-            
             navigate("/settings");
             return;
           }
+
+          // Fallback to checking current session
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          
+          if (sessionError) throw sessionError;
+          
+          if (sessionData?.session) {
+            console.log("Active session found");
+            window.history.replaceState(null, document.title, window.location.pathname);
+            toast({
+              title: "Successfully signed in",
+              description: `Welcome${sessionData.session.user.user_metadata.name ? ', ' + sessionData.session.user.user_metadata.name : ''}!`,
+            });
+            navigate("/settings");
+          }
         } catch (error: any) {
-          console.error("Error handling OAuth callback:", error);
+          console.error("Auth callback error:", error);
           toast({
             variant: "destructive",
             title: "Authentication Error",
-            description: error.message || "We couldn't complete the sign-in process. Please try again.",
+            description: error.message || "Failed to complete authentication.",
           });
         }
       }
@@ -136,38 +150,34 @@ const Auth = () => {
     setGoogleLoading(true);
     try {
       const origin = window.location.origin;
-      
       console.log("Starting Google sign-in. Origin:", origin);
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${origin}/auth-redirect`,
+          redirectTo: `${origin}/auth`,
           queryParams: {
             access_type: 'offline',
-            prompt: 'consent'
+            prompt: 'consent',
+            state: new Date().getTime().toString()
           }
         }
       });
 
-      if (error) {
-        console.error("Google signin error:", error);
-        throw error;
-      }
+      if (error) throw error;
 
       if (data?.url) {
         console.log("Redirecting to OAuth URL:", data.url);
         window.location.href = data.url;
       } else {
-        console.error("No redirect URL received from Supabase");
-        throw new Error("Failed to start Google authentication");
+        throw new Error("No redirect URL received from Supabase");
       }
-    } catch (error) {
-      console.error("Google sign-in failed:", error);
+    } catch (error: any) {
+      console.error("Google sign-in error:", error);
       toast({
         variant: "destructive",
-        title: "Error",
-        description: error.message || "An error occurred with Google sign in. Please try again.",
+        title: "Sign In Error",
+        description: error.message || "Failed to start Google sign in.",
       });
     } finally {
       setGoogleLoading(false);
