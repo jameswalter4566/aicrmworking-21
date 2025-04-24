@@ -38,7 +38,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
   const [processedPhoneNumbers, setProcessedPhoneNumbers] = useState<Set<string>>(new Set());
   const [blacklistedNumbers, setBlacklistedNumbers] = useState<Set<string>>(new Set());
-  const [dialingPaused, setDialingPaused] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -49,7 +48,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     currentPhoneNumber: null as string | null,
     callStartTime: 0,
     callAttempts: 0,
-    lastAttemptTime: 0,
   });
 
   // Track call attempts to prevent infinite looping
@@ -57,9 +55,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   
   // Track phone validation errors
   const phoneValidationErrors = useRef<Record<string, boolean>>({});
-
-  // Add a cooldown between call attempts to prevent rate limiting 
-  const callCooldownMs = 3000; // 3 second cooldown between call attempts
 
   const fixDatabaseFunction = useCallback(async () => {
     try {
@@ -160,12 +155,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       console.log(`Phone number ${phone} is blacklisted, skipping`);
       return false;
     }
-
-    // Check if we've already processed this number
-    if (processedPhoneNumbers.has(phone) || processedPhoneNumbers.has(digitsOnly)) {
-      console.log(`Phone number ${phone} was already called in this session, skipping`);
-      return false;
-    }
     
     // Check minimum length (10 digits for US numbers)
     if (digitsOnly.length < 10) {
@@ -175,7 +164,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
     
     return true;
-  }, [blacklistedNumbers, processedPhoneNumbers]);
+  }, [blacklistedNumbers]);
 
   const getNextLead = useCallback(async () => {
     if (!sessionId) return null;
@@ -409,29 +398,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, []);
 
-  const isTimeToDial = useCallback(() => {
-    const now = Date.now();
-    const timeSinceLastAttempt = now - callStateRef.current.lastAttemptTime;
-    
-    // Ensure we're respecting the cooldown period to prevent rate limiting
-    return timeSinceLastAttempt > callCooldownMs;
-  }, [callCooldownMs]);
-
   const processNextLead = useCallback(async () => {
-    // Check if we're allowed to make calls
-    if (isProcessingCall || !isActive || !sessionId || noMoreLeads || dialingPaused) {
+    if (isProcessingCall || !isActive || !sessionId || noMoreLeads) {
       if (noMoreLeads && isActive) {
         toast({
           title: "All Leads Processed",
           description: "All leads in the session have been dialed",
         });
       }
-      return;
-    }
-    
-    // Check if we need to wait before making another call (cooldown period)
-    if (!isTimeToDial()) {
-      console.log('Waiting for call cooldown period before dialing next lead...');
       return;
     }
     
@@ -483,31 +457,20 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Format phone number to ensure consistency
-      const formattedPhone = phoneNumber.replace(/\D/g, '');
-
-      // Check if phone number is already blacklisted
-      if (blacklistedNumbers.has(formattedPhone) || blacklistedNumbers.has(phoneNumber)) {
-        console.log(`Phone number ${phoneNumber} is already blacklisted, marking as failed and skipping`);
-        await updateLeadStatus(lead.id, 'failed', `Phone number is blacklisted and cannot be called`);
-        setIsProcessingCall(false);
-        onCallComplete();
-        return;
-      }
-
-      // Check if phone number was already processed in this session
-      if (processedPhoneNumbers.has(formattedPhone) || processedPhoneNumbers.has(phoneNumber)) {
-        console.log(`Already called ${phoneNumber} in this session, marking as completed and skipping`);
-        await updateLeadStatus(lead.id, 'completed', 'Phone number already called in this session');
-        setIsProcessingCall(false);
-        onCallComplete();
-        return;
-      }
-
       // Check if phone number is valid
       if (!isValidPhoneNumber(phoneNumber)) {
         console.log(`Invalid phone number ${phoneNumber}, marking as failed and skipping`);
+        
         await updateLeadStatus(lead.id, 'failed', `Invalid phone number: ${phoneNumber}`);
+        setIsProcessingCall(false);
+        onCallComplete();
+        return;
+      }
+
+      // Skip if we've already called this number
+      if (processedPhoneNumbers.has(phoneNumber)) {
+        console.log(`Already called ${phoneNumber}, marking as completed and skipping`);
+        await updateLeadStatus(lead.id, 'completed', 'Phone number already called in this session');
         setIsProcessingCall(false);
         onCallComplete();
         return;
@@ -515,14 +478,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
 
       // Track this lead and phone number
       setCurrentLeadId(lead.id);
-      
-      // Add both the formatted and original phone number to the set
-      const newProcessedNumbers = new Set(processedPhoneNumbers);
-      newProcessedNumbers.add(formattedPhone);
-      if (phoneNumber !== formattedPhone) {
-        newProcessedNumbers.add(phoneNumber);
-      }
-      setProcessedPhoneNumbers(newProcessedNumbers);
+      setProcessedPhoneNumbers(prev => new Set(prev).add(phoneNumber!));
       
       // Update call state ref for tracking
       callStateRef.current = {
@@ -531,7 +487,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         currentPhoneNumber: phoneNumber,
         callStartTime: Date.now(),
         callAttempts: 0,
-        lastAttemptTime: Date.now(),
       };
 
       // Initialize Twilio and make the call
@@ -549,13 +504,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         if (isBlacklistedError) {
           console.log(`Phone number ${phoneNumber} is blacklisted by Twilio, adding to blacklist`);
           
-          // Add both formatted and original versions to blacklist
-          const newBlacklist = new Set(blacklistedNumbers);
-          newBlacklist.add(formattedPhone);
-          if (phoneNumber !== formattedPhone) {
-            newBlacklist.add(phoneNumber);
-          }
-          setBlacklistedNumbers(newBlacklist);
+          // Add to blacklisted numbers
+          setBlacklistedNumbers(prev => new Set(prev).add(phoneNumber!));
           
           toast({
             title: "Blacklisted Number",
@@ -607,33 +557,20 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       setIsProcessingCall(false);
       onCallComplete();
     }
-  }, [
-    isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, 
-    toast, onCallComplete, noMoreLeads, processedPhoneNumbers, isValidPhoneNumber,
-    blacklistedNumbers, dialingPaused, isTimeToDial
-  ]);
+  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads, processedPhoneNumbers, isValidPhoneNumber]);
 
   const handleCallCompletion = useCallback(async (errorCode?: number) => {
     if (callStateRef.current.currentLeadId) {
       // If we have an error code that indicates blacklisted number, add to blacklist
-      if ((errorCode === 13225 || (errorCode && errorCode.toString().includes('13225'))) && callStateRef.current.currentPhoneNumber) {
+      if (errorCode === 13225 && callStateRef.current.currentPhoneNumber) {
         console.log(`Adding phone number ${callStateRef.current.currentPhoneNumber} to blacklist due to error code ${errorCode}`);
-        
-        const formattedPhone = callStateRef.current.currentPhoneNumber.replace(/\D/g, '');
-        setBlacklistedNumbers(prev => {
-          const newSet = new Set(prev);
-          newSet.add(formattedPhone);
-          if (formattedPhone !== callStateRef.current.currentPhoneNumber) {
-            newSet.add(callStateRef.current.currentPhoneNumber!);
-          }
-          return newSet;
-        });
+        setBlacklistedNumbers(prev => new Set(prev).add(callStateRef.current.currentPhoneNumber!));
         
         // Update lead with error details
         await updateLeadStatus(
           callStateRef.current.currentLeadId, 
           'failed', 
-          `Phone number blacklisted: Twilio error ${errorCode}`
+          `Phone number blacklisted: Twilio error 13225`
         );
       } else {
         // Regular call completion
@@ -654,11 +591,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     
     const handleCallDisconnect = async (error?: { code?: number }) => {
       console.log('Call disconnected event received', error ? `with error code: ${error.code}` : '');
-      
-      // Add a small delay to ensure we don't immediately redial
-      setTimeout(async () => {
-        await handleCallCompletion(error?.code);
-      }, 1000);
+      await handleCallCompletion(error?.code);
     };
     
     const cleanupListener = twilioService.onCallDisconnect(handleCallDisconnect);
@@ -687,35 +620,21 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           const newStatus = payload.new.status;
           if (newStatus === 'completed' || newStatus === 'failed') {
             setNoMoreLeads(false);
-            
-            // Only process the next lead if we're not already processing and enough time has passed
-            if (!isProcessingCall && isTimeToDial()) {
-              processNextLead();
-            } else {
-              console.log('Call status changed but waiting for cooldown or current call to complete');
-            }
+            processNextLead();
           }
         }
       )
       .subscribe();
 
     // Start the dialer if it's not already processing a call and there are leads
-    if (!isProcessingCall && !noMoreLeads && isTimeToDial()) {
+    if (!isProcessingCall && !noMoreLeads) {
       processNextLead();
-    } else if (!isTimeToDial()) {
-      // Schedule next attempt after cooldown period
-      const timeToNextCall = callCooldownMs - (Date.now() - callStateRef.current.lastAttemptTime);
-      setTimeout(() => {
-        if (isActive && !isProcessingCall && !noMoreLeads) {
-          processNextLead();
-        }
-      }, Math.max(100, timeToNextCall));
     }
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [sessionId, isActive, processNextLead, isProcessingCall, noMoreLeads, isTimeToDial, callCooldownMs]);
+  }, [sessionId, isActive, processNextLead, isProcessingCall, noMoreLeads]);
 
   // Reset the processed phone numbers when session changes
   useEffect(() => {
@@ -723,14 +642,12 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       setProcessedPhoneNumbers(new Set());
       setBlacklistedNumbers(new Set());
       setNoMoreLeads(false);
-      setDialingPaused(false);
       callStateRef.current = {
         isActiveCall: false,
         currentLeadId: null,
         currentPhoneNumber: null,
         callStartTime: 0,
         callAttempts: 0,
-        lastAttemptTime: 0,
       };
     }
   }, [sessionId]);

@@ -1,62 +1,47 @@
 
-# A string used as a base for generating API URLs.
-# Make sure this matches the URL of your deployed Supabase project.
 project_id = "imrmboyczebjlbnkgjns"
 
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
+schemas = ["public", "storage", "graphql_public"]
 
 [db]
 port = 54322
-shadow_port = 54320
-major_version = 15
-
-[db.pooler]
-enabled = false
-port = 54329
-pool_mode = "transaction"
-default_pool_size = 15
-max_client_conn = 100
-
-[realtime]
-enabled = true
-ip_version = "IPv6"
-
-[storage]
-enabled = true
 
 [studio]
 enabled = true
 port = 54323
 
-# These configs affect edge functions
-[functions]
+[inbucket]
 enabled = true
+port = 54324
 
-# This function needs to be public to handle Twilio webhook callbacks
+[storage]
+enabled = true
+port = 54325
+
+[auth]
+enabled = true
+port = 54326
+
+[realtime]
+enabled = true
+port = 54327
+
+[analytics]
+enabled = true
+port = 54328
+
+[vector]
+enabled = true
+port = 54329
+
 [functions.twilio-token]
 verify_jwt = false
 
-# This function needs to be public to handle Twilio voice calls
 [functions.twilio-voice]
 verify_jwt = false
 
-# Added fix for these functions that need to be public
-[functions.sms-webhook-receiver]
+[functions.twilio-stream]
 verify_jwt = false
-
-[functions.ai-sms-agent]
-verify_jwt = false
-
-# Additional settings
-[auth]
-enabled = true
-
-[auth.email]
-enable_confirmations = false
-double_confirm_changes = false
-enable_signup = true
