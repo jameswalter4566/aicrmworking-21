@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useCallback } from 'react';
 import { twilioService } from "@/services/twilio";
 import { supabase } from "@/integrations/supabase/client";
@@ -158,7 +157,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         if (error) {
           console.error('Error calling get_next_session_lead:', error);
           
-          // Handle various error conditions, including the structure mismatch
           if ((error.message?.includes('ambiguous') || error.code === '42702' || error.code === '42804') && fixAttemptCount < 3) {
             setFixAttemptCount(count => count + 1);
             const fixed = await fixDatabaseFunction();
@@ -228,16 +226,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
 
   const extractPhoneNumberFromNotes = (notesStr: string): string | null => {
     try {
-      // Try to parse the notes as JSON
       const notesData = JSON.parse(notesStr || '{}');
       
-      // Check if we have a phone in the notes
       if (notesData.phone && typeof notesData.phone === 'string') {
         const phone = notesData.phone.trim();
         if (phone) return phone;
       }
       
-      // Check for mobile phone or any other phone fields
       if (notesData.mobile) return notesData.mobile;
       if (notesData.phoneNumber) return notesData.phoneNumber;
       if (notesData.mobilePhone) return notesData.mobilePhone;
@@ -253,7 +248,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const processFetchedLead = (lead: SessionLead): ProcessedSessionLead => {
     let phoneNumber = null;
     
-    // First try to extract phone from notes
     if (lead.notes) {
       phoneNumber = extractPhoneNumberFromNotes(lead.notes);
       if (phoneNumber) {
@@ -266,7 +260,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       phoneNumber,
       getLeadDetails: async () => {
         try {
-          // First check if we can get original lead ID from notes
           if (lead.notes) {
             try {
               const notesData = JSON.parse(lead.notes);
@@ -274,7 +267,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               
               if (originalLeadId) {
                 console.log('Using originalLeadId from notes:', originalLeadId);
-                // Since originalLeadId from notes is likely numeric, we use eq
                 const { data: leadData, error: leadError } = await supabase
                   .from('leads')
                   .select('id, phone1')
@@ -291,7 +283,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             }
           }
           
-          // Try to find by string ID
           try {
             const { data: foundLead, error } = await supabase
               .rpc('find_lead_by_string_id', {
@@ -309,7 +300,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             console.error('Error using find_lead_by_string_id:', lookupError);
           }
 
-          // As a fallback, try direct query on leads table using lead_id
           try {
             const { data: directLead, error: directError } = await supabase
               .from('leads')
@@ -328,13 +318,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
             console.error('Error with direct lead lookup:', directError);
           }
 
-          // If all lookups fail, try to use phone from notes as last resort
           if (phoneNumber) {
             console.log('Using phone number from notes as fallback');
             return { id: lead.lead_id, phone1: phoneNumber };
           }
           
-          // Last fallback - use the lead_id but we couldn't find a phone
           console.log('Could not find phone number for lead ID:', lead.lead_id);
           return { id: lead.lead_id, phone1: null };
         } catch (error) {
@@ -375,24 +363,20 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Try to get phone number directly from lead
       let phoneNumber = lead.phoneNumber;
       
-      // If we don't have a phone number yet, try to get it from lead details
       if (!phoneNumber && lead.getLeadDetails) {
         const leadDetails = await lead.getLeadDetails();
         phoneNumber = leadDetails?.phone1 || null;
       }
 
-      // If still no phone number, update the lead status and notify
       if (!phoneNumber) {
         console.log(`No phone number found for lead ${lead.lead_id}`);
         
-        // When testing, we can use a fallback number instead of failing
-        const useFallbackNumber = true; // Set to false in production
+        const useFallbackNumber = true;
         
         if (useFallbackNumber) {
-          phoneNumber = "+15551234567"; // Test number
+          phoneNumber = "+15551234567";
           console.log(`Using fallback test number: ${phoneNumber}`);
           toast({
             title: "Test Mode",
@@ -422,7 +406,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         }
       }
 
-      // Initialize Twilio Device before attempting call
       const deviceInitialized = await twilioService.initializeTwilioDevice();
       
       if (!deviceInitialized || !twilioService.isDeviceRegistered()) {
@@ -448,7 +431,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Check microphone access
       if (!twilioService.isMicrophoneActive()) {
         toast({
           title: "Microphone Required",
@@ -472,13 +454,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
-      // Format phone number if needed
       let formattedPhoneNumber = phoneNumber;
       if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
         formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
       }
 
-      // Directly use Twilio Device for browser-based calling
       if (!window.Twilio?.Device) {
         toast({
           title: "Browser Phone Error",
@@ -505,7 +485,6 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       try {
         console.log(`Making browser-based call to ${formattedPhoneNumber} for lead ${lead.lead_id}`);
         
-        // Use the twilioService for more robust call handling
         const callResult = await twilioService.makeCall(formattedPhoneNumber, lead.lead_id);
         
         if (callResult.success) {
