@@ -23,12 +23,6 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({ sound }) => {
           containerRef.current.innerHTML = '';
         }
         
-        // Don't attempt to play sounds if URL is empty
-        if (!url) {
-          console.log("No sound URL provided, skipping audio playback");
-          return;
-        }
-
         // Create a fresh audio element
         const audio = document.createElement('audio');
         audio.src = url;
@@ -49,11 +43,6 @@ const TwilioAudioPlayer: React.FC<TwilioAudioPlayerProps> = ({ sound }) => {
           console.error('Audio error:', audio.error);
           setAudioError(`Error loading audio: ${audio.error?.message || 'Unknown error'}`);
           setAudioLoaded(false);
-          
-          // Remove the problematic audio element
-          if (containerRef.current && containerRef.current.contains(audio)) {
-            containerRef.current.removeChild(audio);
-          }
         };
         
         // Just preload for now - don't auto play

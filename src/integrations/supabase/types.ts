@@ -1091,13 +1091,6 @@ export type Database = {
       }
     }
     Functions: {
-      find_lead_by_string_id: {
-        Args: { lead_string_id: string }
-        Returns: {
-          id: number
-          phone1: string
-        }[]
-      }
       get_next_session_lead: {
         Args: { p_session_id: string }
         Returns: {
@@ -1107,7 +1100,6 @@ export type Database = {
           status: string
           priority: number
           attempt_count: number
-          notes: string
         }[]
       }
     }
