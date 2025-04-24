@@ -21,7 +21,22 @@ Deno.serve(async (req) => {
   try {
     console.log("Starting to fix the get_next_session_lead function");
     
-    // Updated approach - ensure ALL column references are fully qualified with table names
+    // First, drop the existing function to avoid any conflicts
+    const dropFunctionResponse = await fetch(`${supabaseUrl}/rest/v1/sql`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseAnonKey}`,
+        'apikey': supabaseAnonKey,
+      },
+      body: JSON.stringify({
+        query: `DROP FUNCTION IF EXISTS public.get_next_session_lead(uuid);`
+      })
+    });
+    
+    console.log('Drop function response status:', dropFunctionResponse.status);
+    
+    // Updated approach - ensure proper uuid type for lead_id
     const updateFunctionResponse = await fetch(`${supabaseUrl}/rest/v1/sql`, {
       method: 'POST',
       headers: {
@@ -32,7 +47,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         query: `
         CREATE OR REPLACE FUNCTION public.get_next_session_lead(p_session_id uuid)
-        RETURNS TABLE(id uuid, lead_id text, session_id uuid, status text, priority integer, attempt_count integer, notes text)
+        RETURNS TABLE(id uuid, lead_id uuid, session_id uuid, status text, priority integer, attempt_count integer, notes text)
         LANGUAGE plpgsql
         SECURITY DEFINER
         AS $function$
@@ -56,7 +71,7 @@ Deno.serve(async (req) => {
             RETURN QUERY
             SELECT 
               v_lead_record.id,
-              v_lead_record.lead_id,
+              v_lead_record.lead_id::uuid,  -- Explicitly cast to UUID
               v_lead_record.session_id,
               'in_progress'::text AS status,
               v_lead_record.priority,
@@ -87,11 +102,14 @@ Deno.serve(async (req) => {
     
     console.log('Test function call result:', testResponse.error ? `Error: ${testResponse.error.message}` : 'Success');
     
-    if (testResponse.error && testResponse.error.message.includes('ambiguous')) {
-      console.error('Function still has ambiguous column reference:', testResponse.error);
+    if (testResponse.error && 
+       (testResponse.error.message.includes('ambiguous') || 
+        testResponse.error.code === '42702' || 
+        testResponse.error.code === '42804')) {
+      console.error('Function still has an error:', testResponse.error);
       return new Response(JSON.stringify({ 
         success: false, 
-        error: 'Function still has ambiguous column reference after update attempt.',
+        error: 'Function still has an error after update attempt.',
         details: testResponse.error
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -102,7 +120,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       message: "Database function fixed successfully",
-      details: "All column references are now fully qualified to resolve ambiguity"
+      details: "Updated lead_id type to UUID with proper casting"
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
