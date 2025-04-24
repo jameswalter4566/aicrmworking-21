@@ -37,6 +37,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const [fixAttemptCount, setFixAttemptCount] = useState(0);
   const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
   const [processedPhoneNumbers, setProcessedPhoneNumbers] = useState<Set<string>>(new Set());
+  const [blacklistedNumbers, setBlacklistedNumbers] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -46,7 +47,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     currentLeadId: null as string | null,
     currentPhoneNumber: null as string | null,
     callStartTime: 0,
+    callAttempts: 0,
   });
+
+  // Track call attempts to prevent infinite looping
+  const maxCallAttempts = useRef(3);
+  
+  // Track phone validation errors
+  const phoneValidationErrors = useRef<Record<string, boolean>>({});
 
   const fixDatabaseFunction = useCallback(async () => {
     try {
@@ -134,6 +142,29 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       return null;
     }
   }, [user?.id, toast]);
+
+  // Function to validate phone numbers
+  const isValidPhoneNumber = useCallback((phone: string | null) => {
+    if (!phone) return false;
+    
+    // Basic phone number validation: at least 10 digits, ignoring any formatting characters
+    const digitsOnly = phone.replace(/\D/g, '');
+    
+    // Check if number is in the blacklisted set
+    if (blacklistedNumbers.has(phone) || blacklistedNumbers.has(digitsOnly)) {
+      console.log(`Phone number ${phone} is blacklisted, skipping`);
+      return false;
+    }
+    
+    // Check minimum length (10 digits for US numbers)
+    if (digitsOnly.length < 10) {
+      console.log(`Phone number ${phone} is too short (${digitsOnly.length} digits), needs at least 10`);
+      phoneValidationErrors.current[phone] = true;
+      return false;
+    }
+    
+    return true;
+  }, [blacklistedNumbers]);
 
   const getNextLead = useCallback(async () => {
     if (!sessionId) return null;
@@ -309,11 +340,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     return processedLead;
   };
 
-  const updateLeadStatus = useCallback(async (leadId: string, status: string) => {
+  const updateLeadStatus = useCallback(async (leadId: string, status: string, errorDetails?: string) => {
     if (!leadId) return false;
     
     try {
-      console.log(`Updating lead ${leadId} to status: ${status}`);
+      console.log(`Updating lead ${leadId} to status: ${status}${errorDetails ? ' with error: ' + errorDetails : ''}`);
       
       // First, get the current notes
       const { data: leadData, error: fetchError } = await supabase
@@ -338,10 +369,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         // Continue with empty object if parsing fails
       }
       
-      // Update notes with call completion timestamp
+      // Update notes with call completion timestamp and any error details
       const updatedNotes = {
         ...notesObj,
-        callCompletedAt: new Date().toISOString()
+        callCompletedAt: new Date().toISOString(),
+        ...(errorDetails ? { errorDetails } : {})
       };
       
       // Update the lead status and notes
@@ -386,6 +418,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         setCurrentLeadId(null);
       }
       
+      // Reset call attempt counter for new lead
+      callStateRef.current.callAttempts = 0;
+      
       // Get next lead
       const lead = await getNextLead();
       
@@ -416,7 +451,17 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           variant: "destructive",
         });
         
-        await updateLeadStatus(lead.id, 'failed');
+        await updateLeadStatus(lead.id, 'failed', 'Missing phone number');
+        setIsProcessingCall(false);
+        onCallComplete();
+        return;
+      }
+
+      // Check if phone number is valid
+      if (!isValidPhoneNumber(phoneNumber)) {
+        console.log(`Invalid phone number ${phoneNumber}, marking as failed and skipping`);
+        
+        await updateLeadStatus(lead.id, 'failed', `Invalid phone number: ${phoneNumber}`);
         setIsProcessingCall(false);
         onCallComplete();
         return;
@@ -425,7 +470,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       // Skip if we've already called this number
       if (processedPhoneNumbers.has(phoneNumber)) {
         console.log(`Already called ${phoneNumber}, marking as completed and skipping`);
-        await updateLeadStatus(lead.id, 'completed');
+        await updateLeadStatus(lead.id, 'completed', 'Phone number already called in this session');
         setIsProcessingCall(false);
         onCallComplete();
         return;
@@ -441,6 +486,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         currentLeadId: lead.id,
         currentPhoneNumber: phoneNumber,
         callStartTime: Date.now(),
+        callAttempts: 0,
       };
 
       // Initialize Twilio and make the call
@@ -450,13 +496,30 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
       
       if (!callResult.success) {
-        toast({
-          title: "Call Failed",
-          description: callResult.error || "Failed to place call",
-          variant: "destructive",
-        });
+        // Check if this is a blacklist error (Twilio error code 13225)
+        if (callResult.error?.includes('blacklisted') || callResult.twilioErrorCode === 13225) {
+          console.log(`Phone number ${phoneNumber} is blacklisted by Twilio, adding to blacklist`);
+          
+          // Add to blacklisted numbers
+          setBlacklistedNumbers(prev => new Set(prev).add(phoneNumber!));
+          
+          toast({
+            title: "Blacklisted Number",
+            description: `The phone number ${phoneNumber} is blacklisted by Twilio and cannot be called`,
+            variant: "destructive",
+          });
+          
+          await updateLeadStatus(lead.id, 'failed', `Phone number blacklisted: ${callResult.error || 'Twilio error 13225'}`);
+        } else {
+          toast({
+            title: "Call Failed",
+            description: callResult.error || "Failed to place call",
+            variant: "destructive",
+          });
+          
+          await updateLeadStatus(lead.id, 'failed', callResult.error || "Unknown error");
+        }
         
-        await updateLeadStatus(lead.id, 'failed');
         setIsProcessingCall(false);
         onCallComplete();
         callStateRef.current.isActiveCall = false;
@@ -490,11 +553,26 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       setIsProcessingCall(false);
       onCallComplete();
     }
-  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads, processedPhoneNumbers]);
+  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads, processedPhoneNumbers, isValidPhoneNumber]);
 
-  const handleCallCompletion = useCallback(async () => {
+  const handleCallCompletion = useCallback(async (errorCode?: number) => {
     if (callStateRef.current.currentLeadId) {
-      await updateLeadStatus(callStateRef.current.currentLeadId, 'completed');
+      // If we have an error code that indicates blacklisted number, add to blacklist
+      if (errorCode === 13225 && callStateRef.current.currentPhoneNumber) {
+        console.log(`Adding phone number ${callStateRef.current.currentPhoneNumber} to blacklist due to error code ${errorCode}`);
+        setBlacklistedNumbers(prev => new Set(prev).add(callStateRef.current.currentPhoneNumber!));
+        
+        // Update lead with error details
+        await updateLeadStatus(
+          callStateRef.current.currentLeadId, 
+          'failed', 
+          `Phone number blacklisted: Twilio error 13225`
+        );
+      } else {
+        // Regular call completion
+        await updateLeadStatus(callStateRef.current.currentLeadId, 'completed');
+      }
+      
       setCurrentLeadId(null);
       callStateRef.current.isActiveCall = false;
     }
@@ -507,9 +585,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   useEffect(() => {
     if (!twilioService || !isActive) return;
     
-    const handleCallDisconnect = async () => {
-      console.log('Call disconnected event received');
-      await handleCallCompletion();
+    const handleCallDisconnect = async (error?: { code?: number }) => {
+      console.log('Call disconnected event received', error ? `with error code: ${error.code}` : '');
+      await handleCallCompletion(error?.code);
     };
     
     const cleanupListener = twilioService.onCallDisconnect(handleCallDisconnect);
@@ -558,12 +636,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   useEffect(() => {
     if (sessionId) {
       setProcessedPhoneNumbers(new Set());
+      setBlacklistedNumbers(new Set());
       setNoMoreLeads(false);
       callStateRef.current = {
         isActiveCall: false,
         currentLeadId: null,
         currentPhoneNumber: null,
         callStartTime: 0,
+        callAttempts: 0,
       };
     }
   }, [sessionId]);
