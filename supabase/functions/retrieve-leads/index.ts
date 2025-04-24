@@ -72,18 +72,32 @@ Deno.serve(async (req) => {
     
     console.log(`Retrieving leads with parameters:`, requestBody);
     
-    // Get total lead count first (for debugging)
-    const { count: totalLeadCount, error: countError } = await supabase
-      .from('leads')
-      .select('*', { count: 'exact', head: true });
-      
-    if (countError) {
-      console.error('Error counting total leads:', countError.message);
-    } else {
-      console.log(`Total leads in database: ${totalLeadCount}`);
+    // SECURITY CHECK: If not authenticated, return an empty array
+    if (!isAuthenticated) {
+      console.log('User is not authenticated. Returning empty array for security.');
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          data: [],
+          metadata: {
+            userId: 'anonymous',
+            isAuthenticated: false,
+            totalLeadCount: 0,
+            userLeadCount: 0,
+            source: requestBody.source,
+            industryFilter: requestBody.industryFilter,
+            leadId: requestBody.leadId,
+            retrievedCount: 0
+          }
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        }
+      );
     }
     
-    // Get user-specific count if authenticated
+    // Get user-specific count
     let userLeadCount = 0;
     if (userId) {
       const { count, error: userCountError } = await supabase
@@ -102,24 +116,23 @@ Deno.serve(async (req) => {
     // Fetch leads based on parameters and authentication status
     let leads = [];
     
-    // If specific leadId is provided, prioritize that
+    // If specific leadId is provided, prioritize that - but still ensure it belongs to the authenticated user
     if (requestBody.leadId) {
       console.log(`Fetching specific lead ID: ${requestBody.leadId}`);
-      leads = await fetchLeadById(requestBody.leadId);
+      leads = await fetchLeadById(requestBody.leadId, userId);
       
       if (leads.length === 0) {
-        console.log(`Lead ID ${requestBody.leadId} not found, falling back to regular search`);
+        console.log(`Lead ID ${requestBody.leadId} not found for this user, returning empty array`);
       } else {
-        console.log(`Found lead with ID: ${requestBody.leadId}`);
+        console.log(`Found lead with ID: ${requestBody.leadId} belonging to user: ${userId}`);
       }
-    } else if (isAuthenticated && userLeadCount === 0 && totalLeadCount > 0) {
-      console.log("User has no leads but there are leads in the database. Fetching all leads for testing purposes.");
-      leads = await fetchAllLeads(userId, requestBody.source, requestBody.industryFilter);
     } else {
+      // CRITICAL SECURITY FIX: Always fetch only the authenticated user's leads
+      // The previous issue was here - we were fetching all leads when a user had none
       leads = await fetchLeadsFromSupabase(userId, requestBody.source, requestBody.industryFilter);
     }
     
-    console.log(`Successfully retrieved ${leads.length} leads out of ${userId ? userLeadCount : totalLeadCount} total`);
+    console.log(`Successfully retrieved ${leads.length} leads for user: ${userId}`);
     
     // Return the response
     return new Response(
@@ -129,8 +142,8 @@ Deno.serve(async (req) => {
         metadata: {
           userId: userId || 'anonymous',
           isAuthenticated,
-          totalLeadCount: totalLeadCount || 0,
-          userLeadCount: userLeadCount || 0,
+          totalLeadCount: userLeadCount, // Only count the user's own leads
+          userLeadCount: userLeadCount,
           source: requestBody.source,
           industryFilter: requestBody.industryFilter,
           leadId: requestBody.leadId,
@@ -164,17 +177,18 @@ Deno.serve(async (req) => {
   }
 });
 
-// New function to fetch a specific lead by ID
-async function fetchLeadById(leadId) {
+// Function to fetch a specific lead by ID - with security check for user ownership
+async function fetchLeadById(leadId, userId) {
   try {
-    console.log(`Starting fetchLeadById for ID: ${leadId}`);
+    console.log(`Starting fetchLeadById for ID: ${leadId} - Ensuring it belongs to user: ${userId}`);
     
-    // Initialize query to the leads table
+    // Initialize query to the leads table WITH security check for user ownership
     let query = supabase.from('leads')
       .select('*')
-      .eq('id', leadId);
+      .eq('id', leadId)
+      .eq('created_by', userId); // CRITICAL: Only fetch leads created by this user
     
-    console.log('Executing Supabase query for specific lead ID...');
+    console.log('Executing Supabase query for specific lead ID with ownership check...');
     const { data, error } = await query;
     
     if (error) {
@@ -183,12 +197,12 @@ async function fetchLeadById(leadId) {
     }
     
     // Log raw data for debugging
-    console.log(`Raw query returned ${data?.length || 0} results for ID ${leadId}`);
+    console.log(`Raw query returned ${data?.length || 0} results for ID ${leadId} belonging to user ${userId}`);
     if (data && data.length > 0) {
-      console.log(`Found lead with ID ${leadId}:`, JSON.stringify(data[0].id, null, 2));
+      console.log(`Found lead with ID ${leadId} for user ${userId}:`, JSON.stringify(data[0].id, null, 2));
     } else {
-      console.log(`No lead found with ID: ${leadId}`);
-      // Return empty array if no lead found with this ID
+      console.log(`No lead found with ID: ${leadId} for user: ${userId}`);
+      // Return empty array if no lead found with this ID for this user
       return [];
     }
     
@@ -213,7 +227,7 @@ async function fetchLeadById(leadId) {
       mortgageData: lead.mortgage_data
     }));
     
-    console.log(`Transformed ${transformedLeads.length} leads for ID ${leadId}`);
+    console.log(`Transformed ${transformedLeads.length} leads for ID ${leadId} belonging to user ${userId}`);
     if (transformedLeads.length > 0) {
       console.log(`Lead ${leadId} name: ${transformedLeads[0].firstName} ${transformedLeads[0].lastName}`);
     }
@@ -226,10 +240,16 @@ async function fetchLeadById(leadId) {
   }
 }
 
-// Function to fetch leads from Supabase with user filtering
+// Function to fetch leads from Supabase with user filtering - ALWAYS filtered by user ID
 async function fetchLeadsFromSupabase(userId, source = 'all', industryFilter = null) {
   try {
     console.log(`Starting fetchLeadsFromSupabase - userId: ${userId || 'anonymous'}, source: ${source}, industryFilter: ${industryFilter || 'none'}`);
+    
+    // SECURITY CRITICAL: If no userId is provided, return empty array
+    if (!userId) {
+      console.log('No userId provided, returning empty array for security');
+      return [];
+    }
     
     // Initialize query to the leads table
     let query = supabase.from('leads').select('*');
@@ -249,15 +269,11 @@ async function fetchLeadsFromSupabase(userId, source = 'all', industryFilter = n
       query = query.eq('is_mortgage_lead', true);
     }
     
-    // If user is authenticated, filter by their user ID
-    if (userId) {
-      console.log(`Filtering leads for user: ${userId}`);
-      query = query.eq('created_by', userId);
-    } else {
-      console.log('Retrieving all leads (no user filtering)');
-    }
+    // CRITICAL SECURITY FIX: ALWAYS filter by user ID
+    console.log(`Filtering leads for user: ${userId}`);
+    query = query.eq('created_by', userId);
     
-    console.log('Executing Supabase query...');
+    console.log('Executing Supabase query with proper security filters...');
     const { data, error } = await query;
     
     if (error) {
@@ -268,9 +284,9 @@ async function fetchLeadsFromSupabase(userId, source = 'all', industryFilter = n
     // Log raw data for debugging
     console.log(`Raw query returned ${data?.length || 0} results`);
     if (data && data.length > 0) {
-      console.log('First lead sample:', JSON.stringify(data[0], null, 2));
+      console.log('First lead sample:', JSON.stringify(data[0].id, null, 2));
     } else {
-      console.log('No leads found in query result');
+      console.log('No leads found in query result - this is expected for new users');
     }
     
     // Transform the data to match the expected format
@@ -294,8 +310,7 @@ async function fetchLeadsFromSupabase(userId, source = 'all', industryFilter = n
       mortgageData: lead.mortgage_data
     }));
     
-    console.log(`Transformed ${transformedLeads.length} leads`);
-    console.log("Sample transformed lead:", transformedLeads.length > 0 ? JSON.stringify(transformedLeads[0]) : "No leads");
+    console.log(`Transformed ${transformedLeads.length} leads for user ${userId}`);
     
     return transformedLeads;
   } catch (error) {
@@ -305,76 +320,4 @@ async function fetchLeadsFromSupabase(userId, source = 'all', industryFilter = n
   }
 }
 
-// Function to fetch all leads regardless of user ID for testing purposes
-// Only used when a user has no leads but there are leads in the database
-async function fetchAllLeads(userId, source = 'all', industryFilter = null) {
-  try {
-    console.log(`Starting fetchAllLeads (testing mode) for user: ${userId || 'anonymous'}`);
-    
-    // Initialize query to the leads table
-    let query = supabase.from('leads').select('*');
-    
-    // Add ordering
-    query = query.order('created_at', { ascending: false });
-    
-    // Apply source filtering if needed
-    if (source !== 'all') {
-      console.log(`Filtering by source: ${source}`);
-      // Implement source filtering logic if needed
-    }
-    
-    // Apply industry filtering if specified
-    if (industryFilter === 'mortgage') {
-      console.log('Filtering for mortgage leads');
-      query = query.eq('is_mortgage_lead', true);
-    }
-    
-    // Don't filter by user ID to return all leads
-    console.log('Testing mode: Retrieving ALL leads regardless of created_by');
-    
-    console.log('Executing Supabase query...');
-    const { data, error } = await query;
-    
-    if (error) {
-      console.error(`Query error: ${error.code} - ${error.message}`, error);
-      throw new Error(`Failed to fetch leads from Supabase database: ${error.message}`);
-    }
-    
-    // Log raw data for debugging
-    console.log(`Raw query returned ${data?.length || 0} results`);
-    if (data && data.length > 0) {
-      console.log('First lead sample:', JSON.stringify(data[0], null, 2));
-    } else {
-      console.log('No leads found in query result');
-    }
-    
-    // Transform the data to match the expected format
-    const transformedLeads = (data || []).map(lead => ({
-      id: lead.id,
-      firstName: lead.first_name,
-      lastName: lead.last_name,
-      email: lead.email,
-      phone1: lead.phone1,
-      phone2: lead.phone2,
-      disposition: lead.disposition,
-      avatar: lead.avatar,
-      mailingAddress: lead.mailing_address,
-      propertyAddress: lead.property_address,
-      tags: lead.tags,
-      createdAt: lead.created_at,
-      updatedAt: lead.updated_at,
-      createdBy: lead.created_by,
-      isMortgageLead: lead.is_mortgage_lead || false,
-      addedToPipelineAt: lead.added_to_pipeline_at,
-      mortgageData: lead.mortgage_data
-    }));
-    
-    console.log(`Transformed ${transformedLeads.length} leads for testing purposes`);
-    
-    return transformedLeads;
-  } catch (error) {
-    console.error(`Error fetching all leads: ${error.message}`);
-    console.error(`Stack trace: ${error.stack}`);
-    throw error;
-  }
-}
+// REMOVED the fetchAllLeads function entirely as it was the source of the security issue
