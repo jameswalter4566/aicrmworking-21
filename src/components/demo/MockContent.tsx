@@ -1,6 +1,6 @@
-
 import React from "react";
 import { BarChart, Users, Phone, MessageSquare } from "lucide-react";
+import { IndustryFeatures } from "./IndustryFeatures";
 
 interface StatCardProps {
   label: string;
@@ -21,7 +21,11 @@ const StatCard = ({ label, value, icon, color }: StatCardProps) => (
   </div>
 );
 
-export const MockContent = () => {
+interface MockContentProps {
+  industry: 'mortgage' | 'realEstate' | 'debtSettlement';
+}
+
+export const MockContent = ({ industry }: MockContentProps) => {
   return (
     <div className="p-8 bg-gray-50 flex-1">
       <div className="mb-6">
@@ -56,13 +60,16 @@ export const MockContent = () => {
         />
       </div>
       
-      <div className="bg-white rounded-lg border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-12 bg-gray-50 rounded animate-pulse" />
-          ))}
+      <div className="bg-white rounded-lg border border-gray-200">
+        <div className="p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-12 bg-gray-50 rounded animate-pulse" />
+            ))}
+          </div>
         </div>
+        <IndustryFeatures industry={industry} />
       </div>
     </div>
   );
