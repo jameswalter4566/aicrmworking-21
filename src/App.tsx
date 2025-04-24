@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -246,22 +247,34 @@ function App() {
             </div>
             <BrowserRouter>
               <Routes>
+                {/* Public Routes - accessible without authentication */}
                 <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
                 <Route path="/auth" element={<PublicRoute><Auth /></PublicRoute>} />
                 <Route path="/auth-redirect" element={<AuthRedirect />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 
+                {/* Special Public Routes - still accessible without auth but may have auth-related behavior */}
+                <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
+                <Route path="/your-home-solution/:id" element={<YourHomeSolution />} />
+                <Route path="/yourhomesolution/:id" element={<YourHomeSolution />} />
+                <Route path="/yourhomesolution*" element={<YourHomeSolution />} />
+                <Route path="/client-portal-landing" element={<ClientPortalLanding />} />
+                <Route path="/client-portal" element={<ClientPortalLanding />} />
+                <Route path="/client-portal/:slug" element={<ClientPortalLanding />} />
+                <Route path="/client-portal/onboarding/:slug" element={<ClientPortalOnboarding />} />
+                
+                {/* Protected Routes - require authentication */}
                 <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
                 <Route path="/lead/:id" element={<ProtectedRoute><LeadProfile /></ProtectedRoute>} />
                 <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
                 <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
-                <Route path="/power-dialer" element={<PowerDialer />} />
-                <Route path="/predictive-dialer" element={<PredictiveDialer />} />
-                <Route path="/ai-dialer" element={<AIDialer />} />
+                <Route path="/power-dialer" element={<ProtectedRoute><PowerDialer /></ProtectedRoute>} />
+                <Route path="/predictive-dialer" element={<ProtectedRoute><PredictiveDialer /></ProtectedRoute>} />
+                <Route path="/ai-dialer" element={<ProtectedRoute><AIDialer /></ProtectedRoute>} />
                 <Route path="/ai-realtor" element={<ProtectedRoute><AIRealtor /></ProtectedRoute>} />
                 <Route path="/listing-presentation" element={<ProtectedRoute><ListingPresentation /></ProtectedRoute>} />
-                <Route path="/sms-campaign" element={<SMSCampaign />} />
+                <Route path="/sms-campaign" element={<ProtectedRoute><SMSCampaign /></ProtectedRoute>} />
                 <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                 
                 <Route path="/amortization" element={<ProtectedRoute><AmortizationCalculator /></ProtectedRoute>} />
@@ -271,34 +284,23 @@ function App() {
                 <Route path="/processor" element={<ProtectedRoute><ProcessorAssist /></ProtectedRoute>} />
                 <Route path="/processor-assist/:id" element={<ProtectedRoute><ProcessorAssistViewer /></ProtectedRoute>} />
                 
-                <Route path="/pitch-deck/view/:slug" element={<PitchDeckLandingPage />} />
-                
-                <Route path="/your-home-solution/:id" element={<YourHomeSolution />} />
-                
-                <Route path="/yourhomesolution/:id" element={<YourHomeSolution />} />
-                <Route path="/yourhomesolution*" element={<YourHomeSolution />} />
-                
                 <Route path="/loan-application/:id" element={<ProtectedRoute><LoanApplicationViewer /></ProtectedRoute>} />
                 <Route path="/loan-application-form" element={<ProtectedRoute><LoanApplicationForm /></ProtectedRoute>} />
                 
-                <Route path="/calling-list/:id" element={<CallingListViewer />} />
+                <Route path="/calling-list/:id" element={<ProtectedRoute><CallingListViewer /></ProtectedRoute>} />
                 
-                <Route path="/client-portal-landing" element={<ClientPortalLanding />} />
-                <Route path="/client-portal" element={<ClientPortalLanding />} />
-                <Route path="/client-portal/dashboard/:slug" element={<ClientPortal />} />
-                <Route path="/client-portal/dashboard" element={<ClientPortal />} />
-                <Route path="/client-portal/:slug" element={<ClientPortalLanding />} />
+                <Route path="/client-portal/dashboard/:slug" element={<ProtectedRoute><ClientPortal /></ProtectedRoute>} />
+                <Route path="/client-portal/dashboard" element={<ProtectedRoute><ClientPortal /></ProtectedRoute>} />
                 
-                <Route path="/client-portal/onboarding/:slug" element={<ClientPortalOnboarding />} />
-                
-                <Route path="/dialer" element={<Dialer />} />
-                <Route path="/dialer-session" element={<DialerSession />} />
+                <Route path="/dialer" element={<ProtectedRoute><Dialer /></ProtectedRoute>} />
+                <Route path="/dialer-session" element={<ProtectedRoute><DialerSession /></ProtectedRoute>} />
                 
                 <Route path="/mortgage/smart-1003-builder/:leadId" element={<ProtectedRoute><Smart1003Builder /></ProtectedRoute>} />
                 
-                <Route path="/smart-document-manager" element={<SmartDocumentManager />} />
-                <Route path="/smart-document-manager/:id" element={<SmartDocumentManager />} />
+                <Route path="/smart-document-manager" element={<ProtectedRoute><SmartDocumentManager /></ProtectedRoute>} />
+                <Route path="/smart-document-manager/:id" element={<ProtectedRoute><SmartDocumentManager /></ProtectedRoute>} />
                 
+                {/* 404 Page */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>
