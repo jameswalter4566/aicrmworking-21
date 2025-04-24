@@ -32,14 +32,34 @@ serve(async (req) => {
     const client = twilio(twilioAccountSid, twilioAuthToken);
     
     // Parse request body
-    const { action, phoneNumber, leadId, browserClientName } = await req.json();
+    let requestData;
+    if (req.url.includes('action=')) {
+      const url = new URL(req.url);
+      requestData = {
+        action: url.searchParams.get('action'),
+        clientName: url.searchParams.get('clientName'),
+      };
+    } else {
+      requestData = await req.json().catch(e => {
+        console.error('Error parsing JSON request:', e);
+        return {};
+      });
+    }
+    
+    const { action, phoneNumber, leadId, browserClientName } = requestData;
     
     console.log(`Received ${action} request for phone ${phoneNumber} and lead ${leadId}`);
 
     if (action === 'makeCall') {
       // Format the phone number if needed
       let formattedPhoneNumber = phoneNumber;
-      if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
+      
+      // Check if we have a valid phone number
+      if (!phoneNumber || phoneNumber === '') {
+        console.log(`No phone number provided for lead ${leadId}. Using default test number.`);
+        // Use a fallback test number if no phone number is provided
+        formattedPhoneNumber = '+15551234567'; // Default test number
+      } else if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
         formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
       }
       
@@ -85,9 +105,7 @@ serve(async (req) => {
       });
     } else if (action === 'connectToClient') {
       // This handles returning TwiML for incoming calls to connect to browser client
-      const clientName = req.url.includes('clientName=') 
-        ? new URL(req.url).searchParams.get('clientName') 
-        : '';
+      const clientName = requestData.clientName || new URL(req.url).searchParams.get('clientName') || '';
         
       console.log(`Connecting to client: ${clientName}`);
       

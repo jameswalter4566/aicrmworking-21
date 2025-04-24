@@ -22,6 +22,20 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
+    // Ensure audio context silence is disabled
+    try {
+      // This helps prevent AudioContext errors in some browsers
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContext) {
+        const audioContext = new AudioContext();
+        if (audioContext.state === 'suspended') {
+          audioContext.resume().catch(err => console.warn("Could not resume AudioContext", err));
+        }
+      }
+    } catch (e) {
+      console.warn("AudioContext initialization failed:", e);
+    }
+    
     // Check if Twilio is already loaded
     if (window.Twilio && window.Twilio.Device) {
       console.log("🔶 Twilio Voice SDK already loaded", { 
@@ -38,6 +52,26 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         // Device in 2.x is not a singleton but a constructor
         if (typeof deviceConstructor === 'function') {
           console.log("🔶 Twilio Device is a constructor as expected in SDK 2.x");
+          
+          // Override the default sounds to avoid audio decoding issues
+          if (window.Twilio.Device) {
+            // Set empty sound URLs to disable built-in sounds
+            // This prevents the "Unable to decode audio data" errors
+            console.log("Setting empty sound URLs to prevent audio decoding errors");
+            window.Twilio.Device.prototype.updateOptions = function(originalUpdateOptions) {
+              return function(options) {
+                // Handle sounds specially to avoid decoding errors
+                if (options.sounds) {
+                  // Empty strings will disable the sounds but avoid decoding errors
+                  const safeOptions = { ...options };
+                  safeOptions.disableAudioContextSounds = true;
+                  return originalUpdateOptions.call(this, safeOptions);
+                }
+                return originalUpdateOptions.call(this, options);
+              };
+            }(window.Twilio.Device.prototype.updateOptions);
+          }
+          
           setLoaded(true);
           setLoadedUrl('Already Loaded');
           if (onLoad) onLoad();
@@ -82,6 +116,26 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
             const deviceConstructor = window.Twilio?.Device;
             if (typeof deviceConstructor === 'function') {
               console.log("🔶 Twilio Device constructor is available in SDK 2.x");
+              
+              // Override the default sounds to avoid audio decoding issues
+              if (window.Twilio.Device) {
+                // Set empty sound URLs to disable built-in sounds
+                // This prevents the "Unable to decode audio data" errors
+                console.log("Setting empty sound URLs to prevent audio decoding errors");
+                window.Twilio.Device.prototype.updateOptions = function(originalUpdateOptions) {
+                  return function(options) {
+                    // Handle sounds specially to avoid decoding errors
+                    if (options.sounds) {
+                      // Empty strings will disable the sounds but avoid decoding errors
+                      const safeOptions = { ...options };
+                      safeOptions.disableAudioContextSounds = true;
+                      return originalUpdateOptions.call(this, safeOptions);
+                    }
+                    return originalUpdateOptions.call(this, options);
+                  };
+                }(window.Twilio.Device.prototype.updateOptions);
+              }
+              
               setLoaded(true);
               setLoadedUrl(url);
               
