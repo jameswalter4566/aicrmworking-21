@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -15,32 +14,27 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Temporary memory store for call statuses when database table is not available
 const memoryCallStatusStore: Record<string, any[]> = {};
 
-// For debugging - add some mock data to the memory store
-function addMockData(sessionId: string) {
+// Add a call status update directly to the memory store
+function addCallStatusUpdate(sessionId: string, statusData: any) {
   if (!memoryCallStatusStore[sessionId]) {
     memoryCallStatusStore[sessionId] = [];
   }
   
-  const statuses = ['ringing', 'in-progress', 'completed', 'busy', 'no-answer', 'failed'];
-  const mockStatus = statuses[Math.floor(Math.random() * statuses.length)];
-  
-  const mockUpdate = {
+  const update = {
     session_id: sessionId,
     timestamp: Date.now(),
-    data: {
-      callSid: `mock-call-${Date.now()}`,
-      status: mockStatus,
-      timestamp: Date.now(),
-      phoneNumber: '+1234567890',
-      leadName: 'Mock Test Lead',
-      company: 'Mock Company'
-    },
+    data: statusData,
   };
   
-  memoryCallStatusStore[sessionId].push(mockUpdate);
-  console.log(`Added mock update to memory store for session ${sessionId}:`, mockUpdate);
+  memoryCallStatusStore[sessionId].push(update);
+  console.log(`Added update to memory store for session ${sessionId}:`, update);
   
-  return mockUpdate;
+  // Keep only the latest 100 updates per session to avoid memory issues
+  if (memoryCallStatusStore[sessionId].length > 100) {
+    memoryCallStatusStore[sessionId] = memoryCallStatusStore[sessionId].slice(-100);
+  }
+  
+  return update;
 }
 
 Deno.serve(async (req) => {
@@ -53,7 +47,8 @@ Deno.serve(async (req) => {
     // Get request body if it's a POST request
     let sessionId;
     let lastTimestamp = '0';
-    let enableMocking = false; // Set to true to enable automatic mock data generation
+    let enableMocking = false;
+    let directUpdate = null;
     
     if (req.method === 'POST') {
       const body = await req.json();
@@ -61,6 +56,16 @@ Deno.serve(async (req) => {
       sessionId = body.sessionId;
       lastTimestamp = body.lastTimestamp || '0';
       enableMocking = body.enableMocking === true;
+      
+      // Check if this is a direct call from dialer-webhook with an update
+      if (body.updateSource === 'webhook_direct' && body.callSid && body.lastStatus) {
+        directUpdate = {
+          callSid: body.callSid,
+          status: body.lastStatus,
+          timestamp: Date.now()
+        };
+        console.log('Received direct update from webhook:', directUpdate);
+      }
     } else {
       // Parse session ID from URL parameters for GET requests
       const url = new URL(req.url);
@@ -96,6 +101,11 @@ Deno.serve(async (req) => {
       console.log(`Exception looking up session: ${e.message}`);
     }
     
+    // If we received a direct update from the webhook, add it to memory store immediately
+    if (directUpdate) {
+      addCallStatusUpdate(sessionId, directUpdate);
+    }
+    
     let updates = [];
     
     try {
@@ -124,7 +134,7 @@ Deno.serve(async (req) => {
             timestamp: new Date(update.timestamp).getTime()
           }
         }));
-        console.log('Processed updates:', updates);
+        console.log('Processed updates from database:', updates);
       } else {
         console.log('No database updates found, checking memory store...');
       }
@@ -148,11 +158,31 @@ Deno.serve(async (req) => {
     const memoryStoreUpdates = memoryCallStatusStore[sessionId] || [];
     console.log(`Memory store has ${memoryStoreUpdates.length} updates for this session`);
     
-    // Generate a mock update if requested
+    // Generated mock update if enabled and no real updates found
     if ((updates.length === 0 && enableMocking) || (updates.length === 0 && sessionId === 'mock-session')) {
       console.log('Generating mock update for testing');
-      const mockUpdate = addMockData(sessionId);
+      
+      const statuses = ['ringing', 'in-progress', 'completed', 'busy', 'no-answer', 'failed'];
+      const mockStatus = statuses[Math.floor(Math.random() * statuses.length)];
+      
+      const mockUpdate = {
+        session_id: sessionId,
+        timestamp: Date.now(),
+        data: {
+          callSid: `mock-call-${Date.now()}`,
+          status: mockStatus,
+          timestamp: Date.now(),
+          phoneNumber: '+1234567890',
+          leadName: 'Mock Test Lead',
+          company: 'Mock Company'
+        },
+      };
+      
+      memoryCallStatusStore[sessionId] = memoryCallStatusStore[sessionId] || [];
+      memoryCallStatusStore[sessionId].push(mockUpdate);
+      
       updates.push(mockUpdate);
+      console.log('Added mock update:', mockUpdate);
     }
     
     // Return the updates
