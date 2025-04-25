@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,19 +69,33 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     });
   }, [sessionId, autoDialerActive, isActivePowerDialing]);
 
+  // Updated to properly map current call data to the LineDisplay component
   useEffect(() => {
     if (currentCall) {
-      console.log('Current call updated:', currentCall);
+      console.log('Current call updated in PreviewDialerWindow:', currentCall);
+      
+      // Extract phone information
+      const phoneNumber = currentCall.parameters?.To || 'Unknown';
+      const firstName = currentCall.parameters?.firstName || '';
+      const lastName = currentCall.parameters?.lastName || '';
+      const leadName = `${firstName} ${lastName}`.trim() || phoneNumber;
+      
       setActiveCallsInProgress({
         '1': {
           contact: {
-            phone1: currentCall.parameters?.To || 'Unknown',
-            firstName: currentCall.parameters?.firstName || 'Current',
-            lastName: currentCall.parameters?.lastName || 'Lead'
+            phone1: phoneNumber,
+            firstName: firstName,
+            lastName: lastName
           },
           status: currentCall.status || 'connecting',
           startTime: currentCall.status === 'in-progress' ? new Date() : undefined
         }
+      });
+      
+      console.log('Set active calls to:', {
+        phone: phoneNumber,
+        name: leadName,
+        status: currentCall.status || 'connecting'
       });
     } else {
       setActiveCallsInProgress({});

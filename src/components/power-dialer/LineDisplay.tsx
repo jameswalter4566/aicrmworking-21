@@ -17,12 +17,13 @@ interface LineDisplayProps {
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   
+  // Update the call duration timer every second if the call is in progress
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
       interval = setInterval(() => {
-        const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
+        const duration = Math.floor((new Date().getTime() - (currentCall.startTime as Date).getTime()) / 1000);
         setCallDuration(duration);
       }, 1000);
     } else {
@@ -41,6 +42,8 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const getStatusDisplay = () => {
+    console.log("LineDisplay - current call status:", currentCall?.status, currentCall);
+    
     if (!currentCall) return { bg: 'bg-white', text: 'FREE' };
     
     switch (currentCall.status) {
@@ -84,7 +87,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
               ${currentCall?.status === 'in-progress' ? 'bg-green-500 text-white' : 
                 (currentCall?.status === 'connecting' || currentCall?.status === 'ringing') ? 'bg-green-100 text-green-800' :
                 (currentCall?.status === 'completed' || currentCall?.status === 'failed' || 
-                 currentCall?.status === 'busy' || currentCall?.status === 'no-answer') ? 'bg-red-100 text-red-800' :
+                currentCall?.status === 'busy' || currentCall?.status === 'no-answer') ? 'bg-red-100 text-red-800' :
                 'bg-white text-gray-600'} 
               border-gray-200
             `}
