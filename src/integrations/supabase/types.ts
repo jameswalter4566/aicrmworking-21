@@ -9,6 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      call_logs: {
+        Row: {
+          created_at: string
+          duration: number | null
+          from_number: string | null
+          id: string
+          line_number: number
+          sid: string
+          status: string
+          timestamp: string
+          to_number: string | null
+        }
+        Insert: {
+          created_at?: string
+          duration?: number | null
+          from_number?: string | null
+          id?: string
+          line_number: number
+          sid: string
+          status: string
+          timestamp?: string
+          to_number?: string | null
+        }
+        Update: {
+          created_at?: string
+          duration?: number | null
+          from_number?: string | null
+          id?: string
+          line_number?: number
+          sid?: string
+          status?: string
+          timestamp?: string
+          to_number?: string | null
+        }
+        Relationships: []
+      }
       calling_list_leads: {
         Row: {
           added_at: string

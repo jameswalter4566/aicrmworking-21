@@ -2,15 +2,18 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Timer } from 'lucide-react';
+import { Phone } from 'lucide-react';
+
+type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
 
 interface LineDisplayProps {
   lineNumber: number;
   currentCall?: {
     phoneNumber?: string;
     leadName?: string;
-    status?: string;
+    status?: CallStatus;
     startTime?: Date;
+    company?: string;
   };
 }
 
@@ -41,18 +44,21 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const getStatusDisplay = () => {
-    if (!currentCall) return { bg: 'bg-white', text: 'FREE' };
+    if (!currentCall) return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     
     switch (currentCall.status) {
       case 'connecting':
+      case 'ringing':
         return { 
           bg: 'bg-green-100/50',
-          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber}`
+          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber}`,
+          badge: 'bg-green-100 text-green-800'
         };
       case 'in-progress':
         return {
-          bg: 'bg-green-500',
-          text: `Connected ${formatDuration(callDuration)}`
+          bg: 'bg-green-500/90',
+          text: `Connected ${formatDuration(callDuration)}`,
+          badge: 'bg-green-500 text-white'
         };
       case 'completed':
       case 'failed':
@@ -60,10 +66,11 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       case 'no-answer':
         return {
           bg: 'bg-red-100',
-          text: 'Disconnected'
+          text: 'Disconnected',
+          badge: 'bg-red-100 text-red-800'
         };
       default:
-        return { bg: 'bg-white', text: 'FREE' };
+        return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
   };
 
@@ -79,20 +86,21 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           </div>
           <Badge 
             variant="outline" 
-            className={`
-              ${currentCall?.status === 'in-progress' ? 'bg-green-500 text-white' : 
-                currentCall?.status === 'connecting' ? 'bg-green-100 text-green-800' :
-                currentCall?.status === 'completed' || currentCall?.status === 'failed' ? 'bg-red-100 text-red-800' :
-                'bg-white text-gray-600'} 
-              border-gray-200
-            `}
+            className={`${status.badge} border-gray-200`}
           >
             {status.text}
           </Badge>
         </div>
+        
         {currentCall?.phoneNumber && (
           <div className="mt-2 text-sm text-gray-500">
             {currentCall.phoneNumber}
+          </div>
+        )}
+        
+        {currentCall?.company && (
+          <div className="mt-1 text-sm text-gray-500">
+            {currentCall.company}
           </div>
         )}
       </CardContent>

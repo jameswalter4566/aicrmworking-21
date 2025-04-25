@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -197,7 +196,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     console.log('Call completed, ready for next call');
   }, []);
 
-  // Example of active calls we'll track
   useEffect(() => {
     if (currentCall) {
       setActiveCallsInProgress({
@@ -226,10 +224,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               lineNumber={line}
               currentCall={line === 1 && Object.values(activeCallsInProgress)[0] ? {
                 phoneNumber: Object.values(activeCallsInProgress)[0]?.contact?.phone1,
-                leadName: `${Object.values(activeCallsInProgress)[0]?.contact?.firstName} ${Object.values(activeCallsInProgress)[0]?.contact?.lastName}`,
+                leadName: `${Object.values(activeCallsInProgress)[0]?.contact?.firstName || ''} ${Object.values(activeCallsInProgress)[0]?.contact?.lastName || ''}`.trim(),
                 status: Object.values(activeCallsInProgress)[0]?.status,
                 startTime: Object.values(activeCallsInProgress)[0]?.status === 'in-progress' ? 
-                  new Date(Object.values(activeCallsInProgress)[0]?.startTime || new Date()) : undefined
+                  new Date(Object.values(activeCallsInProgress)[0]?.startTime || new Date()) : undefined,
+                company: Object.values(activeCallsInProgress)[0]?.contact?.company
               } : undefined}
             />
           ))}

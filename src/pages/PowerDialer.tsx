@@ -99,6 +99,7 @@ export default function PowerDialer() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
   const [currentCall, setCurrentCall] = useState(null);
+  const [activeCallsInProgress, setActiveCallsInProgress] = useState({});
 
   const twilioState = useTwilio();
 
@@ -110,6 +111,29 @@ export default function PowerDialer() {
       return () => {};
     }
   }, [isScriptLoaded]);
+
+  useEffect(() => {
+    if (!twilioState) return;
+    
+    if (Object.keys(twilioState.activeCalls).length > 0) {
+      const activeCall = Object.values(twilioState.activeCalls)[0];
+      
+      setActiveCallsInProgress({
+        '1': {
+          contact: {
+            phone1: activeCall.phoneNumber,
+            firstName: currentCall?.parameters?.firstName || 'Current',
+            lastName: currentCall?.parameters?.lastName || 'Lead',
+            company: currentCall?.parameters?.company || ''
+          },
+          status: activeCall.status,
+          startTime: activeCall.status === 'in-progress' ? new Date() : undefined
+        }
+      });
+    } else {
+      setActiveCallsInProgress({});
+    }
+  }, [twilioState.activeCalls, currentCall]);
 
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
