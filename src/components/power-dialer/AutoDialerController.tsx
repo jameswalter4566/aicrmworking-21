@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { twilioService } from '@/services/twilio';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 
 interface AutoDialerControllerProps {
   sessionId: string;
@@ -35,8 +35,9 @@ export const AutoDialerController = ({ sessionId, isActive, onCallComplete }: Au
           return;
         }
 
-        // Parse lead data from notes
-        const leadData = JSON.parse(nextLead.notes);
+        // Parse lead data from notes field
+        // nextLead is a single object, not an array
+        const leadData = JSON.parse(nextLead.notes || '{}');
         const phoneNumber = leadData.phone;
 
         if (!phoneNumber) {

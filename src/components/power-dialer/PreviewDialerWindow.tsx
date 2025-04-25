@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
-import { toast } from "sonner";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
@@ -334,20 +334,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   </div>
                 )}
 
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium">Select a Calling List</h3>
-                  {selectedListId && !sessionId && (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSelectedListId(null)}
-                      className="text-sm"
-                      disabled={isCreatingSession}
-                    >
-                      Change List
-                    </Button>
-                  )}
-                </div>
-                
                 {isLoadingLists ? (
                   <div className="text-center py-8 text-gray-500">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
