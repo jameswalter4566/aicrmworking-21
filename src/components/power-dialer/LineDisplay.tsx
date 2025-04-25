@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Timer } from 'lucide-react';
+import { useTwilio } from '@/hooks/use-twilio';
 
 interface LineDisplayProps {
   lineNumber: number;
@@ -17,21 +18,51 @@ interface LineDisplayProps {
 
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
-
+  const { activeCalls } = useTwilio();
+  
   // Add debugging logs to trace prop changes
   console.log(`LineDisplay Render - Input Props:`, { lineNumber, currentCall });
+
+  // Get active call from Twilio activeCalls if not provided as props
+  const callData = React.useMemo(() => {
+    if (currentCall && currentCall.status) {
+      return currentCall;
+    }
+    
+    // If no currentCall was provided but we have activeCalls, find the call for this line
+    if (activeCalls && Object.keys(activeCalls).length > 0) {
+      // Get an array of active calls
+      const callsArray = Object.values(activeCalls);
+      
+      // If we have a call for this line (by index), use it
+      if (callsArray.length >= lineNumber) {
+        const callForLine = callsArray[lineNumber - 1];
+        if (callForLine) {
+          console.log(`Found active call for line ${lineNumber}:`, callForLine);
+          return {
+            phoneNumber: callForLine.phoneNumber,
+            status: callForLine.status,
+            startTime: new Date(),
+            leadName: `Lead ${callForLine.leadId || 'Unknown'}`,
+          };
+        }
+      }
+    }
+    
+    return undefined;
+  }, [currentCall, activeCalls, lineNumber]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     
-    if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
+    if (callData?.status === 'in-progress' && callData?.startTime) {
       // Start timer for in-progress calls
       interval = setInterval(() => {
-        const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
+        const duration = Math.floor((new Date().getTime() - callData.startTime!.getTime()) / 1000);
         setCallDuration(duration);
       }, 1000);
       
-      console.log(`Starting timer for line ${lineNumber} with call`, currentCall);
+      console.log(`Starting timer for line ${lineNumber} with call`, callData);
     } else {
       setCallDuration(0);
     }
@@ -39,7 +70,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [currentCall?.status, currentCall?.startTime, lineNumber]);
+  }, [callData?.status, callData?.startTime, lineNumber]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -48,20 +79,20 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const getStatusDisplay = () => {
-    console.log(`LineDisplay getStatusDisplay - Calculating status for: ${currentCall?.status}`);
+    console.log(`LineDisplay getStatusDisplay - Calculating status for: ${callData?.status}`);
     
-    if (!currentCall?.status) {
+    if (!callData?.status) {
       console.log(`No current call or phone number - displaying FREE state`);
       return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
     
-    switch (currentCall.status) {
+    switch (callData.status) {
       case 'connecting':
       case 'ringing':
-        console.log(`Call in ${currentCall.status} state for line ${lineNumber}`);
+        console.log(`Call in ${callData.status} state for line ${lineNumber}`);
         return { 
           bg: 'bg-green-100/50',
-          text: `Dialing ${currentCall.leadName || currentCall.phoneNumber || 'unknown'}`,
+          text: `Dialing ${callData.leadName || callData.phoneNumber || 'unknown'}`,
           badge: 'bg-green-100 text-green-800'
         };
       case 'in-progress':
@@ -75,14 +106,14 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       case 'failed':
       case 'busy':
       case 'no-answer':
-        console.log(`Call ended with status ${currentCall.status} for line ${lineNumber}`);
+        console.log(`Call ended with status ${callData.status} for line ${lineNumber}`);
         return {
           bg: 'bg-red-100',
           text: 'Disconnected',
           badge: 'bg-red-100 text-red-800'
         };
       default:
-        console.log(`Unknown call status ${currentCall.status} for line ${lineNumber}`);
+        console.log(`Unknown call status ${callData.status} for line ${lineNumber}`);
         return { 
           bg: 'bg-yellow-100', 
           text: 'WAITING', 
@@ -110,21 +141,21 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           </Badge>
         </div>
         
-        {currentCall?.phoneNumber && (
+        {callData?.phoneNumber && (
           <div className="mt-2 text-sm text-gray-500">
-            {currentCall.phoneNumber}
+            {callData.phoneNumber}
           </div>
         )}
         
-        {currentCall?.leadName && (
+        {callData?.leadName && (
           <div className="mt-1 text-sm font-medium">
-            {currentCall.leadName}
+            {callData.leadName}
           </div>
         )}
         
-        {currentCall?.company && (
+        {callData?.company && (
           <div className="mt-1 text-sm text-gray-500">
-            {currentCall.company}
+            {callData.company}
           </div>
         )}
       </CardContent>
