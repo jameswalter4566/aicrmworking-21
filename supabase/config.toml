@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.predictive-dialer-webhook]
 verify_jwt = false
+
+[functions.dialer-webhook]
+verify_jwt = false

@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -9,7 +8,7 @@ export interface TwilioCallResult {
   conferenceName?: string;
   message?: string;
   error?: string;
-  twilioErrorCode?: number;  // Added this property
+  twilioErrorCode?: number;
   leadId?: string | number;
 }
 
@@ -21,6 +20,7 @@ class TwilioService {
   private isCleaningUp: boolean = false;
   private soundsInitialized: boolean = false;
   private callDisconnectListeners: Array<() => void> = [];
+  private sessionId: string = `session-${Date.now()}`;
 
   async initializeAudioContext(): Promise<boolean> {
     try {
@@ -288,7 +288,8 @@ class TwilioService {
         const call = await this.device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
-            leadId: leadId.toString()
+            leadId: leadId.toString(),
+            sessionId: this.sessionId
           }
         });
         
@@ -520,6 +521,14 @@ class TwilioService {
         console.warn("Error during cleanup:", e);
       }
     }
+  }
+
+  setSessionId(sessionId: string) {
+    this.sessionId = sessionId;
+  }
+
+  getSessionId(): string {
+    return this.sessionId;
   }
 }
 
