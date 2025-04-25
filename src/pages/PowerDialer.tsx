@@ -124,14 +124,18 @@ export default function PowerDialer() {
   useEffect(() => {
     console.log("Updating line statuses from activeCalls:", activeCalls);
     
-    if (!activeCalls) return;
+    if (!activeCalls) {
+      console.log("No active calls available");
+      return;
+    }
     
     const newLineStatuses = new Map();
+    let hasActiveCall = false;
     
     Object.entries(activeCalls).forEach(([leadId, call], index) => {
       if (index < 3) { // Only track first 3 lines
         const lineNumber = index + 1;
-        const leadInfo = leads.find(lead => lead.id === leadId);
+        const leadInfo = leads.find(l => l.id === leadId);
         
         if (call) {
           const callInfo = {
@@ -139,28 +143,32 @@ export default function PowerDialer() {
             leadName: leadInfo?.name || `Lead ${leadId.substring(0, 6)}`, 
             status: call.status,
             startTime: call.status === 'in-progress' ? new Date() : undefined,
-            company: leadInfo?.company
+            company: leadInfo?.company,
+            customName: leadInfo?.name
           };
           
           console.log(`Assigning call to line ${lineNumber}:`, callInfo);
           newLineStatuses.set(lineNumber, callInfo);
+          
+          if (call.status === 'in-progress' || call.status === 'connecting' || call.status === 'ringing') {
+            hasActiveCall = true;
+          }
         }
       }
     });
+    
+    setCallInProgress(hasActiveCall);
     
     setCurrentLineStatuses(newLineStatuses);
     
     const activeCallsArray = Object.values(activeCalls);
     if (activeCallsArray.length > 0) {
       setCurrentCall(activeCallsArray[0] as ActiveCall);
-      
-      if (activeCallsArray.some(call => call.status === 'in-progress')) {
-        setCallInProgress(true);
-      }
     } else {
       setCurrentCall(null);
-      setCallInProgress(false);
     }
+    
+    console.log("Final line statuses:", Array.from(newLineStatuses.entries()));
   }, [activeCalls, leads]);
 
   const getCallInfoForLine = (lineNumber: number): {
@@ -235,7 +243,22 @@ export default function PowerDialer() {
       
       console.log("Call result:", callResult);
       
-      if (!callResult.success) {
+      if (callResult.success) {
+        const newLineStatuses = new Map(currentLineStatuses);
+        newLineStatuses.set(1, {
+          phoneNumber: lead.phone,
+          leadName: lead.name,
+          company: lead.company,
+          status: 'connecting',
+          startTime: undefined
+        });
+        setCurrentLineStatuses(newLineStatuses);
+        
+        toast({
+          title: "Call Initiated",
+          description: `Calling ${lead.name}...`,
+        });
+      } else {
         console.error("Call failed:", JSON.stringify(callResult));
         toast({
           title: "Call Failed",
@@ -244,11 +267,6 @@ export default function PowerDialer() {
         });
         setCallInProgress(false);
         setIsDialing(false);
-      } else {
-        toast({
-          title: "Call Initiated",
-          description: `Calling ${lead.name}...`,
-        });
       }
     } catch (error: any) {
       console.error("Error making call:", error);
@@ -274,6 +292,17 @@ export default function PowerDialer() {
     await endCall(leadId);
     updateLeadStatus(leadId, "Contacted");
     setCallInProgress(false);
+    
+    const newLineStatuses = new Map(currentLineStatuses);
+    currentLineStatuses.forEach((callInfo, lineNumber) => {
+      if (callInfo && activeCalls && activeCalls[leadId]) {
+        newLineStatuses.set(lineNumber, {
+          ...callInfo,
+          status: 'completed'
+        });
+      }
+    });
+    setCurrentLineStatuses(newLineStatuses);
   };
 
   const handleDisposition = (type: string) => {
@@ -302,6 +331,7 @@ export default function PowerDialer() {
                 onClick={async () => {
                   const success = await endAllCalls();
                   if (success) {
+                    setCurrentLineStatuses(new Map());
                     toast({
                       title: "System Reset",
                       description: "All active calls have been terminated. The system has been reset.",

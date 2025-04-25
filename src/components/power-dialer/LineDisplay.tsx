@@ -22,20 +22,25 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   
   // This function extracts call data from either props or Twilio hook
   const getCallData = React.useCallback(() => {
-    // First priority: use the prop if available
+    // First priority: check the prop data if available
     if (currentCall?.status) {
       console.log(`Line ${lineNumber} using currentCall prop:`, currentCall);
       return currentCall;
     }
     
-    // Second priority: check for active calls from Twilio hook
+    // Second priority: check for active calls in the Twilio hook
     if (!activeCalls) return undefined;
     
-    // Convert activeCalls object to array
+    // Convert activeCalls object to array to iterate through it
     const activeCallsArray = Object.entries(activeCalls);
+    
+    if (activeCallsArray.length === 0) {
+      return undefined;
+    }
+    
     console.log(`Line ${lineNumber} checking activeCalls:`, activeCallsArray);
     
-    // Find a call for this line based on index
+    // For a more direct mapping, assign calls to lines by index
     if (activeCallsArray.length >= lineNumber) {
       const [leadId, call] = activeCallsArray[lineNumber - 1];
       if (call) {
@@ -44,7 +49,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           phoneNumber: call.phoneNumber,
           status: call.status,
           startTime: call.status === 'in-progress' ? new Date() : undefined,
-          leadName: `Lead ${leadId}`, 
+          leadName: call.customName || `Lead ${leadId.substring(0, 6)}`,
         };
       }
     }
@@ -55,9 +60,8 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   // Extract current call data
   const callData = getCallData();
   
-  // Log the call data for debugging
   useEffect(() => {
-    console.log(`LineDisplay ${lineNumber} callData:`, callData);
+    console.log(`LineDisplay ${lineNumber} callData updated:`, callData);
   }, [callData, lineNumber]);
 
   // Set up the timer for ongoing calls
@@ -89,8 +93,8 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const getStatusDisplay = () => {
     console.log(`LineDisplay getStatusDisplay - Calculating status for call:`, callData);
     
-    if (!callData?.status) {
-      console.log("No current call or phone number - displaying FREE state");
+    if (!callData || !callData.status) {
+      console.log(`No current call or phone number for line ${lineNumber} - displaying FREE state`);
       return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
     
@@ -120,7 +124,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       default:
         return { 
           bg: 'bg-yellow-100', 
-          text: 'WAITING', 
+          text: callData.status || 'WAITING', 
           badge: 'bg-yellow-100 text-yellow-800' 
         };
     }
@@ -162,6 +166,13 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
         {callData?.company && (
           <div className="mt-1 text-sm text-gray-500">
             {callData.company}
+          </div>
+        )}
+        
+        {callData?.status === 'in-progress' && (
+          <div className="mt-2 flex items-center gap-1 text-green-800">
+            <Timer className="h-4 w-4" />
+            <span>{formatDuration(callDuration)}</span>
           </div>
         )}
       </CardContent>
