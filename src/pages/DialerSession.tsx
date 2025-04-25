@@ -67,41 +67,45 @@ const DialerSession = () => {
         console.log('No stats in view, querying leads table directly');
         
         // Fallback to directly querying the leads table
-        const { data: queuedCount } = await supabase
+        const { count: queuedCount } = await supabase
           .from('dialing_session_leads')
           .select('id', { count: 'exact', head: true })
           .eq('session_id', sessionId)
           .eq('status', 'queued');
           
-        const { data: inProgressCount } = await supabase
+        const { count: inProgressCount } = await supabase
           .from('dialing_session_leads')
           .select('id', { count: 'exact', head: true })
           .eq('session_id', sessionId)
           .eq('status', 'in_progress');
           
-        const { data: completedCount } = await supabase
+        const { count: completedCount } = await supabase
           .from('dialing_session_leads')
           .select('id', { count: 'exact', head: true })
           .eq('session_id', sessionId)
           .eq('status', 'completed');
           
-        const totalCount = (queuedCount || 0) + (inProgressCount || 0) + (completedCount || 0);
+        // Safely convert counts to numbers
+        const queuedNum = typeof queuedCount === 'number' ? queuedCount : 0;
+        const inProgressNum = typeof inProgressCount === 'number' ? inProgressCount : 0;
+        const completedNum = typeof completedCount === 'number' ? completedCount : 0;
+        const totalCount = queuedNum + inProgressNum + completedNum;
         
-        console.log(`Direct count - Queued: ${queuedCount}, In Progress: ${inProgressCount}, Completed: ${completedCount}, Total: ${totalCount}`);
+        console.log(`Direct count - Queued: ${queuedNum}, In Progress: ${inProgressNum}, Completed: ${completedNum}, Total: ${totalCount}`);
         
         setStats({
-          queued: queuedCount || 0,
-          inProgress: inProgressCount || 0,
-          completed: completedCount || 0,
+          queued: queuedNum,
+          inProgress: inProgressNum,
+          completed: completedNum,
           total: totalCount
         });
       } else {
         // Use stats from the view
         setStats({
-          queued: statsData.queued_count || 0,
-          inProgress: statsData.in_progress_count || 0,
-          completed: statsData.completed_count || 0,
-          total: statsData.total_count || 0
+          queued: typeof statsData.queued_count === 'number' ? statsData.queued_count : 0,
+          inProgress: typeof statsData.in_progress_count === 'number' ? statsData.in_progress_count : 0,
+          completed: typeof statsData.completed_count === 'number' ? statsData.completed_count : 0,
+          total: typeof statsData.total_count === 'number' ? statsData.total_count : 0
         });
         console.log(`Using stats from view - ${JSON.stringify(statsData)}`);
       }
