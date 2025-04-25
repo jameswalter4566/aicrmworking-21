@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "@/components/ui/use-toast";
 import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
+import { ActiveCall } from "@/hooks/use-twilio";
 
 const SAMPLE_LEADS = [
   {
@@ -98,10 +100,26 @@ export default function PowerDialer() {
   const [twilioReady, setTwilioReady] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
-  const [currentCall, setCurrentCall] = useState(null);
+  const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
 
-  const twilioState = useTwilio();
+  // Get twilio state from the hook
+  const {
+    initialized,
+    activeCalls,
+    microphoneActive,
+    audioStreaming,
+    audioOutputDevices,
+    currentAudioDevice,
+    makeCall,
+    endCall,
+    endAllCalls,
+    toggleMute,
+    toggleSpeaker,
+    setAudioOutputDevice,
+    refreshAudioDevices,
+    testAudio
+  } = useTwilio();
 
   useEffect(() => {
     if (window.Twilio && window.Twilio.Device) {
@@ -113,16 +131,16 @@ export default function PowerDialer() {
   }, [isScriptLoaded]);
 
   useEffect(() => {
-    if (!twilioState) return;
+    if (!activeCalls) return;
     
     // Update current call state
-    const activeCalls = Object.values(twilioState.activeCalls);
-    if (activeCalls.length > 0) {
-      setCurrentCall(activeCalls[0]);
+    const activeCallsArray = Object.values(activeCalls);
+    if (activeCallsArray.length > 0) {
+      setCurrentCall(activeCallsArray[0] as ActiveCall);
     } else {
       setCurrentCall(null);
     }
-  }, [twilioState.activeCalls]);
+  }, [activeCalls]);
 
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
@@ -146,7 +164,7 @@ export default function PowerDialer() {
   }, [leads, filterStatus, sortBy]);
 
   const handleCallLead = async (lead: any) => {
-    if (!twilioState.initialized && !isScriptLoaded) {
+    if (!initialized && !isScriptLoaded) {
       toast({
         title: "Phone System Not Ready",
         description: "Please wait for the phone system to initialize.",
@@ -175,7 +193,7 @@ export default function PowerDialer() {
       setCallInProgress(true);
       
       const formattedPhone = lead.phone.replace(/\D/g, '');
-      const callResult = await twilioService.makeCall(formattedPhone, lead.id);
+      const callResult = await makeCall(formattedPhone, lead.id);
       
       console.log("Call result:", callResult);
       
@@ -215,7 +233,7 @@ export default function PowerDialer() {
   };
 
   const handleEndCall = async (leadId: string) => {
-    await twilioState.endCall(leadId);
+    await endCall(leadId);
     updateLeadStatus(leadId, "Contacted");
     setCallInProgress(false);
   };
@@ -228,7 +246,7 @@ export default function PowerDialer() {
       description: `Call marked as ${type}`,
     });
     
-    handleEndCall(currentCall.parameters.leadId);
+    handleEndCall(currentCall.leadId.toString());
   };
 
   const [isDialing, setIsDialing] = useState(false);
@@ -244,7 +262,7 @@ export default function PowerDialer() {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
-                  const success = await twilioState.endAllCalls();
+                  const success = await endAllCalls();
                   if (success) {
                     toast({
                       title: "System Reset",
@@ -282,10 +300,14 @@ export default function PowerDialer() {
       <PreviewDialerWindow 
         currentCall={currentCall}
         onDisposition={handleDisposition}
-        onEndCall={() => Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id))}
+        onEndCall={() => {
+          if (activeCalls) {
+            Object.keys(activeCalls).forEach(id => handleEndCall(id));
+          }
+        }}
       />
 
-      {Object.keys(twilioState.activeCalls).length > 0 && (
+      {activeCalls && Object.keys(activeCalls).length > 0 && (
         <Card className="bg-muted/50">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex justify-between items-center">
@@ -293,63 +315,64 @@ export default function PowerDialer() {
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={() => 
-                  twilioState.endAllCalls()
-                }
+                onClick={() => endAllCalls()}
               >
                 End All Calls
               </Button>
             </CardTitle>
           </CardHeader>
           <CardContent className="pb-2">
-            {Object.entries(twilioState.activeCalls).map(([leadId, call]) => (
-              <div key={leadId} className="mb-4">
-                {leads.find(l => l.id === leadId) && (
-                  <div className="flex flex-col space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">
-                          {leads.find(l => l.id === leadId)?.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {call.phoneNumber}
-                        </p>
+            {Object.entries(activeCalls).map(([leadId, callData]) => {
+              const call = callData as ActiveCall;
+              return (
+                <div key={leadId} className="mb-4">
+                  {leads.find(l => l.id === leadId) && (
+                    <div className="flex flex-col space-y-2">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="font-medium">
+                            {leads.find(l => l.id === leadId)?.name}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {call.phoneNumber}
+                          </p>
+                        </div>
+                        <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
+                          {call.status === 'connecting' ? 'Ringing' : 
+                          call.status === 'in-progress' ? 'Connected' :
+                          call.status === 'completed' ? 'Ended' : 
+                          call.status}
+                        </Badge>
                       </div>
-                      <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
-                        {call.status === 'connecting' ? 'Ringing' : 
-                         call.status === 'in-progress' ? 'Connected' :
-                         call.status === 'completed' ? 'Ended' : 
-                         call.status}
-                      </Badge>
+                      
+                      <CallControls
+                        leadId={leadId}
+                        phoneNumber={call.phoneNumber}
+                        activeCall={call}
+                        onCall={(phone, id) => {}}
+                        onHangup={() => handleEndCall(leadId)}
+                        onToggleMute={(id) => toggleMute(id)}
+                        onToggleSpeaker={(id) => toggleSpeaker(id)}
+                        audioOutputDevices={audioOutputDevices}
+                        currentAudioDevice={currentAudioDevice}
+                        onChangeAudioDevice={(deviceId) => setAudioOutputDevice(deviceId)}
+                        onRefreshDevices={() => refreshAudioDevices()}
+                        onTestAudio={(deviceId) => testAudio(deviceId || '')}
+                      />
+                      
+                      {!call.audioActive && call.status === 'in-progress' && (
+                        <Alert variant="destructive" className="mt-2">
+                          <AlertTitle>Audio Warning</AlertTitle>
+                          <AlertDescription>
+                            Microphone appears to be inactive. Check your browser permissions.
+                          </AlertDescription>
+                        </Alert>
+                      )}
                     </div>
-                    
-                    <CallControls
-                      leadId={leadId}
-                      phoneNumber={call.phoneNumber}
-                      activeCall={call}
-                      onCall={(phone, id) => {}}
-                      onHangup={() => handleEndCall(leadId)}
-                      onToggleMute={(id) => twilioState.toggleMute(id)}
-                      onToggleSpeaker={(id) => twilioState.toggleSpeaker(id)}
-                      audioOutputDevices={twilioState.audioOutputDevices}
-                      currentAudioDevice={twilioState.currentAudioDevice}
-                      onChangeAudioDevice={(deviceId) => twilioState.setAudioOutputDevice(deviceId)}
-                      onRefreshDevices={() => twilioState.refreshAudioDevices()}
-                      onTestAudio={(deviceId) => twilioState.testAudio(deviceId || '')}
-                    />
-                    
-                    {!call.audioActive && call.status === 'in-progress' && (
-                      <Alert variant="destructive" className="mt-2">
-                        <AlertTitle>Audio Warning</AlertTitle>
-                        <AlertDescription>
-                          Microphone appears to be inactive. Check your browser permissions.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
+                  )}
+                </div>
+              );
+            })}
           </CardContent>
         </Card>
       )}
@@ -428,7 +451,7 @@ export default function PowerDialer() {
                         size="sm"
                         variant="default"
                         onClick={() => handleCallLead(lead)}
-                        disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0}
+                        disabled={callInProgress || (activeCalls && Object.keys(activeCalls).length > 0)}
                         className="w-16 h-8"
                       >
                         <Phone className="mr-1 h-3 w-3" /> Call
@@ -455,11 +478,11 @@ export default function PowerDialer() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            <Alert variant={twilioState.microphoneActive ? "default" : "destructive"}>
+            <Alert variant={microphoneActive ? "default" : "destructive"}>
               <InfoCircledIcon className="h-4 w-4" />
               <AlertTitle>Microphone Status</AlertTitle>
               <AlertDescription>
-                {twilioState.microphoneActive 
+                {microphoneActive 
                   ? "Microphone is active and ready for calls."
                   : "Microphone access is not available. Check browser permissions."}
               </AlertDescription>
@@ -467,17 +490,17 @@ export default function PowerDialer() {
             
             <AudioDeviceSelector 
               onDeviceChange={async (deviceId) => {
-                const success = await twilioState.setAudioOutputDevice(deviceId);
+                const success = await setAudioOutputDevice(deviceId);
                 return success;
               }}
               onRefreshDevices={async () => {
-                return twilioState.refreshAudioDevices();
+                return refreshAudioDevices();
               }}
               onTestAudio={async (deviceId) => {
-                return twilioState.testAudio(deviceId);
+                return testAudio(deviceId);
               }}
-              devices={twilioState.audioOutputDevices}
-              currentDeviceId={twilioState.currentAudioDevice}
+              devices={audioOutputDevices}
+              currentDeviceId={currentAudioDevice}
             />
             
             <div className="flex justify-between">
@@ -490,9 +513,9 @@ export default function PowerDialer() {
               
               <Button 
                 onClick={async () => {
-                  const deviceId = twilioState.currentAudioDevice;
+                  const deviceId = currentAudioDevice;
                   if (deviceId) {
-                    const result = await twilioState.testAudio(deviceId);
+                    const result = await testAudio(deviceId);
                     if (result) {
                       toast({
                         title: "Audio Test",
@@ -517,7 +540,7 @@ export default function PowerDialer() {
 
       <GlobalAudioSettings />
 
-      {!twilioState.initialized && (
+      {!initialized && (
         <Card className="bg-muted/50">
           <CardHeader>
             <CardTitle className="text-lg">Initialize Phone System</CardTitle>
@@ -615,14 +638,14 @@ export default function PowerDialer() {
           )}
 
           <div className="flex items-center space-x-2">
-            <Badge variant={twilioState.initialized ? "default" : "outline"}>
-              {twilioState.initialized ? "System Ready" : "Initializing..."}
+            <Badge variant={initialized ? "default" : "outline"}>
+              {initialized ? "System Ready" : "Initializing..."}
             </Badge>
-            <Badge variant={twilioState.microphoneActive ? "default" : "destructive"}>
-              {twilioState.microphoneActive ? "Microphone Active" : "Microphone Inactive"}
+            <Badge variant={microphoneActive ? "default" : "destructive"}>
+              {microphoneActive ? "Microphone Active" : "Microphone Inactive"}
             </Badge>
-            <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
-              {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
+            <Badge variant={audioStreaming ? "default" : "outline"}>
+              {audioStreaming ? "Streaming Active" : "Streaming Inactive"}
             </Badge>
           </div>
         </div>
