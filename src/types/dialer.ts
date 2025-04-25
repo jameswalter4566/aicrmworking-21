@@ -1,3 +1,4 @@
+
 export type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
 
 export interface LineCallData {
@@ -7,6 +8,8 @@ export interface LineCallData {
   startTime?: Date;
   company?: string;
   duration?: number;
+  errorCode?: string;
+  errorMessage?: string;
 }
 
 export interface LineDisplayData {
