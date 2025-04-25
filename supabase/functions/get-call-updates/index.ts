@@ -19,10 +19,20 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Parse session ID from URL parameters
-    const url = new URL(req.url);
-    const sessionId = url.searchParams.get('sessionId');
-    const lastTimestamp = url.searchParams.get('lastTimestamp') || '0';
+    // Get request body if it's a POST request
+    let sessionId;
+    let lastTimestamp = '0';
+    
+    if (req.method === 'POST') {
+      const body = await req.json();
+      sessionId = body.sessionId;
+      lastTimestamp = body.lastTimestamp || '0';
+    } else {
+      // Parse session ID from URL parameters for GET requests
+      const url = new URL(req.url);
+      sessionId = url.searchParams.get('sessionId');
+      lastTimestamp = url.searchParams.get('lastTimestamp') || '0';
+    }
     
     if (!sessionId) {
       throw new Error('Session ID is required');
@@ -33,7 +43,7 @@ Deno.serve(async (req) => {
       .from('call_status_updates')
       .select('*')
       .eq('session_id', sessionId)
-      .gt('timestamp', new Date(parseInt(lastTimestamp)).toISOString())
+      .gt('timestamp', new Date(parseInt(lastTimestamp.toString())).toISOString())
       .order('timestamp', { ascending: false })
       .limit(20);
     

@@ -23,7 +23,7 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
       // Use existing duration if provided (from server) or calculate from startTime
-      const initialDuration = currentCall.duration || 
+      const initialDuration = currentCall.duration !== undefined ? currentCall.duration : 
         Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
       
       setCallDuration(initialDuration);

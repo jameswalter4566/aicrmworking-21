@@ -33,6 +33,12 @@ export function useCallStatus(sessionId: string | null) {
         response.data.updates.forEach((update: any) => {
           const statusData = update.data;
           if (statusData && statusData.callSid) {
+            // Extract any lead information from the status update
+            if (statusData.leadInfo) {
+              statusData.leadName = statusData.leadInfo.name;
+              statusData.company = statusData.leadInfo.company;
+            }
+            
             // Update our status map
             newStatuses[statusData.callSid] = statusData;
             

@@ -129,6 +129,7 @@ Deno.serve(async (req) => {
       agentId: call.agent_id,
       leadId: call.contact_id,
       phoneNumber: call.contact?.phone_number,
+      leadName: call.contact?.name,  // Include the lead name
       duration: callDuration ? parseInt(callDuration) : undefined
     };
     

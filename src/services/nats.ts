@@ -14,7 +14,9 @@ export interface CallStatusUpdate {
   agentId?: string;
   leadId?: string;
   phoneNumber?: string;
+  leadName?: string; // Added lead name property
   duration?: number;
+  company?: string; // Added company property
 }
 
 class NatsService {
