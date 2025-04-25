@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { connect, StringCodec } from "https://deno.land/x/nats@v1.16.0/src/mod.ts";
 
@@ -10,13 +9,13 @@ const corsHeaders = {
 
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // String codec for NATS messages
 const sc = StringCodec();
 
-// Temporary memory store for call status updates when database table is not available
+// Temporary memory store for call statuses when database table is not available
 const memoryCallStatusStore: Record<string, any[]> = {};
 
 // Store call status update in memory
@@ -38,22 +37,13 @@ function storeCallStatusUpdate(sessionId: string, statusData: any) {
     memoryCallStatusStore[sessionId] = memoryCallStatusStore[sessionId].slice(-100);
   }
   
-  console.log(`Stored call status update for ${sessionId}`, update);
-  
   return update;
 }
 
 // Main function to handle requests
 Deno.serve(async (req) => {
-  // Log all request information for debugging
-  console.log("🔔 DIALER-WEBHOOK CALLED 🔔");
-  console.log("Request method:", req.method);
-  console.log("Request URL:", req.url);
-  console.log("Request headers:", JSON.stringify(Object.fromEntries([...req.headers])));
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling OPTIONS request");
     return new Response(null, { headers: corsHeaders });
   }
   
@@ -61,28 +51,18 @@ Deno.serve(async (req) => {
     // Get callId from URL parameters
     const url = new URL(req.url);
     const callId = url.searchParams.get('callId');
-    const sessionId = url.searchParams.get('sessionId');
-    
-    console.log(`Webhook received with callId=${callId}, sessionId=${sessionId}`);
     
     if (!callId) {
       throw new Error('Call ID is required');
     }
     
     // Parse form data from Twilio webhook
-    console.log("Parsing form data from request...");
     const formData = await req.formData();
-    
-    // Log the entire form data for debugging
-    const formDataEntries = Array.from(formData.entries());
-    console.log("Received form data:", JSON.stringify(formDataEntries));
-    
     const callStatus = formData.get('CallStatus')?.toString();
     const callSid = formData.get('CallSid')?.toString();
     const callDuration = formData.get('CallDuration')?.toString();
-    const answeredBy = formData.get('AnsweredBy')?.toString();
     
-    console.log(`Call status: ${callStatus}, SID: ${callSid}, Duration: ${callDuration}, AnsweredBy: ${answeredBy}`);
+    console.log(`Webhook received for call ${callId} with status: ${callStatus}`);
     
     // Get the call record
     const { data: call, error: callError } = await supabase
@@ -92,12 +72,8 @@ Deno.serve(async (req) => {
       .single();
       
     if (callError || !call) {
-      const errorMsg = `Call not found: ${callError?.message}`;
-      console.error(errorMsg);
-      throw new Error(errorMsg);
+      throw new Error(`Call not found: ${callError?.message}`);
     }
-    
-    console.log("Retrieved call record:", JSON.stringify(call));
     
     // Update call status based on Twilio webhook
     switch(callStatus) {
@@ -169,30 +145,18 @@ Deno.serve(async (req) => {
         console.log(`Received status update: ${callStatus} for call ${callId}`);
     }
     
-    // Get the session ID from the call record if not provided in the URL
-    const effectiveSessionId = sessionId || call.session_id;
-    
-    if (!effectiveSessionId) {
-      console.warn('No session ID available for this call!');
-    } else {
-      console.log(`Using session ID: ${effectiveSessionId}`);
-    }
-    
     // Create a call status update for real-time tracking
     const statusUpdate = {
       callSid,
       status: callStatus,
       timestamp: Date.now(),
       agentId: call.agent_id,
-      contactId: call.contact_id,
+      leadId: call.contact_id,
       phoneNumber: call.contact?.phone_number,
-      leadName: call.contact?.name,
-      company: call.contact?.company,
+      leadName: call.contact?.name,  // Include the lead name
       duration: callDuration ? parseInt(callDuration) : undefined,
-      answeredBy: answeredBy || undefined
+      company: call.contact?.company
     };
-    
-    console.log('Created status update:', statusUpdate);
     
     // Try to store the call status update in Supabase table
     try {
@@ -200,7 +164,7 @@ Deno.serve(async (req) => {
         .from('call_status_updates')
         .insert({
           call_sid: callSid,
-          session_id: effectiveSessionId,
+          session_id: call.session_id,
           status: callStatus,
           timestamp: new Date().toISOString(),
           data: statusUpdate
@@ -209,86 +173,38 @@ Deno.serve(async (req) => {
       if (error) {
         console.error('Error writing to call_status_updates table:', error);
         // If the database write fails, use the memory store
-        if (effectiveSessionId) {
-          storeCallStatusUpdate(effectiveSessionId, statusUpdate);
-        } else {
-          console.error('No session ID available for memory store fallback');
-        }
+        storeCallStatusUpdate(call.session_id, statusUpdate);
       } else {
-        console.log('Successfully wrote call status update to database');
+        console.log('Successfully wrote call status update to database:', data);
       }
     } catch (dbError) {
       console.error('Error writing to call_status_updates table, using memory store instead:', dbError.message);
       // If the database write fails, use the memory store
-      if (effectiveSessionId) {
-        storeCallStatusUpdate(effectiveSessionId, statusUpdate);
-      } else {
-        console.error('No session ID available for memory store fallback');
-      }
+      storeCallStatusUpdate(call.session_id, statusUpdate);
     }
     
     // Try to publish via NATS if available (as backup method)
     try {
       const natsUrl = Deno.env.get("NATS_URL");
-      if (natsUrl && effectiveSessionId) {
+      if (natsUrl) {
         const nats = await connect({ servers: natsUrl });
-        await nats.publish(`call.status.${effectiveSessionId}`, sc.encode(JSON.stringify(statusUpdate)));
+        await nats.publish(`call.status.${call.session_id}`, sc.encode(JSON.stringify(statusUpdate)));
         await nats.flush();
         await nats.close();
-        console.log(`Published call status update to NATS for session ${effectiveSessionId}`);
+        console.log(`Published call status update to NATS for session ${call.session_id}`);
       }
     } catch (natsError) {
       // Don't fail if NATS isn't available, just log the error
       console.error('NATS publish error (non-critical):', natsError);
     }
     
-    // Also trigger our get-call-updates function directly to ensure it has the latest data
-    try {
-      if (effectiveSessionId) {
-        console.log("🔄 Directly triggering get-call-updates function to push update...");
-        
-        const triggerBody = JSON.stringify({
-          sessionId: effectiveSessionId,
-          lastTimestamp: 0,
-          updateSource: 'webhook_direct',
-          lastStatus: callStatus,
-          callSid: callSid
-        });
-        
-        console.log("Trigger body:", triggerBody);
-        
-        const triggerResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-call-updates`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-          },
-          body: triggerBody
-        });
-        
-        if (!triggerResponse.ok) {
-          const errorText = await triggerResponse.text();
-          console.error(`Failed to trigger get-call-updates: ${triggerResponse.status} ${triggerResponse.statusText}`, errorText);
-        } else {
-          const responseData = await triggerResponse.json();
-          console.log('Successfully triggered get-call-updates function:', responseData);
-        }
-      }
-    } catch (triggerError) {
-      console.error('Error triggering get-call-updates function:', triggerError);
-    }
-    
-    console.log('✅ Processing of webhook completed successfully');
-    
-    // Return appropriate TwiML
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
       status: 200,
     });
   } catch (error) {
-    console.error('❌ Error in dialer-webhook function:', error);
+    console.error('Error in dialer-webhook function:', error);
     
-    // Return valid TwiML even for errors to avoid Twilio retry loops
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
       status: 200, // Return 200 even for errors to avoid Twilio retries

@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import twilio from 'https://esm.sh/twilio@4.18.1';
 
@@ -26,14 +27,10 @@ Deno.serve(async (req) => {
   }
   
   try {
-    const { agentId, sessionId, maxConcurrentCalls } = await req.json();
+    const { agentId, maxConcurrentCalls } = await req.json();
     
     if (!agentId) {
       throw new Error('Agent ID is required');
-    }
-    
-    if (!sessionId) {
-      throw new Error('Session ID is required');
     }
     
     // Get the agent
@@ -91,8 +88,7 @@ Deno.serve(async (req) => {
     const { data: activeCalls, error: activeCallsError } = await supabase
       .from('predictive_dialer_calls')
       .select('*')
-      .eq('status', 'in_progress')
-      .eq('session_id', sessionId);
+      .eq('status', 'in_progress');
       
     if (activeCallsError) {
       throw new Error('Failed to get active calls');
@@ -115,7 +111,6 @@ Deno.serve(async (req) => {
     
     // Select contacts to call (up to callsToMake)
     const contactsToCall = contacts.slice(0, callsToMake);
-    const callsPlaced = [];
     
     // Start making calls
     for (const contact of contactsToCall) {
@@ -125,7 +120,6 @@ Deno.serve(async (req) => {
           .from('predictive_dialer_calls')
           .insert({
             contact_id: contact.id,
-            session_id: sessionId,
             status: 'queued',
             start_timestamp: new Date().toISOString()
           })
@@ -147,8 +141,8 @@ Deno.serve(async (req) => {
           .eq('id', contact.id);
         
         // Define webhook URLs for Twilio
-        const statusCallbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-webhook?callId=${callData.id}&sessionId=${sessionId}`;
-        const machineDetectionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-machine-detection?callId=${callData.id}&sessionId=${sessionId}`;
+        const statusCallbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-webhook?callId=${callData.id}`;
+        const machineDetectionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-machine-detection?callId=${callData.id}`;
         
         // Place the call using Twilio
         const twilioCall = await twilioClient.calls.create({
@@ -171,14 +165,7 @@ Deno.serve(async (req) => {
           })
           .eq('id', callData.id);
           
-        callsPlaced.push({
-          id: callData.id,
-          contactName: contact.name,
-          phoneNumber: contact.phone_number,
-          twilioSid: twilioCall.sid
-        });
-          
-        console.log(`Call record created for ${contact.phone_number} (${contact.name}), Twilio SID: ${twilioCall.sid}`);
+        console.log(`Call initiated to ${contact.phone_number} (${contact.name}), Twilio SID: ${twilioCall.sid}`);
       } catch (callError) {
         console.error('Error making call:', callError);
       }
@@ -186,14 +173,13 @@ Deno.serve(async (req) => {
     
     return new Response(JSON.stringify({ 
       success: true, 
-      message: `Predictive dialer started. Making ${callsPlaced.length} calls.`,
-      callsPlaced
+      message: `Predictive dialer started. Making ${contactsToCall.length} calls.` 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error) {
-    console.error('Error in start-predictive-dialer:', error);
+    console.error('Error in start-predictive-dialer function:', error);
     
     return new Response(JSON.stringify({ 
       success: false, 

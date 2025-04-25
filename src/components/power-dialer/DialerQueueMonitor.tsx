@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -98,6 +99,7 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
         const completed = leadsData?.filter(lead => lead.status === 'completed').length || 0;
         
         console.log(`Direct count - Queued: ${queued}, In Progress: ${inProgress}, Completed: ${completed}, Total: ${leadsData.length}`);
+        console.log("Sample lead:", leadsData[0]);
         
         setStats({
           queued_count: queued,
@@ -105,6 +107,15 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
           completed_count: completed,
           total_count: (leadsData?.length || 0)
         });
+        
+        if (queued === 0 && leadsData.length > 0) {
+          // If we have leads but none are queued, check what status they have
+          const statuses = [...new Set(leadsData.map(lead => lead.status))];
+          console.log("Lead statuses in session:", statuses);
+          if (!statuses.includes('queued')) {
+            setNoLeadsError(`Leads found but none are queued. Current statuses: ${statuses.join(', ')}`);
+          }
+        }
       }
     } catch (error) {
       console.error('Error fetching queue stats:', error);
