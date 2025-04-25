@@ -1,49 +1,81 @@
-
-# project_id should be the first line
 project_id = "imrmboyczebjlbnkgjns"
-
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage", "graphql_public"]
+schemas = ["public", "storage"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
 
 [db]
 port = 54322
 shadow_port = 54320
 major_version = 15
 
+[db.pooler]
+enabled = false
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[realtime]
+enabled = true
+
 [studio]
 enabled = true
 port = 54323
 api_url = "http://localhost"
 
-[inbucket]
-enabled = true
-port = 54324
-
 [storage]
 enabled = true
-port = 54325
 
 [auth]
 enabled = true
-port = 54326
+site_url = "http://localhost:3000"
+uri_allow_list = ["https://localhost:3000", "capacitor://localhost", "https://***-***.gitpod.io"]
+additional_redirect_urls = ["https://localhost:3000"]
 
-[auto-update]
+[auth.email]
 enabled = true
+double_confirm_changes = true
+double_confirm_delete = true
 
-[realtime]
-enabled = true
+[auth.email.template.invite]
+subject = "You have been invited"
+content_path = ""
 
-# Add verify_jwt=false for both functions to make them public
+[auth.external.github]
+enabled = false
+client_id = ""
+secret = ""
+redirect_uri = ""
+
+[analytics]
+enabled = false
+port = 54327
+vector_port = 54328
+backend = "postgres"
+
+[experimental.functions.memory]
+max_memory_mb = 3500
+
+[functions]
+port = 54324
+serve_port = 54325
+url = "http://localhost:54321"
+protocol = "http"
+
 [functions.twilio-token]
 verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.call-status-logger]
+[functions.twilio-stream]
 verify_jwt = false
 
-[functions.twilio-stream]
+[functions.predictive-dialer-webhook]
+verify_jwt = false
+
+[functions.call-status-logger]
 verify_jwt = false

@@ -22,6 +22,16 @@ interface LineDisplayProps {
   };
 }
 
+interface CallLog {
+  sid: string;
+  status: string;
+  from_number: string;
+  to_number: string;
+  duration: number;
+  timestamp: string;
+  line_number: number;
+}
+
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   const [recentCallLogs, setRecentCallLogs] = useState<CallLog[]>([]);

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import twilio from "npm:twilio@4.10.0";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -16,27 +15,6 @@ const twiml = twilio.twiml;
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Initialize maps to store calling attempts
-const callAttempts = new Map<string, Map<string, number>>();
-const activeDialingAttempts = new Map<string, Map<string, number>>();
-
-// Helper functions
-function formatPhoneNumberForDialing(phoneNumber: string): string {
-  // Clean up the phone number, removing any non-digit characters
-  const cleaned = phoneNumber.replace(/\D/g, '');
-  
-  // Add + prefix if not already present
-  if (!cleaned.startsWith('+')) {
-    return `+${cleaned}`;
-  }
-  
-  return phoneNumber;
-}
-
-function normalizePhoneNumber(phoneNumber: string): string {
-  return phoneNumber.replace(/\D/g, '');
-}
 
 // Helper function to log call status
 async function logCallStatus(data: any) {
@@ -96,25 +74,6 @@ serve(async (req) => {
     // Log call status for any incoming status updates
     if (formData.CallSid && formData.CallStatus) {
       await logCallStatus(formData);
-      
-      // Also forward to the call-status-logger for redundancy
-      try {
-        const callStatusLoggerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-status-logger`;
-        
-        const formDataToSend = new FormData();
-        Object.keys(formData).forEach(key => {
-          formDataToSend.append(key, formData[key]);
-        });
-        
-        fetch(callStatusLoggerUrl, {
-          method: 'POST',
-          body: formDataToSend
-        }).catch(err => console.error(`[${requestId}] Error forwarding to call-status-logger:`, err));
-        
-        console.log(`[${requestId}] Successfully forwarded call status to call-status-logger`);
-      } catch (err) {
-        console.error(`[${requestId}] Error forwarding call status:`, err);
-      }
     }
 
     // Extract session ID
@@ -274,9 +233,6 @@ serve(async (req) => {
       
       console.log(`JSON Request: Dialing ${formData.phoneNumber} with caller ID: ${callerId || "default"}`);
       
-      // Get the full URL to our call-status-logger function
-      const callStatusLoggerUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/call-status-logger`;
-      
       const dial = response.dial({
         callerId: callerId,
         timeout: 30,
@@ -284,7 +240,7 @@ serve(async (req) => {
         action: `${Deno.env.get('SUPABASE_URL')}/functions/v1/twilio-voice?dialAction=true`,
         method: "POST",
         statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        statusCallback: callStatusLoggerUrl, // Use our call-status-logger function
+        statusCallback: `${Deno.env.get('SUPABASE_URL')}/functions/v1/twilio-voice`,
         statusCallbackMethod: 'POST'
       });
       
