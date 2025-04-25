@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -11,6 +10,31 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Temporary memory store for call statuses when database table is not available
+const memoryCallStatusStore: Record<string, any[]> = {};
+
+// Store call status update in memory
+function storeCallStatusUpdate(sessionId: string, statusData: any) {
+  if (!memoryCallStatusStore[sessionId]) {
+    memoryCallStatusStore[sessionId] = [];
+  }
+  
+  const update = {
+    session_id: sessionId,
+    timestamp: Date.now(),
+    data: statusData,
+  };
+  
+  memoryCallStatusStore[sessionId].push(update);
+  
+  // Keep only the latest 100 updates per session to avoid memory issues
+  if (memoryCallStatusStore[sessionId].length > 100) {
+    memoryCallStatusStore[sessionId] = memoryCallStatusStore[sessionId].slice(-100);
+  }
+  
+  return update;
+}
 
 // Main function to handle requests
 Deno.serve(async (req) => {
@@ -115,6 +139,46 @@ Deno.serve(async (req) => {
       default:
         // For other statuses (ringing, queued, etc.), just log
         console.log(`Received status update: ${callStatus} for call ${callId}`);
+    }
+    
+    // Create a call status update for real-time tracking
+    const statusUpdate = {
+      callSid,
+      status: callStatus,
+      timestamp: Date.now(),
+      agentId: call.agent_id,
+      leadId: call.contact_id,
+      phoneNumber: call.contact?.phone_number,
+      leadName: call.contact?.name,
+      duration: callDuration ? parseInt(callDuration) : undefined,
+      company: call.contact?.company
+    };
+    
+    // Try to store the call status update in Supabase table
+    if (call.session_id) {
+      try {
+        const { data, error } = await supabase
+          .from('call_status_updates')
+          .insert({
+            call_sid: callSid,
+            session_id: call.session_id,
+            status: callStatus,
+            timestamp: new Date().toISOString(),
+            data: statusUpdate
+          });
+          
+        if (error) {
+          console.error('Error writing to call_status_updates table:', error);
+          // If the database write fails, use the memory store
+          storeCallStatusUpdate(call.session_id, statusUpdate);
+        } else {
+          console.log('Successfully wrote call status update to database:', data);
+        }
+      } catch (dbError) {
+        console.error('Error writing to call_status_updates table, using memory store instead:', dbError.message);
+        // If the database write fails, use the memory store
+        storeCallStatusUpdate(call.session_id, statusUpdate);
+      }
     }
     
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {

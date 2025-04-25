@@ -160,7 +160,7 @@ Deno.serve(async (req) => {
     
     // Try to store the call status update in Supabase table
     try {
-      await supabase
+      const { data, error } = await supabase
         .from('call_status_updates')
         .insert({
           call_sid: callSid,
@@ -169,8 +169,16 @@ Deno.serve(async (req) => {
           timestamp: new Date().toISOString(),
           data: statusUpdate
         });
+      
+      if (error) {
+        console.error('Error writing to call_status_updates table:', error);
+        // If the database write fails, use the memory store
+        storeCallStatusUpdate(call.session_id, statusUpdate);
+      } else {
+        console.log('Successfully wrote call status update to database:', data);
+      }
     } catch (dbError) {
-      console.log('Error writing to call_status_updates table, using memory store instead:', dbError.message);
+      console.error('Error writing to call_status_updates table, using memory store instead:', dbError.message);
       // If the database write fails, use the memory store
       storeCallStatusUpdate(call.session_id, statusUpdate);
     }

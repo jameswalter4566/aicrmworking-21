@@ -44,6 +44,27 @@ Deno.serve(async (req) => {
 
     console.log(`Fetching updates for session ${sessionId} since timestamp ${lastTimestamp}`);
     
+    // For diagnostic purposes, let's check if the session exists by querying a dialing_sessions table
+    let sessionInfo = null;
+    try {
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('dialing_sessions')
+        .select('id, name, status')
+        .eq('id', sessionId)
+        .maybeSingle();
+        
+      if (sessionData) {
+        console.log(`Found session: ${sessionData.name} with status ${sessionData.status}`);
+        sessionInfo = sessionData;
+      } else if (sessionError) {
+        console.log(`Error looking up session: ${sessionError.message}`);
+      } else {
+        console.log(`No session found with ID ${sessionId}`);
+      }
+    } catch (e) {
+      console.log(`Exception looking up session: ${e.message}`);
+    }
+    
     let updates = [];
     
     try {
@@ -86,6 +107,10 @@ Deno.serve(async (req) => {
       console.log('Memory store updates:', updates);
     }
     
+    // Check if we have any updates in memory store for this session
+    const memoryStoreUpdates = memoryCallStatusStore[sessionId] || [];
+    console.log(`Memory store has ${memoryStoreUpdates.length} updates for this session`);
+    
     // Return the updates
     return new Response(JSON.stringify({ 
       updates,
@@ -93,6 +118,8 @@ Deno.serve(async (req) => {
         sessionId,
         lastTimestamp,
         updateCount: updates.length,
+        memoryStoreCount: memoryStoreUpdates.length,
+        sessionInfo,
         timestamp: new Date().toISOString()
       }
     }), {

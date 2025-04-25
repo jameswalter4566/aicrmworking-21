@@ -1,14 +1,42 @@
 
+# This file contains all the settings for your Supabase project
+
 project_id = "imrmboyczebjlbnkgjns"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+
+[db]
+port = 54322
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
+[realtime]
+enabled = true
+
 [functions.dialer-webhook]
 verify_jwt = false
+
 [functions.get-call-updates]
 verify_jwt = false
+
 [functions.twilio-token]
 verify_jwt = false
+
 [functions.twilio-voice]
-verify_jwt = false
-[functions.ai-sms-agent]
-verify_jwt = false
-[functions.sms-webhook-receiver]
 verify_jwt = false
