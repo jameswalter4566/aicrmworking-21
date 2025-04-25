@@ -51,23 +51,26 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       case 'ringing':
         return { 
           bg: 'bg-green-100/50',
-          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber}`
+          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber || ''}`,
+          badgeClass: 'bg-green-100 text-green-800'
         };
       case 'in-progress':
         return {
-          bg: 'bg-green-500',
-          text: `Connected ${formatDuration(callDuration)}`
+          bg: 'bg-green-500/20',
+          text: `Connected ${formatDuration(callDuration)}`,
+          badgeClass: 'bg-green-500 text-white'
         };
       case 'completed':
       case 'failed':
       case 'busy':
       case 'no-answer':
         return {
-          bg: 'bg-red-100',
-          text: 'Disconnected'
+          bg: 'bg-red-100/50',
+          text: 'Disconnected',
+          badgeClass: 'bg-red-100 text-red-800'
         };
       default:
-        return { bg: 'bg-white', text: 'FREE' };
+        return { bg: 'bg-white', text: 'FREE', badgeClass: 'bg-white text-gray-600' };
     }
   };
 
@@ -83,14 +86,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           </div>
           <Badge 
             variant="outline" 
-            className={`
-              ${currentCall?.status === 'in-progress' ? 'bg-green-500 text-white' : 
-                (currentCall?.status === 'connecting' || currentCall?.status === 'ringing') ? 'bg-green-100 text-green-800' :
-                (currentCall?.status === 'completed' || currentCall?.status === 'failed' || 
-                currentCall?.status === 'busy' || currentCall?.status === 'no-answer') ? 'bg-red-100 text-red-800' :
-                'bg-white text-gray-600'} 
-              border-gray-200
-            `}
+            className={`${status.badgeClass || ''} border-gray-200`}
           >
             {status.text}
           </Badge>

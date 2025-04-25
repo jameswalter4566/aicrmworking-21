@@ -27,7 +27,7 @@ export interface ActiveCall {
     id?: string;
   };
   // Updated to match CallStatus type
-  status: CallStatus['status'];
+  status: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   startTime?: Date;
   endTime?: Date;
   duration?: number;
