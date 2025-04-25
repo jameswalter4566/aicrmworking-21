@@ -62,6 +62,10 @@ export function useCallStatus(sessionId: string | null) {
               statusData.company = statusData.leadInfo.company;
             }
             
+            // Make sure error information is included
+            statusData.errorCode = statusData.errorCode || statusData.ErrorCode;
+            statusData.errorMessage = statusData.errorMessage || statusData.ErrorMessage;
+            
             // Update our status map
             newStatuses[statusData.callSid] = statusData;
             
@@ -126,5 +130,28 @@ export function useCallStatus(sessionId: string | null) {
     };
   }, [sessionId]);
   
-  return { callStatuses, isPolling };
+  // Create a mock update if one is explicitly requested (for testing only)
+  const createMockUpdate = () => {
+    if (!sessionId) return;
+    
+    const mockUpdate: CallStatusUpdate = {
+      callSid: `mock-call-${Date.now()}`,
+      status: 'ringing',
+      timestamp: Date.now(),
+      phoneNumber: '+18158625164',
+      leadName: 'Mock Test Lead',
+      company: 'Test Company',
+      errorCode: null,
+      errorMessage: null
+    };
+    
+    setCallStatuses(prev => ({
+      ...prev,
+      [mockUpdate.callSid]: mockUpdate
+    }));
+    
+    console.log('Added mock call status for testing:', mockUpdate);
+  };
+  
+  return { callStatuses, isPolling, createMockUpdate };
 }

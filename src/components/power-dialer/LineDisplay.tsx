@@ -12,12 +12,13 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
 
   useEffect(() => {
     if (currentCall?.status !== previousStatus) {
+      console.log(`Line ${lineNumber} status changed: ${previousStatus} -> ${currentCall?.status}`);
       setPreviousStatus(currentCall?.status);
       if (previousStatus && currentCall?.status !== 'in-progress') {
         setCallDuration(0);
       }
     }
-  }, [currentCall?.status, previousStatus]);
+  }, [currentCall?.status, previousStatus, lineNumber]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
@@ -38,6 +39,13 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
       if (interval) clearInterval(interval);
     };
   }, [currentCall?.status, currentCall?.startTime, currentCall?.duration]);
+
+  useEffect(() => {
+    // Debug log to confirm we're receiving error information
+    if (currentCall?.errorCode || currentCall?.errorMessage) {
+      console.log(`Line ${lineNumber} has error: ${currentCall.errorCode} - ${currentCall.errorMessage}`);
+    }
+  }, [currentCall?.errorCode, currentCall?.errorMessage, lineNumber]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -134,9 +142,9 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
         )}
 
         {currentCall?.errorMessage && (
-          <Alert variant="destructive" className="mt-2">
+          <Alert variant="destructive" className="mt-2 py-2 px-3">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{currentCall.errorMessage}</AlertDescription>
+            <AlertDescription className="text-xs">{currentCall.errorMessage}</AlertDescription>
           </Alert>
         )}
 

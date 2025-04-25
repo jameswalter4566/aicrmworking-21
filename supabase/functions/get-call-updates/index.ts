@@ -90,7 +90,10 @@ Deno.serve(async (req) => {
           ...update,
           data: {
             ...update.data,
-            timestamp: new Date(update.timestamp).getTime()
+            timestamp: new Date(update.timestamp).getTime(),
+            // Make sure error information is included if available
+            errorCode: update.data.errorCode || update.data.ErrorCode,
+            errorMessage: update.data.errorMessage || update.data.ErrorMessage
           }
         }));
         console.log('Processed updates:', updates);
@@ -109,7 +112,14 @@ Deno.serve(async (req) => {
       const sessionUpdates = memoryCallStatusStore[sessionId] || [];
       updates = sessionUpdates.filter(update => 
         update.timestamp > parseInt(lastTimestamp.toString())
-      ).slice(0, 20);
+      ).slice(0, 20).map(update => {
+        // Make sure error information is included if available
+        if (update.data) {
+          update.data.errorCode = update.data.errorCode || update.data.ErrorCode;
+          update.data.errorMessage = update.data.errorMessage || update.data.ErrorMessage;
+        }
+        return update;
+      });
       console.log(`Memory store has ${sessionUpdates.length} total updates, returning ${updates.length} updates for timestamp > ${lastTimestamp}`);
     }
     
@@ -118,8 +128,7 @@ Deno.serve(async (req) => {
     console.log(`Memory store has ${memoryStoreUpdates.length} updates for this session`);
     
     // Generate a mock update if we have no updates (for testing only)
-    // Comment out in production
-    if (updates.length === 0 && false) {  // Set to true to enable mock updates for testing
+    if (updates.length === 0 && req.url.includes('mock=true')) {
       const mockUpdate = {
         id: `mock-${Date.now()}`,
         session_id: sessionId,
@@ -128,8 +137,10 @@ Deno.serve(async (req) => {
           callSid: `mock-call-${Date.now()}`,
           status: 'ringing',
           timestamp: Date.now(),
-          phoneNumber: '+1234567890',
-          leadName: 'Mock Test Lead'
+          phoneNumber: '+18158625164',
+          leadName: 'Test Lead',
+          errorCode: null,
+          errorMessage: null
         }
       };
       updates.push(mockUpdate);
