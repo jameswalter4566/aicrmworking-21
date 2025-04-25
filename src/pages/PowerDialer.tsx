@@ -257,7 +257,7 @@ export default function PowerDialer() {
       
       const phoneNumber = currentCall.parameters?.To || currentCall.phoneNumber;
       
-      if (currentCall.status === 'ringing' || currentCall.status === 'connecting') {
+      if (currentCall.status === 'connecting' || currentCall.status === 'ringing') {
         return { 
           bg: 'bg-yellow-50',
           text: `Dialing${displayName ? ` ${displayName}` : ''}`,
@@ -298,8 +298,6 @@ export default function PowerDialer() {
           };
       }
     };
-
-    const status = getStatusDisplay();
 
     return (
       <div className="flex flex-col space-y-4">
