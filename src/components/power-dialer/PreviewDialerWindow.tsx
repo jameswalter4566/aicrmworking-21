@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
-import { toast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/context/AuthContext";
@@ -168,10 +168,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 
   const handleStartPowerDialing = async () => {
     if (!sessionId) {
-      toast({
-        title: "No active session found",
-        description: "Please select a list and create a dialing session first.",
-      });
+      toast.error("No active session found");
       return;
     }
 
@@ -181,17 +178,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       setAutoDialerActive(true);
       setIsActivePowerDialing(true);
       
-      toast({
-        title: "Power Dialing Session Started",
-        description: "The system will now automatically dial leads in queue",
+      toast.success("Power dialing sequence started", {
+        description: "The system will now automatically dial leads in queue"
       });
     } catch (error) {
       console.error("Error starting power dialing:", error);
-      toast({
-        title: "Failed to start power dialing",
-        description: error instanceof Error ? error.message : "Failed to start dialing",
-        variant: "destructive",
-      });
+      toast.error("Failed to start power dialing");
       setAutoDialerActive(false);
       setIsActivePowerDialing(false);
     } finally {
@@ -292,13 +284,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       </div>
                     )}
 
-                    {autoDialerActive && (
-                      <AutoDialerController 
-                        sessionId={sessionId}
-                        isActive={autoDialerActive}
-                        onCallComplete={handleCallComplete}
-                      />
-                    )}
+                    <AutoDialerController 
+                      sessionId={sessionId}
+                      isActive={autoDialerActive}
+                      onCallComplete={handleCallComplete}
+                    />
                   </>
                 )}
                 
@@ -334,6 +324,20 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   </div>
                 )}
 
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-medium">Select a Calling List</h3>
+                  {selectedListId && !sessionId && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setSelectedListId(null)}
+                      className="text-sm"
+                      disabled={isCreatingSession}
+                    >
+                      Change List
+                    </Button>
+                  )}
+                </div>
+                
                 {isLoadingLists ? (
                   <div className="text-center py-8 text-gray-500">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />

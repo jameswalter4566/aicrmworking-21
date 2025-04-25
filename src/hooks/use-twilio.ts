@@ -5,7 +5,7 @@ import { toast } from '@/components/ui/use-toast';
 export interface ActiveCall {
   callSid: string;
   phoneNumber: string;
-  status: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+  status: 'connecting' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   leadId: string | number;
   isMuted?: boolean;
   speakerOn?: boolean;

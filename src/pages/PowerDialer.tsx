@@ -102,11 +102,7 @@ export default function PowerDialer() {
   const [callInProgress, setCallInProgress] = useState(false);
   const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
-  const [currentLineStatuses, setCurrentLineStatuses] = useState<Map<number, any>>(new Map());
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [isProcessingCall, setIsProcessingCall] = useState(false);
-  const [autoDialerActive, setAutoDialerActive] = useState(false);
-  const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
+  const [currentLineStatuses, setCurrentLineStatuses] = useState<Map<number, ActiveCall>>(new Map());
 
   const {
     initialized,
@@ -126,43 +122,22 @@ export default function PowerDialer() {
   } = useTwilio();
 
   useEffect(() => {
-    console.log("Updating line statuses from activeCalls:", activeCalls);
-    
-    if (!activeCalls) {
-      console.log("No active calls available");
-      return;
+    if (window.Twilio && window.Twilio.Device) {
+      console.log("Twilio device available:", window.Twilio.Device);
+      setTwilioReady(true);
+      
+      return () => {};
     }
+  }, [isScriptLoaded]);
+
+  useEffect(() => {
+    if (!activeCalls) return;
     
-    const newLineStatuses = new Map();
-    let hasActiveCall = false;
-    
-    Object.entries(activeCalls).forEach(([leadId, call], index) => {
-      if (index < 3) { // Only track first 3 lines
-        const lineNumber = index + 1;
-        const leadInfo = leads.find(l => l.id === leadId);
-        
-        if (call) {
-          const callInfo = {
-            phoneNumber: call.phoneNumber,
-            leadName: leadInfo?.name || `Lead ${leadId.substring(0, 6)}`, 
-            status: call.status,
-            startTime: call.status === 'in-progress' ? new Date() : undefined,
-            company: leadInfo?.company,
-            customName: leadInfo?.name
-          };
-          
-          console.log(`Assigning call to line ${lineNumber}:`, callInfo);
-          newLineStatuses.set(lineNumber, callInfo);
-          
-          if (call.status === 'in-progress' || call.status === 'connecting' || 
-              call.status === 'ringing') {
-            hasActiveCall = true;
-          }
-        }
-      }
+    const newLineStatuses = new Map<number, ActiveCall>();
+    Object.entries(activeCalls).forEach(([leadId, callData], index) => {
+      const call = callData as ActiveCall;
+      newLineStatuses.set(index + 1, call);
     });
-    
-    setCallInProgress(hasActiveCall);
     
     setCurrentLineStatuses(newLineStatuses);
     
@@ -172,26 +147,7 @@ export default function PowerDialer() {
     } else {
       setCurrentCall(null);
     }
-    
-    console.log("Final line statuses:", Array.from(newLineStatuses.entries()));
-  }, [activeCalls, leads]);
-
-  const getCallInfoForLine = (lineNumber: number): {
-    phoneNumber?: string;
-    leadName?: string;
-    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
-    startTime?: Date;
-    company?: string;
-  } | undefined => {
-    if (currentLineStatuses.has(lineNumber)) {
-      const callInfo = currentLineStatuses.get(lineNumber);
-      console.log(`Getting call info for line ${lineNumber}:`, callInfo);
-      return callInfo;
-    }
-    
-    console.log(`No call info for line ${lineNumber}`);
-    return undefined;
-  };
+  }, [activeCalls]);
 
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
@@ -248,22 +204,7 @@ export default function PowerDialer() {
       
       console.log("Call result:", callResult);
       
-      if (callResult.success) {
-        const newLineStatuses = new Map(currentLineStatuses);
-        newLineStatuses.set(1, {
-          phoneNumber: lead.phone,
-          leadName: lead.name,
-          company: lead.company,
-          status: 'connecting',
-          startTime: undefined
-        });
-        setCurrentLineStatuses(newLineStatuses);
-        
-        toast({
-          title: "Call Initiated",
-          description: `Calling ${lead.name}...`,
-        });
-      } else {
+      if (!callResult.success) {
         console.error("Call failed:", JSON.stringify(callResult));
         toast({
           title: "Call Failed",
@@ -272,6 +213,11 @@ export default function PowerDialer() {
         });
         setCallInProgress(false);
         setIsDialing(false);
+      } else {
+        toast({
+          title: "Call Initiated",
+          description: `Calling ${lead.name}...`,
+        });
       }
     } catch (error: any) {
       console.error("Error making call:", error);
@@ -297,17 +243,6 @@ export default function PowerDialer() {
     await endCall(leadId);
     updateLeadStatus(leadId, "Contacted");
     setCallInProgress(false);
-    
-    const newLineStatuses = new Map(currentLineStatuses);
-    currentLineStatuses.forEach((callInfo, lineNumber) => {
-      if (callInfo && activeCalls && activeCalls[leadId]) {
-        newLineStatuses.set(lineNumber, {
-          ...callInfo,
-          status: 'completed'
-        });
-      }
-    });
-    setCurrentLineStatuses(newLineStatuses);
   };
 
   const handleDisposition = (type: string) => {
@@ -323,6 +258,27 @@ export default function PowerDialer() {
 
   const [isDialing, setIsDialing] = useState(false);
 
+  const getCallInfoForLine = (lineNumber: number): {
+    phoneNumber?: string;
+    leadName?: string;
+    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+    startTime?: Date;
+    company?: string;
+  } | undefined => {
+    const activeCall = currentLineStatuses.get(lineNumber);
+    if (!activeCall) return undefined;
+    
+    const leadInfo = leads.find(lead => lead.id === activeCall.leadId.toString());
+    
+    return {
+      phoneNumber: activeCall.phoneNumber,
+      leadName: leadInfo?.name,
+      status: activeCall.status,
+      startTime: activeCall.status === 'in-progress' ? new Date() : undefined,
+      company: leadInfo?.company
+    };
+  };
+
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
       <Card className="bg-muted/50">
@@ -336,7 +292,6 @@ export default function PowerDialer() {
                 onClick={async () => {
                   const success = await endAllCalls();
                   if (success) {
-                    setCurrentLineStatuses(new Map());
                     toast({
                       title: "System Reset",
                       description: "All active calls have been terminated. The system has been reset.",
@@ -696,53 +651,6 @@ export default function PowerDialer() {
       </Card>
     </div>
   );
-
-  const handleStartPowerDialing = async () => {
-    if (!sessionId) {
-      toast({
-        title: "No active session found",
-        description: "Please select a list and create a dialing session first.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsProcessingCall(true);
-      await twilioService.initializeTwilioDevice();
-      setAutoDialerActive(true);
-      setIsActivePowerDialing(true);
-      
-      // Initialize audio capture
-      const micAccess = await twilioService.initializeAudioContext();
-      if (!micAccess) {
-        toast({
-          title: "Microphone Access Required",
-          description: "Please allow microphone access to start dialing.",
-          variant: "destructive",
-        });
-        setAutoDialerActive(false);
-        setIsActivePowerDialing(false);
-        return;
-      }
-      
-      toast({
-        title: "Power Dialing Session Started",
-        description: "The system will now automatically dial leads in queue",
-      });
-    } catch (error) {
-      console.error("Error starting power dialing:", error);
-      toast({
-        title: "Failed to Start",
-        description: "Could not start power dialing session. Please try again.",
-        variant: "destructive",
-      });
-      setAutoDialerActive(false);
-      setIsActivePowerDialing(false);
-    } finally {
-      setIsProcessingCall(false);
-    }
-  };
 
   return (
     <MainLayout>
