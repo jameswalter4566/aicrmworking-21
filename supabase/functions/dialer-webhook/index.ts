@@ -1,6 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { connect, StringCodec } from "https://deno.land/x/nats@v1.16.0/src/mod.ts";
+import { storeCallStatusUpdate } from "../get-call-updates/index.ts";
 
 // Define CORS headers for browser requests
 const corsHeaders = {
@@ -130,19 +131,26 @@ Deno.serve(async (req) => {
       leadId: call.contact_id,
       phoneNumber: call.contact?.phone_number,
       leadName: call.contact?.name,  // Include the lead name
-      duration: callDuration ? parseInt(callDuration) : undefined
+      duration: callDuration ? parseInt(callDuration) : undefined,
+      company: call.contact?.company
     };
     
-    // Store the call status update in Supabase table for clients to poll
-    await supabase
-      .from('call_status_updates')
-      .insert({
-        call_sid: callSid,
-        session_id: call.session_id,
-        status: callStatus,
-        timestamp: new Date().toISOString(),
-        data: statusUpdate
-      });
+    // Try to store the call status update in Supabase table for clients to poll
+    try {
+      await supabase
+        .from('call_status_updates')
+        .insert({
+          call_sid: callSid,
+          session_id: call.session_id,
+          status: callStatus,
+          timestamp: new Date().toISOString(),
+          data: statusUpdate
+        });
+    } catch (dbError) {
+      console.log('Error writing to call_status_updates table, using memory store instead:', dbError.message);
+      // If the database table doesn't exist, use the memory store
+      storeCallStatusUpdate(call.session_id, statusUpdate);
+    }
     
     // Try to publish via NATS if available (as backup method)
     try {
