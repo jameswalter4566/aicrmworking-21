@@ -14,6 +14,7 @@ interface LineDisplayProps {
     status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
     startTime?: Date;
     company?: string;
+    customName?: string;
   };
 }
 
