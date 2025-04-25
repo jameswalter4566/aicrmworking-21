@@ -18,14 +18,20 @@ interface LineDisplayProps {
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
 
+  // Add debugging logs to trace prop changes
+  console.log(`LineDisplay Render - Input Props:`, { lineNumber, currentCall });
+
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
+      // Start timer for in-progress calls
       interval = setInterval(() => {
         const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
         setCallDuration(duration);
       }, 1000);
+      
+      console.log(`Starting timer for line ${lineNumber} with call`, currentCall);
     } else {
       setCallDuration(0);
     }
@@ -33,7 +39,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [currentCall?.status, currentCall?.startTime]);
+  }, [currentCall?.status, currentCall?.startTime, lineNumber]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -42,19 +48,24 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const getStatusDisplay = () => {
+    console.log(`LineDisplay getStatusDisplay - Calculating status for: ${currentCall?.status}`);
+    
     if (!currentCall?.status) {
+      console.log(`No current call or phone number - displaying FREE state`);
       return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
     
     switch (currentCall.status) {
       case 'connecting':
       case 'ringing':
+        console.log(`Call in ${currentCall.status} state for line ${lineNumber}`);
         return { 
           bg: 'bg-green-100/50',
-          text: `Dialing ${currentCall.leadName || currentCall.phoneNumber}`,
+          text: `Dialing ${currentCall.leadName || currentCall.phoneNumber || 'unknown'}`,
           badge: 'bg-green-100 text-green-800'
         };
       case 'in-progress':
+        console.log(`Call in progress for line ${lineNumber}, duration: ${formatDuration(callDuration)}`);
         return {
           bg: 'bg-green-500/90',
           text: `Connected ${formatDuration(callDuration)}`,
@@ -64,12 +75,14 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       case 'failed':
       case 'busy':
       case 'no-answer':
+        console.log(`Call ended with status ${currentCall.status} for line ${lineNumber}`);
         return {
           bg: 'bg-red-100',
           text: 'Disconnected',
           badge: 'bg-red-100 text-red-800'
         };
       default:
+        console.log(`Unknown call status ${currentCall.status} for line ${lineNumber}`);
         return { 
           bg: 'bg-yellow-100', 
           text: 'WAITING', 
@@ -79,6 +92,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const status = getStatusDisplay();
+  console.log(`LineDisplay Render - Calculated Status:`, status);
 
   return (
     <Card className={`transition-all duration-300 ${status.bg}`}>

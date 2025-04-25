@@ -102,7 +102,7 @@ export default function PowerDialer() {
   const [callInProgress, setCallInProgress] = useState(false);
   const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
-  const [currentLineStatuses, setCurrentLineStatuses] = useState<Map<number, ActiveCall>>(new Map());
+  const [currentLineStatuses, setCurrentLineStatuses] = useState<Map<number, any>>(new Map());
 
   const {
     initialized,
@@ -122,21 +122,30 @@ export default function PowerDialer() {
   } = useTwilio();
 
   useEffect(() => {
-    if (window.Twilio && window.Twilio.Device) {
-      console.log("Twilio device available:", window.Twilio.Device);
-      setTwilioReady(true);
-      
-      return () => {};
-    }
-  }, [isScriptLoaded]);
-
-  useEffect(() => {
+    console.log("Updating line statuses from activeCalls:", activeCalls);
+    
     if (!activeCalls) return;
     
-    const newLineStatuses = new Map<number, ActiveCall>();
-    Object.entries(activeCalls).forEach(([leadId, callData], index) => {
+    const newLineStatuses = new Map();
+    
+    const callEntries = Object.entries(activeCalls);
+    
+    callEntries.forEach(([leadId, callData], index) => {
       const call = callData as ActiveCall;
-      newLineStatuses.set(index + 1, call);
+      const lineNumber = index + 1;
+      
+      const leadInfo = leads.find(lead => lead.id === leadId);
+      
+      const callInfo = {
+        phoneNumber: call.phoneNumber,
+        leadName: leadInfo?.name || "Unknown Lead", 
+        status: call.status,
+        startTime: call.status === 'in-progress' ? new Date() : undefined,
+        company: leadInfo?.company || "Unknown Company"
+      };
+      
+      console.log(`Assigning call to line ${lineNumber}:`, callInfo);
+      newLineStatuses.set(lineNumber, callInfo);
     });
     
     setCurrentLineStatuses(newLineStatuses);
@@ -147,7 +156,24 @@ export default function PowerDialer() {
     } else {
       setCurrentCall(null);
     }
-  }, [activeCalls]);
+  }, [activeCalls, leads]);
+
+  const getCallInfoForLine = (lineNumber: number): {
+    phoneNumber?: string;
+    leadName?: string;
+    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+    startTime?: Date;
+    company?: string;
+  } | undefined => {
+    if (currentLineStatuses.has(lineNumber)) {
+      const callInfo = currentLineStatuses.get(lineNumber);
+      console.log(`Getting call info for line ${lineNumber}:`, callInfo);
+      return callInfo;
+    }
+    
+    console.log(`No call info for line ${lineNumber}`);
+    return undefined;
+  };
 
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
@@ -257,27 +283,6 @@ export default function PowerDialer() {
   };
 
   const [isDialing, setIsDialing] = useState(false);
-
-  const getCallInfoForLine = (lineNumber: number): {
-    phoneNumber?: string;
-    leadName?: string;
-    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
-    startTime?: Date;
-    company?: string;
-  } | undefined => {
-    const activeCall = currentLineStatuses.get(lineNumber);
-    if (!activeCall) return undefined;
-    
-    const leadInfo = leads.find(lead => lead.id === activeCall.leadId.toString());
-    
-    return {
-      phoneNumber: activeCall.phoneNumber,
-      leadName: leadInfo?.name,
-      status: activeCall.status,
-      startTime: activeCall.status === 'in-progress' ? new Date() : undefined,
-      company: leadInfo?.company
-    };
-  };
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
