@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { natsService } from '@/services/nats';
 import { supabase } from '@/integrations/supabase/client';
@@ -48,16 +47,15 @@ export function useCallStatus(sessionId: string | null) {
       
       console.log('Received update response:', response.data);
       
-      if (response.data && response.data.updates && response.data.updates.length > 0) {
-        console.log(`Received ${response.data.updates.length} call updates`);
+      if (response.data?.updates?.length > 0) {
+        console.log(`Received ${response.data.updates.length} call updates:`, response.data.updates);
         
-        // Process the updates
         const newStatuses = { ...callStatuses };
         
         response.data.updates.forEach((update: any) => {
-          const statusData = update.data || update; // Handle both DB and memory store formats
-          if (statusData && statusData.callSid) {
-            // Extract any lead information from the status update
+          const statusData = update.data || update;
+          if (statusData?.callSid) {
+            // Extract lead information
             if (statusData.leadInfo) {
               statusData.leadName = statusData.leadInfo.name;
               statusData.company = statusData.leadInfo.company;
@@ -71,10 +69,14 @@ export function useCallStatus(sessionId: string | null) {
               statusData.errorMessage = statusData.errorMessage || statusData.ErrorMessage;
             }
             
-            // Update our status map
-            newStatuses[statusData.callSid] = statusData;
+            newStatuses[statusData.callSid] = {
+              ...statusData,
+              status: statusData.status as CallStatus,
+              errorCode: statusData.errorCode,
+              errorMessage: statusData.errorMessage
+            };
             
-            // Update our latest timestamp
+            // Update timestamp tracking
             const updateTime = update.timestamp || statusData.timestamp;
             if (updateTime > lastTimestampRef.current) {
               lastTimestampRef.current = updateTime;
@@ -83,8 +85,6 @@ export function useCallStatus(sessionId: string | null) {
         });
         
         setCallStatuses(newStatuses);
-      } else {
-        console.log('No new call updates found');
       }
     } catch (error) {
       console.error('Failed to fetch call updates:', error);
