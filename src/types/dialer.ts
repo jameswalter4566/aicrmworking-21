@@ -10,6 +10,7 @@ export interface LineCallData {
   duration?: number;
   errorCode?: string;
   errorMessage?: string;
+  callSid?: string;
 }
 
 export interface LineDisplayData {
@@ -19,7 +20,7 @@ export interface LineDisplayData {
 
 export interface CallStatusUpdate {
   callSid: string;
-  status: 'queued' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+  status: CallStatus;
   timestamp: number;
   agentId?: string;
   leadId?: string;

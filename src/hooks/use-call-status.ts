@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { CallStatusUpdate, natsService } from '@/services/nats';
 import { supabase } from '@/integrations/supabase/client';
@@ -110,9 +109,15 @@ export function useCallStatus(sessionId: string | null) {
     
     try {
       natsUnsubscribe = natsService.subscribeToCallStatus(sessionId, (update) => {
+        console.log('Received NATS call status update:', update);
         setCallStatuses(prev => ({
           ...prev,
-          [update.callSid]: update
+          [update.callSid]: {
+            ...update,
+            status: update.status as CallStatus,
+            errorCode: update.errorCode,
+            errorMessage: update.errorMessage
+          }
         }));
       });
     } catch (error) {

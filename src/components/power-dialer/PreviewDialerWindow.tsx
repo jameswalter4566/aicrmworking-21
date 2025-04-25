@@ -116,27 +116,24 @@ const PreviewDialerWindow: React.FC<Props> = ({
     
     console.log('Received call status updates:', callStatuses);
     
-    const updatedCallsInProgress: Record<string, any> = {};
+    const updatedCallsInProgress: Record<string, LineCallData> = {};
     
     Object.values(callStatuses).forEach((status, index) => {
       const lineNumber = (index + 1).toString();
       updatedCallsInProgress[lineNumber] = {
         callSid: status.callSid,
-        leadId: status.leadId,
         phoneNumber: status.phoneNumber,
         leadName: status.leadName || `Lead ${status.leadId?.toString().slice(-4)}`,
-        status: status.status,
+        status: status.status as CallStatus,
         startTime: status.status === 'in-progress' ? new Date() : undefined,
         duration: status.duration,
+        company: status.company,
         errorCode: status.errorCode,
         errorMessage: status.errorMessage
       };
     });
     
-    setActiveCallsInProgress(prevCalls => ({
-      ...prevCalls,
-      ...updatedCallsInProgress
-    }));
+    setActiveCallsInProgress(updatedCallsInProgress);
   }, [callStatuses]);
 
   const fetchCallingLists = async () => {
