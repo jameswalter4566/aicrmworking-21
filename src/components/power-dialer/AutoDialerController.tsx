@@ -38,6 +38,15 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
   const [processedPhoneNumbers, setProcessedPhoneNumbers] = useState<Set<string>>(new Set());
   const [blacklistedNumbers, setBlacklistedNumbers] = useState<Set<string>>(new Set());
+  
+  // Add a new ref to track leads currently being processed
+  const processingLeadIdsRef = useRef<Set<string>>(new Set());
+  // Add a new ref to track phone numbers that are currently being dialed
+  const dialingPhoneNumbersRef = useRef<Set<string>>(new Set());
+  
+  // Add a request ID tracker to ensure uniqueness of operations
+  const requestIdCounter = useRef<number>(0);
+  
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -166,12 +175,15 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     return true;
   }, [blacklistedNumbers]);
 
+  // Enhanced version of getNextLead with better race condition handling
   const getNextLead = useCallback(async () => {
     if (!sessionId) return null;
     
+    // Generate a unique request ID for this attempt
+    const requestId = `lead-request-${Date.now()}-${requestIdCounter.current++}`;
+    console.log(`[${requestId}] Fetching next lead for session: ${sessionId}`);
+    
     try {
-      console.log('Fetching next lead for session:', sessionId);
-      
       const { data: queuedLeads, error: queueCheckError } = await supabase
         .from('dialing_session_leads')
         .select('count')
@@ -179,52 +191,53 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         .eq('status', 'queued');
       
       if (queueCheckError) {
-        console.error('Error checking for queued leads:', queueCheckError);
+        console.error(`[${requestId}] Error checking for queued leads:`, queueCheckError);
         throw queueCheckError;
       }
       
       const queuedCount = queuedLeads && queuedLeads.length > 0 ? queuedLeads[0].count : 0;
       
       if (queuedCount === 0) {
-        console.log('No more queued leads available in the session');
+        console.log(`[${requestId}] No more queued leads available in the session`);
         setNoMoreLeads(true);
         return null;
       }
       
       try {
+        console.log(`[${requestId}] Calling get_next_session_lead RPC`);
         const { data: nextLead, error } = await supabase.rpc('get_next_session_lead', {
           p_session_id: sessionId
         });
         
         if (error) {
-          console.error('Error calling get_next_session_lead:', error);
+          console.error(`[${requestId}] Error calling get_next_session_lead:`, error);
           
           if (error.message?.includes('ambiguous') && error.code === '42702' && fixAttemptCount < 3) {
             setFixAttemptCount(count => count + 1);
             const fixed = await fixDatabaseFunction();
             
             if (fixed) {
-              console.log('Retrying get_next_session_lead after fix...');
+              console.log(`[${requestId}] Retrying get_next_session_lead after fix...`);
               const retryResponse = await supabase.rpc('get_next_session_lead', {
                 p_session_id: sessionId
               });
               
               if (retryResponse.error) {
-                console.error('Error after fix attempt:', retryResponse.error);
+                console.error(`[${requestId}] Error after fix attempt:`, retryResponse.error);
                 
-                console.log('Attempting direct SQL approach as last resort...');
+                console.log(`[${requestId}] Attempting direct SQL approach as last resort...`);
                 const leadFromSQL = await getNextLeadDirectSQL(sessionId);
                 return leadFromSQL;
               }
               
               if (!retryResponse.data || retryResponse.data.length === 0) {
-                console.log('No lead returned after fix');
+                console.log(`[${requestId}] No lead returned after fix`);
                 setNoMoreLeads(true);
                 return null;
               }
               
-              console.log('Next lead retrieved after fix:', retryResponse.data[0]);
-              return processFetchedLead(retryResponse.data[0]);
+              console.log(`[${requestId}] Next lead retrieved after fix:`, retryResponse.data[0]);
+              return processFetchedLead(retryResponse.data[0], requestId);
             } else {
               return await getNextLeadDirectSQL(sessionId);
             }
@@ -234,19 +247,19 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         }
         
         if (!nextLead || nextLead.length === 0) {
-          console.log('No lead returned from get_next_session_lead');
+          console.log(`[${requestId}] No lead returned from get_next_session_lead`);
           setNoMoreLeads(true);
           return null;
         }
         
-        console.log('Next lead retrieved:', nextLead[0]);
-        return processFetchedLead(nextLead[0]);
+        console.log(`[${requestId}] Next lead retrieved:`, nextLead[0]);
+        return processFetchedLead(nextLead[0], requestId);
       } catch (error) {
-        console.error('Error in getNextLead:', error);
+        console.error(`[${requestId}] Error in getNextLead:`, error);
         throw error;
       }
     } catch (error) {
-      console.error('Error getting next lead:', error);
+      console.error(`[${requestId}] Error getting next lead:`, error);
       
       if (error.message?.includes('ambiguous') || error.code === '42702') {
         toast({
@@ -266,7 +279,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, [sessionId, fixAttemptCount, fixDatabaseFunction, getNextLeadDirectSQL, toast]);
 
-  const processFetchedLead = (lead: SessionLead): ProcessedSessionLead => {
+  // Enhanced version of processFetchedLead with request ID for tracking
+  const processFetchedLead = (lead: SessionLead, requestId: string): ProcessedSessionLead => {
     let phoneNumber = null;
     
     if (lead.notes) {
@@ -281,7 +295,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           };
         }
       } catch (e) {
-        console.error('Error parsing lead notes:', e);
+        console.error(`[${requestId}] Error parsing lead notes:`, e);
       }
     }
     
@@ -307,7 +321,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                 }
               }
             } catch (parseError) {
-              console.error('Error parsing lead notes:', parseError);
+              console.error(`[${requestId}] Error parsing lead notes:`, parseError);
             }
           }
           
@@ -326,12 +340,12 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               }
             }
           } catch (parseError) {
-            console.error('Error parsing lead_id as number:', parseError);
+            console.error(`[${requestId}] Error parsing lead_id as number:`, parseError);
           }
           
           return { id: null, phone1: null };
         } catch (error) {
-          console.error('Error fetching lead details:', error);
+          console.error(`[${requestId}] Error fetching lead details:`, error);
           return { id: null, phone1: null };
         }
       }
@@ -343,8 +357,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   const updateLeadStatus = useCallback(async (leadId: string, status: string, errorDetails?: string) => {
     if (!leadId) return false;
     
+    // Generate a unique request ID for this status update
+    const requestId = `status-update-${Date.now()}-${requestIdCounter.current++}`;
+    
     try {
-      console.log(`Updating lead ${leadId} to status: ${status}${errorDetails ? ' with error: ' + errorDetails : ''}`);
+      console.log(`[${requestId}] Updating lead ${leadId} to status: ${status}${errorDetails ? ' with error: ' + errorDetails : ''}`);
       
       // First, get the current notes
       const { data: leadData, error: fetchError } = await supabase
@@ -354,7 +371,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         .single();
       
       if (fetchError) {
-        console.error('Error fetching lead notes:', fetchError);
+        console.error(`[${requestId}] Error fetching lead notes:`, fetchError);
         return false;
       }
       
@@ -365,7 +382,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           notesObj = JSON.parse(leadData.notes);
         }
       } catch (parseError) {
-        console.error('Error parsing existing notes:', parseError);
+        console.error(`[${requestId}] Error parsing existing notes:`, parseError);
         // Continue with empty object if parsing fails
       }
       
@@ -386,18 +403,19 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         .eq('id', leadId);
       
       if (error) {
-        console.error('Error updating lead status:', error);
+        console.error(`[${requestId}] Error updating lead status:`, error);
         return false;
       }
       
-      console.log(`Successfully updated lead ${leadId} to status: ${status}`);
+      console.log(`[${requestId}] Successfully updated lead ${leadId} to status: ${status}`);
       return true;
     } catch (error) {
-      console.error('Error in updateLeadStatus:', error);
+      console.error(`[${requestId}] Error in updateLeadStatus:`, error);
       return false;
     }
   }, []);
 
+  // Enhanced version of processNextLead with better race condition handling
   const processNextLead = useCallback(async () => {
     if (isProcessingCall || !isActive || !sessionId || noMoreLeads) {
       if (noMoreLeads && isActive) {
@@ -408,6 +426,10 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       }
       return;
     }
+    
+    // Generate a unique request ID for this process
+    const requestId = `process-lead-${Date.now()}-${requestIdCounter.current++}`;
+    console.log(`[${requestId}] Starting to process next lead`);
     
     try {
       setIsProcessingCall(true);
@@ -436,6 +458,15 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         return;
       }
 
+      // Mark this lead as being processed to prevent race conditions
+      if (processingLeadIdsRef.current.has(lead.id)) {
+        console.log(`[${requestId}] Lead ${lead.id} is already being processed, skipping`);
+        setIsProcessingCall(false);
+        onCallComplete();
+        return;
+      }
+      processingLeadIdsRef.current.add(lead.id);
+
       // Check if we've already processed this phone number
       let phoneNumber = lead.phoneNumber;
       
@@ -454,31 +485,50 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         await updateLeadStatus(lead.id, 'failed', 'Missing phone number');
         setIsProcessingCall(false);
         onCallComplete();
+        processingLeadIdsRef.current.delete(lead.id);
+        return;
+      }
+
+      // Standardize phone number format for consistent tracking
+      const standardizedPhone = phoneNumber.replace(/\D/g, '');
+      
+      // Check if this number is currently being dialed - prevents race conditions
+      if (dialingPhoneNumbersRef.current.has(standardizedPhone)) {
+        console.log(`[${requestId}] Phone number ${phoneNumber} is currently being dialed in another process, skipping`);
+        await updateLeadStatus(lead.id, 'failed', `Phone number ${phoneNumber} is already being dialed`);
+        setIsProcessingCall(false);
+        onCallComplete();
+        processingLeadIdsRef.current.delete(lead.id);
         return;
       }
 
       // Check if phone number is valid
       if (!isValidPhoneNumber(phoneNumber)) {
-        console.log(`Invalid phone number ${phoneNumber}, marking as failed and skipping`);
+        console.log(`[${requestId}] Invalid phone number ${phoneNumber}, marking as failed and skipping`);
         
         await updateLeadStatus(lead.id, 'failed', `Invalid phone number: ${phoneNumber}`);
         setIsProcessingCall(false);
         onCallComplete();
+        processingLeadIdsRef.current.delete(lead.id);
         return;
       }
 
       // Skip if we've already called this number
-      if (processedPhoneNumbers.has(phoneNumber)) {
-        console.log(`Already called ${phoneNumber}, marking as completed and skipping`);
+      if (processedPhoneNumbers.has(standardizedPhone)) {
+        console.log(`[${requestId}] Already called ${phoneNumber}, marking as completed and skipping`);
         await updateLeadStatus(lead.id, 'completed', 'Phone number already called in this session');
         setIsProcessingCall(false);
         onCallComplete();
+        processingLeadIdsRef.current.delete(lead.id);
         return;
       }
 
       // Track this lead and phone number
       setCurrentLeadId(lead.id);
-      setProcessedPhoneNumbers(prev => new Set(prev).add(phoneNumber!));
+      
+      // Add to tracking sets BEFORE making the call
+      setProcessedPhoneNumbers(prev => new Set(prev).add(standardizedPhone));
+      dialingPhoneNumbersRef.current.add(standardizedPhone);
       
       // Update call state ref for tracking
       callStateRef.current = {
@@ -490,65 +540,81 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       };
 
       // Initialize Twilio and make the call
-      await twilioService.initializeTwilioDevice();
-      
-      console.log(`Initiating call to ${phoneNumber} for lead ID ${lead.lead_id}`);
-      const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
-      
-      if (!callResult.success) {
-        // Check if this is a blacklist error based on error message
-        const isBlacklistedError = 
-          callResult.error?.includes('blacklisted') || 
-          callResult.error?.includes('13225');
+      try {
+        await twilioService.initializeTwilioDevice();
+        
+        console.log(`[${requestId}] Initiating call to ${phoneNumber} for lead ID ${lead.lead_id}`);
+        const callResult = await twilioService.makeCall(phoneNumber, lead.lead_id);
+        
+        if (!callResult.success) {
+          // Check if this is a blacklist error based on error message
+          const isBlacklistedError = 
+            callResult.error?.includes('blacklisted') || 
+            callResult.error?.includes('13225');
+            
+          if (isBlacklistedError) {
+            console.log(`[${requestId}] Phone number ${phoneNumber} is blacklisted by Twilio, adding to blacklist`);
+            
+            // Add to blacklisted numbers
+            setBlacklistedNumbers(prev => new Set(prev).add(standardizedPhone));
+            
+            toast({
+              title: "Blacklisted Number",
+              description: `The phone number ${phoneNumber} is blacklisted by Twilio and cannot be called`,
+              variant: "destructive",
+            });
+            
+            await updateLeadStatus(lead.id, 'failed', `Phone number blacklisted: ${callResult.error || 'Twilio error'}`);
+          } else {
+            toast({
+              title: "Call Failed",
+              description: callResult.error || "Failed to place call",
+              variant: "destructive",
+            });
+            
+            await updateLeadStatus(lead.id, 'failed', callResult.error || "Unknown error");
+          }
           
-        if (isBlacklistedError) {
-          console.log(`Phone number ${phoneNumber} is blacklisted by Twilio, adding to blacklist`);
+          setIsProcessingCall(false);
+          onCallComplete();
+          callStateRef.current.isActiveCall = false;
           
-          // Add to blacklisted numbers
-          setBlacklistedNumbers(prev => new Set(prev).add(phoneNumber!));
-          
-          toast({
-            title: "Blacklisted Number",
-            description: `The phone number ${phoneNumber} is blacklisted by Twilio and cannot be called`,
-            variant: "destructive",
-          });
-          
-          await updateLeadStatus(lead.id, 'failed', `Phone number blacklisted: ${callResult.error || 'Twilio error'}`);
+          // Remove from processing sets after failure
+          processingLeadIdsRef.current.delete(lead.id);
+          dialingPhoneNumbersRef.current.delete(standardizedPhone);
         } else {
           toast({
-            title: "Call Failed",
-            description: callResult.error || "Failed to place call",
-            variant: "destructive",
+            title: "Call Initiated",
+            description: `Calling lead ${lead.lead_id}`
           });
           
-          await updateLeadStatus(lead.id, 'failed', callResult.error || "Unknown error");
+          // Set a failsafe timeout to ensure call gets marked as completed
+          setTimeout(async () => {
+            // If the call is still marked as active after 60 seconds, forcibly mark it as completed
+            if (callStateRef.current.currentLeadId === lead.id && callStateRef.current.isActiveCall) {
+              console.log(`[${requestId}] Failsafe timeout triggered for lead ${lead.id} - forcing completion`);
+              await updateLeadStatus(lead.id, 'completed');
+              setCurrentLeadId(null);
+              setIsProcessingCall(false);
+              callStateRef.current.isActiveCall = false;
+              onCallComplete();
+              processingLeadIdsRef.current.delete(lead.id);
+              dialingPhoneNumbersRef.current.delete(standardizedPhone);
+            }
+          }, 60000); // 60 second timeout
         }
+      } catch (error) {
+        console.error(`[${requestId}] Error making call:`, error);
         
+        // Clean up tracking on error
+        await updateLeadStatus(lead.id, 'failed', `Error making call: ${error?.message || 'Unknown error'}`);
+        processingLeadIdsRef.current.delete(lead.id);
+        dialingPhoneNumbersRef.current.delete(standardizedPhone);
         setIsProcessingCall(false);
         onCallComplete();
-        callStateRef.current.isActiveCall = false;
-      } else {
-        toast({
-          title: "Call Initiated",
-          description: `Calling lead ${lead.lead_id}`
-        });
-        
-        // Set a failsafe timeout to ensure call gets marked as completed
-        setTimeout(async () => {
-          // If the call is still marked as active after 60 seconds, forcibly mark it as completed
-          if (callStateRef.current.currentLeadId === lead.id && callStateRef.current.isActiveCall) {
-            console.log(`Failsafe timeout triggered for lead ${lead.id} - forcing completion`);
-            await updateLeadStatus(lead.id, 'completed');
-            setCurrentLeadId(null);
-            setIsProcessingCall(false);
-            callStateRef.current.isActiveCall = false;
-            onCallComplete();
-          }
-        }, 60000); // 60 second timeout
       }
-
     } catch (error) {
-      console.error('Error processing lead:', error);
+      console.error(`[${requestId}] Error processing lead:`, error);
       toast({
         title: "Error",
         description: "Failed to process next lead",
@@ -560,11 +626,15 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads, processedPhoneNumbers, isValidPhoneNumber]);
 
   const handleCallCompletion = useCallback(async (errorCode?: number) => {
-    if (callStateRef.current.currentLeadId) {
+    const requestId = `call-completion-${Date.now()}-${requestIdCounter.current++}`;
+    console.log(`[${requestId}] Handling call completion, error code: ${errorCode || 'none'}`);
+    
+    if (callStateRef.current.currentLeadId && callStateRef.current.currentPhoneNumber) {
       // If we have an error code that indicates blacklisted number, add to blacklist
       if (errorCode === 13225 && callStateRef.current.currentPhoneNumber) {
-        console.log(`Adding phone number ${callStateRef.current.currentPhoneNumber} to blacklist due to error code ${errorCode}`);
-        setBlacklistedNumbers(prev => new Set(prev).add(callStateRef.current.currentPhoneNumber!));
+        console.log(`[${requestId}] Adding phone number ${callStateRef.current.currentPhoneNumber} to blacklist due to error code ${errorCode}`);
+        const standardizedPhone = callStateRef.current.currentPhoneNumber.replace(/\D/g, '');
+        setBlacklistedNumbers(prev => new Set(prev).add(standardizedPhone));
         
         // Update lead with error details
         await updateLeadStatus(
@@ -577,8 +647,17 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         await updateLeadStatus(callStateRef.current.currentLeadId, 'completed');
       }
       
+      // Clean up tracking
+      if (callStateRef.current.currentPhoneNumber) {
+        const standardizedPhone = callStateRef.current.currentPhoneNumber.replace(/\D/g, '');
+        dialingPhoneNumbersRef.current.delete(standardizedPhone);
+      }
+      
+      processingLeadIdsRef.current.delete(callStateRef.current.currentLeadId);
       setCurrentLeadId(null);
       callStateRef.current.isActiveCall = false;
+      callStateRef.current.currentPhoneNumber = null;
+      callStateRef.current.currentLeadId = null;
     }
     
     setIsProcessingCall(false);
@@ -639,8 +718,12 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   // Reset the processed phone numbers when session changes
   useEffect(() => {
     if (sessionId) {
+      // Clear all tracking sets when session changes
       setProcessedPhoneNumbers(new Set());
       setBlacklistedNumbers(new Set());
+      processingLeadIdsRef.current = new Set();
+      dialingPhoneNumbersRef.current = new Set();
+      
       setNoMoreLeads(false);
       callStateRef.current = {
         isActiveCall: false,
@@ -649,6 +732,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         callStartTime: 0,
         callAttempts: 0,
       };
+      
+      // Reset request counter
+      requestIdCounter.current = 0;
+      
+      console.log(`Session reset: ${sessionId}. All tracking data cleared.`);
     }
   }, [sessionId]);
 
