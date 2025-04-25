@@ -98,52 +98,30 @@ export default function PowerDialer() {
   const [twilioReady, setTwilioReady] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
-  const [currentCall, setCurrentCall] = useState<any>(null);
+  const [currentCall, setCurrentCall] = useState(null);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
-  const [isDialing, setIsDialing] = useState(false);
 
   const twilioState = useTwilio();
-
-  console.log('PowerDialer render - twilioState:', { 
-    initialized: twilioState.initialized,
-    activeCallsCount: Object.keys(twilioState.activeCalls).length,
-    microphoneActive: twilioState.microphoneActive
-  });
 
   useEffect(() => {
     if (window.Twilio && window.Twilio.Device) {
       console.log("Twilio device available:", window.Twilio.Device);
       setTwilioReady(true);
+      
+      return () => {};
     }
   }, [isScriptLoaded]);
 
   useEffect(() => {
     if (!twilioState) return;
     
-    console.log('twilioState.activeCalls changed:', twilioState.activeCalls);
-    
-    const activeCallsArray = Object.values(twilioState.activeCalls);
-    
-    if (activeCallsArray.length > 0) {
-      const primaryCall = activeCallsArray[0];
-      console.log('Setting current call to:', primaryCall);
-      
-      setCurrentCall({
-        ...primaryCall,
-        phoneNumber: primaryCall.phoneNumber,
-        leadName: primaryCall.leadId ? `Lead ${primaryCall.leadId}` : 'Unknown',
-        company: ''
-      });
-      
-      if (primaryCall.status === 'in-progress') {
-        setCallInProgress(true);
-      }
+    // Update current call state
+    const activeCalls = Object.values(twilioState.activeCalls);
+    if (activeCalls.length > 0) {
+      setCurrentCall(activeCalls[0]);
     } else {
       setCurrentCall(null);
-      setCallInProgress(false);
     }
-    
-    setActiveCallsInProgress(twilioState.activeCalls);
   }, [twilioState.activeCalls]);
 
   const filteredAndSortedLeads = React.useMemo(() => {
@@ -197,11 +175,7 @@ export default function PowerDialer() {
       setCallInProgress(true);
       
       const formattedPhone = lead.phone.replace(/\D/g, '');
-      
-      const callResult = await twilioService.makeCall(formattedPhone, lead.id, {
-        leadName: lead.name,
-        company: lead.company
-      });
+      const callResult = await twilioService.makeCall(formattedPhone, lead.id);
       
       console.log("Call result:", callResult);
       
@@ -240,16 +214,10 @@ export default function PowerDialer() {
     ));
   };
 
-  const handleEndCall = async (leadId?: string) => {
-    if (leadId) {
-      await twilioState.endCall(leadId);
-      updateLeadStatus(leadId, "Contacted");
-    } else {
-      await twilioState.endAllCalls();
-    }
-    
+  const handleEndCall = async (leadId: string) => {
+    await twilioState.endCall(leadId);
+    updateLeadStatus(leadId, "Contacted");
     setCallInProgress(false);
-    setIsDialing(false);
   };
 
   const handleDisposition = (type: string) => {
@@ -260,13 +228,10 @@ export default function PowerDialer() {
       description: `Call marked as ${type}`,
     });
     
-    const leadId = currentCall.leadId;
-    if (leadId) {
-      handleEndCall(leadId);
-    } else {
-      handleEndCall();
-    }
+    handleEndCall(currentCall.parameters.leadId);
   };
+
+  const [isDialing, setIsDialing] = useState(false);
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">

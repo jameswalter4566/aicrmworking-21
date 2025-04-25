@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -8,7 +9,7 @@ export interface TwilioCallResult {
   conferenceName?: string;
   message?: string;
   error?: string;
-  twilioErrorCode?: number;
+  twilioErrorCode?: number;  // Added this property
   leadId?: string | number;
 }
 
@@ -253,7 +254,7 @@ class TwilioService {
     }
   }
 
-  async makeCall(phoneNumber: string, leadId: string, additionalParams: Record<string, any> = {}): Promise<TwilioCallResult> {
+  async makeCall(phoneNumber: string, leadId: string): Promise<TwilioCallResult> {
     try {
       if (!this.device) {
         console.error("Twilio device not initialized.");
@@ -284,16 +285,11 @@ class TwilioService {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        const params = {
-          phoneNumber: formattedPhoneNumber,
-          leadId: leadId.toString(),
-          ...additionalParams
-        };
-
-        console.log("Making call with parameters:", params);
-        
         const call = await this.device.connect({
-          params
+          params: {
+            phoneNumber: formattedPhoneNumber,
+            leadId: leadId.toString()
+          }
         });
         
         this.activeCalls.push(call);
