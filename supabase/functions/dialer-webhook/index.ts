@@ -1,7 +1,5 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { connect, StringCodec } from "https://deno.land/x/nats@v1.16.0/src/mod.ts";
-import { storeCallStatusUpdate } from "../get-call-updates/index.ts";
 
 // Define CORS headers for browser requests
 const corsHeaders = {
@@ -16,6 +14,31 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // String codec for NATS messages
 const sc = StringCodec();
+
+// Temporary memory store for call statuses when database table is not available
+const memoryCallStatusStore: Record<string, any[]> = {};
+
+// Store call status update in memory
+function storeCallStatusUpdate(sessionId: string, statusData: any) {
+  if (!memoryCallStatusStore[sessionId]) {
+    memoryCallStatusStore[sessionId] = [];
+  }
+  
+  const update = {
+    session_id: sessionId,
+    timestamp: Date.now(),
+    data: statusData,
+  };
+  
+  memoryCallStatusStore[sessionId].push(update);
+  
+  // Keep only the latest 100 updates per session to avoid memory issues
+  if (memoryCallStatusStore[sessionId].length > 100) {
+    memoryCallStatusStore[sessionId] = memoryCallStatusStore[sessionId].slice(-100);
+  }
+  
+  return update;
+}
 
 // Main function to handle requests
 Deno.serve(async (req) => {
