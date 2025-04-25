@@ -1,4 +1,3 @@
-
 // Twilio Voice Edge Function
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import twilio from "npm:twilio@4.10.0";
@@ -11,6 +10,13 @@ const corsHeaders = {
 };
 
 const twiml = twilio.twiml;
+
+// Keep track of blacklisted numbers to prevent repeated attempts
+const blacklistedNumbers = new Set<string>();
+
+// Monitor attempts per call to prevent excessive retries
+const callAttempts = new Map<string, number>();
+const MAX_ATTEMPTS = 3;
 
 serve(async (req) => {
   console.log("Received request to Twilio Voice function");
@@ -38,6 +44,53 @@ serve(async (req) => {
         formData[key] = value;
       }
       console.log("Received form data request:", JSON.stringify(formData));
+    }
+
+    // Check for dial action with blacklisted number error
+    if (formData.dialAction === "true" || formData.DialCallStatus === "failed") {
+      console.log("Processing dial action response");
+      
+      const callSid = formData.CallSid || "";
+      const errorCode = formData.ErrorCode || "";
+      const errorMessage = formData.ErrorMessage || "";
+      const dialCallStatus = formData.DialCallStatus || "";
+      const phoneNumber = formData.phoneNumber || "";
+      
+      // Check if this is a blacklisted phone number
+      if (errorCode === "13225" || errorMessage?.includes("blacklisted")) {
+        console.log(`Phone number ${phoneNumber} is blacklisted, blocking further attempts`);
+        
+        // Add to our blacklist cache
+        if (phoneNumber) {
+          blacklistedNumbers.add(phoneNumber);
+          console.log(`Added ${phoneNumber} to blacklist cache. Current blacklist:`, Array.from(blacklistedNumbers));
+        }
+        
+        // Return TwiML that ends the call rather than attempting to dial again
+        const response = new twiml.VoiceResponse();
+        response.say("This number is blacklisted and cannot be called.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      
+      // Check for too many attempts
+      if (callSid) {
+        const attempts = callAttempts.get(callSid) || 0;
+        if (attempts >= MAX_ATTEMPTS) {
+          console.log(`Max attempts (${MAX_ATTEMPTS}) reached for call ${callSid}, ending call`);
+          
+          const response = new twiml.VoiceResponse();
+          response.say("The call cannot be completed at this time. Maximum retry attempts reached.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
+        // Increment attempt counter
+        callAttempts.set(callSid, attempts + 1);
+        console.log(`Call ${callSid} attempt ${attempts + 1} of ${MAX_ATTEMPTS}`);
+      }
     }
 
     // Handle different request types
@@ -79,6 +132,19 @@ serve(async (req) => {
       // Handle JSON request for making a call
       console.log(`Processing JSON outbound call request to: ${formData.phoneNumber}`);
       
+      const phoneNumber = formData.phoneNumber;
+      
+      // Check if this phone number is blacklisted
+      if (blacklistedNumbers.has(phoneNumber)) {
+        console.log(`Rejecting call to blacklisted number ${phoneNumber}`);
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "This number is blacklisted and cannot be called."
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      
       // Create TwiML for dialing
       const response = new twiml.VoiceResponse();
       
@@ -112,6 +178,19 @@ serve(async (req) => {
     } else if (formData.CallStatus === "ringing" && formData.phoneNumber) {
       // This is a form data request for an outbound call
       console.log(`Processing form outbound call request to: ${formData.phoneNumber}`);
+      
+      const phoneNumber = formData.phoneNumber;
+      
+      // Check if this phone number is blacklisted
+      if (blacklistedNumbers.has(phoneNumber)) {
+        console.log(`Rejecting call to blacklisted number ${phoneNumber}`);
+        
+        const response = new twiml.VoiceResponse();
+        response.say("This number is blacklisted and cannot be called.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
       
       // Create TwiML for dialing
       const response = new twiml.VoiceResponse();
@@ -161,6 +240,17 @@ serve(async (req) => {
         // Found a phone number to dial
         console.log(`Found phone number to dial: ${phoneNumber}`);
         
+        // Check if this phone number is blacklisted
+        if (blacklistedNumbers.has(phoneNumber)) {
+          console.log(`Rejecting call to blacklisted number ${phoneNumber}`);
+          
+          const response = new twiml.VoiceResponse();
+          response.say("This number is blacklisted and cannot be called.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
         // Create TwiML for dialing
         const response = new twiml.VoiceResponse();
         
@@ -201,12 +291,19 @@ serve(async (req) => {
       // Handle dial action callback
       console.log(`Received dial action callback: ${formData.DialCallStatus || 'unknown'}`);
       
-      // Return empty TwiML to end the call
+      // Return empty TwiML to end the call if there was an error or if call is completed
       const response = new twiml.VoiceResponse();
       
-      if (formData.DialCallStatus === 'failed' || formData.DialCallStatus === 'busy' || formData.DialCallStatus === 'no-answer') {
-        // Could add a message here if the call fails
-        response.say("The call could not be completed. Please try again later.");
+      if (formData.ErrorCode === "13225" || formData.DialCallStatus === 'failed' || 
+          formData.DialCallStatus === 'busy' || formData.DialCallStatus === 'no-answer') {
+        // Add blacklisted number to our cache if applicable
+        if (formData.ErrorCode === "13225" && formData.phoneNumber) {
+          blacklistedNumbers.add(formData.phoneNumber);
+          console.log(`Added ${formData.phoneNumber} to blacklist cache from dial action`);
+        }
+        
+        response.say("The call could not be completed. The number may be unreachable or blacklisted.");
+        response.hangup();
       }
       
       return new Response(response.toString(), { headers: corsHeaders });
@@ -229,6 +326,17 @@ serve(async (req) => {
       let phoneNumber = formData.phoneNumber || formData.PhoneNumber || formData.Phonenumber || formData.phonenumber;
       
       if (phoneNumber) {
+        // Check if this phone number is blacklisted
+        if (blacklistedNumbers.has(phoneNumber)) {
+          console.log(`Rejecting call to blacklisted number ${phoneNumber} in fallback handler`);
+          
+          const response = new twiml.VoiceResponse();
+          response.say("This number is blacklisted and cannot be called.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
         console.log(`Found phone number in fallback handler: ${phoneNumber}`);
         
         // Create TwiML for dialing as a last resort
