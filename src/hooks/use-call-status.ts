@@ -63,8 +63,12 @@ export function useCallStatus(sessionId: string | null) {
             }
             
             // Make sure error information is included
-            statusData.errorCode = statusData.errorCode || statusData.ErrorCode;
-            statusData.errorMessage = statusData.errorMessage || statusData.ErrorMessage;
+            if (statusData.errorCode || statusData.ErrorCode) {
+              statusData.errorCode = statusData.errorCode || statusData.ErrorCode;
+            }
+            if (statusData.errorMessage || statusData.ErrorMessage) {
+              statusData.errorMessage = statusData.errorMessage || statusData.ErrorMessage;
+            }
             
             // Update our status map
             newStatuses[statusData.callSid] = statusData;

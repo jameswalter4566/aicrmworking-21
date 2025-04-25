@@ -267,6 +267,34 @@ const PreviewDialerWindow: React.FC<Props> = ({
     console.log('Call completed, ready for next call');
   }, []);
 
+  const renderCallInfo = (activeCall) => {
+    if (activeCall?.errorCode || activeCall?.errorMessage) {
+      return (
+        <div className="mt-4 p-3 bg-red-50 border border-red-100 rounded-md">
+          <h4 className="text-sm font-medium text-red-800">Call Error</h4>
+          {activeCall.errorCode && (
+            <div className="text-xs text-red-700 mt-1">Error Code: {activeCall.errorCode}</div>
+          )}
+          {activeCall.errorMessage && (
+            <div className="text-xs text-red-700 mt-1">{activeCall.errorMessage}</div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <Button 
+          onClick={() => setIsDialingStarted(true)}
+          className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
+        >
+          <Play className="h-6 w-6" />
+          Start Dialing
+        </Button>
+      </div>
+    );
+  };
+
   return (
     <>
       <Card className="bg-gray-800 p-4 rounded-lg">
@@ -298,15 +326,7 @@ const PreviewDialerWindow: React.FC<Props> = ({
           </CardHeader>
           <CardContent>
             {!isDialingStarted ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Button 
-                  onClick={() => setIsDialingStarted(true)}
-                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
-                >
-                  <Play className="h-6 w-6" />
-                  Start Dialing
-                </Button>
-              </div>
+              renderCallInfo(currentCallData)
             ) : !currentCallData ? (
               <div className="space-y-4">
                 {sessionId && (
