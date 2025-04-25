@@ -77,5 +77,8 @@ verify_jwt = false
 [functions.start-predictive-dialer]
 verify_jwt = false
 
+[functions.twilio-call-status]
+verify_jwt = false
+
 [vector]
 extensions = ["pgvector", "vector"]
