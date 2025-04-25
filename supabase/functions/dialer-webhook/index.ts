@@ -16,7 +16,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // String codec for NATS messages
 const sc = StringCodec();
 
-// Temporary memory store for call statuses when database table is not available
+// Temporary memory store for call status updates when database table is not available
 const memoryCallStatusStore: Record<string, any[]> = {};
 
 // Store call status update in memory
@@ -45,8 +45,15 @@ function storeCallStatusUpdate(sessionId: string, statusData: any) {
 
 // Main function to handle requests
 Deno.serve(async (req) => {
+  // Log all request information for debugging
+  console.log("🔔 DIALER-WEBHOOK CALLED 🔔");
+  console.log("Request method:", req.method);
+  console.log("Request URL:", req.url);
+  console.log("Request headers:", JSON.stringify(Object.fromEntries([...req.headers])));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS request");
     return new Response(null, { headers: corsHeaders });
   }
   
@@ -56,14 +63,20 @@ Deno.serve(async (req) => {
     const callId = url.searchParams.get('callId');
     const sessionId = url.searchParams.get('sessionId');
     
+    console.log(`Webhook received with callId=${callId}, sessionId=${sessionId}`);
+    
     if (!callId) {
       throw new Error('Call ID is required');
     }
     
-    console.log(`Webhook received for call ${callId}${sessionId ? `, session ${sessionId}` : ''}`);
-    
     // Parse form data from Twilio webhook
+    console.log("Parsing form data from request...");
     const formData = await req.formData();
+    
+    // Log the entire form data for debugging
+    const formDataEntries = Array.from(formData.entries());
+    console.log("Received form data:", JSON.stringify(formDataEntries));
+    
     const callStatus = formData.get('CallStatus')?.toString();
     const callSid = formData.get('CallSid')?.toString();
     const callDuration = formData.get('CallDuration')?.toString();
@@ -83,6 +96,8 @@ Deno.serve(async (req) => {
       console.error(errorMsg);
       throw new Error(errorMsg);
     }
+    
+    console.log("Retrieved call record:", JSON.stringify(call));
     
     // Update call status based on Twilio webhook
     switch(callStatus) {
@@ -157,6 +172,12 @@ Deno.serve(async (req) => {
     // Get the session ID from the call record if not provided in the URL
     const effectiveSessionId = sessionId || call.session_id;
     
+    if (!effectiveSessionId) {
+      console.warn('No session ID available for this call!');
+    } else {
+      console.log(`Using session ID: ${effectiveSessionId}`);
+    }
+    
     // Create a call status update for real-time tracking
     const statusUpdate = {
       callSid,
@@ -224,38 +245,50 @@ Deno.serve(async (req) => {
     // Also trigger our get-call-updates function directly to ensure it has the latest data
     try {
       if (effectiveSessionId) {
+        console.log("🔄 Directly triggering get-call-updates function to push update...");
+        
+        const triggerBody = JSON.stringify({
+          sessionId: effectiveSessionId,
+          lastTimestamp: 0,
+          updateSource: 'webhook_direct',
+          lastStatus: callStatus,
+          callSid: callSid
+        });
+        
+        console.log("Trigger body:", triggerBody);
+        
         const triggerResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/get-call-updates`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
           },
-          body: JSON.stringify({
-            sessionId: effectiveSessionId,
-            lastTimestamp: 0,
-            updateSource: 'webhook_direct',
-            lastStatus: callStatus,
-            callSid: callSid
-          })
+          body: triggerBody
         });
         
         if (!triggerResponse.ok) {
-          console.error('Failed to trigger get-call-updates:', await triggerResponse.text());
+          const errorText = await triggerResponse.text();
+          console.error(`Failed to trigger get-call-updates: ${triggerResponse.status} ${triggerResponse.statusText}`, errorText);
         } else {
-          console.log('Successfully triggered get-call-updates function');
+          const responseData = await triggerResponse.json();
+          console.log('Successfully triggered get-call-updates function:', responseData);
         }
       }
     } catch (triggerError) {
       console.error('Error triggering get-call-updates function:', triggerError);
     }
     
+    console.log('✅ Processing of webhook completed successfully');
+    
+    // Return appropriate TwiML
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
       status: 200,
     });
   } catch (error) {
-    console.error('Error in dialer-webhook function:', error);
+    console.error('❌ Error in dialer-webhook function:', error);
     
+    // Return valid TwiML even for errors to avoid Twilio retry loops
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
       status: 200, // Return 200 even for errors to avoid Twilio retries

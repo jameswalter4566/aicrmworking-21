@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -38,8 +39,14 @@ function addCallStatusUpdate(sessionId: string, statusData: any) {
 }
 
 Deno.serve(async (req) => {
+  // Log all request information for debugging
+  console.log("🔍 GET-CALL-UPDATES CALLED 🔍");
+  console.log("Request method:", req.method);
+  console.log("Request URL:", req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling OPTIONS request");
     return new Response(null, { headers: corsHeaders });
   }
   
@@ -52,7 +59,7 @@ Deno.serve(async (req) => {
     
     if (req.method === 'POST') {
       const body = await req.json();
-      console.log('Received request body:', body);
+      console.log('Received request body:', JSON.stringify(body));
       sessionId = body.sessionId;
       lastTimestamp = body.lastTimestamp || '0';
       enableMocking = body.enableMocking === true;
@@ -64,7 +71,7 @@ Deno.serve(async (req) => {
           status: body.lastStatus,
           timestamp: Date.now()
         };
-        console.log('Received direct update from webhook:', directUpdate);
+        console.log('📞 Received direct update from webhook:', directUpdate);
       }
     } else {
       // Parse session ID from URL parameters for GET requests
@@ -103,6 +110,7 @@ Deno.serve(async (req) => {
     
     // If we received a direct update from the webhook, add it to memory store immediately
     if (directUpdate) {
+      console.log("📥 Processing direct update from webhook");
       addCallStatusUpdate(sessionId, directUpdate);
     }
     
@@ -158,6 +166,38 @@ Deno.serve(async (req) => {
     const memoryStoreUpdates = memoryCallStatusStore[sessionId] || [];
     console.log(`Memory store has ${memoryStoreUpdates.length} updates for this session`);
     
+    // For debugging, let's also check the total number of records in the call_status_updates table
+    let totalStatusUpdatesCount = 0;
+    try {
+      const { count, error } = await supabase
+        .from('call_status_updates')
+        .select('*', { count: 'exact', head: true });
+      
+      if (!error && count !== null) {
+        totalStatusUpdatesCount = count;
+        console.log(`Total records in call_status_updates table: ${totalStatusUpdatesCount}`);
+      }
+    } catch (e) {
+      console.log(`Error counting records: ${e.message}`);
+    }
+    
+    // Check if there are any active calls for this session
+    let activeCallsForSession = [];
+    try {
+      const { data: activeCalls, error } = await supabase
+        .from('predictive_dialer_calls')
+        .select('id, status, twilio_call_sid')
+        .eq('session_id', sessionId)
+        .in('status', ['in_progress', 'queued']);
+      
+      if (!error && activeCalls) {
+        activeCallsForSession = activeCalls;
+        console.log(`Active calls for session ${sessionId}:`, activeCallsForSession);
+      }
+    } catch (e) {
+      console.log(`Error getting active calls: ${e.message}`);
+    }
+    
     // Generated mock update if enabled and no real updates found
     if ((updates.length === 0 && enableMocking) || (updates.length === 0 && sessionId === 'mock-session')) {
       console.log('Generating mock update for testing');
@@ -194,6 +234,8 @@ Deno.serve(async (req) => {
         updateCount: updates.length,
         memoryStoreCount: memoryStoreUpdates.length,
         sessionInfo,
+        totalStatusUpdatesCount,
+        activeCallsForSession,
         timestamp: new Date().toISOString(),
         mockEnabled: enableMocking
       }

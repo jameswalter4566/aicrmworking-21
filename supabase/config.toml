@@ -68,5 +68,14 @@ verify_jwt = false
 [functions.twilio-token]
 verify_jwt = false
 
+[functions.predictive-dialer-machine-detection]
+verify_jwt = false
+
+[functions.dialer-machine-detection]
+verify_jwt = false
+
+[functions.start-predictive-dialer]
+verify_jwt = false
+
 [vector]
 extensions = ["pgvector", "vector"]
