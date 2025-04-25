@@ -117,6 +117,25 @@ Deno.serve(async (req) => {
     const memoryStoreUpdates = memoryCallStatusStore[sessionId] || [];
     console.log(`Memory store has ${memoryStoreUpdates.length} updates for this session`);
     
+    // Generate a mock update if we have no updates (for testing only)
+    // Comment out in production
+    if (updates.length === 0 && false) {  // Set to true to enable mock updates for testing
+      const mockUpdate = {
+        id: `mock-${Date.now()}`,
+        session_id: sessionId,
+        timestamp: new Date().toISOString(),
+        data: {
+          callSid: `mock-call-${Date.now()}`,
+          status: 'ringing',
+          timestamp: Date.now(),
+          phoneNumber: '+1234567890',
+          leadName: 'Mock Test Lead'
+        }
+      };
+      updates.push(mockUpdate);
+      console.log('Added mock update for testing:', mockUpdate);
+    }
+    
     // Return the updates
     return new Response(JSON.stringify({ 
       updates,
@@ -137,7 +156,8 @@ Deno.serve(async (req) => {
     
     return new Response(JSON.stringify({ 
       error: error.message,
-      details: error.stack
+      details: error.stack,
+      timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,

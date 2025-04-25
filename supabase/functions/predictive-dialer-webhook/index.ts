@@ -75,6 +75,29 @@ Deno.serve(async (req) => {
     // Ensure we have a session_id
     if (!call.session_id) {
       console.error('No session_id associated with this call:', callId);
+      
+      // Try to get the session_id from the dialing_sessions table
+      const { data: sessionData } = await supabase
+        .from('dialing_sessions')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (sessionData && sessionData.length > 0) {
+        console.log(`Found most recent session ${sessionData[0].id}, associating with call ${callId}`);
+        
+        // Update the call with the session_id
+        await supabase
+          .from('predictive_dialer_calls')
+          .update({
+            session_id: sessionData[0].id
+          })
+          .eq('id', callId);
+          
+        call.session_id = sessionData[0].id;
+      } else {
+        console.error('Could not find any dialing sessions to associate with call');
+      }
     } else {
       console.log(`Call ${callId} is associated with session ${call.session_id}`);
     }
