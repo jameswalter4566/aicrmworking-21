@@ -12,14 +12,29 @@ const corsHeaders = {
 const twiml = twilio.twiml;
 
 // Keep track of blacklisted numbers to prevent repeated attempts
+// This is a server-side in-memory cache that persists between function calls
 const blacklistedNumbers = new Set<string>();
 
 // Monitor attempts per call to prevent excessive retries
 const callAttempts = new Map<string, number>();
 const MAX_ATTEMPTS = 3;
 
+// Track when a number was last attempted to prevent hammering
+const lastAttemptTimestamps = new Map<string, number>();
+const MIN_RETRY_INTERVAL_MS = 10000; // 10 seconds minimum between retries
+
+// Track dialing attempts by normalized phone number
+const activeDialingAttempts = new Map<string, number>();
+
 serve(async (req) => {
   console.log("Received request to Twilio Voice function");
+
+  // Helper function to normalize phone numbers for consistent tracking
+  const normalizePhoneNumber = (phoneNumber: string): string => {
+    if (!phoneNumber) return '';
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    return digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+  };
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -46,6 +61,53 @@ serve(async (req) => {
       console.log("Received form data request:", JSON.stringify(formData));
     }
 
+    // Handle blacklisted number detection early
+    if (formData.phoneNumber) {
+      const phoneNumber = formData.phoneNumber;
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
+      
+      if (blacklistedNumbers.has(normalizedPhone)) {
+        console.log(`Phone number ${phoneNumber} (${normalizedPhone}) is blacklisted, preventing dial attempt`);
+        
+        const response = new twiml.VoiceResponse();
+        response.say("This number is blacklisted and cannot be called.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      
+      // Check if we're already dialing this number too rapidly
+      const now = Date.now();
+      const lastAttempt = lastAttemptTimestamps.get(normalizedPhone) || 0;
+      if (now - lastAttempt < MIN_RETRY_INTERVAL_MS) {
+        console.log(`Too many rapid attempts for ${phoneNumber}, throttling`);
+        
+        const response = new twiml.VoiceResponse();
+        response.say("Please wait before trying this number again.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      
+      // Track this attempt
+      lastAttemptTimestamps.set(normalizedPhone, now);
+      
+      // Track concurrent dialing attempts
+      const currentAttempts = activeDialingAttempts.get(normalizedPhone) || 0;
+      if (currentAttempts > 0) {
+        console.log(`Already dialing ${phoneNumber} (${currentAttempts} active attempts), preventing concurrent dial`);
+        
+        const response = new twiml.VoiceResponse();
+        response.say("A call to this number is already in progress.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      
+      // Mark this number as being dialed
+      activeDialingAttempts.set(normalizedPhone, currentAttempts + 1);
+    }
+
     // Check for dial action with blacklisted number error
     if (formData.dialAction === "true" || formData.DialCallStatus === "failed") {
       console.log("Processing dial action response");
@@ -55,6 +117,12 @@ serve(async (req) => {
       const errorMessage = formData.ErrorMessage || "";
       const dialCallStatus = formData.DialCallStatus || "";
       const phoneNumber = formData.phoneNumber || "";
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
+      
+      // Clean up tracking for this number
+      if (normalizedPhone) {
+        activeDialingAttempts.set(normalizedPhone, Math.max(0, (activeDialingAttempts.get(normalizedPhone) || 0) - 1));
+      }
       
       // Check if this is a blacklisted phone number
       if (errorCode === "13225" || errorMessage?.includes("blacklisted")) {
@@ -62,8 +130,8 @@ serve(async (req) => {
         
         // Add to our blacklist cache
         if (phoneNumber) {
-          blacklistedNumbers.add(phoneNumber);
-          console.log(`Added ${phoneNumber} to blacklist cache. Current blacklist:`, Array.from(blacklistedNumbers));
+          blacklistedNumbers.add(normalizedPhone);
+          console.log(`Added ${phoneNumber} (${normalizedPhone}) to blacklist cache. Current blacklist:`, Array.from(blacklistedNumbers));
         }
         
         // Return TwiML that ends the call rather than attempting to dial again
@@ -133,9 +201,10 @@ serve(async (req) => {
       console.log(`Processing JSON outbound call request to: ${formData.phoneNumber}`);
       
       const phoneNumber = formData.phoneNumber;
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
       
       // Check if this phone number is blacklisted
-      if (blacklistedNumbers.has(phoneNumber)) {
+      if (blacklistedNumbers.has(normalizedPhone)) {
         console.log(`Rejecting call to blacklisted number ${phoneNumber}`);
         return new Response(JSON.stringify({ 
           success: false, 
@@ -164,7 +233,7 @@ serve(async (req) => {
         callerId: callerId,
         timeout: 30,
         answerOnBridge: true,
-        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true`,
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(phoneNumber)}`,
         method: "POST",
       });
       
@@ -180,9 +249,10 @@ serve(async (req) => {
       console.log(`Processing form outbound call request to: ${formData.phoneNumber}`);
       
       const phoneNumber = formData.phoneNumber;
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
       
       // Check if this phone number is blacklisted
-      if (blacklistedNumbers.has(phoneNumber)) {
+      if (blacklistedNumbers.has(normalizedPhone)) {
         console.log(`Rejecting call to blacklisted number ${phoneNumber}`);
         
         const response = new twiml.VoiceResponse();
@@ -195,7 +265,7 @@ serve(async (req) => {
       // Create TwiML for dialing
       const response = new twiml.VoiceResponse();
       
-      // Get caller ID from environment or use the From parameter
+      // Get caller ID from environment
       const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
       
       // Format phone number
@@ -211,7 +281,7 @@ serve(async (req) => {
         callerId: callerId || formData.From,
         timeout: 30,
         answerOnBridge: true,
-        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true`,
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(phoneNumber)}`,
         method: "POST",
       });
       
@@ -239,9 +309,10 @@ serve(async (req) => {
       if (phoneNumber) {
         // Found a phone number to dial
         console.log(`Found phone number to dial: ${phoneNumber}`);
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
         
         // Check if this phone number is blacklisted
-        if (blacklistedNumbers.has(phoneNumber)) {
+        if (blacklistedNumbers.has(normalizedPhone)) {
           console.log(`Rejecting call to blacklisted number ${phoneNumber}`);
           
           const response = new twiml.VoiceResponse();
@@ -254,7 +325,7 @@ serve(async (req) => {
         // Create TwiML for dialing
         const response = new twiml.VoiceResponse();
         
-        // Get caller ID from environment or use the From parameter
+        // Get caller ID from environment
         const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
         
         // Format phone number
@@ -270,7 +341,7 @@ serve(async (req) => {
           callerId: callerId || formData.From,
           timeout: 30,
           answerOnBridge: true,
-          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true`,
+          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(phoneNumber)}`,
           method: "POST",
         });
         
@@ -291,15 +362,23 @@ serve(async (req) => {
       // Handle dial action callback
       console.log(`Received dial action callback: ${formData.DialCallStatus || 'unknown'}`);
       
+      const phoneNumber = formData.phoneNumber || "";
+      const normalizedPhone = normalizePhoneNumber(phoneNumber);
+      
+      // Release tracking for this phone number
+      if (normalizedPhone) {
+        activeDialingAttempts.set(normalizedPhone, Math.max(0, (activeDialingAttempts.get(normalizedPhone) || 0) - 1));
+      }
+      
       // Return empty TwiML to end the call if there was an error or if call is completed
       const response = new twiml.VoiceResponse();
       
       if (formData.ErrorCode === "13225" || formData.DialCallStatus === 'failed' || 
           formData.DialCallStatus === 'busy' || formData.DialCallStatus === 'no-answer') {
         // Add blacklisted number to our cache if applicable
-        if (formData.ErrorCode === "13225" && formData.phoneNumber) {
-          blacklistedNumbers.add(formData.phoneNumber);
-          console.log(`Added ${formData.phoneNumber} to blacklist cache from dial action`);
+        if (formData.ErrorCode === "13225" && phoneNumber) {
+          blacklistedNumbers.add(normalizedPhone);
+          console.log(`Added ${phoneNumber} (${normalizedPhone}) to blacklist cache from dial action`);
         }
         
         response.say("The call could not be completed. The number may be unreachable or blacklisted.");
@@ -326,8 +405,10 @@ serve(async (req) => {
       let phoneNumber = formData.phoneNumber || formData.PhoneNumber || formData.Phonenumber || formData.phonenumber;
       
       if (phoneNumber) {
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        
         // Check if this phone number is blacklisted
-        if (blacklistedNumbers.has(phoneNumber)) {
+        if (blacklistedNumbers.has(normalizedPhone)) {
           console.log(`Rejecting call to blacklisted number ${phoneNumber} in fallback handler`);
           
           const response = new twiml.VoiceResponse();
@@ -358,7 +439,7 @@ serve(async (req) => {
           callerId: callerId,
           timeout: 30,
           answerOnBridge: true,
-          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true`,
+          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(phoneNumber)}`,
           method: "POST",
         });
         
