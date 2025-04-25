@@ -36,7 +36,6 @@ import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "@/components/ui/use-toast";
 import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
-import { CallHistoryTracker } from "@/components/power-dialer/CallHistoryTracker";
 
 const SAMPLE_LEADS = [
   {
@@ -100,7 +99,6 @@ export default function PowerDialer() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
   const [currentCall, setCurrentCall] = useState(null);
-  const [sessionId, setSessionId] = useState(`session-${Date.now()}`);
 
   const twilioState = useTwilio();
 
@@ -249,19 +247,16 @@ export default function PowerDialer() {
                 variant="default" 
                 size="sm"
                 onClick={async () => {
-                  const newSessionId = `session-${Date.now()}`;
-                  setSessionId(newSessionId);
-                  
                   const initialized = await twilioService.initializeTwilioDevice();
                   if (initialized) {
                     toast({
                       title: "System Reinitialized",
-                      description: "The phone system has been reinitialized with a new session.",
+                      description: "The phone system has been reinitialized with a new token.",
                     });
                   }
                 }}
               >
-                Start New Session
+                Reinitialize System
               </Button>
             </div>
           </CardTitle>
@@ -270,8 +265,6 @@ export default function PowerDialer() {
           </CardDescription>
         </CardHeader>
       </Card>
-
-      <CallHistoryTracker sessionId={sessionId} />
 
       <PreviewDialerWindow 
         currentCall={Object.values(twilioState.activeCalls)[0]}
@@ -617,9 +610,6 @@ export default function PowerDialer() {
             </Badge>
             <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
               {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
-            </Badge>
-            <Badge variant="outline">
-              Session: {sessionId.split('-')[1]}
             </Badge>
           </div>
         </div>

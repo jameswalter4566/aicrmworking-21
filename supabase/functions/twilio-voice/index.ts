@@ -1,218 +1,700 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import twilio from 'npm:twilio@4.18.1';
+// Twilio Voice Edge Function
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import twilio from "npm:twilio@4.10.0";
 
-// Define CORS headers for browser requests
+// Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'text/xml',
 };
 
-// For tracking calls in memory (temporary solution until we implement database tracking)
-const callLogs = new Map<string, Array<{
-  phoneNumber: string,
-  timestamp: number,
-  status: string,
-  duration?: number,
-  callSid?: string
-}>>();
+const twiml = twilio.twiml;
 
-// The Twilio phone number to use as the caller ID
-const fromNumber = Deno.env.get("TWILIO_PHONE_NUMBER") || "+18158625164";
-const accountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-const authToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+// Server-side in-memory caches to track call data between function invocations
+// Store blacklists by session ID to ensure session-specific blacklisting
+const sessionTemporaryBlacklists = new Map<string, Set<string>>();
+// Track Twilio-reported blacklisted numbers (permanent blacklists from Twilio)
+const twilioReportedBlacklists = new Map<string, Set<string>>();
+// Track call attempts for each session
+const callAttempts = new Map<string, Map<string, number>>();
+// Track no-answer timeouts for each session
+const noAnswerTimeouts = new Map<string, Map<string, number>>();
+const MAX_ATTEMPTS = 3;
+
+// Track more granular call status data - required for proper tracking of call disposition
+const callStatusData = new Map<string, {
+  callSid: string;
+  sessionId: string;
+  phoneNumber: string;
+  startTime: number;
+  lastUpdateTime: number;
+  currentStatus: string;
+  attempts: number;
+  wasDialed: boolean;
+  dialComplete: boolean;
+}>();
+
+const lastAttemptTimestamps = new Map<string, Map<string, number>>();
+const MIN_RETRY_INTERVAL_MS = 10000; // 10 seconds minimum between retries
+const activeDialingAttempts = new Map<string, Map<string, number>>();
+
+// Track dial timeouts for proper call disposition
+const dialTimeouts = new Map<string, number>();
+const DIAL_TIMEOUT_MS = 30000; // 30 seconds as per requirement
+
+// Error codes that indicate Twilio-level blacklisting - these are permanent
+const TWILIO_BLACKLIST_ERROR_CODES = new Set(['13225']);
+
+// Error codes that should cause session-temporary restrictions but NOT blacklisting
+const RESTRICTION_ERROR_CODES = new Set(['13227', '21215', '21211']);
 
 serve(async (req) => {
+  console.log("Received request to Twilio Voice function");
+
+  // Helper function to normalize phone numbers for consistent tracking
+  const normalizePhoneNumber = (phoneNumber: string): string => {
+    if (!phoneNumber) return '';
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    return digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+  };
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Generate a unique request ID for logging
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+  console.log(`[${requestId}] Processing request`);
+
   try {
-    // Get URL and query parameters
-    const url = new URL(req.url);
-    const isDialAction = url.searchParams.get('dialAction') === 'true';
-    const phoneNumber = url.searchParams.get('phoneNumber') || '';
-    const sessionId = url.searchParams.get('sessionId') || 'default-session';
-    
-    if (!callLogs.has(sessionId)) {
-      callLogs.set(sessionId, []);
+    let method;
+    let formData: any = {};
+
+    if (req.headers.get('Content-Type')?.includes('application/json')) {
+      // Handle JSON requests from our own frontend
+      method = 'json';
+      formData = await req.json();
+      console.log(`[${requestId}] Received JSON request:`, JSON.stringify(formData));
+    } else {
+      // Handle form data from Twilio webhooks
+      method = 'form';
+      const params = await req.formData();
+      for (const [key, value] of params.entries()) {
+        formData[key] = value;
+      }
+      console.log(`[${requestId}] Received form data request:`, JSON.stringify(formData));
     }
 
-    // Parse request body as form data (how Twilio sends it)
-    const contentType = req.headers.get('content-type') || '';
-    let body: any = {};
+    // Extract session ID (for session-scoped blacklisting)
+    // This could be provided as a parameter or extracted from the leadId
+    const sessionId = formData.sessionId || formData.dialingSessionId || 'default-session';
     
-    if (contentType.includes('application/json')) {
-      body = await req.json();
-    } else if (contentType.includes('application/x-www-form-urlencoded')) {
-      const formData = await req.formData();
-      for (const [key, value] of formData.entries()) {
-        body[key] = value;
+    // Initialize session blacklist if it doesn't exist
+    if (!sessionTemporaryBlacklists.has(sessionId)) {
+      sessionTemporaryBlacklists.set(sessionId, new Set<string>());
+      console.log(`[${requestId}] Created new session blacklist for session ${sessionId}`);
+    }
+    
+    if (!twilioReportedBlacklists.has(sessionId)) {
+      twilioReportedBlacklists.set(sessionId, new Set<string>());
+      console.log(`[${requestId}] Created new Twilio blacklist tracking for session ${sessionId}`);
+    }
+    
+    if (!callAttempts.has(sessionId)) {
+      callAttempts.set(sessionId, new Map<string, number>());
+      console.log(`[${requestId}] Created new call attempts tracking for session ${sessionId}`);
+    }
+    
+    if (!lastAttemptTimestamps.has(sessionId)) {
+      lastAttemptTimestamps.set(sessionId, new Map<string, number>());
+      console.log(`[${requestId}] Created new attempt timestamps tracking for session ${sessionId}`);
+    }
+    
+    if (!activeDialingAttempts.has(sessionId)) {
+      activeDialingAttempts.set(sessionId, new Map<string, number>());
+      console.log(`[${requestId}] Created new active dialing attempts tracking for session ${sessionId}`);
+    }
+    
+    if (!noAnswerTimeouts.has(sessionId)) {
+      noAnswerTimeouts.set(sessionId, new Map<string, number>());
+      console.log(`[${requestId}] Created new no-answer timeouts tracking for session ${sessionId}`);
+    }
+    
+    // Get the session-specific tracking data
+    const sessionBlacklist = sessionTemporaryBlacklists.get(sessionId)!;
+    const twilioReportedBlacklist = twilioReportedBlacklists.get(sessionId)!;
+    const sessionCallAttempts = callAttempts.get(sessionId)!;
+    const sessionLastAttempts = lastAttemptTimestamps.get(sessionId)!;
+    const sessionActiveDialing = activeDialingAttempts.get(sessionId)!;
+    const sessionNoAnswerTimeouts = noAnswerTimeouts.get(sessionId)!;
+
+    // Extract key data from the request
+    const phoneNumber = formData.phoneNumber;
+    const normalizedPhone = phoneNumber ? normalizePhoneNumber(phoneNumber) : '';
+    const callSid = formData.CallSid || '';
+    const dialCallStatus = formData.DialCallStatus || '';
+    const errorCode = formData.ErrorCode || '';
+    const errorMessage = formData.ErrorMessage || '';
+    const isDialAction = formData.dialAction === "true" || req.url.includes('dialAction=true');
+    
+    if (callSid && !callStatusData.has(callSid) && phoneNumber) {
+      // Initialize call status tracking
+      callStatusData.set(callSid, {
+        callSid,
+        sessionId,
+        phoneNumber: normalizedPhone,
+        startTime: Date.now(),
+        lastUpdateTime: Date.now(),
+        currentStatus: formData.CallStatus || 'unknown',
+        attempts: 0,
+        wasDialed: false,
+        dialComplete: false
+      });
+    }
+    
+    // Start tracking dial timeout if this is a fresh outbound call
+    if (phoneNumber && !isDialAction && callSid && !dialTimeouts.has(callSid)) {
+      // Record the start time for this dial attempt
+      dialTimeouts.set(callSid, Date.now());
+      console.log(`[${requestId}] Started dial timeout tracking for ${callSid}`);
+      
+      // Update call status data
+      if (callStatusData.has(callSid)) {
+        const statusData = callStatusData.get(callSid)!;
+        statusData.wasDialed = true;
+        statusData.attempts++;
+        callStatusData.set(callSid, statusData);
       }
     }
 
-    // Special actions
-    if (body.action === 'hangupAll') {
-      console.log('Hanging up all active calls via API');
-      if (accountSid && authToken) {
-        const client = twilio(accountSid, authToken);
-        const calls = await client.calls.list({ status: 'in-progress' });
+    // Check if Twilio has blacklisted this number - this is a permanent blacklist
+    if (phoneNumber && twilioReportedBlacklist.has(normalizedPhone)) {
+      console.log(`[${requestId}] Phone number ${phoneNumber} was previously reported as blacklisted by Twilio`);
+      const response = new twiml.VoiceResponse();
+      response.say("This number has been blacklisted by Twilio and cannot be called.");
+      response.hangup();
+      return new Response(response.toString(), { headers: corsHeaders });
+    }
+
+    // Check for session-specific blacklisting
+    if (phoneNumber && sessionBlacklist.has(normalizedPhone)) {
+      console.log(`[${requestId}] Phone number ${phoneNumber} is blacklisted for session ${sessionId}, preventing dial`);
+      
+      const response = new twiml.VoiceResponse();
+      response.say("This number is temporarily restricted in the current session due to previous failed call attempts.");
+      response.hangup();
+      
+      return new Response(response.toString(), { headers: corsHeaders });
+    }
+    
+    // Check for throttling (too many rapid attempts)
+    if (phoneNumber && sessionLastAttempts.has(normalizedPhone)) {
+      const now = Date.now();
+      const lastAttempt = sessionLastAttempts.get(normalizedPhone)!;
+      if (now - lastAttempt < MIN_RETRY_INTERVAL_MS) {
+        console.log(`[${requestId}] Too many rapid attempts for ${phoneNumber}, throttling`);
         
-        let hungUpCount = 0;
-        for (const call of calls) {
-          await client.calls(call.sid).update({ status: 'completed' });
-          hungUpCount++;
+        const response = new twiml.VoiceResponse();
+        response.say("Please wait before trying this number again.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+    }
+    
+    // Track this attempt time if we have a valid phone number
+    if (phoneNumber) {
+      sessionLastAttempts.set(normalizedPhone, Date.now());
+      
+      // Check for concurrent dialing attempts to the same number
+      const currentAttempts = sessionActiveDialing.get(normalizedPhone) || 0;
+      if (currentAttempts > 0 && !isDialAction) {
+        console.log(`[${requestId}] Already dialing ${phoneNumber} (${currentAttempts} active attempts), preventing concurrent dial`);
+        
+        const response = new twiml.VoiceResponse();
+        response.say("A call to this number is already in progress.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      
+      // Mark this number as being dialed
+      if (!isDialAction) {
+        sessionActiveDialing.set(normalizedPhone, (currentAttempts || 0) + 1);
+        
+        // Increment attempt counter for this number
+        const attempts = sessionCallAttempts.get(normalizedPhone) || 0;
+        sessionCallAttempts.set(normalizedPhone, attempts + 1);
+        
+        console.log(`[${requestId}] Now dialing ${phoneNumber}, attempt #${attempts + 1} for session ${sessionId}`);
+      }
+    }
+
+    // Handle dial action with proper handling of error codes
+    if (isDialAction) {
+      console.log(`[${requestId}] Processing dial action response for session ${sessionId}: Status=${dialCallStatus}, Error=${errorCode}`);
+      
+      // Clean up tracking for this number
+      if (normalizedPhone) {
+        const currentActive = sessionActiveDialing.get(normalizedPhone) || 0;
+        if (currentActive > 0) {
+          sessionActiveDialing.set(normalizedPhone, currentActive - 1);
+        }
+      }
+      
+      // Calculate how long the call has been in progress
+      const dialStartTime = dialTimeouts.get(callSid) || 0;
+      const dialDuration = Date.now() - dialStartTime;
+      console.log(`[${requestId}] Call ${callSid} has been active for ${dialDuration}ms`);
+      
+      // Update call status data
+      if (callStatusData.has(callSid)) {
+        const statusData = callStatusData.get(callSid)!;
+        statusData.lastUpdateTime = Date.now();
+        statusData.currentStatus = dialCallStatus;
+        statusData.dialComplete = true;
+        callStatusData.set(callSid, statusData);
+      }
+      
+      // Check if this is a Twilio blacklist error - this means the number is permanently blacklisted by Twilio
+      if (TWILIO_BLACKLIST_ERROR_CODES.has(errorCode) || errorMessage?.toLowerCase().includes("blacklisted")) {
+        console.log(`[${requestId}] Phone number ${phoneNumber} is blacklisted by Twilio`);
+        
+        // Add to Twilio blacklist tracking for this session
+        if (phoneNumber) {
+          twilioReportedBlacklist.add(normalizedPhone);
+          console.log(`[${requestId}] Added ${phoneNumber} (${normalizedPhone}) to Twilio blacklist tracking for session ${sessionId}`);
         }
         
-        return new Response(
-          JSON.stringify({ success: true, hungUpCount }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        // Return TwiML that ends the call
+        const response = new twiml.VoiceResponse();
+        response.say("This number is blacklisted by Twilio and cannot be called.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      
+      // Handle session-temporary restrictions (not blacklisting)
+      if (RESTRICTION_ERROR_CODES.has(errorCode)) {
+        console.log(`[${requestId}] Phone number ${phoneNumber} has a restriction error: ${errorCode} - ${errorMessage}`);
+        
+        // Return TwiML that ends the call with appropriate message
+        const response = new twiml.VoiceResponse();
+        response.say("This number cannot be called due to restrictions. Please verify the number and try again later.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      
+      // Handle call completion cases for proper session blacklisting
+      if (dialCallStatus === "completed" || dialCallStatus === "answered") {
+        // Call was answered - remove any dial timeout tracking
+        dialTimeouts.delete(callSid);
+        console.log(`[${requestId}] Call ${callSid} was answered and completed normally`);
+        
+        const response = new twiml.VoiceResponse();
+        response.hangup();
+        return new Response(response.toString(), { headers: corsHeaders });
+      } 
+      else if (dialCallStatus === "no-answer" && dialDuration >= DIAL_TIMEOUT_MS) {
+        // Call rang for 30+ seconds with no answer - add to session blacklist to prevent retries
+        console.log(`[${requestId}] Call ${callSid} rang for 30+ seconds with no answer, adding to session ${sessionId} blacklist`);
+        
+        if (phoneNumber) {
+          sessionBlacklist.add(normalizedPhone);
+          console.log(`[${requestId}] Added ${phoneNumber} (${normalizedPhone}) to session ${sessionId} blacklist due to no-answer timeout`);
+        }
+        
+        const response = new twiml.VoiceResponse();
+        response.say("This number did not answer after 30 seconds and has been temporarily restricted for this session.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      else if (dialCallStatus === "busy") {
+        // Number is busy - don't blacklist, but end the call
+        console.log(`[${requestId}] Number ${phoneNumber} is busy`);
+        
+        const response = new twiml.VoiceResponse();
+        response.say("The number is busy. Please try again later.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      } 
+      else if (dialCallStatus === "failed") {
+        // Check for too many attempts
+        const attempts = sessionCallAttempts.get(normalizedPhone) || 0;
+        
+        if (attempts >= MAX_ATTEMPTS) {
+          console.log(`[${requestId}] Max attempts (${MAX_ATTEMPTS}) reached for ${phoneNumber}, adding to session ${sessionId} blacklist`);
+          
+          if (phoneNumber) {
+            sessionBlacklist.add(normalizedPhone);
+            console.log(`[${requestId}] Added ${phoneNumber} (${normalizedPhone}) to session ${sessionId} blacklist due to max attempts reached`);
+          }
+          
+          const response = new twiml.VoiceResponse();
+          response.say("The call cannot be completed at this time. Maximum retry attempts reached.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
+        // Retry logic for failed calls - typically through the AutoDialer
+        const response = new twiml.VoiceResponse();
+        response.say("Call failed. You may retry this number later.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
       }
     }
 
-    // Special action to clear call logs for a session
-    if (body.action === 'clearCallLogs' && body.sessionId) {
-      callLogs.set(body.sessionId, []);
-      return new Response(
-        JSON.stringify({ success: true, message: `Call logs cleared for session ${body.sessionId}` }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get call logs for a session
-    if (body.action === 'getCallLogs' && body.sessionId) {
-      const logs = callLogs.get(body.sessionId) || [];
-      return new Response(
-        JSON.stringify({ success: true, logs }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Handle dial action result (when a call is completed)
-    if (isDialAction) {
-      const dialCallStatus = body.DialCallStatus || 'unknown';
-      const dialCallSid = body.DialCallSid;
-      const errorCode = body.ErrorCode;
-      const errorMessage = body.ErrorMessage;
+    // Handle different request types
+    if (method === 'json' && formData.action === 'hangupAll') {
+      // Handle request to hang up all active calls
+      console.log(`[${requestId}] Attempting to hang up all active calls`);
       
-      // Log the call attempt outcome
-      const logs = callLogs.get(sessionId) || [];
-      const existingLogIndex = logs.findIndex(log => log.phoneNumber === phoneNumber);
-      
-      if (existingLogIndex >= 0) {
-        logs[existingLogIndex] = {
-          ...logs[existingLogIndex],
-          status: dialCallStatus,
-          callSid: dialCallSid,
-          errorCode,
-          errorMessage,
-          timestamp: Date.now()
-        };
-      } else {
-        logs.push({
-          phoneNumber,
-          status: dialCallStatus,
-          callSid: dialCallSid,
-          errorCode,
-          errorMessage,
-          timestamp: Date.now()
+      try {
+        const twilioClient = twilio(
+          Deno.env.get("TWILIO_ACCOUNT_SID"),
+          Deno.env.get("TWILIO_AUTH_TOKEN")
+        );
+        
+        // Get all active calls
+        const calls = await twilioClient.calls.list({status: 'in-progress'});
+        console.log(`[${requestId}] Found ${calls.length} active calls`);
+        
+        // Hang up each active call
+        for (const call of calls) {
+          try {
+            await twilioClient.calls(call.sid).update({status: 'completed'});
+            console.log(`[${requestId}] Hung up call ${call.sid}`);
+          } catch (err) {
+            console.error(`[${requestId}] Failed to hang up call ${call.sid}:`, err);
+          }
+        }
+        
+        return new Response(JSON.stringify({ success: true, hungUpCount: calls.length }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error(`[${requestId}] Error hanging up calls:`, error);
+        return new Response(JSON.stringify({ success: false, error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      callLogs.set(sessionId, logs);
-
-      console.log(`Call to ${phoneNumber} ended with status: ${dialCallStatus}`);
+    } 
+    else if (method === 'json' && formData.action === 'clearSessionBlacklist') {
+      // Add handler to clear a session's blacklist
+      const targetSessionId = formData.sessionId || 'default-session';
       
-      // Handle different call statuses
-      if (dialCallStatus === 'failed' && errorCode) {
-        console.warn(`Call failed with error code ${errorCode}: ${errorMessage}`);
-        return new Response(
-          `<?xml version="1.0" encoding="UTF-8"?>
-           <Response>
-             <Say>The call could not be completed. ${errorMessage || 'An error occurred.'}</Say>
-             <Hangup/>
-           </Response>`,
-          { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-        );
-      } else if (dialCallStatus === 'busy') {
-        return new Response(
-          `<?xml version="1.0" encoding="UTF-8"?>
-           <Response>
-             <Say>The number is busy. Please try again later.</Say>
-             <Hangup/>
-           </Response>`,
-          { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-        );
-      } else if (dialCallStatus === 'no-answer') {
-        return new Response(
-          `<?xml version="1.0" encoding="UTF-8"?>
-           <Response>
-             <Say>There was no answer. Please try again later.</Say>
-             <Hangup/>
-           </Response>`,
-          { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-        );
-      } else if (dialCallStatus === 'completed') {
-        return new Response(
-          `<?xml version="1.0" encoding="UTF-8"?>
-           <Response>
-             <Say>The call has ended.</Say>
-             <Hangup/>
-           </Response>`,
-          { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-        );
+      console.log(`[${requestId}] Clearing blacklist for session ${targetSessionId}`);
+      
+      if (sessionTemporaryBlacklists.has(targetSessionId)) {
+        sessionTemporaryBlacklists.set(targetSessionId, new Set<string>());
       }
       
-      // Default response for other statuses
-      return new Response(
-        `<?xml version="1.0" encoding="UTF-8"?>
-         <Response>
-           <Say>The call has ended with status: ${dialCallStatus}</Say>
-           <Hangup/>
-         </Response>`,
-        { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-      );
+      if (twilioReportedBlacklists.has(targetSessionId)) {
+        twilioReportedBlacklists.set(targetSessionId, new Set<string>());
+      }
+      
+      if (callAttempts.has(targetSessionId)) {
+        callAttempts.set(targetSessionId, new Map<string, number>());
+      }
+      
+      if (lastAttemptTimestamps.has(targetSessionId)) {
+        lastAttemptTimestamps.set(targetSessionId, new Map<string, number>());
+      }
+      
+      if (activeDialingAttempts.has(targetSessionId)) {
+        activeDialingAttempts.set(targetSessionId, new Map<string, number>());
+      }
+      
+      if (noAnswerTimeouts.has(targetSessionId)) {
+        noAnswerTimeouts.set(targetSessionId, new Map<string, number>());
+      }
+      
+      // Also clean up any call status data related to this session
+      for (const [callSid, statusData] of callStatusData.entries()) {
+        if (statusData.sessionId === targetSessionId) {
+          callStatusData.delete(callSid);
+        }
+      }
+      
+      console.log(`[${requestId}] Successfully cleared all tracking data for session ${targetSessionId}`);
+      
+      return new Response(JSON.stringify({ 
+        success: true, 
+        message: `Blacklist and tracking data cleared for session ${targetSessionId}`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
-
-    // Handle regular voice request
-    const leadId = body.leadId || 'unknown';
-    
-    // Log the call attempt
-    const logs = callLogs.get(sessionId) || [];
-    logs.push({
-      phoneNumber,
-      status: 'initiated',
-      timestamp: Date.now(),
-      leadId
-    });
-    callLogs.set(sessionId, logs);
-    
-    console.log(`Initiating call to ${phoneNumber} for lead ${leadId}`);
-    
-    return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?>
-       <Response>
-         <Dial callerId="${fromNumber}" timeout="30" answerOnBridge="true" 
-               action="${url.origin + url.pathname}?dialAction=true&phoneNumber=${encodeURIComponent(phoneNumber)}&sessionId=${encodeURIComponent(sessionId)}" 
-               method="POST">
-           <Number>${phoneNumber}</Number>
-         </Dial>
-       </Response>`,
-      { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-    );
-  } catch (error) {
-    console.error("Error handling Twilio voice request:", error);
-    return new Response(
-      `<?xml version="1.0" encoding="UTF-8"?>
-       <Response>
-         <Say>An error occurred: ${error.message || 'Unknown error'}</Say>
-         <Hangup/>
-       </Response>`,
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
-        status: 200 // Return 200 even for errors to prevent Twilio retries
+    else if (method === 'json' && formData.action === 'getSessionBlacklist') {
+      // Add handler to get a session's blacklist
+      const targetSessionId = formData.sessionId || 'default-session';
+      
+      const sessionBlacklistArray = sessionTemporaryBlacklists.has(targetSessionId) 
+        ? Array.from(sessionTemporaryBlacklists.get(targetSessionId)!) 
+        : [];
+      
+      const twilioBlacklistArray = twilioReportedBlacklists.has(targetSessionId)
+        ? Array.from(twilioReportedBlacklists.get(targetSessionId)!)
+        : [];
+        
+      return new Response(JSON.stringify({
+        success: true,
+        sessionBlacklist: sessionBlacklistArray,
+        twilioBlacklist: twilioBlacklistArray,
+        sessionId: targetSessionId
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    else if (method === 'json' && formData.phoneNumber) {
+      // Handle JSON request for making a call
+      console.log(`[${requestId}] Processing JSON outbound call request to: ${formData.phoneNumber} for session ${sessionId}`);
+      
+      // Create TwiML for dialing
+      const response = new twiml.VoiceResponse();
+      
+      // Get caller ID from environment
+      const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
+      
+      // Format phone number
+      let formattedPhone = formData.phoneNumber;
+      if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
+        formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
       }
-    );
+      
+      console.log(`[${requestId}] JSON Request: Dialing ${formattedPhone} with caller ID: ${callerId || "default"} for session ${sessionId}`);
+      
+      // Use <Dial> verb with proper options and include phoneNumber in action URL
+      const dial = response.dial({
+        callerId: callerId,
+        timeout: 30,
+        answerOnBridge: true,
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(formData.phoneNumber)}&sessionId=${encodeURIComponent(sessionId)}`,
+        method: "POST",
+      });
+      
+      // Add the number to dial
+      dial.number(formattedPhone);
+      
+      const twimlResponse = response.toString();
+      console.log(`[${requestId}] Generated TwiML for JSON request:`, twimlResponse);
+      
+      return new Response(twimlResponse, { headers: corsHeaders });
+    } else if (formData.CallStatus === "ringing" && formData.phoneNumber) {
+      // This is a form data request for an outbound call
+      console.log(`[${requestId}] Processing form outbound call request to: ${formData.phoneNumber} for session ${sessionId}`);
+      
+      // Create TwiML for dialing
+      const response = new twiml.VoiceResponse();
+      
+      // Get caller ID from environment
+      const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
+      
+      // Format phone number
+      let formattedPhone = formData.phoneNumber;
+      if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
+        formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
+      }
+      
+      console.log(`[${requestId}] Form Request: Dialing ${formattedPhone} with caller ID: ${callerId || formData.From} for session ${sessionId}`);
+      
+      // Use <Dial> verb with proper options and include phoneNumber and sessionId in action URL
+      const dial = response.dial({
+        callerId: callerId || formData.From,
+        timeout: 30,
+        answerOnBridge: true,
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(formData.phoneNumber)}&sessionId=${encodeURIComponent(sessionId)}`,
+        method: "POST",
+      });
+      
+      // Add the number to dial
+      dial.number(formattedPhone);
+      
+      const twimlResponse = response.toString();
+      console.log(`[${requestId}] Generated TwiML for form request:`, twimlResponse);
+      
+      return new Response(twimlResponse, { headers: corsHeaders });
+    } else if (formData.CallSid && formData.Caller && !formData.phoneNumber) {
+      // This is an incoming call from Twilio
+      console.log(`[${requestId}] Processing incoming call from Twilio: CallSid=${formData.CallSid}, Caller=${formData.Caller}`);
+      
+      // Look for phoneNumber in any potential parameter field
+      let phoneNumber = null;
+      for (const key in formData) {
+        if (key.toLowerCase() === 'phonenumber' || (formData[key] && typeof formData[key] === 'string' && formData[key].match(/^\+?[0-9]+$/))) {
+          phoneNumber = formData[key];
+          break;
+        }
+      }
+      
+      if (phoneNumber) {
+        // Found a phone number to dial
+        console.log(`[${requestId}] Found phone number to dial: ${phoneNumber}`);
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        
+        // Check if this number is session-blacklisted or Twilio-blacklisted
+        if (sessionBlacklist.has(normalizedPhone)) {
+          console.log(`[${requestId}] Rejecting call to session-blacklisted number ${phoneNumber} for session ${sessionId}`);
+          
+          const response = new twiml.VoiceResponse();
+          response.say("This number has been temporarily restricted in the current session due to failed call attempts.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
+        if (twilioReportedBlacklist.has(normalizedPhone)) {
+          console.log(`[${requestId}] Rejecting call to Twilio-blacklisted number ${phoneNumber} for session ${sessionId}`);
+          
+          const response = new twiml.VoiceResponse();
+          response.say("This number has been blacklisted by Twilio and cannot be called.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
+        // Create TwiML for dialing
+        const response = new twiml.VoiceResponse();
+        
+        // Get caller ID from environment
+        const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
+        
+        // Format phone number
+        let formattedPhone = phoneNumber;
+        if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
+          formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
+        }
+        
+        console.log(`[${requestId}] Dialing ${formattedPhone} with caller ID: ${callerId || formData.From} for session ${sessionId}`);
+        
+        // Use <Dial> verb with proper options and include phoneNumber and sessionId in action URL
+        const dial = response.dial({
+          callerId: callerId || formData.From,
+          timeout: 30,
+          answerOnBridge: true,
+          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(phoneNumber)}&sessionId=${encodeURIComponent(sessionId)}`,
+          method: "POST",
+        });
+        
+        // Add the number to dial
+        dial.number(formattedPhone);
+        
+        const twimlResponse = response.toString();
+        console.log(`[${requestId}] Generated TwiML for incoming call:`, twimlResponse);
+        
+        return new Response(twimlResponse, { headers: corsHeaders });
+      } else {
+        // This is just a status callback or other type of request
+        console.log(`[${requestId}] No phone number found to dial, handling as a status callback`);
+        const response = new twiml.VoiceResponse();
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+    } else if (formData.CallStatus && formData.CallbackSource === "call-progress-events") {
+      // Handle Twilio status callback
+      console.log(`[${requestId}] Detected Twilio status callback: {
+        callSid: "${formData.CallSid}",
+        callStatus: "${formData.CallStatus}",
+        callbackSource: "${formData.CallbackSource || 'unknown'}"
+      }`);
+      
+      if (callStatusData.has(formData.CallSid)) {
+        const statusData = callStatusData.get(formData.CallSid)!;
+        statusData.currentStatus = formData.CallStatus;
+        statusData.lastUpdateTime = Date.now();
+        callStatusData.set(formData.CallSid, statusData);
+      }
+      
+      // Just acknowledge with a 200 OK and empty TwiML for status callbacks
+      const response = new twiml.VoiceResponse();
+      return new Response(response.toString(), { headers: corsHeaders });
+    } else {
+      // Default fallback - log the full request for debugging
+      console.warn(`[${requestId}] Unhandled request type received:`, JSON.stringify(formData, null, 2));
+      
+      // Check specifically for phoneNumber in any format we might have missed
+      let phoneNumber = formData.phoneNumber || formData.PhoneNumber || formData.Phonenumber || formData.phonenumber;
+      
+      if (phoneNumber) {
+        const normalizedPhone = normalizePhoneNumber(phoneNumber);
+        
+        // Check if this phone number is session-blacklisted or Twilio-blacklisted
+        if (sessionBlacklist.has(normalizedPhone)) {
+          console.log(`[${requestId}] Rejecting call to session-blacklisted number ${phoneNumber} in fallback handler for session ${sessionId}`);
+          
+          const response = new twiml.VoiceResponse();
+          response.say("This number has been temporarily restricted in the current session due to failed call attempts.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
+        if (twilioReportedBlacklist.has(normalizedPhone)) {
+          console.log(`[${requestId}] Rejecting call to Twilio-blacklisted number ${phoneNumber} in fallback handler for session ${sessionId}`);
+          
+          const response = new twiml.VoiceResponse();
+          response.say("This number has been blacklisted by Twilio and cannot be called.");
+          response.hangup();
+          
+          return new Response(response.toString(), { headers: corsHeaders });
+        }
+        
+        console.log(`[${requestId}] Found phone number in fallback handler: ${phoneNumber} for session ${sessionId}`);
+        
+        // Create TwiML for dialing as a last resort
+        const response = new twiml.VoiceResponse();
+        
+        // Get caller ID from environment
+        const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
+        
+        // Format phone number
+        let formattedPhone = phoneNumber;
+        if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
+          formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
+        }
+        
+        console.log(`[${requestId}] Fallback: Dialing ${formattedPhone} with caller ID: ${callerId || "default"} for session ${sessionId}`);
+        
+        // Use <Dial> verb with proper options and include phoneNumber and sessionId in action URL
+        const dial = response.dial({
+          callerId: callerId,
+          timeout: 30,
+          answerOnBridge: true,
+          action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(phoneNumber)}&sessionId=${encodeURIComponent(sessionId)}`,
+          method: "POST",
+        });
+        
+        dial.number(formattedPhone);
+        
+        const twimlResponse = response.toString();
+        console.log(`[${requestId}] Generated TwiML in fallback:`, twimlResponse);
+        
+        return new Response(twimlResponse, { headers: corsHeaders });
+      }
+      
+      // If we still couldn't figure out what to do, return a basic response
+      const response = new twiml.VoiceResponse();
+      response.say("We're sorry, but we couldn't process your request.");
+      return new Response(response.toString(), { headers: corsHeaders });
+    }
+  } catch (error) {
+    console.error(`[${requestId}] Error processing request:`, error);
+    
+    // Return a proper TwiML response with error message
+    const response = new twiml.VoiceResponse();
+    response.say("We encountered an error processing your request.");
+    
+    return new Response(response.toString(), { 
+      status: 200,  // Return 200 even for errors to avoid Twilio retries
+      headers: corsHeaders
+    });
   }
 });
