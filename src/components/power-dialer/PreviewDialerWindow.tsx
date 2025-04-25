@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +31,7 @@ import { AutoDialerController } from './AutoDialerController';
 import { twilioService } from "@/services/twilio";
 import { LineDisplay } from './LineDisplay';
 import { useTwilio } from "@/hooks/use-twilio";
-import { ActiveCallData } from '@/types/dialer';
+import { ActiveCallData, LineCallData, CallStatus } from '@/types/dialer';
 import { useCallStatus } from '@/hooks/use-call-status';
 
 interface Props {

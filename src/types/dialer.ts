@@ -23,7 +23,7 @@ export interface CallStatusUpdate {
   status: CallStatus;
   timestamp: number;
   agentId?: string;
-  leadId?: string;
+  leadId?: string | number;
   phoneNumber?: string;
   leadName?: string;
   duration?: number;

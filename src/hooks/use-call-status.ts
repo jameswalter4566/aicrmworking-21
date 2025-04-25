@@ -1,7 +1,9 @@
+
 import { useState, useEffect, useRef } from 'react';
-import { CallStatusUpdate, natsService } from '@/services/nats';
+import { natsService } from '@/services/nats';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { CallStatus, CallStatusUpdate } from '@/types/dialer';
 
 export function useCallStatus(sessionId: string | null) {
   const [callStatuses, setCallStatuses] = useState<Record<string, CallStatusUpdate>>({});
@@ -150,8 +152,8 @@ export function useCallStatus(sessionId: string | null) {
       phoneNumber: '+18158625164',
       leadName: 'Mock Test Lead',
       company: 'Test Company',
-      errorCode: null,
-      errorMessage: null
+      errorCode: undefined,
+      errorMessage: undefined
     };
     
     setCallStatuses(prev => ({
