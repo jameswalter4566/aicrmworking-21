@@ -27,6 +27,8 @@ const callStatusData = new Map<string, {
   attempts: number;
   wasDialed: boolean;
   dialComplete: boolean;
+  errorCode?: string;
+  errorMessage?: string;
 }>();
 
 // Track active dialing attempts for concurrent call prevention
@@ -44,6 +46,26 @@ serve(async (req) => {
     if (!phoneNumber) return '';
     const digitsOnly = phoneNumber.replace(/\D/g, '');
     return digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+  };
+  
+  // Helper function to properly format phone numbers for Twilio
+  const formatPhoneNumberForDialing = (phoneNumber: string): string => {
+    if (!phoneNumber) return '';
+    if (phoneNumber.startsWith('client:')) return phoneNumber;
+    
+    const digitsOnly = phoneNumber.replace(/\D/g, '');
+    
+    // For US numbers (10 digits), ensure they have +1 prefix
+    if (digitsOnly.length === 10) {
+      return `+1${digitsOnly}`;
+    } 
+    // For international numbers, ensure they have + prefix
+    else if (digitsOnly.length > 10) {
+      // If it already has a country code (doesn't start with 1), just add +
+      return digitsOnly.startsWith('1') ? `+${digitsOnly}` : `+${digitsOnly}`;
+    }
+    // If it's a short code or incomplete number, just add + for consistency
+    return `+${digitsOnly}`;
   };
 
   // Handle CORS preflight requests
@@ -89,13 +111,29 @@ serve(async (req) => {
     const sessionNoAnswerTimeouts = noAnswerTimeouts.get(sessionId)!;
 
     // Extract key data from the request
-    const phoneNumber = formData.phoneNumber;
+    let phoneNumber = formData.phoneNumber;
+    // Get error codes and messages if they exist
+    const errorCode = formData.ErrorCode || '';
+    const errorMessage = formData.ErrorMessage || '';
+    
+    // Format the phone number properly 
+    if (phoneNumber && !phoneNumber.startsWith('client:')) {
+      const originalPhoneNumber = phoneNumber;
+      phoneNumber = formatPhoneNumberForDialing(phoneNumber);
+      if (originalPhoneNumber !== phoneNumber) {
+        console.log(`[${requestId}] Formatted phone number from ${originalPhoneNumber} to ${phoneNumber}`);
+      }
+    }
+    
     const normalizedPhone = phoneNumber ? normalizePhoneNumber(phoneNumber) : '';
     const callSid = formData.CallSid || '';
     const dialCallStatus = formData.DialCallStatus || '';
-    const errorCode = formData.ErrorCode || '';
-    const errorMessage = formData.ErrorMessage || '';
     const isDialAction = formData.dialAction === "true" || req.url.includes('dialAction=true');
+    
+    // If we have error information from Twilio, log it
+    if (errorCode || errorMessage) {
+      console.log(`[${requestId}] Twilio Error - Code: ${errorCode}, Message: ${errorMessage}`);
+    }
     
     if (callSid && !callStatusData.has(callSid) && phoneNumber) {
       // Initialize call status tracking
@@ -108,8 +146,16 @@ serve(async (req) => {
         currentStatus: formData.CallStatus || 'unknown',
         attempts: 0,
         wasDialed: false,
-        dialComplete: false
+        dialComplete: false,
+        errorCode: errorCode || undefined,
+        errorMessage: errorMessage || undefined
       });
+    } else if (callSid && callStatusData.has(callSid) && (errorCode || errorMessage)) {
+      // Update with error info if we get it later
+      const callData = callStatusData.get(callSid)!;
+      callData.errorCode = errorCode || callData.errorCode;
+      callData.errorMessage = errorMessage || callData.errorMessage;
+      callStatusData.set(callSid, callData);
     }
     
     // Start tracking dial timeout if this is a fresh outbound call
@@ -170,6 +216,8 @@ serve(async (req) => {
         statusData.lastUpdateTime = Date.now();
         statusData.currentStatus = dialCallStatus;
         statusData.dialComplete = true;
+        statusData.errorCode = errorCode || statusData.errorCode;
+        statusData.errorMessage = errorMessage || statusData.errorMessage;
         callStatusData.set(callSid, statusData);
       }
 
@@ -201,8 +249,12 @@ serve(async (req) => {
         return new Response(response.toString(), { headers: corsHeaders });
       } 
       else if (dialCallStatus === "failed") {
-        // Log the failure but don't prevent future attempts
-        console.log(`[${requestId}] Call to ${phoneNumber} failed, will allow future attempts`);
+        // Include error code in the log if available
+        const logMessage = errorCode ? 
+          `[${requestId}] Call to ${phoneNumber} failed with error code ${errorCode}: ${errorMessage}` :
+          `[${requestId}] Call to ${phoneNumber} failed, will allow future attempts`;
+        
+        console.log(logMessage);
         
         const response = new twiml.VoiceResponse();
         // This is the key change - using the updated message that matches what we set elsewhere in the code
@@ -272,19 +324,15 @@ serve(async (req) => {
       const response = new twiml.VoiceResponse();
       const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
       
-      // Format phone number
-      let formattedPhone = formData.phoneNumber;
-      if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
-        formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
-      }
-      
+      // Format phone number (already happened above)
+      const formattedPhone = phoneNumber; // Using the formatted version
       console.log(`[${requestId}] JSON Request: Dialing ${formattedPhone} with caller ID: ${callerId || "default"}`);
       
       const dial = response.dial({
         callerId: callerId,
         timeout: 30,
         answerOnBridge: true,
-        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(formData.phoneNumber)}`,
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(formattedPhone)}`,
         method: "POST",
       });
       
@@ -301,18 +349,15 @@ serve(async (req) => {
       const response = new twiml.VoiceResponse();
       const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
       
-      let formattedPhone = formData.phoneNumber;
-      if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
-        formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
-      }
-      
+      // Format phone number (already happened above)
+      const formattedPhone = phoneNumber; // Using the formatted version
       console.log(`[${requestId}] Form Request: Dialing ${formattedPhone} with caller ID: ${callerId || formData.From}`);
       
       const dial = response.dial({
         callerId: callerId || formData.From,
         timeout: 30,
         answerOnBridge: true,
-        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(formData.phoneNumber)}`,
+        action: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice?dialAction=true&phoneNumber=${encodeURIComponent(formattedPhone)}`,
         method: "POST",
       });
       
@@ -342,11 +387,8 @@ serve(async (req) => {
         const response = new twiml.VoiceResponse();
         const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
         
-        let formattedPhone = phoneNumber;
-        if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
-          formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
-        }
-        
+        // Format phone number properly to ensure correct dialing
+        const formattedPhone = formatPhoneNumberForDialing(phoneNumber);
         console.log(`[${requestId}] Dialing ${formattedPhone} with caller ID: ${callerId || formData.From}`);
         
         const dial = response.dial({
@@ -401,13 +443,9 @@ serve(async (req) => {
         const response = new twiml.VoiceResponse();
         const callerId = Deno.env.get("TWILIO_PHONE_NUMBER");
         
-        // Format phone number
-        let formattedPhone = phoneNumber;
-        if (!formattedPhone.startsWith('+') && !formattedPhone.includes('client:')) {
-          formattedPhone = '+' + formattedPhone.replace(/\D/g, '');
-        }
-        
-        console.log(`[${requestId}] Fallback: Dialing ${formattedPhone} with caller ID: ${callerId || "default"}`);
+        // Format phone number properly
+        phoneNumber = formatPhoneNumberForDialing(phoneNumber);
+        console.log(`[${requestId}] Fallback: Dialing ${phoneNumber} with caller ID: ${callerId || "default"}`);
         
         const dial = response.dial({
           callerId: callerId,
@@ -417,7 +455,7 @@ serve(async (req) => {
           method: "POST",
         });
         
-        dial.number(formattedPhone);
+        dial.number(phoneNumber);
         
         const twimlResponse = response.toString();
         console.log(`[${requestId}] Generated TwiML in fallback:`, twimlResponse);
