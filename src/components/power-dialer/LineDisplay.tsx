@@ -18,7 +18,7 @@ interface LineDisplayProps {
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   
-  // Extensive logging to trace data flow
+  // Debug logging
   console.log('LineDisplay Render - Input Props:', {
     lineNumber,
     currentCall: currentCall ? {
@@ -59,8 +59,8 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const getStatusDisplay = () => {
     console.log('LineDisplay getStatusDisplay - Calculating status for:', currentCall?.status);
     
-    if (!currentCall) {
-      console.log('No current call - displaying FREE state');
+    if (!currentCall || !currentCall.phoneNumber) {
+      console.log('No current call or phone number - displaying FREE state');
       return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
     
@@ -88,8 +88,8 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           badge: 'bg-red-100 text-red-800'
         };
       default:
-        console.log('Unknown call status:', currentCall.status);
-        return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
+        console.log('Unknown call status or waiting:', currentCall.status);
+        return { bg: 'bg-yellow-100', text: 'WAITING', badge: 'bg-yellow-100 text-yellow-800' };
     }
   };
 
@@ -116,6 +116,12 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
         {currentCall?.phoneNumber && (
           <div className="mt-2 text-sm text-gray-500">
             {currentCall.phoneNumber}
+          </div>
+        )}
+        
+        {currentCall?.leadName && (
+          <div className="mt-1 text-sm font-medium">
+            {currentCall.leadName}
           </div>
         )}
         

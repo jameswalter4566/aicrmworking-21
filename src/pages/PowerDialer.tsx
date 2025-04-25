@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -38,6 +37,7 @@ import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "@/components/ui/use-toast";
 import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
 import { ActiveCall } from "@/hooks/use-twilio";
+import { LineDisplay } from "@/components/power-dialer/LineDisplay";
 
 const SAMPLE_LEADS = [
   {
@@ -103,7 +103,6 @@ export default function PowerDialer() {
   const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
 
-  // Get twilio state from the hook
   const {
     initialized,
     activeCalls,
@@ -133,7 +132,6 @@ export default function PowerDialer() {
   useEffect(() => {
     if (!activeCalls) return;
     
-    // Update current call state
     const activeCallsArray = Object.values(activeCalls);
     if (activeCallsArray.length > 0) {
       setCurrentCall(activeCallsArray[0] as ActiveCall);
@@ -251,6 +249,35 @@ export default function PowerDialer() {
 
   const [isDialing, setIsDialing] = useState(false);
 
+  const getCallInfoForLine = (lineNumber: number): {
+    phoneNumber?: string;
+    leadName?: string;
+    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+    startTime?: Date;
+    company?: string;
+  } | undefined => {
+    if (!activeCalls) return undefined;
+    
+    const activeCallsArray = Object.entries(activeCalls);
+    
+    if (lineNumber <= activeCallsArray.length) {
+      const [leadId, callData] = activeCallsArray[lineNumber - 1];
+      const call = callData as ActiveCall;
+      
+      const leadInfo = leads.find(lead => lead.id === call.leadId.toString());
+      
+      return {
+        phoneNumber: call.phoneNumber,
+        leadName: leadInfo?.name,
+        status: call.status,
+        startTime: call.status === 'in-progress' ? new Date() : undefined,
+        company: leadInfo?.company
+      };
+    }
+    
+    return undefined;
+  };
+
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
       <Card className="bg-muted/50">
@@ -296,6 +323,12 @@ export default function PowerDialer() {
           </CardDescription>
         </CardHeader>
       </Card>
+
+      <div className="grid grid-cols-1 gap-4">
+        <LineDisplay lineNumber={1} currentCall={getCallInfoForLine(1)} />
+        <LineDisplay lineNumber={2} currentCall={getCallInfoForLine(2)} />
+        <LineDisplay lineNumber={3} currentCall={getCallInfoForLine(3)} />
+      </div>
 
       <PreviewDialerWindow 
         currentCall={currentCall}
