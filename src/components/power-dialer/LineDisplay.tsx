@@ -2,16 +2,14 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Phone } from 'lucide-react';
-
-type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
+import { Phone, Timer } from 'lucide-react';
 
 interface LineDisplayProps {
   lineNumber: number;
   currentCall?: {
     phoneNumber?: string;
     leadName?: string;
-    status?: CallStatus;
+    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
     startTime?: Date;
     company?: string;
   };
@@ -20,13 +18,28 @@ interface LineDisplayProps {
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   
+  // Extensive logging to trace data flow
+  console.log('LineDisplay Render - Input Props:', {
+    lineNumber,
+    currentCall: currentCall ? {
+      phoneNumber: currentCall.phoneNumber,
+      leadName: currentCall.leadName,
+      status: currentCall.status,
+      startTime: currentCall.startTime?.toISOString(),
+      company: currentCall.company
+    } : null
+  });
+
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
+    
+    console.log('LineDisplay useEffect - Current Call Status:', currentCall?.status);
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
       interval = setInterval(() => {
         const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
         setCallDuration(duration);
+        console.log('LineDisplay Timer - Call Duration:', duration);
       }, 1000);
     } else {
       setCallDuration(0);
@@ -44,7 +57,12 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const getStatusDisplay = () => {
-    if (!currentCall) return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
+    console.log('LineDisplay getStatusDisplay - Calculating status for:', currentCall?.status);
+    
+    if (!currentCall) {
+      console.log('No current call - displaying FREE state');
+      return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
+    }
     
     switch (currentCall.status) {
       case 'connecting':
@@ -70,11 +88,14 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           badge: 'bg-red-100 text-red-800'
         };
       default:
+        console.log('Unknown call status:', currentCall.status);
         return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
   };
 
   const status = getStatusDisplay();
+
+  console.log('LineDisplay Render - Calculated Status:', status);
 
   return (
     <Card className={`transition-all duration-300 ${status.bg}`}>
