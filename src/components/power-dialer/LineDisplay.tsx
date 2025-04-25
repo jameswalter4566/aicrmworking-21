@@ -20,24 +20,31 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   const { activeCalls } = useTwilio();
   
-  // Get active call for this line from Twilio hook if not provided via props
-  const callData = React.useMemo(() => {
+  // This function extracts call data from either props or Twilio hook
+  const getCallData = React.useCallback(() => {
+    // First priority: use the prop if available
     if (currentCall?.status) {
+      console.log(`Line ${lineNumber} using currentCall prop:`, currentCall);
       return currentCall;
     }
     
+    // Second priority: check for active calls from Twilio hook
     if (!activeCalls) return undefined;
     
+    // Convert activeCalls object to array
     const activeCallsArray = Object.entries(activeCalls);
+    console.log(`Line ${lineNumber} checking activeCalls:`, activeCallsArray);
+    
+    // Find a call for this line based on index
     if (activeCallsArray.length >= lineNumber) {
       const [leadId, call] = activeCallsArray[lineNumber - 1];
       if (call) {
-        console.log(`Found Twilio call data for line ${lineNumber}:`, {leadId, call});
+        console.log(`Found Twilio call for line ${lineNumber}:`, {leadId, call});
         return {
           phoneNumber: call.phoneNumber,
           status: call.status,
           startTime: call.status === 'in-progress' ? new Date() : undefined,
-          leadName: `Lead ${leadId}`,
+          leadName: `Lead ${leadId}`, 
         };
       }
     }
@@ -45,6 +52,15 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
     return undefined;
   }, [currentCall, activeCalls, lineNumber]);
 
+  // Extract current call data
+  const callData = getCallData();
+  
+  // Log the call data for debugging
+  useEffect(() => {
+    console.log(`LineDisplay ${lineNumber} callData:`, callData);
+  }, [callData, lineNumber]);
+
+  // Set up the timer for ongoing calls
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     
@@ -74,6 +90,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
     console.log(`LineDisplay getStatusDisplay - Calculating status for call:`, callData);
     
     if (!callData?.status) {
+      console.log("No current call or phone number - displaying FREE state");
       return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
     
@@ -110,6 +127,9 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const status = getStatusDisplay();
+  
+  // Log render data
+  console.log(`LineDisplay Render - Line ${lineNumber}, Status: ${status.text}`);
 
   return (
     <Card className={`transition-all duration-300 ${status.bg}`}>

@@ -136,7 +136,7 @@ export default function PowerDialer() {
         if (call) {
           const callInfo = {
             phoneNumber: call.phoneNumber,
-            leadName: leadInfo?.name || "Unknown Lead", 
+            leadName: leadInfo?.name || `Lead ${leadId.substring(0, 6)}`, 
             status: call.status,
             startTime: call.status === 'in-progress' ? new Date() : undefined,
             company: leadInfo?.company
@@ -153,8 +153,13 @@ export default function PowerDialer() {
     const activeCallsArray = Object.values(activeCalls);
     if (activeCallsArray.length > 0) {
       setCurrentCall(activeCallsArray[0] as ActiveCall);
+      
+      if (activeCallsArray.some(call => call.status === 'in-progress')) {
+        setCallInProgress(true);
+      }
     } else {
       setCurrentCall(null);
+      setCallInProgress(false);
     }
   }, [activeCalls, leads]);
 
@@ -335,7 +340,7 @@ export default function PowerDialer() {
           <LineDisplay 
             key={lineNumber}
             lineNumber={lineNumber} 
-            currentCall={currentLineStatuses.get(lineNumber)}
+            currentCall={getCallInfoForLine(lineNumber)}
           />
         ))}
       </div>
