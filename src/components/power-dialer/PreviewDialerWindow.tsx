@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff, Mic, MicOff, VolumeX, Volume2 } from 'lucide-react';
 import { LineDisplay } from './LineDisplay';
 import { toast } from "@/components/ui/use-toast";
+import { ActiveCall } from "@/hooks/use-twilio";
 
 interface PreviewDialerWindowProps {
-  currentCall: any;
+  currentCall: ActiveCall | null;
   onDisposition: (type: string) => void;
   onEndCall: () => void;
 }
@@ -27,10 +28,10 @@ const PreviewDialerWindow = ({ currentCall, onDisposition, onEndCall }: PreviewD
         ...prev,
         1: {
           phoneNumber: currentCall.phoneNumber,
-          leadName: currentCall.parameters?.leadName || 'Unknown',
+          leadName: currentCall.leadName || 'Unknown',
           status: currentCall.status,
           startTime: currentCall.status === 'in-progress' ? new Date() : undefined,
-          company: currentCall.parameters?.company || ''
+          company: currentCall.company || ''
         }
       }));
       

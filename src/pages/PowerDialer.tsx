@@ -130,9 +130,9 @@ export default function PowerDialer() {
       
       setCurrentCall({
         ...primaryCall,
-        phoneNumber: primaryCall.phoneNumber || primaryCall.parameters?.phoneNumber,
-        leadName: primaryCall.parameters?.leadName || 'Unknown',
-        company: primaryCall.parameters?.company || ''
+        phoneNumber: primaryCall.phoneNumber,
+        leadName: primaryCall.leadId ? `Lead ${primaryCall.leadId}` : 'Unknown',
+        company: ''
       });
       
       if (primaryCall.status === 'in-progress') {
@@ -260,7 +260,7 @@ export default function PowerDialer() {
       description: `Call marked as ${type}`,
     });
     
-    const leadId = currentCall.parameters?.leadId;
+    const leadId = currentCall.leadId;
     if (leadId) {
       handleEndCall(leadId);
     } else {
