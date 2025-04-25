@@ -102,6 +102,7 @@ export default function PowerDialer() {
   const [callInProgress, setCallInProgress] = useState(false);
   const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
+  const [currentLineStatuses, setCurrentLineStatuses] = useState<Map<number, ActiveCall>>(new Map());
 
   const {
     initialized,
@@ -131,6 +132,14 @@ export default function PowerDialer() {
 
   useEffect(() => {
     if (!activeCalls) return;
+    
+    const newLineStatuses = new Map<number, ActiveCall>();
+    Object.entries(activeCalls).forEach(([leadId, callData], index) => {
+      const call = callData as ActiveCall;
+      newLineStatuses.set(index + 1, call);
+    });
+    
+    setCurrentLineStatuses(newLineStatuses);
     
     const activeCallsArray = Object.values(activeCalls);
     if (activeCallsArray.length > 0) {
@@ -256,26 +265,18 @@ export default function PowerDialer() {
     startTime?: Date;
     company?: string;
   } | undefined => {
-    if (!activeCalls) return undefined;
+    const activeCall = currentLineStatuses.get(lineNumber);
+    if (!activeCall) return undefined;
     
-    const activeCallsArray = Object.entries(activeCalls);
+    const leadInfo = leads.find(lead => lead.id === activeCall.leadId.toString());
     
-    if (lineNumber <= activeCallsArray.length) {
-      const [leadId, callData] = activeCallsArray[lineNumber - 1];
-      const call = callData as ActiveCall;
-      
-      const leadInfo = leads.find(lead => lead.id === call.leadId.toString());
-      
-      return {
-        phoneNumber: call.phoneNumber,
-        leadName: leadInfo?.name,
-        status: call.status,
-        startTime: call.status === 'in-progress' ? new Date() : undefined,
-        company: leadInfo?.company
-      };
-    }
-    
-    return undefined;
+    return {
+      phoneNumber: activeCall.phoneNumber,
+      leadName: leadInfo?.name,
+      status: activeCall.status,
+      startTime: activeCall.status === 'in-progress' ? new Date() : undefined,
+      company: leadInfo?.company
+    };
   };
 
   const DialerTab = () => (
@@ -324,10 +325,14 @@ export default function PowerDialer() {
         </CardHeader>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4">
-        <LineDisplay lineNumber={1} currentCall={getCallInfoForLine(1)} />
-        <LineDisplay lineNumber={2} currentCall={getCallInfoForLine(2)} />
-        <LineDisplay lineNumber={3} currentCall={getCallInfoForLine(3)} />
+      <div className="grid grid-cols-1 gap-4 mb-4">
+        {[1, 2, 3].map(lineNumber => (
+          <LineDisplay 
+            key={lineNumber}
+            lineNumber={lineNumber} 
+            currentCall={getCallInfoForLine(lineNumber)}
+          />
+        ))}
       </div>
 
       <PreviewDialerWindow 

@@ -17,29 +17,14 @@ interface LineDisplayProps {
 
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
-  
-  // Debug logging
-  console.log('LineDisplay Render - Input Props:', {
-    lineNumber,
-    currentCall: currentCall ? {
-      phoneNumber: currentCall.phoneNumber,
-      leadName: currentCall.leadName,
-      status: currentCall.status,
-      startTime: currentCall.startTime?.toISOString(),
-      company: currentCall.company
-    } : null
-  });
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
-    
-    console.log('LineDisplay useEffect - Current Call Status:', currentCall?.status);
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
       interval = setInterval(() => {
         const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
         setCallDuration(duration);
-        console.log('LineDisplay Timer - Call Duration:', duration);
       }, 1000);
     } else {
       setCallDuration(0);
@@ -57,10 +42,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const getStatusDisplay = () => {
-    console.log('LineDisplay getStatusDisplay - Calculating status for:', currentCall?.status);
-    
-    if (!currentCall || !currentCall.phoneNumber) {
-      console.log('No current call or phone number - displaying FREE state');
+    if (!currentCall?.status) {
       return { bg: 'bg-white', text: 'FREE', badge: 'bg-gray-100 text-gray-500' };
     }
     
@@ -69,7 +51,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       case 'ringing':
         return { 
           bg: 'bg-green-100/50',
-          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber}`,
+          text: `Dialing ${currentCall.leadName || currentCall.phoneNumber}`,
           badge: 'bg-green-100 text-green-800'
         };
       case 'in-progress':
@@ -88,14 +70,15 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           badge: 'bg-red-100 text-red-800'
         };
       default:
-        console.log('Unknown call status or waiting:', currentCall.status);
-        return { bg: 'bg-yellow-100', text: 'WAITING', badge: 'bg-yellow-100 text-yellow-800' };
+        return { 
+          bg: 'bg-yellow-100', 
+          text: 'WAITING', 
+          badge: 'bg-yellow-100 text-yellow-800' 
+        };
     }
   };
 
   const status = getStatusDisplay();
-
-  console.log('LineDisplay Render - Calculated Status:', status);
 
   return (
     <Card className={`transition-all duration-300 ${status.bg}`}>
