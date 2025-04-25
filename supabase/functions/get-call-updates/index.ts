@@ -94,17 +94,23 @@ Deno.serve(async (req) => {
           }
         }));
         console.log('Processed updates:', updates);
+      } else {
+        console.log('No database updates found, checking memory store...');
       }
       
     } catch (dbError) {
       console.error('Database error:', dbError);
       // Fall back to memory store on any database error
       console.log('Falling back to memory store...');
+    }
+    
+    // If no updates from database, check memory store
+    if (updates.length === 0) {
       const sessionUpdates = memoryCallStatusStore[sessionId] || [];
       updates = sessionUpdates.filter(update => 
         update.timestamp > parseInt(lastTimestamp.toString())
       ).slice(0, 20);
-      console.log('Memory store updates:', updates);
+      console.log(`Memory store has ${sessionUpdates.length} total updates, returning ${updates.length} updates for timestamp > ${lastTimestamp}`);
     }
     
     // Check if we have any updates in memory store for this session

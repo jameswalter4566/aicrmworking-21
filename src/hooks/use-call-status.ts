@@ -16,6 +16,8 @@ export function useCallStatus(sessionId: string | null) {
     if (!sessionId) return;
     
     try {
+      console.log(`Fetching call updates for session: ${sessionId}, since timestamp: ${lastTimestampRef.current}`);
+      
       const response = await supabase.functions.invoke('get-call-updates', {
         body: { 
           sessionId,
@@ -43,7 +45,11 @@ export function useCallStatus(sessionId: string | null) {
       // Reset error counter on success
       setPollingErrors(0);
       
+      console.log('Received update response:', response.data);
+      
       if (response.data && response.data.updates && response.data.updates.length > 0) {
+        console.log(`Received ${response.data.updates.length} call updates`);
+        
         // Process the updates
         const newStatuses = { ...callStatuses };
         
@@ -68,6 +74,8 @@ export function useCallStatus(sessionId: string | null) {
         });
         
         setCallStatuses(newStatuses);
+      } else {
+        console.log('No new call updates found');
       }
     } catch (error) {
       console.error('Failed to fetch call updates:', error);
@@ -77,6 +85,8 @@ export function useCallStatus(sessionId: string | null) {
   
   useEffect(() => {
     if (!sessionId) return;
+    
+    console.log(`Starting polling for session ID: ${sessionId}`);
     
     // Start polling
     setIsPolling(true);
@@ -112,6 +122,7 @@ export function useCallStatus(sessionId: string | null) {
       }
       
       setIsPolling(false);
+      console.log(`Stopped polling for session ID: ${sessionId}`);
     };
   }, [sessionId]);
   

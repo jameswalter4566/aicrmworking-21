@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -8,8 +9,8 @@ const corsHeaders = {
 
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Temporary memory store for call statuses when database table is not available
 const memoryCallStatusStore: Record<string, any[]> = {};
@@ -63,12 +64,19 @@ Deno.serve(async (req) => {
     // Get the call record
     const { data: call, error: callError } = await supabase
       .from('predictive_dialer_calls')
-      .select('*, contact:contact_id(*), agent:agent_id(*)')
+      .select('*, contact:contact_id(*), agent:agent_id(*), session_id')
       .eq('id', callId)
       .single();
       
     if (callError || !call) {
       throw new Error(`Call not found: ${callError?.message}`);
+    }
+    
+    // Ensure we have a session_id
+    if (!call.session_id) {
+      console.error('No session_id associated with this call:', callId);
+    } else {
+      console.log(`Call ${callId} is associated with session ${call.session_id}`);
     }
     
     // Update call status based on Twilio webhook
@@ -157,6 +165,8 @@ Deno.serve(async (req) => {
     // Try to store the call status update in Supabase table
     if (call.session_id) {
       try {
+        console.log(`Inserting status update into call_status_updates for session ${call.session_id} with status ${callStatus}`);
+        
         const { data, error } = await supabase
           .from('call_status_updates')
           .insert({
@@ -179,6 +189,8 @@ Deno.serve(async (req) => {
         // If the database write fails, use the memory store
         storeCallStatusUpdate(call.session_id, statusUpdate);
       }
+    } else {
+      console.warn('No session ID available for this call, cannot store status update');
     }
     
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
