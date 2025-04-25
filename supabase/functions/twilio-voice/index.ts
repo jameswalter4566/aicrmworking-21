@@ -1,6 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import twilio from "npm:twilio@4.10.0";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers
 const corsHeaders = {
@@ -37,6 +37,36 @@ const activeDialingAttempts = new Map<string, Map<string, number>>();
 // Track dial timeouts for proper call disposition
 const dialTimeouts = new Map<string, number>();
 const DIAL_TIMEOUT_MS = 30000; // 30 seconds as per requirement
+
+// Create Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Temporary memory store for call statuses when database table is not available
+const memoryCallStatusStore: Record<string, any[]> = {};
+
+// Store call status update in memory
+function storeCallStatusUpdate(sessionId: string, statusData: any) {
+  if (!memoryCallStatusStore[sessionId]) {
+    memoryCallStatusStore[sessionId] = [];
+  }
+  
+  const update = {
+    session_id: sessionId,
+    timestamp: Date.now(),
+    data: statusData,
+  };
+  
+  memoryCallStatusStore[sessionId].push(update);
+  
+  // Keep only the latest 100 updates per session to avoid memory issues
+  if (memoryCallStatusStore[sessionId].length > 100) {
+    memoryCallStatusStore[sessionId] = memoryCallStatusStore[sessionId].slice(-100);
+  }
+  
+  return update;
+}
 
 serve(async (req) => {
   console.log("Received request to Twilio Voice function");
@@ -263,6 +293,46 @@ serve(async (req) => {
         
         return new Response(response.toString(), { headers: corsHeaders });
       }
+    }
+
+    // Enhanced status reporting - try to write to call_status_updates table
+    const reportCallStatus = async (statusData: any) => {
+      try {
+        const { error } = await supabase
+          .from('call_status_updates')
+          .insert({
+            call_sid: statusData.callSid,
+            session_id: sessionId,
+            status: statusData.status,
+            timestamp: new Date().toISOString(),
+            data: statusData
+          });
+
+        if (error) {
+          console.error(`[${requestId}] Error writing call status:`, error);
+          // Fallback to memory store
+          storeCallStatusUpdate(sessionId, statusData);
+        } else {
+          console.log(`[${requestId}] Successfully reported call status to webhook`);
+        }
+      } catch (err) {
+        console.error(`[${requestId}] Failed to report call status:`, err);
+        // Fallback to memory store
+        storeCallStatusUpdate(sessionId, statusData);
+      }
+    };
+
+    // If we have a CallStatus update, report it
+    if (formData.CallStatus) {
+      await reportCallStatus({
+        callSid: formData.CallSid,
+        status: formData.CallStatus,
+        timestamp: Date.now(),
+        phoneNumber: phoneNumber,
+        errorCode: formData.ErrorCode,
+        errorMessage: formData.ErrorMessage,
+        duration: formData.CallDuration ? parseInt(formData.CallDuration) : undefined
+      });
     }
 
     // Handle different request types
