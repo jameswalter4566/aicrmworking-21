@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Timer, History } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
+import type { CallLog } from '@/types/call-log';
 
 interface LineDisplayProps {
   lineNumber: number;
@@ -34,7 +35,7 @@ interface CallLog {
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   const [recentCallLogs, setRecentCallLogs] = useState<CallLog[]>([]);
-  
+
   useEffect(() => {
     console.log('LineDisplay - current call status:', currentCall?.status, currentCall?.phoneNumber);
     let interval: NodeJS.Timeout | undefined;
@@ -55,15 +56,15 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
 
   useEffect(() => {
     const fetchCallLogs = async () => {
-      const { data, error } = await supabase
+      const { data: logs, error } = await supabase
         .from('call_logs')
         .select('*')
         .eq('line_number', lineNumber)
         .order('timestamp', { ascending: false })
         .limit(5);
 
-      if (!error && data) {
-        setRecentCallLogs(data);
+      if (!error && logs) {
+        setRecentCallLogs(logs as CallLog[]);
       }
     };
 
@@ -197,7 +198,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
               <div className="space-y-1">
                 {recentCallLogs.map((log) => (
                   <div key={log.sid} className="text-xs text-gray-600 flex justify-between items-center">
-                    <span>{log.to_number}</span>
+                    <span>{log.to_number || 'Unknown'}</span>
                     <Badge variant="outline" className="text-xs">
                       {log.status === 'completed' ? `${log.duration}s` : log.status}
                     </Badge>
