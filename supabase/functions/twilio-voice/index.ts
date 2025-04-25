@@ -201,11 +201,11 @@ serve(async (req) => {
         return new Response(response.toString(), { headers: corsHeaders });
       } 
       else if (dialCallStatus === "failed") {
-        // Instead of returning an error message, simply log the failure and allow the system
-        // to continue normally without preventing future attempts
-        console.log(`[${requestId}] Call to ${phoneNumber} failed, but no longer blocking future attempts`);
+        // Log the failure but don't prevent future attempts
+        console.log(`[${requestId}] Call to ${phoneNumber} failed, will allow future attempts`);
         
         const response = new twiml.VoiceResponse();
+        // This is the key change - using the updated message that matches what we set elsewhere in the code
         response.say("The call could not be connected. The system will try again later.");
         response.hangup();
         
