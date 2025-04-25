@@ -257,17 +257,16 @@ export default function PowerDialer() {
       
       const phoneNumber = currentCall.parameters?.To || currentCall.phoneNumber;
       
-      if (currentCall.status === 'ringing' || currentCall.status === 'connecting') {
-        return { 
-          bg: 'bg-yellow-50',
-          text: `Dialing${displayName ? ` ${displayName}` : ''}`,
-          badgeClass: 'bg-yellow-100 text-yellow-800',
-          subText: phoneNumber,
-          icon: 'phone'
-        };
-      }
-
       switch (currentCall.status) {
+        case 'connecting':
+        case 'ringing':
+          return { 
+            bg: 'bg-yellow-50',
+            text: `Dialing${displayName ? ` ${displayName}` : ''}`,
+            badgeClass: 'bg-yellow-100 text-yellow-800',
+            subText: phoneNumber,
+            icon: 'phone'
+          };
         case 'in-progress':
           return {
             bg: 'bg-green-50',
