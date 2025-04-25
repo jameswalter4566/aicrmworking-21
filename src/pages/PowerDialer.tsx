@@ -99,7 +99,7 @@ export default function PowerDialer() {
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
   const [currentCall, setCurrentCall] = useState(null);
-  const [activeCallsInProgress, setActiveCallsInProgress] = useState({});
+  const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
 
   const twilioState = useTwilio();
 
@@ -115,25 +115,14 @@ export default function PowerDialer() {
   useEffect(() => {
     if (!twilioState) return;
     
-    if (Object.keys(twilioState.activeCalls).length > 0) {
-      const activeCall = Object.values(twilioState.activeCalls)[0];
-      
-      setActiveCallsInProgress({
-        '1': {
-          contact: {
-            phone1: activeCall.phoneNumber,
-            firstName: currentCall?.parameters?.firstName || 'Current',
-            lastName: currentCall?.parameters?.lastName || 'Lead',
-            company: currentCall?.parameters?.company || ''
-          },
-          status: activeCall.status,
-          startTime: activeCall.status === 'in-progress' ? new Date() : undefined
-        }
-      });
+    // Update current call state
+    const activeCalls = Object.values(twilioState.activeCalls);
+    if (activeCalls.length > 0) {
+      setCurrentCall(activeCalls[0]);
     } else {
-      setActiveCallsInProgress({});
+      setCurrentCall(null);
     }
-  }, [twilioState.activeCalls, currentCall]);
+  }, [twilioState.activeCalls]);
 
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
@@ -291,7 +280,7 @@ export default function PowerDialer() {
       </Card>
 
       <PreviewDialerWindow 
-        currentCall={Object.values(twilioState.activeCalls)[0]}
+        currentCall={currentCall}
         onDisposition={handleDisposition}
         onEndCall={() => Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id))}
       />
