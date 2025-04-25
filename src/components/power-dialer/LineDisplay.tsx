@@ -25,6 +25,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   
   useEffect(() => {
+    console.log('LineDisplay - current call status:', currentCall?.status, currentCall?.phoneNumber);
     let interval: NodeJS.Timeout | undefined;
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
