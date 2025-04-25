@@ -65,6 +65,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
   // Track phone validation errors
   const phoneValidationErrors = useRef<Record<string, boolean>>({});
 
+  // Add a lock to prevent concurrent getNextLead calls
+  const isGettingNextLeadRef = useRef(false);
+  
+  // Add a throttle timer for call attempts
+  const lastCallAttemptTimeRef = useRef(0);
+  const minTimeBetweenCallsMs = 2000; // 2 seconds minimum between calls
+
   const fixDatabaseFunction = useCallback(async () => {
     try {
       console.log('Attempting to fix database function...');
@@ -144,7 +151,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       }
       
       console.log('Successfully retrieved lead:', data[0]);
-      return processFetchedLead(data[0]);
+      return processFetchedLead(data[0], `direct-sql-${Date.now()}`);
       
     } catch (error) {
       console.error('Error with getting next lead:', error);
@@ -159,9 +166,11 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     // Basic phone number validation: at least 10 digits, ignoring any formatting characters
     const digitsOnly = phone.replace(/\D/g, '');
     
-    // Check if number is in the blacklisted set
-    if (blacklistedNumbers.has(phone) || blacklistedNumbers.has(digitsOnly)) {
-      console.log(`Phone number ${phone} is blacklisted, skipping`);
+    // Check if number is in the blacklisted set - use standardized format
+    const standardizedPhone = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+    
+    if (blacklistedNumbers.has(standardizedPhone)) {
+      console.log(`Phone number ${phone} (standardized: ${standardizedPhone}) is blacklisted, skipping`);
       return false;
     }
     
@@ -177,7 +186,16 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
 
   // Enhanced version of getNextLead with better race condition handling
   const getNextLead = useCallback(async () => {
+    // If we're already getting a lead, don't start another request
+    if (isGettingNextLeadRef.current) {
+      console.log("Already fetching a lead, waiting for completion...");
+      return null;
+    }
+    
     if (!sessionId) return null;
+    
+    // Set the lock
+    isGettingNextLeadRef.current = true;
     
     // Generate a unique request ID for this attempt
     const requestId = `lead-request-${Date.now()}-${requestIdCounter.current++}`;
@@ -200,6 +218,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       if (queuedCount === 0) {
         console.log(`[${requestId}] No more queued leads available in the session`);
         setNoMoreLeads(true);
+        isGettingNextLeadRef.current = false;
         return null;
       }
       
@@ -227,35 +246,47 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
                 
                 console.log(`[${requestId}] Attempting direct SQL approach as last resort...`);
                 const leadFromSQL = await getNextLeadDirectSQL(sessionId);
+                isGettingNextLeadRef.current = false;
                 return leadFromSQL;
               }
               
               if (!retryResponse.data || retryResponse.data.length === 0) {
                 console.log(`[${requestId}] No lead returned after fix`);
                 setNoMoreLeads(true);
+                isGettingNextLeadRef.current = false;
                 return null;
               }
               
               console.log(`[${requestId}] Next lead retrieved after fix:`, retryResponse.data[0]);
-              return processFetchedLead(retryResponse.data[0], requestId);
+              const processedLead = processFetchedLead(retryResponse.data[0], requestId);
+              isGettingNextLeadRef.current = false;
+              return processedLead;
             } else {
-              return await getNextLeadDirectSQL(sessionId);
+              const leadFromSQL = await getNextLeadDirectSQL(sessionId);
+              isGettingNextLeadRef.current = false;
+              return leadFromSQL;
             }
           } else {
-            return await getNextLeadDirectSQL(sessionId);
+            const leadFromSQL = await getNextLeadDirectSQL(sessionId);
+            isGettingNextLeadRef.current = false;
+            return leadFromSQL;
           }
         }
         
         if (!nextLead || nextLead.length === 0) {
           console.log(`[${requestId}] No lead returned from get_next_session_lead`);
           setNoMoreLeads(true);
+          isGettingNextLeadRef.current = false;
           return null;
         }
         
         console.log(`[${requestId}] Next lead retrieved:`, nextLead[0]);
-        return processFetchedLead(nextLead[0], requestId);
+        const processedLead = processFetchedLead(nextLead[0], requestId);
+        isGettingNextLeadRef.current = false;
+        return processedLead;
       } catch (error) {
         console.error(`[${requestId}] Error in getNextLead:`, error);
+        isGettingNextLeadRef.current = false;
         throw error;
       }
     } catch (error) {
@@ -271,10 +302,13 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           setFixAttemptCount(count => count + 1);
           await fixDatabaseFunction();
           
-          return await getNextLeadDirectSQL(sessionId);
+          const leadFromSQL = await getNextLeadDirectSQL(sessionId);
+          isGettingNextLeadRef.current = false;
+          return leadFromSQL;
         }
       }
       
+      isGettingNextLeadRef.current = false;
       return null;
     }
   }, [sessionId, fixAttemptCount, fixDatabaseFunction, getNextLeadDirectSQL, toast]);
@@ -415,6 +449,45 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
     }
   }, []);
 
+  // Add a semaphore system to ensure only one call attempt is made at a time
+  const callSemaphoreRef = useRef({
+    isProcessing: false,
+    pendingCallPromise: null as Promise<void> | null,
+    resolveCurrentCall: null as (() => void) | null,
+  });
+  
+  // Function to wait until it's safe to process the next call
+  const waitForCallSemaphoreAvailable = useCallback(async () => {
+    // If there's already a call being processed, wait for it to complete
+    if (callSemaphoreRef.current.isProcessing) {
+      // If there's no pending promise yet, create one
+      if (!callSemaphoreRef.current.pendingCallPromise) {
+        callSemaphoreRef.current.pendingCallPromise = new Promise<void>((resolve) => {
+          callSemaphoreRef.current.resolveCurrentCall = resolve;
+        });
+      }
+      
+      // Wait for the current call to complete
+      await callSemaphoreRef.current.pendingCallPromise;
+    }
+    
+    // Mark that we're now processing a call
+    callSemaphoreRef.current.isProcessing = true;
+  }, []);
+  
+  // Function to release the call semaphore
+  const releaseCallSemaphore = useCallback(() => {
+    // Release the semaphore
+    callSemaphoreRef.current.isProcessing = false;
+    
+    // Resolve the pending promise if there is one
+    if (callSemaphoreRef.current.resolveCurrentCall) {
+      callSemaphoreRef.current.resolveCurrentCall();
+      callSemaphoreRef.current.pendingCallPromise = null;
+      callSemaphoreRef.current.resolveCurrentCall = null;
+    }
+  }, []);
+
   // Enhanced version of processNextLead with better race condition handling
   const processNextLead = useCallback(async () => {
     if (isProcessingCall || !isActive || !sessionId || noMoreLeads) {
@@ -427,12 +500,31 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       return;
     }
     
+    // Throttle call attempts - check if minimum time between calls has elapsed
+    const now = Date.now();
+    const timeSinceLastCall = now - lastCallAttemptTimeRef.current;
+    if (timeSinceLastCall < minTimeBetweenCallsMs) {
+      console.log(`Too soon since last call attempt (${timeSinceLastCall}ms). Minimum wait: ${minTimeBetweenCallsMs}ms`);
+      // Queue up another attempt after delay
+      setTimeout(processNextLead, minTimeBetweenCallsMs - timeSinceLastCall);
+      return;
+    }
+    
+    // Wait until it's safe to process the next call
+    try {
+      await waitForCallSemaphoreAvailable();
+    } catch (error) {
+      console.error("Error waiting for call semaphore:", error);
+      return;
+    }
+    
     // Generate a unique request ID for this process
     const requestId = `process-lead-${Date.now()}-${requestIdCounter.current++}`;
     console.log(`[${requestId}] Starting to process next lead`);
     
     try {
       setIsProcessingCall(true);
+      lastCallAttemptTimeRef.current = now;
       
       // If a previous lead exists, ensure it's properly marked as completed
       if (currentLeadId) {
@@ -455,6 +547,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           setNoMoreLeads(true);
         }
         setIsProcessingCall(false);
+        releaseCallSemaphore();
+        onCallComplete();
         return;
       }
 
@@ -462,6 +556,7 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       if (processingLeadIdsRef.current.has(lead.id)) {
         console.log(`[${requestId}] Lead ${lead.id} is already being processed, skipping`);
         setIsProcessingCall(false);
+        releaseCallSemaphore();
         onCallComplete();
         return;
       }
@@ -486,19 +581,22 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         setIsProcessingCall(false);
         onCallComplete();
         processingLeadIdsRef.current.delete(lead.id);
+        releaseCallSemaphore();
         return;
       }
 
       // Standardize phone number format for consistent tracking
       const standardizedPhone = phoneNumber.replace(/\D/g, '');
+      const normalizedPhone = standardizedPhone.length >= 10 ? standardizedPhone.slice(-10) : standardizedPhone;
       
       // Check if this number is currently being dialed - prevents race conditions
-      if (dialingPhoneNumbersRef.current.has(standardizedPhone)) {
+      if (dialingPhoneNumbersRef.current.has(normalizedPhone)) {
         console.log(`[${requestId}] Phone number ${phoneNumber} is currently being dialed in another process, skipping`);
         await updateLeadStatus(lead.id, 'failed', `Phone number ${phoneNumber} is already being dialed`);
         setIsProcessingCall(false);
         onCallComplete();
         processingLeadIdsRef.current.delete(lead.id);
+        releaseCallSemaphore();
         return;
       }
 
@@ -510,16 +608,18 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         setIsProcessingCall(false);
         onCallComplete();
         processingLeadIdsRef.current.delete(lead.id);
+        releaseCallSemaphore();
         return;
       }
 
       // Skip if we've already called this number
-      if (processedPhoneNumbers.has(standardizedPhone)) {
+      if (processedPhoneNumbers.has(normalizedPhone)) {
         console.log(`[${requestId}] Already called ${phoneNumber}, marking as completed and skipping`);
         await updateLeadStatus(lead.id, 'completed', 'Phone number already called in this session');
         setIsProcessingCall(false);
         onCallComplete();
         processingLeadIdsRef.current.delete(lead.id);
+        releaseCallSemaphore();
         return;
       }
 
@@ -527,8 +627,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       setCurrentLeadId(lead.id);
       
       // Add to tracking sets BEFORE making the call
-      setProcessedPhoneNumbers(prev => new Set(prev).add(standardizedPhone));
-      dialingPhoneNumbersRef.current.add(standardizedPhone);
+      setProcessedPhoneNumbers(prev => new Set([...prev, normalizedPhone]));
+      dialingPhoneNumbersRef.current.add(normalizedPhone);
       
       // Update call state ref for tracking
       callStateRef.current = {
@@ -550,13 +650,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           // Check if this is a blacklist error based on error message
           const isBlacklistedError = 
             callResult.error?.includes('blacklisted') || 
-            callResult.error?.includes('13225');
+            callResult.error?.includes('13225') ||
+            callResult.twilioErrorCode === 13225;
             
           if (isBlacklistedError) {
             console.log(`[${requestId}] Phone number ${phoneNumber} is blacklisted by Twilio, adding to blacklist`);
             
-            // Add to blacklisted numbers
-            setBlacklistedNumbers(prev => new Set(prev).add(standardizedPhone));
+            // Add to blacklisted numbers - use normalized format
+            setBlacklistedNumbers(prev => new Set([...prev, normalizedPhone]));
             
             toast({
               title: "Blacklisted Number",
@@ -581,7 +682,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
           
           // Remove from processing sets after failure
           processingLeadIdsRef.current.delete(lead.id);
-          dialingPhoneNumbersRef.current.delete(standardizedPhone);
+          dialingPhoneNumbersRef.current.delete(normalizedPhone);
+          releaseCallSemaphore();
         } else {
           toast({
             title: "Call Initiated",
@@ -599,7 +701,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
               callStateRef.current.isActiveCall = false;
               onCallComplete();
               processingLeadIdsRef.current.delete(lead.id);
-              dialingPhoneNumbersRef.current.delete(standardizedPhone);
+              dialingPhoneNumbersRef.current.delete(normalizedPhone);
+              releaseCallSemaphore();
             }
           }, 60000); // 60 second timeout
         }
@@ -609,8 +712,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         // Clean up tracking on error
         await updateLeadStatus(lead.id, 'failed', `Error making call: ${error?.message || 'Unknown error'}`);
         processingLeadIdsRef.current.delete(lead.id);
-        dialingPhoneNumbersRef.current.delete(standardizedPhone);
+        dialingPhoneNumbersRef.current.delete(normalizedPhone);
         setIsProcessingCall(false);
+        releaseCallSemaphore();
         onCallComplete();
       }
     } catch (error) {
@@ -621,9 +725,10 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
         variant: "destructive",
       });
       setIsProcessingCall(false);
+      releaseCallSemaphore();
       onCallComplete();
     }
-  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads, processedPhoneNumbers, isValidPhoneNumber]);
+  }, [isProcessingCall, isActive, sessionId, currentLeadId, getNextLead, updateLeadStatus, toast, onCallComplete, noMoreLeads, processedPhoneNumbers, isValidPhoneNumber, waitForCallSemaphoreAvailable, releaseCallSemaphore]);
 
   const handleCallCompletion = useCallback(async (errorCode?: number) => {
     const requestId = `call-completion-${Date.now()}-${requestIdCounter.current++}`;
@@ -634,7 +739,9 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       if (errorCode === 13225 && callStateRef.current.currentPhoneNumber) {
         console.log(`[${requestId}] Adding phone number ${callStateRef.current.currentPhoneNumber} to blacklist due to error code ${errorCode}`);
         const standardizedPhone = callStateRef.current.currentPhoneNumber.replace(/\D/g, '');
-        setBlacklistedNumbers(prev => new Set(prev).add(standardizedPhone));
+        const normalizedPhone = standardizedPhone.length >= 10 ? standardizedPhone.slice(-10) : standardizedPhone;
+        
+        setBlacklistedNumbers(prev => new Set([...prev, normalizedPhone]));
         
         // Update lead with error details
         await updateLeadStatus(
@@ -650,7 +757,8 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       // Clean up tracking
       if (callStateRef.current.currentPhoneNumber) {
         const standardizedPhone = callStateRef.current.currentPhoneNumber.replace(/\D/g, '');
-        dialingPhoneNumbersRef.current.delete(standardizedPhone);
+        const normalizedPhone = standardizedPhone.length >= 10 ? standardizedPhone.slice(-10) : standardizedPhone;
+        dialingPhoneNumbersRef.current.delete(normalizedPhone);
       }
       
       processingLeadIdsRef.current.delete(callStateRef.current.currentLeadId);
@@ -658,11 +766,14 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       callStateRef.current.isActiveCall = false;
       callStateRef.current.currentPhoneNumber = null;
       callStateRef.current.currentLeadId = null;
+      
+      // Release the call semaphore to allow the next call to proceed
+      releaseCallSemaphore();
     }
     
     setIsProcessingCall(false);
     onCallComplete();
-  }, [updateLeadStatus, onCallComplete]);
+  }, [updateLeadStatus, onCallComplete, releaseCallSemaphore]);
 
   // This effect sets up the call disconnect listener
   useEffect(() => {
@@ -735,6 +846,16 @@ export const AutoDialerController: React.FC<AutoDialerControllerProps> = ({
       
       // Reset request counter
       requestIdCounter.current = 0;
+      
+      // Reset call semaphore
+      callSemaphoreRef.current = {
+        isProcessing: false,
+        pendingCallPromise: null,
+        resolveCurrentCall: null,
+      };
+      
+      // Reset throttle timer
+      lastCallAttemptTimeRef.current = 0;
       
       console.log(`Session reset: ${sessionId}. All tracking data cleared.`);
     }
