@@ -99,7 +99,9 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({ sessionId }) =>
         const completed = leadsData?.filter(lead => lead.status === 'completed').length || 0;
         
         console.log(`Direct count - Queued: ${queued}, In Progress: ${inProgress}, Completed: ${completed}, Total: ${leadsData.length}`);
-        console.log("Sample lead:", leadsData[0]);
+        if (leadsData && leadsData.length > 0) {
+            console.log("Sample lead:", leadsData[0]);
+        }
         
         setStats({
           queued_count: queued,

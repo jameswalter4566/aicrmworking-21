@@ -1,177 +1,191 @@
 
+import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json',
 };
 
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Temporary memory store for call statuses when database table is not available
-const memoryCallStatusStore: Record<string, any[]> = {};
+// Memory store for when DB isn't available/failing
+const memoryUpdateStore: Record<string, any[]> = {};
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
-    // Get request body if it's a POST request
-    let sessionId;
-    let lastTimestamp = '0';
-    
-    if (req.method === 'POST') {
-      const body = await req.json();
-      console.log('Received request body:', body);
-      sessionId = body.sessionId;
-      lastTimestamp = body.lastTimestamp || '0';
-    } else {
-      // Parse session ID from URL parameters for GET requests
-      const url = new URL(req.url);
-      sessionId = url.searchParams.get('sessionId');
-      lastTimestamp = url.searchParams.get('lastTimestamp') || '0';
-    }
+    // Parse request body
+    const { sessionId, lastTimestamp = 0 } = await req.json();
     
     if (!sessionId) {
       throw new Error('Session ID is required');
     }
 
     console.log(`Fetching updates for session ${sessionId} since timestamp ${lastTimestamp}`);
-    
-    // For diagnostic purposes, let's check if the session exists by querying a dialing_sessions table
-    let sessionInfo = null;
-    try {
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('dialing_sessions')
-        .select('id, name, status')
-        .eq('id', sessionId)
-        .maybeSingle();
-        
-      if (sessionData) {
-        console.log(`Found session: ${sessionData.name} with status ${sessionData.status}`);
-        sessionInfo = sessionData;
-      } else if (sessionError) {
-        console.log(`Error looking up session: ${sessionError.message}`);
-      } else {
-        console.log(`No session found with ID ${sessionId}`);
-      }
-    } catch (e) {
-      console.log(`Exception looking up session: ${e.message}`);
-    }
-    
-    let updates = [];
-    
-    try {
-      // Try to get updates from the database first
-      console.log('Querying call_status_updates table...');
-      const { data: dbUpdates, error } = await supabase
-        .from('call_status_updates')
-        .select('*')
-        .eq('session_id', sessionId)
-        .gt('timestamp', new Date(parseInt(lastTimestamp.toString())).toISOString())
-        .order('timestamp', { ascending: false })
-        .limit(20);
+
+    // Verify session exists
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('dialing_sessions')
+      .select('id, name, status')
+      .eq('id', sessionId)
+      .single();
       
+    if (sessionError) {
+      console.error('Session not found:', sessionError);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Session not found',
+          updates: [] 
+        }),
+        { headers: corsHeaders }
+      );
+    }
+
+    console.log(`Found session: ${sessionData.name} with status ${sessionData.status}`);
+
+    // Query the call_status_updates table
+    console.log('Querying call_status_updates table...');
+    
+    const { data, error } = await supabase
+      .from('call_status_updates')
+      .select('*')
+      .eq('session_id', sessionId)
+      .gt('timestamp', new Date(lastTimestamp).toISOString())
+      .order('timestamp', { ascending: true });
+      
+    console.log('Database query results:', data);
+
+    // If database query failed or returned no results, check memory store
+    if (error || !data || data.length === 0) {
       if (error) {
-        console.error('Database query error:', error);
-        throw error;
+        console.error('Error querying call_status_updates table:', error);
       }
       
-      console.log('Database query results:', dbUpdates);
+      console.log('No database updates found, checking memory store...');
       
-      if (dbUpdates && dbUpdates.length > 0) {
-        updates = dbUpdates.map(update => ({
-          ...update,
-          data: {
-            ...update.data,
-            timestamp: new Date(update.timestamp).getTime(),
-            // Make sure error information is included if available
-            errorCode: update.data.errorCode || update.data.ErrorCode,
-            errorMessage: update.data.errorMessage || update.data.ErrorMessage
+      // Filter memory updates by timestamp
+      const memoryUpdates = memoryUpdateStore[sessionId] || [];
+      console.log(`Memory store has ${memoryUpdates.length} total updates, returning ${memoryUpdates.filter(u => u.timestamp > lastTimestamp).length} updates for timestamp > ${lastTimestamp}`);
+      
+      const filteredMemoryUpdates = memoryUpdates.filter(update => 
+        update.timestamp > lastTimestamp
+      );
+      
+      console.log(`Memory store has ${filteredMemoryUpdates.length} updates for this session`);
+      
+      // Also query for any active calls
+      try {
+        const { data: callsData } = await supabase
+          .from('predictive_dialer_calls')
+          .select('*, contact:contact_id(*)')
+          .eq('session_id', sessionId)
+          .in('status', ['in_progress', 'queued', 'connecting', 'ringing']);
+          
+        console.log('Active calls found:', callsData?.length || 0);
+        
+        // If there are active calls but no updates, create synthetic updates
+        if (callsData && callsData.length > 0 && filteredMemoryUpdates.length === 0) {
+          const syntheticUpdates = callsData.map(call => ({
+            timestamp: Date.now(),
+            session_id: sessionId,
+            call_sid: call.twilio_call_sid,
+            status: call.status,
+            data: {
+              callSid: call.twilio_call_sid,
+              status: call.status,
+              timestamp: Date.now(),
+              agentId: call.agent_id,
+              leadId: call.contact_id,
+              phoneNumber: call.contact?.phone_number,
+              leadName: call.contact?.name,
+              company: call.contact?.company
+            }
+          }));
+          
+          console.log('Created synthetic updates from active calls:', syntheticUpdates);
+          
+          return new Response(
+            JSON.stringify({ 
+              updates: syntheticUpdates,
+              debug: {
+                sessionId,
+                lastTimestamp,
+                updateCount: syntheticUpdates.length,
+                memoryStoreCount: memoryUpdates.length,
+                sessionInfo: sessionData,
+                syntheticUpdatesCreated: true,
+                timestamp: new Date().toISOString()
+              }
+            }),
+            { headers: corsHeaders }
+          );
+        }
+        
+      } catch (callQueryError) {
+        console.error('Error querying active calls:', callQueryError);
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          updates: filteredMemoryUpdates,
+          debug: {
+            sessionId,
+            lastTimestamp,
+            updateCount: filteredMemoryUpdates.length,
+            memoryStoreCount: memoryUpdates.length,
+            sessionInfo: sessionData,
+            timestamp: new Date().toISOString()
           }
-        }));
-        console.log('Processed updates:', updates);
-      } else {
-        console.log('No database updates found, checking memory store...');
-      }
-      
-    } catch (dbError) {
-      console.error('Database error:', dbError);
-      // Fall back to memory store on any database error
-      console.log('Falling back to memory store...');
+        }),
+        { headers: corsHeaders }
+      );
     }
-    
-    // If no updates from database, check memory store
-    if (updates.length === 0) {
-      const sessionUpdates = memoryCallStatusStore[sessionId] || [];
-      updates = sessionUpdates.filter(update => 
-        update.timestamp > parseInt(lastTimestamp.toString())
-      ).slice(0, 20).map(update => {
-        // Make sure error information is included if available
-        if (update.data) {
-          update.data.errorCode = update.data.errorCode || update.data.ErrorCode;
-          update.data.errorMessage = update.data.errorMessage || update.data.ErrorMessage;
+
+    // Format and return updates from database
+    const formattedUpdates = data.map(update => ({
+      timestamp: new Date(update.timestamp).getTime(),
+      session_id: update.session_id,
+      call_sid: update.call_sid,
+      status: update.status,
+      data: update.data || {}
+    }));
+
+    return new Response(
+      JSON.stringify({ 
+        updates: formattedUpdates,
+        debug: {
+          sessionId,
+          lastTimestamp,
+          updateCount: formattedUpdates.length,
+          databaseSourced: true,
+          sessionInfo: sessionData,
+          timestamp: new Date().toISOString()
         }
-        return update;
-      });
-      console.log(`Memory store has ${sessionUpdates.length} total updates, returning ${updates.length} updates for timestamp > ${lastTimestamp}`);
-    }
-    
-    // Check if we have any updates in memory store for this session
-    const memoryStoreUpdates = memoryCallStatusStore[sessionId] || [];
-    console.log(`Memory store has ${memoryStoreUpdates.length} updates for this session`);
-    
-    // Generate a mock update if we have no updates (for testing only)
-    if (updates.length === 0 && req.url.includes('mock=true')) {
-      const mockUpdate = {
-        id: `mock-${Date.now()}`,
-        session_id: sessionId,
-        timestamp: new Date().toISOString(),
-        data: {
-          callSid: `mock-call-${Date.now()}`,
-          status: 'ringing',
-          timestamp: Date.now(),
-          phoneNumber: '+18158625164',
-          leadName: 'Test Lead',
-          errorCode: null,
-          errorMessage: null
-        }
-      };
-      updates.push(mockUpdate);
-      console.log('Added mock update for testing:', mockUpdate);
-    }
-    
-    // Return the updates
-    return new Response(JSON.stringify({ 
-      updates,
-      debug: {
-        sessionId,
-        lastTimestamp,
-        updateCount: updates.length,
-        memoryStoreCount: memoryStoreUpdates.length,
-        sessionInfo,
-        timestamp: new Date().toISOString()
-      }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+      }),
+      { headers: corsHeaders }
+    );
   } catch (error) {
     console.error('Error in get-call-updates function:', error);
     
-    return new Response(JSON.stringify({ 
-      error: error.message,
-      details: error.stack,
-      timestamp: new Date().toISOString()
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return new Response(
+      JSON.stringify({ 
+        error: error.message,
+        updates: [] 
+      }),
+      { 
+        status: 400,
+        headers: corsHeaders 
+      }
+    );
   }
 });

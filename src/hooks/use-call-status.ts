@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { natsService } from '@/services/nats';
 import { supabase } from '@/integrations/supabase/client';
@@ -69,12 +70,21 @@ export function useCallStatus(sessionId: string | null) {
               statusData.errorMessage = statusData.errorMessage || statusData.ErrorMessage;
             }
             
-            newStatuses[statusData.callSid] = {
-              ...statusData,
+            const callUpdate: CallStatusUpdate = {
+              callSid: statusData.callSid,
               status: statusData.status as CallStatus,
+              timestamp: update.timestamp || statusData.timestamp,
+              agentId: statusData.agentId,
+              leadId: statusData.leadId,
+              phoneNumber: statusData.phoneNumber,
+              leadName: statusData.leadName,
+              duration: statusData.duration,
+              company: statusData.company,
               errorCode: statusData.errorCode,
               errorMessage: statusData.errorMessage
             };
+            
+            newStatuses[statusData.callSid] = callUpdate;
             
             // Update timestamp tracking
             const updateTime = update.timestamp || statusData.timestamp;
@@ -112,15 +122,17 @@ export function useCallStatus(sessionId: string | null) {
     try {
       natsUnsubscribe = natsService.subscribeToCallStatus(sessionId, (update) => {
         console.log('Received NATS call status update:', update);
-        setCallStatuses(prev => ({
-          ...prev,
-          [update.callSid]: {
-            ...update,
-            status: update.status as CallStatus,
-            errorCode: update.errorCode,
-            errorMessage: update.errorMessage
-          }
-        }));
+        if (update.callSid) {
+          setCallStatuses(prev => ({
+            ...prev,
+            [update.callSid]: {
+              ...update,
+              status: update.status as CallStatus,
+              errorCode: update.errorCode,
+              errorMessage: update.errorMessage
+            }
+          }));
+        }
       });
     } catch (error) {
       console.warn('NATS subscription failed, falling back to polling only:', error);
