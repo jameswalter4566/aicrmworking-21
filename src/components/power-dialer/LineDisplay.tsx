@@ -4,6 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Timer } from 'lucide-react';
 import { useTwilio } from '@/hooks/use-twilio';
+import { ActiveCall } from '@/hooks/use-twilio';
 
 interface LineDisplayProps {
   lineNumber: number;
@@ -49,7 +50,8 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
           phoneNumber: call.phoneNumber,
           status: call.status,
           startTime: call.status === 'in-progress' ? new Date() : undefined,
-          leadName: call.customName || `Lead ${leadId.substring(0, 6)}`,
+          leadName: call.leadId ? `Lead ${call.leadId.toString().substring(0, 6)}` : undefined,
+          company: undefined // Added undefined company as it's not available in ActiveCall
         };
       }
     }

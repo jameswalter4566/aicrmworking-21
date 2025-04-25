@@ -150,7 +150,8 @@ export default function PowerDialer() {
           console.log(`Assigning call to line ${lineNumber}:`, callInfo);
           newLineStatuses.set(lineNumber, callInfo);
           
-          if (call.status === 'in-progress' || call.status === 'connecting' || call.status === 'ringing') {
+          if (call.status === 'in-progress' || call.status === 'connecting' || 
+              call.status === 'ringing') {
             hasActiveCall = true;
           }
         }
