@@ -22,16 +22,21 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
     let interval: NodeJS.Timeout | undefined;
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
+      // Use existing duration if provided (from server) or calculate from startTime
+      const initialDuration = currentCall.duration || 
+        Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
+      
+      setCallDuration(initialDuration);
+      
       interval = setInterval(() => {
-        const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
-        setCallDuration(duration);
+        setCallDuration(prev => prev + 1);
       }, 1000);
     }
     
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [currentCall?.status, currentCall?.startTime]);
+  }, [currentCall?.status, currentCall?.startTime, currentCall?.duration]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -109,6 +114,15 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
         {currentCall?.company && (
           <div className="mt-1 text-sm text-gray-500">
             {currentCall.company}
+          </div>
+        )}
+
+        {currentCall?.status === 'in-progress' && (
+          <div className="mt-1 text-xs">
+            <span className="inline-flex items-center">
+              <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse mr-1"></span> 
+              Live call
+            </span>
           </div>
         )}
       </CardContent>

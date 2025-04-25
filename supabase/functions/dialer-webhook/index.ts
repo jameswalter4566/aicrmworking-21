@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { connect, StringCodec } from "https://deno.land/x/nats@v1.16.0/src/mod.ts";
 
@@ -11,6 +12,9 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// String codec for NATS messages
+const sc = StringCodec();
 
 // Main function to handle requests
 Deno.serve(async (req) => {
@@ -117,9 +121,7 @@ Deno.serve(async (req) => {
         console.log(`Received status update: ${callStatus} for call ${callId}`);
     }
     
-    // After processing the webhook, publish status to NATS
-    const nats = await connect({ servers: Deno.env.get("NATS_URL") });
-    
+    // Create a call status update for real-time tracking
     const statusUpdate = {
       callSid,
       status: callStatus,
@@ -130,9 +132,31 @@ Deno.serve(async (req) => {
       duration: callDuration ? parseInt(callDuration) : undefined
     };
     
-    await nats.publish(`call.status.${call.session_id}`, sc.encode(JSON.stringify(statusUpdate)));
-    await nats.flush();
-    await nats.close();
+    // Store the call status update in Supabase table for clients to poll
+    await supabase
+      .from('call_status_updates')
+      .insert({
+        call_sid: callSid,
+        session_id: call.session_id,
+        status: callStatus,
+        timestamp: new Date().toISOString(),
+        data: statusUpdate
+      });
+    
+    // Try to publish via NATS if available (as backup method)
+    try {
+      const natsUrl = Deno.env.get("NATS_URL");
+      if (natsUrl) {
+        const nats = await connect({ servers: natsUrl });
+        await nats.publish(`call.status.${call.session_id}`, sc.encode(JSON.stringify(statusUpdate)));
+        await nats.flush();
+        await nats.close();
+        console.log(`Published call status update to NATS for session ${call.session_id}`);
+      }
+    } catch (natsError) {
+      // Don't fail if NATS isn't available, just log the error
+      console.error('NATS publish error (non-critical):', natsError);
+    }
     
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },

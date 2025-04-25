@@ -57,7 +57,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
   const { user } = useAuth();
   const twilioState = useTwilio();
-  const callStatuses = useCallStatus(sessionId);
+  const { callStatuses, isPolling } = useCallStatus(sessionId);
 
   useEffect(() => {
     if (isDialingStarted) {
@@ -114,6 +114,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   useEffect(() => {
     if (!callStatuses || Object.keys(callStatuses).length === 0) return;
     
+    console.log('Received call status updates:', callStatuses);
+    
     const updatedCallsInProgress: Record<string, any> = {};
     
     Object.values(callStatuses).forEach((status, index) => {
@@ -122,6 +124,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         callSid: status.callSid,
         leadId: status.leadId,
         phoneNumber: status.phoneNumber,
+        leadName: status.leadName || `Lead ${status.leadId?.toString().slice(-4)}`,
         status: status.status,
         startTime: status.status === 'in-progress' ? new Date() : undefined,
         duration: status.duration
