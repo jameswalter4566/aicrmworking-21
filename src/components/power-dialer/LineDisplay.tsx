@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Phone } from 'lucide-react';
+import { Phone, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LineDisplayData, CallStatus } from '@/types/dialer';
 
 export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall }) => {
@@ -53,9 +54,9 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
       case 'connecting':
       case 'ringing':
         return { 
-          bg: 'bg-green-100/50',
-          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber}`,
-          badge: 'bg-green-100 text-green-800'
+          bg: 'bg-yellow-100/50',
+          text: `Dialing ${currentCall.phoneNumber || ''}`,
+          badge: 'bg-yellow-100 text-yellow-800'
         };
       case 'in-progress':
         return {
@@ -64,13 +65,28 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
           badge: 'bg-green-500 text-white'
         };
       case 'completed':
+        return {
+          bg: 'bg-gray-100',
+          text: 'Call Ended',
+          badge: 'bg-gray-100 text-gray-800'
+        };
       case 'failed':
-      case 'busy':
-      case 'no-answer':
         return {
           bg: 'bg-red-100',
-          text: 'Disconnected',
+          text: 'Call Failed',
           badge: 'bg-red-100 text-red-800'
+        };
+      case 'busy':
+        return {
+          bg: 'bg-orange-100',
+          text: 'Line Busy',
+          badge: 'bg-orange-100 text-orange-800'
+        };
+      case 'no-answer':
+        return {
+          bg: 'bg-gray-100',
+          text: 'No Answer',
+          badge: 'bg-gray-100 text-gray-600'
         };
       default:
         return { 
@@ -115,6 +131,13 @@ export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall
           <div className="mt-1 text-sm text-gray-500">
             {currentCall.company}
           </div>
+        )}
+
+        {currentCall?.errorMessage && (
+          <Alert variant="destructive" className="mt-2">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{currentCall.errorMessage}</AlertDescription>
+          </Alert>
         )}
 
         {currentCall?.status === 'in-progress' && (

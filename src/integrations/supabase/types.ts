@@ -919,6 +919,7 @@ export type Database = {
           end_timestamp: string | null
           id: string
           machine_detection_result: string | null
+          session_id: string | null
           start_timestamp: string | null
           status: string
           twilio_call_sid: string | null
@@ -932,6 +933,7 @@ export type Database = {
           end_timestamp?: string | null
           id?: string
           machine_detection_result?: string | null
+          session_id?: string | null
           start_timestamp?: string | null
           status?: string
           twilio_call_sid?: string | null
@@ -945,6 +947,7 @@ export type Database = {
           end_timestamp?: string | null
           id?: string
           machine_detection_result?: string | null
+          session_id?: string | null
           start_timestamp?: string | null
           status?: string
           twilio_call_sid?: string | null
@@ -1145,15 +1148,7 @@ export type Database = {
           session_id: string | null
           total_count: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "dialing_session_leads_session_id_fkey"
-            columns: ["session_id"]
-            isOneToOne: false
-            referencedRelation: "dialing_sessions"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Functions: {

@@ -1,4 +1,3 @@
-
 export type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
 
 export interface LineCallData {
@@ -7,7 +6,7 @@ export interface LineCallData {
   status?: CallStatus;
   startTime?: Date;
   company?: string;
-  duration?: number;  // Added this missing property
+  duration?: number;
 }
 
 export interface LineDisplayData {
@@ -17,13 +16,16 @@ export interface LineDisplayData {
 
 export interface CallStatusUpdate {
   callSid: string;
-  status: string;
+  status: 'queued' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   timestamp: number;
   agentId?: string;
   leadId?: string;
   phoneNumber?: string;
+  leadName?: string;
   duration?: number;
-  leadName?: string;  // Added this missing property
+  company?: string;
+  errorCode?: string;
+  errorMessage?: string;
 }
 
 export interface ActiveCallData extends LineCallData {

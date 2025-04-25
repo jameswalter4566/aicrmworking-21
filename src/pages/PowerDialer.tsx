@@ -336,7 +336,7 @@ export default function PowerDialer() {
       </div>
 
       <PreviewDialerWindow 
-        currentCall={currentCall}
+        currentCallData={currentCall}
         onDisposition={handleDisposition}
         onEndCall={() => {
           if (activeCalls) {

@@ -33,14 +33,14 @@ import { useTwilio } from "@/hooks/use-twilio";
 import { ActiveCallData } from '@/types/dialer';
 import { useCallStatus } from '@/hooks/use-call-status';
 
-interface PreviewDialerWindowProps {
-  currentCall: any;
+interface Props {
+  currentCallData?: any;
   onDisposition: (type: string) => void;
   onEndCall: () => void;
 }
 
-const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
-  currentCall,
+const PreviewDialerWindow: React.FC<Props> = ({
+  currentCallData,
   onDisposition,
   onEndCall
 }) => {
@@ -74,7 +74,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
 
     const twilioCall = Object.values(twilioState.activeCalls)[0];
-    const callData = currentCall?.parameters || {};
+    const callData = currentCallData?.parameters || {};
     
     const lineData: Record<string, ActiveCallData> = {
       '1': {
@@ -91,25 +91,25 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     };
 
     setActiveCallsInProgress(lineData);
-  }, [twilioState.activeCalls, currentCall]);
+  }, [twilioState.activeCalls, currentCallData]);
 
   useEffect(() => {
-    if (currentCall && !Object.keys(twilioState.activeCalls).length) {
-      const callData = currentCall.parameters || {};
+    if (currentCallData && !Object.keys(twilioState.activeCalls).length) {
+      const callData = currentCallData.parameters || {};
       
       setActiveCallsInProgress({
         '1': {
-          callSid: currentCall.callSid || '',
+          callSid: currentCallData.callSid || '',
           leadId: callData.leadId || '',
           phoneNumber: callData.To,
           leadName: `${callData.firstName || ''} ${callData.lastName || ''}`.trim() || 'Unknown Lead',
           company: callData.company,
-          status: currentCall.status || 'connecting',
-          startTime: currentCall.status === 'in-progress' ? new Date() : undefined
+          status: currentCallData.status || 'connecting',
+          startTime: currentCallData.status === 'in-progress' ? new Date() : undefined
         }
       });
     }
-  }, [currentCall, twilioState.activeCalls]);
+  }, [currentCallData, twilioState.activeCalls]);
 
   useEffect(() => {
     if (!callStatuses || Object.keys(callStatuses).length === 0) return;
@@ -127,7 +127,9 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         leadName: status.leadName || `Lead ${status.leadId?.toString().slice(-4)}`,
         status: status.status,
         startTime: status.status === 'in-progress' ? new Date() : undefined,
-        duration: status.duration
+        duration: status.duration,
+        errorCode: status.errorCode,
+        errorMessage: status.errorMessage
       };
     });
     
@@ -287,7 +289,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 <Phone className="h-5 w-5 text-green-500" />
                 Preview Dialer
               </div>
-              {currentCall && (
+              {currentCallData && (
                 <Badge variant="outline" className="bg-green-50 text-green-700">
                   On Call
                 </Badge>
@@ -305,7 +307,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   Start Dialing
                 </Button>
               </div>
-            ) : !currentCall ? (
+            ) : !currentCallData ? (
               <div className="space-y-4">
                 {sessionId && (
                   <>
@@ -440,17 +442,17 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 <div className="flex items-start gap-4">
                   <Avatar className="h-12 w-12">
                     <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
-                      {currentCall.parameters.To ? currentCall.parameters.To[0].toUpperCase() : '?'}
+                      {currentCallData.parameters.To ? currentCallData.parameters.To[0].toUpperCase() : '?'}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold">
-                      {currentCall.parameters.To || 'Unknown Contact'}
+                      {currentCallData.parameters.To || 'Unknown Contact'}
                     </h3>
                     <div className="text-sm text-gray-500 space-y-1">
-                      <p>Company: {currentCall.parameters.company || 'Unknown'}</p>
-                      <p>Phone: {currentCall.parameters.To || 'N/A'}</p>
+                      <p>Company: {currentCallData.parameters.company || 'Unknown'}</p>
+                      <p>Phone: {currentCallData.parameters.To || 'N/A'}</p>
                       <p>Status: Active Call</p>
                     </div>
                   </div>
@@ -469,7 +471,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                      onClick={(e) => handleDeleteLead(currentCall?.parameters?.leadId, e)}
+                      onClick={(e) => handleDeleteLead(currentCallData?.parameters?.leadId, e)}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
