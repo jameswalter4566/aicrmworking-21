@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import DialerQueueMonitor from './DialerQueueMonitor';
 import { AutoDialerController } from './AutoDialerController';
 import { twilioService } from "@/services/twilio";
+import { LineDisplay } from './LineDisplay';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -59,7 +59,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
   }, [isDialingStarted]);
 
-  // Add an effect to detect and log state changes
   useEffect(() => {
     console.log('Session state update:', { 
       sessionId, 
@@ -150,8 +149,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       
       console.log("Dialing session created successfully:", data);
       setSessionId(data.sessionId);
-      // Don't automatically set autoDialerActive to true here
-      // The user should explicitly start the power dialing
       setAutoDialerActive(false);
       
       toast.success("Dialing Session Started", {
@@ -203,19 +200,17 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       <Card className="bg-gray-800 p-4 rounded-lg">
         <div className="grid grid-cols-3 gap-4">
           {[1, 2, 3].map((line) => (
-            <Card key={line} className="bg-white">
-              <CardContent className="p-4">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-gray-600" />
-                    <span className="text-gray-600">Line {line}</span>
-                  </div>
-                  <Badge variant="outline" className="bg-white text-gray-600 border-gray-200">
-                    FREE
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
+            <LineDisplay 
+              key={line} 
+              lineNumber={line}
+              currentCall={line === 1 && Object.values(callsInProgress)[0] ? {
+                phoneNumber: Object.values(callsInProgress)[0]?.contact?.phone1,
+                leadName: `${Object.values(callsInProgress)[0]?.contact?.firstName} ${Object.values(callsInProgress)[0]?.contact?.lastName}`,
+                status: Object.values(callsInProgress)[0]?.status,
+                startTime: Object.values(callsInProgress)[0]?.status === 'in-progress' ? 
+                  new Date(Object.values(callsInProgress)[0]?.startTime) : undefined
+              } : undefined}
+            />
           ))}
         </div>
       </Card>
@@ -252,7 +247,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   <>
                     <DialerQueueMonitor sessionId={sessionId} />
                     
-                    {/* Explicitly check that autoDialerActive is false to ensure button shows */}
                     {!autoDialerActive && (
                       <div className="flex justify-center my-4">
                         <Button
