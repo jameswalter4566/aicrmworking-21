@@ -40,13 +40,3 @@ verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
-
-[functions.predictive-dialer-webhook]
-verify_jwt = false
-
-[functions.start-predictive-dialer]
-verify_jwt = false
-
-[functions.initiate-manual-call]
-verify_jwt = false
-

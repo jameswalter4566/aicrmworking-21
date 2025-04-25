@@ -15,34 +15,6 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 // Temporary memory store for call statuses when database table is not available
 const memoryCallStatusStore: Record<string, any[]> = {};
 
-// For debugging - add some mock data to the memory store
-function addMockData(sessionId: string) {
-  if (!memoryCallStatusStore[sessionId]) {
-    memoryCallStatusStore[sessionId] = [];
-  }
-  
-  const statuses = ['ringing', 'in-progress', 'completed', 'busy', 'no-answer', 'failed'];
-  const mockStatus = statuses[Math.floor(Math.random() * statuses.length)];
-  
-  const mockUpdate = {
-    session_id: sessionId,
-    timestamp: Date.now(),
-    data: {
-      callSid: `mock-call-${Date.now()}`,
-      status: mockStatus,
-      timestamp: Date.now(),
-      phoneNumber: '+1234567890',
-      leadName: 'Mock Test Lead',
-      company: 'Mock Company'
-    },
-  };
-  
-  memoryCallStatusStore[sessionId].push(mockUpdate);
-  console.log(`Added mock update to memory store for session ${sessionId}:`, mockUpdate);
-  
-  return mockUpdate;
-}
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -53,20 +25,17 @@ Deno.serve(async (req) => {
     // Get request body if it's a POST request
     let sessionId;
     let lastTimestamp = '0';
-    let enableMocking = false; // Set to true to enable automatic mock data generation
     
     if (req.method === 'POST') {
       const body = await req.json();
       console.log('Received request body:', body);
       sessionId = body.sessionId;
       lastTimestamp = body.lastTimestamp || '0';
-      enableMocking = body.enableMocking === true;
     } else {
       // Parse session ID from URL parameters for GET requests
       const url = new URL(req.url);
       sessionId = url.searchParams.get('sessionId');
       lastTimestamp = url.searchParams.get('lastTimestamp') || '0';
-      enableMocking = url.searchParams.get('enableMocking') === 'true';
     }
     
     if (!sessionId) {
@@ -148,11 +117,23 @@ Deno.serve(async (req) => {
     const memoryStoreUpdates = memoryCallStatusStore[sessionId] || [];
     console.log(`Memory store has ${memoryStoreUpdates.length} updates for this session`);
     
-    // Generate a mock update if requested
-    if ((updates.length === 0 && enableMocking) || (updates.length === 0 && sessionId === 'mock-session')) {
-      console.log('Generating mock update for testing');
-      const mockUpdate = addMockData(sessionId);
+    // Generate a mock update if we have no updates (for testing only)
+    // Comment out in production
+    if (updates.length === 0 && false) {  // Set to true to enable mock updates for testing
+      const mockUpdate = {
+        id: `mock-${Date.now()}`,
+        session_id: sessionId,
+        timestamp: new Date().toISOString(),
+        data: {
+          callSid: `mock-call-${Date.now()}`,
+          status: 'ringing',
+          timestamp: Date.now(),
+          phoneNumber: '+1234567890',
+          leadName: 'Mock Test Lead'
+        }
+      };
       updates.push(mockUpdate);
+      console.log('Added mock update for testing:', mockUpdate);
     }
     
     // Return the updates
@@ -164,8 +145,7 @@ Deno.serve(async (req) => {
         updateCount: updates.length,
         memoryStoreCount: memoryStoreUpdates.length,
         sessionInfo,
-        timestamp: new Date().toISOString(),
-        mockEnabled: enableMocking
+        timestamp: new Date().toISOString()
       }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
