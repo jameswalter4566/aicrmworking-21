@@ -14,14 +14,15 @@ Deno.serve(async (req) => {
 
   try {
     const formData = await req.formData();
-    const callSid = formData.get('CallSid')?.toString();
-    const callStatus = formData.get('CallStatus')?.toString();
-    const from = formData.get('From')?.toString();
-    const to = formData.get('To')?.toString();
-    const duration = formData.get('CallDuration')?.toString();
-    const timestamp = new Date().toISOString();
+    const callSid = formData.get('sid')?.toString();
+    const callStatus = formData.get('status')?.toString();
+    const from = formData.get('from_number')?.toString();
+    const to = formData.get('to_number')?.toString();
+    const duration = formData.get('duration')?.toString();
+    const timestamp = formData.get('timestamp')?.toString() || new Date().toISOString();
+    const lineNumber = formData.get('line_number') ? parseInt(formData.get('line_number')?.toString() || '1') : 1;
 
-    console.log(`Call Status Update - SID: ${callSid}, Status: ${callStatus}`);
+    console.log(`Call Status Update - SID: ${callSid}, Status: ${callStatus}, From: ${from}, To: ${to}`);
 
     // Create call log object
     const callLog = {
@@ -31,7 +32,7 @@ Deno.serve(async (req) => {
       to_number: to,
       duration: duration ? parseInt(duration) : 0,
       timestamp,
-      line_number: 1 // Hardcoded to Line 1 for now
+      line_number: lineNumber
     };
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -40,10 +41,15 @@ Deno.serve(async (req) => {
 
     // Store call log in Supabase
     const { error } = await supabase
-      .from('call_logs')  // We'll create this table in the next step
+      .from('call_logs')
       .insert([callLog]);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Error inserting call log:", error);
+      throw error;
+    }
+
+    console.log(`Successfully logged call: ${callSid} with status ${callStatus}`);
 
     // Return empty TwiML response to acknowledge receipt
     return new Response(
