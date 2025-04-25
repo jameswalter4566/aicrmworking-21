@@ -18,11 +18,11 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   
   useEffect(() => {
-    let interval: NodeJS.Timer;
+    let interval: NodeJS.Timeout | undefined;
     
     if (currentCall?.status === 'in-progress' && currentCall?.startTime) {
       interval = setInterval(() => {
-        const duration = Math.floor((new Date().getTime() - currentCall.startTime.getTime()) / 1000);
+        const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
         setCallDuration(duration);
       }, 1000);
     } else {
