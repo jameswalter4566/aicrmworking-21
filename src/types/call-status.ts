@@ -1,6 +1,6 @@
 
 export interface CallStatus {
-  // Expanded call status types to include 'ringing'
+  // Call status types
   status: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   
   // Call metadata

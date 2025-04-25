@@ -107,88 +107,9 @@ export default function PowerDialer() {
       console.log("Twilio device available:", window.Twilio.Device);
       setTwilioReady(true);
       
-      const device = window.Twilio.Device;
-      
-      const handleIncoming = (call: any) => {
-        console.log("Incoming call detected:", call);
-        setCurrentCall(call);
-      };
-      
-      const handleConnect = (call: any) => {
-        console.log("Call connected callback:", call);
-        call.on('accept', () => {
-          console.log("Call accepted and in progress:", call);
-          setCurrentCall(prevCall => {
-            const updatedCall = {...prevCall, status: 'in-progress'};
-            console.log("Updated call object:", updatedCall);
-            return updatedCall;
-          });
-          setCallInProgress(true);
-        });
-      };
-      
-      const handleCancel = () => {
-        console.log("Call canceled");
-        setCurrentCall(null);
-        setCallInProgress(false);
-      };
-      
-      const handleDisconnect = (call: any) => {
-        console.log("Call disconnected callback:", call);
-        setCurrentCall(prevCall => {
-          const updatedCall = {...prevCall, status: 'completed'};
-          console.log("Disconnected call object:", updatedCall);
-          return updatedCall;
-        });
-        
-        setTimeout(() => {
-          setCurrentCall(null);
-          setCallInProgress(false);
-        }, 3000);
-      };
-      
-      device.on('incoming', handleIncoming);
-      device.on('connect', handleConnect);
-      device.on('cancel', handleCancel);
-      device.on('disconnect', handleDisconnect);
-      
-      return () => {
-        device.off('incoming', handleIncoming);
-        device.off('connect', handleConnect);
-        device.off('cancel', handleCancel);
-        device.off('disconnect', handleDisconnect);
-      };
+      return () => {};
     }
   }, [isScriptLoaded]);
-
-  useEffect(() => {
-    const activeCallsArray = Object.values(twilioState.activeCalls);
-    if (activeCallsArray.length > 0) {
-      const activeCall = activeCallsArray[0];
-      console.log("Active call from twilioState:", activeCall);
-      
-      if (!currentCall || currentCall.status !== activeCall.status) {
-        setCurrentCall({
-          ...currentCall,
-          status: activeCall.status,
-          parameters: {
-            To: activeCall.phoneNumber,
-            firstName: activeCall.leadId ? leads.find(l => l.id === activeCall.leadId)?.name.split(' ')[0] : '',
-            lastName: activeCall.leadId ? leads.find(l => l.id === activeCall.leadId)?.name.split(' ')[1] : '',
-            leadId: activeCall.leadId,
-            company: activeCall.leadId ? leads.find(l => l.id === activeCall.leadId)?.company : ''
-          }
-        });
-        setCallInProgress(activeCall.status === 'in-progress' || activeCall.status === 'connecting' || activeCall.status === 'ringing');
-      }
-    } else if (currentCall && Object.keys(twilioState.activeCalls).length === 0) {
-      setCurrentCall(prev => ({...prev, status: 'completed'}));
-      setTimeout(() => {
-        setCurrentCall(null);
-        setCallInProgress(false);
-      }, 3000);
-    }
-  }, [twilioState.activeCalls, leads]);
 
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
@@ -240,17 +161,6 @@ export default function PowerDialer() {
       
       setCallInProgress(true);
       
-      setCurrentCall({
-        status: 'connecting',
-        parameters: {
-          To: lead.phone,
-          firstName: lead.name.split(' ')[0],
-          lastName: lead.name.split(' ')[1],
-          leadId: lead.id,
-          company: lead.company
-        }
-      });
-      
       const formattedPhone = lead.phone.replace(/\D/g, '');
       const callResult = await twilioService.makeCall(formattedPhone, lead.id);
       
@@ -265,7 +175,6 @@ export default function PowerDialer() {
         });
         setCallInProgress(false);
         setIsDialing(false);
-        setCurrentCall(null);
       } else {
         toast({
           title: "Call Initiated",
@@ -277,7 +186,6 @@ export default function PowerDialer() {
       setTokenError(error.message);
       setCallInProgress(false);
       setIsDialing(false);
-      setCurrentCall(null);
       
       toast({
         title: "Call Error",
@@ -703,11 +611,6 @@ export default function PowerDialer() {
             <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
               {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
             </Badge>
-            {callInProgress && (
-              <Badge variant="default" className="bg-green-500">
-                Call In Progress
-              </Badge>
-            )}
           </div>
         </div>
 
