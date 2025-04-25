@@ -31,6 +31,7 @@ import { twilioService } from "@/services/twilio";
 import { LineDisplay } from './LineDisplay';
 import { useTwilio } from "@/hooks/use-twilio";
 import { ActiveCallData } from '@/types/dialer';
+import { useCallStatus } from '@/hooks/use-call-status';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -56,6 +57,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
   const { user } = useAuth();
   const twilioState = useTwilio();
+  const callStatuses = useCallStatus(sessionId);
 
   useEffect(() => {
     if (isDialingStarted) {
@@ -63,7 +65,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
   }, [isDialingStarted]);
 
-  // Add new type-safe effect to properly track Twilio call status changes
   useEffect(() => {
     if (Object.keys(twilioState.activeCalls).length === 0) {
       if (Object.keys(activeCallsInProgress).length > 0) {
@@ -72,7 +73,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       return;
     }
 
-    // Map Twilio call data to our line display format
     const twilioCall = Object.values(twilioState.activeCalls)[0];
     const callData = currentCall?.parameters || {};
     
@@ -93,7 +93,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     setActiveCallsInProgress(lineData);
   }, [twilioState.activeCalls, currentCall]);
 
-  // Regular call updates from currentCall prop
   useEffect(() => {
     if (currentCall && !Object.keys(twilioState.activeCalls).length) {
       const callData = currentCall.parameters || {};
@@ -111,6 +110,29 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       });
     }
   }, [currentCall, twilioState.activeCalls]);
+
+  useEffect(() => {
+    if (!callStatuses || Object.keys(callStatuses).length === 0) return;
+    
+    const updatedCallsInProgress: Record<string, any> = {};
+    
+    Object.values(callStatuses).forEach((status, index) => {
+      const lineNumber = (index + 1).toString();
+      updatedCallsInProgress[lineNumber] = {
+        callSid: status.callSid,
+        leadId: status.leadId,
+        phoneNumber: status.phoneNumber,
+        status: status.status,
+        startTime: status.status === 'in-progress' ? new Date() : undefined,
+        duration: status.duration
+      };
+    });
+    
+    setActiveCallsInProgress(prevCalls => ({
+      ...prevCalls,
+      ...updatedCallsInProgress
+    }));
+  }, [callStatuses]);
 
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);

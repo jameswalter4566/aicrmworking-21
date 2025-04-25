@@ -1,5 +1,5 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { connect, StringCodec } from "https://deno.land/x/nats@v1.16.0/src/mod.ts";
 
 // Define CORS headers for browser requests
 const corsHeaders = {
@@ -116,6 +116,23 @@ Deno.serve(async (req) => {
         // For other statuses (ringing, queued, etc.), just log
         console.log(`Received status update: ${callStatus} for call ${callId}`);
     }
+    
+    // After processing the webhook, publish status to NATS
+    const nats = await connect({ servers: Deno.env.get("NATS_URL") });
+    
+    const statusUpdate = {
+      callSid,
+      status: callStatus,
+      timestamp: Date.now(),
+      agentId: call.agent_id,
+      leadId: call.contact_id,
+      phoneNumber: call.contact?.phone_number,
+      duration: callDuration ? parseInt(callDuration) : undefined
+    };
+    
+    await nats.publish(`call.status.${call.session_id}`, sc.encode(JSON.stringify(statusUpdate)));
+    await nats.flush();
+    await nats.close();
     
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
