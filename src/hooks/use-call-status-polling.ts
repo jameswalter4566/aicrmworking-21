@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/utils/supabase-custom-client';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CallStatusUpdate {
   callSid: string;
@@ -23,7 +23,7 @@ interface UseCallStatusPollingProps {
 export function useCallStatusPolling({
   sessionId,
   enabled = true,
-  interval = 2000,
+  interval = 1000, // Changed to poll every second
   onUpdate
 }: UseCallStatusPollingProps) {
   const [updates, setUpdates] = useState<CallStatusUpdate[]>([]);
@@ -87,7 +87,7 @@ export function useCallStatusPolling({
     }
   }, [sessionId, enabled, lastTimestamp, onUpdate]);
 
-  // Function to get active call SIDs for direct Twilio API calls
+  // Function to get active call SIDs for direct Twilio API calls - ENHANCED FOR MORE AGGRESSIVE POLLING
   const fetchActiveCalls = useCallback(async () => {
     if (!sessionId || !enabled) return;
     
@@ -95,19 +95,19 @@ export function useCallStatusPolling({
       // Get active calls for this session
       const { data: activeCalls, error: activeCallsError } = await supabase
         .from('predictive_dialer_calls')
-        .select('twilio_call_sid')
+        .select('twilio_call_sid, status')
         .eq('session_id', sessionId)
-        .in('status', ['in_progress', 'queued', 'ringing']);
+        .not('twilio_call_sid', 'is', null);
         
       if (activeCallsError) {
         console.error(`Error fetching active calls: ${activeCallsError.message}`);
         return;
       }
       
+      console.log(`Found ${activeCalls?.length || 0} calls to check with Twilio API`);
+      
       if (activeCalls && activeCalls.length > 0) {
-        console.log(`Found ${activeCalls.length} active calls to check with Twilio API`);
-        
-        // For each active call, fetch its status directly from Twilio API
+        // For each call, fetch its status directly from Twilio API
         for (const call of activeCalls) {
           if (call.twilio_call_sid) {
             try {
@@ -130,7 +130,9 @@ export function useCallStatusPolling({
                   status: twilioData.data.status,
                   timestamp: Date.now(),
                   duration: twilioData.data.duration,
-                  answeredBy: twilioData.data.answeredBy
+                  answeredBy: twilioData.data.answeredBy,
+                  from: twilioData.data.from,
+                  to: twilioData.data.to
                 };
                 
                 setUpdates(prev => [...prev, newUpdate]);
@@ -145,28 +147,26 @@ export function useCallStatusPolling({
           }
         }
       } else {
-        console.log('No active calls found to fetch from Twilio API');
+        console.log('No calls found to fetch from Twilio API');
       }
     } catch (err) {
       console.error('Error checking active calls:', err);
     }
   }, [sessionId, enabled, onUpdate]);
   
-  // Set up polling intervals
+  // Set up polling intervals - more aggressive with 1 second polling
   useEffect(() => {
     if (!enabled || !sessionId) return;
     
-    console.log(`Setting up call status polling for session ${sessionId}`);
+    console.log(`Setting up call status polling for session ${sessionId} with 1 second intervals`);
     
     // Initial fetch
     fetchUpdates();
-    
-    // Also do an initial fetch of active call statuses directly from Twilio
     fetchActiveCalls();
     
-    // Set up polling intervals - regular DB polling and occasional direct Twilio API checks
+    // Set up polling intervals - polling both every second for maximum data capture
     const updateInterval = setInterval(fetchUpdates, interval);
-    const directTwilioInterval = setInterval(fetchActiveCalls, interval * 5); // Check Twilio less frequently
+    const directTwilioInterval = setInterval(fetchActiveCalls, interval);
     
     return () => {
       clearInterval(updateInterval);

@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, Phone, Clock, User } from 'lucide-react';
+import { AlertCircle, Phone, Clock, User, RefreshCw } from 'lucide-react';
 import { useCallStatusPolling } from '@/hooks/use-call-status-polling';
 import { useSearchParams } from 'react-router-dom';
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { supabase } from '@/utils/supabase-custom-client';
+import { supabase } from "@/integrations/supabase/client";
 
 const DialerSession = () => {
   const [searchParams] = useSearchParams();
@@ -110,7 +110,7 @@ const DialerSession = () => {
     }
   };
 
-  // Use our custom hook for call status polling
+  // Use our custom hook for call status polling with 1 second interval
   const { 
     updates, 
     isPolling, 
@@ -122,7 +122,7 @@ const DialerSession = () => {
   } = useCallStatusPolling({
     sessionId,
     enabled: !!sessionId,
-    interval: 2000,
+    interval: 1000, // Poll every second
     onUpdate: (newUpdates) => {
       console.log(`Received ${newUpdates.length} new call updates`);
       setCallUpdates(prev => {
@@ -134,7 +134,7 @@ const DialerSession = () => {
     }
   });
   
-  // Additional manual check function for debugging
+  // Additional manual check function with more aggressive Twilio API checking
   const checkCallsManually = async () => {
     if (!sessionId) return;
     
@@ -145,8 +145,37 @@ const DialerSession = () => {
       // Force call status refresh
       await refreshNow();
       
-      // Force direct Twilio check
+      // Force direct Twilio check for each call
       await checkTwilioDirectly();
+      
+      // Extra: Directly check for all calls in this session regardless of status
+      const { data: allCalls } = await supabase
+        .from('predictive_dialer_calls')
+        .select('twilio_call_sid')
+        .eq('session_id', sessionId)
+        .not('twilio_call_sid', 'is', null);
+        
+      if (allCalls && allCalls.length > 0) {
+        console.log(`Manually checking ${allCalls.length} calls with Twilio API`);
+        
+        for (const call of allCalls) {
+          try {
+            const { data } = await supabase.functions.invoke('twilio-call-status', {
+              body: { 
+                callSid: call.twilio_call_sid,
+                sessionId,
+                forceRefresh: true
+              }
+            });
+            
+            if (data && data.data) {
+              console.log(`Manual check result for ${call.twilio_call_sid}:`, data.data);
+            }
+          } catch (err) {
+            console.error(`Manual check error for ${call.twilio_call_sid}:`, err);
+          }
+        }
+      }
     } catch (err) {
       console.error('Error in manual check:', err);
     }
@@ -185,8 +214,10 @@ const DialerSession = () => {
             variant="outline" 
             onClick={checkCallsManually}
             disabled={isPolling}
+            className="flex items-center gap-2"
           >
-            Refresh Call Status
+            <RefreshCw className="h-4 w-4" />
+            Force Refresh Call Status
           </Button>
         </div>
       </div>
@@ -234,7 +265,7 @@ const DialerSession = () => {
             {isPolling ? (
               <span className="flex items-center">
                 <Clock className="h-4 w-4 mr-2 animate-spin" />
-                Polling for updates...
+                Polling for updates (every second)...
               </span>
             ) : (
               <span className="flex items-center">
@@ -267,6 +298,14 @@ const DialerSession = () => {
               <Phone className="mx-auto h-12 w-12 opacity-20 mb-2" />
               <p>No call status updates received yet.</p>
               <p className="text-sm">Updates will appear here as calls are made and status changes occur.</p>
+              <Button 
+                variant="outline" 
+                onClick={checkCallsManually}
+                className="mt-4"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Force Refresh
+              </Button>
             </div>
           ) : (
             <div className="space-y-4 max-h-[400px] overflow-y-auto">

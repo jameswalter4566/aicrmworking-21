@@ -31,8 +31,8 @@ Deno.serve(async (req) => {
   }
   
   try {
-    const { callSid, sessionId } = await req.json();
-    console.log(`Fetching call status for SID: ${callSid}, Session: ${sessionId}`);
+    const { callSid, sessionId, forceRefresh } = await req.json();
+    console.log(`Fetching call status for SID: ${callSid}, Session: ${sessionId}, Force Refresh: ${forceRefresh}`);
     
     if (!callSid) {
       throw new Error('Call SID is required');
