@@ -1,4 +1,3 @@
-
 project_id = "imrmboyczebjlbnkgjns"
 [api]
 enabled = true
@@ -76,4 +75,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.predictive-dialer-webhook]
+verify_jwt = false
+
+[functions.call-status-logger]
 verify_jwt = false

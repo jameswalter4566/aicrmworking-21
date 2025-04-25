@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Timer } from 'lucide-react';
+import { Phone, Timer, History } from 'lucide-react';
+import { supabase } from "@/integrations/supabase/client";
 
 interface LineDisplayProps {
   lineNumber: number;
@@ -21,8 +21,19 @@ interface LineDisplayProps {
   };
 }
 
+interface CallLog {
+  sid: string;
+  status: string;
+  from_number: string;
+  to_number: string;
+  duration: number;
+  timestamp: string;
+  line_number: number;
+}
+
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
+  const [recentCallLogs, setRecentCallLogs] = useState<CallLog[]>([]);
   
   useEffect(() => {
     console.log('LineDisplay - current call status:', currentCall?.status, currentCall?.phoneNumber);
@@ -42,6 +53,43 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
     };
   }, [currentCall?.status, currentCall?.startTime]);
 
+  useEffect(() => {
+    const fetchCallLogs = async () => {
+      const { data, error } = await supabase
+        .from('call_logs')
+        .select('*')
+        .eq('line_number', lineNumber)
+        .order('timestamp', { ascending: false })
+        .limit(5);
+
+      if (!error && data) {
+        setRecentCallLogs(data);
+      }
+    };
+
+    fetchCallLogs();
+
+    const channel = supabase
+      .channel('call-logs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'call_logs',
+          filter: `line_number=eq.${lineNumber}`
+        },
+        (payload) => {
+          setRecentCallLogs(prev => [payload.new as CallLog, ...prev.slice(0, 4)]);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [lineNumber]);
+
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -55,12 +103,10 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       badgeClass: 'bg-gray-100 text-gray-600' 
     };
 
-    // Get display name from parameters or fallback to leadName
     const displayName = currentCall.parameters?.firstName ? 
       `${currentCall.parameters.firstName} ${currentCall.parameters.lastName || ''}` : 
       currentCall.leadName;
     
-    // Get phone number from parameters or fallback to phoneNumber
     const phoneNumber = currentCall.parameters?.To || currentCall.phoneNumber;
     
     switch (currentCall.status) {
@@ -139,6 +185,25 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
             <div className="flex items-center gap-1 text-xs text-gray-500">
               <Timer className="h-3 w-3" />
               {formatDuration(callDuration)}
+            </div>
+          )}
+          
+          {recentCallLogs.length > 0 && (
+            <div className="mt-4 border-t pt-2">
+              <div className="text-xs font-medium text-gray-500 mb-2 flex items-center gap-1">
+                <History className="h-3 w-3" />
+                Recent Call History
+              </div>
+              <div className="space-y-1">
+                {recentCallLogs.map((log) => (
+                  <div key={log.sid} className="text-xs text-gray-600 flex justify-between items-center">
+                    <span>{log.to_number}</span>
+                    <Badge variant="outline" className="text-xs">
+                      {log.status === 'completed' ? `${log.duration}s` : log.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
