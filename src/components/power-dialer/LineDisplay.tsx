@@ -2,21 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Timer } from 'lucide-react';
+import { Phone } from 'lucide-react';
+import { LineDisplayData, CallStatus } from '@/types/dialer';
 
-interface LineDisplayProps {
-  lineNumber: number;
-  currentCall?: {
-    phoneNumber?: string;
-    leadName?: string;
-    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
-    startTime?: Date;
-    company?: string;
-  };
-}
-
-export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
+export const LineDisplay: React.FC<LineDisplayData> = ({ lineNumber, currentCall }) => {
   const [callDuration, setCallDuration] = useState(0);
+  const [previousStatus, setPreviousStatus] = useState<CallStatus | undefined>(undefined);
+
+  useEffect(() => {
+    if (currentCall?.status !== previousStatus) {
+      setPreviousStatus(currentCall?.status);
+      if (previousStatus && currentCall?.status !== 'in-progress') {
+        setCallDuration(0);
+      }
+    }
+  }, [currentCall?.status, previousStatus]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
@@ -26,8 +26,6 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
         const duration = Math.floor((new Date().getTime() - currentCall.startTime!.getTime()) / 1000);
         setCallDuration(duration);
       }, 1000);
-    } else {
-      setCallDuration(0);
     }
     
     return () => {
@@ -51,7 +49,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       case 'ringing':
         return { 
           bg: 'bg-green-100/50',
-          text: `Dialing ${currentCall.leadName || currentCall.phoneNumber}`,
+          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber}`,
           badge: 'bg-green-100 text-green-800'
         };
       case 'in-progress':

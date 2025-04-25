@@ -29,6 +29,8 @@ import DialerQueueMonitor from './DialerQueueMonitor';
 import { AutoDialerController } from './AutoDialerController';
 import { twilioService } from "@/services/twilio";
 import { LineDisplay } from './LineDisplay';
+import { useTwilio } from "@/hooks/use-twilio";
+import { ActiveCallData } from '@/types/dialer';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -53,20 +55,62 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [isProcessingCall, setIsProcessingCall] = useState(false);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
   const { user } = useAuth();
-  
+  const twilioState = useTwilio();
+
   useEffect(() => {
     if (isDialingStarted) {
       fetchCallingLists();
     }
   }, [isDialingStarted]);
 
+  // Add new type-safe effect to properly track Twilio call status changes
   useEffect(() => {
-    console.log('Session state update:', { 
-      sessionId, 
-      autoDialerActive, 
-      isActivePowerDialing 
-    });
-  }, [sessionId, autoDialerActive, isActivePowerDialing]);
+    if (Object.keys(twilioState.activeCalls).length === 0) {
+      if (Object.keys(activeCallsInProgress).length > 0) {
+        setActiveCallsInProgress({});
+      }
+      return;
+    }
+
+    // Map Twilio call data to our line display format
+    const twilioCall = Object.values(twilioState.activeCalls)[0];
+    const callData = currentCall?.parameters || {};
+    
+    const lineData: Record<string, ActiveCallData> = {
+      '1': {
+        callSid: twilioCall.callSid,
+        leadId: twilioCall.leadId,
+        phoneNumber: twilioCall.phoneNumber,
+        leadName: `${callData.firstName || ''} ${callData.lastName || ''}`.trim() || 'Unknown Lead',
+        company: callData.company || undefined,
+        status: twilioCall.status,
+        startTime: twilioCall.status === 'in-progress' ? new Date() : undefined,
+        audioActive: twilioCall.audioActive,
+        audioStreaming: twilioCall.audioStreaming
+      }
+    };
+
+    setActiveCallsInProgress(lineData);
+  }, [twilioState.activeCalls, currentCall]);
+
+  // Regular call updates from currentCall prop
+  useEffect(() => {
+    if (currentCall && !Object.keys(twilioState.activeCalls).length) {
+      const callData = currentCall.parameters || {};
+      
+      setActiveCallsInProgress({
+        '1': {
+          callSid: currentCall.callSid || '',
+          leadId: callData.leadId || '',
+          phoneNumber: callData.To,
+          leadName: `${callData.firstName || ''} ${callData.lastName || ''}`.trim() || 'Unknown Lead',
+          company: callData.company,
+          status: currentCall.status || 'connecting',
+          startTime: currentCall.status === 'in-progress' ? new Date() : undefined
+        }
+      });
+    }
+  }, [currentCall, twilioState.activeCalls]);
 
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);
@@ -196,24 +240,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     console.log('Call completed, ready for next call');
   }, []);
 
-  useEffect(() => {
-    if (currentCall) {
-      setActiveCallsInProgress({
-        '1': {
-          contact: {
-            phone1: currentCall.parameters?.To || 'Unknown',
-            firstName: 'Current',
-            lastName: 'Lead'
-          },
-          status: currentCall.status || 'connecting',
-          startTime: currentCall.status === 'in-progress' ? new Date() : undefined
-        }
-      });
-    } else {
-      setActiveCallsInProgress({});
-    }
-  }, [currentCall]);
-
   return (
     <>
       <Card className="bg-gray-800 p-4 rounded-lg">
@@ -222,14 +248,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
             <LineDisplay 
               key={line} 
               lineNumber={line}
-              currentCall={line === 1 && Object.values(activeCallsInProgress)[0] ? {
-                phoneNumber: Object.values(activeCallsInProgress)[0]?.contact?.phone1,
-                leadName: `${Object.values(activeCallsInProgress)[0]?.contact?.firstName || ''} ${Object.values(activeCallsInProgress)[0]?.contact?.lastName || ''}`.trim(),
-                status: Object.values(activeCallsInProgress)[0]?.status,
-                startTime: Object.values(activeCallsInProgress)[0]?.status === 'in-progress' ? 
-                  new Date(Object.values(activeCallsInProgress)[0]?.startTime || new Date()) : undefined,
-                company: Object.values(activeCallsInProgress)[0]?.contact?.company
-              } : undefined}
+              currentCall={activeCallsInProgress[line.toString()]}
             />
           ))}
         </div>
