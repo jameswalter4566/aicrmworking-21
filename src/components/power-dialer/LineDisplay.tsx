@@ -9,15 +9,21 @@ interface LineDisplayProps {
   currentCall?: {
     phoneNumber?: string;
     leadName?: string;
-    status?: string;
+    status?: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
     startTime?: Date;
+    parameters?: {
+      To?: string;
+      firstName?: string;
+      lastName?: string;
+      leadId?: string;
+      company?: string;
+    };
   };
 }
 
 export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   const [callDuration, setCallDuration] = useState(0);
   
-  // Update the call duration timer every second if the call is in progress
   useEffect(() => {
     let interval: NodeJS.Timeout | undefined;
     
@@ -42,35 +48,58 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   };
 
   const getStatusDisplay = () => {
-    console.log("LineDisplay - current call status:", currentCall?.status, currentCall);
+    if (!currentCall) return { 
+      bg: 'bg-gray-50', 
+      text: 'Available',
+      badgeClass: 'bg-gray-100 text-gray-600' 
+    };
+
+    // Get display name from parameters or fallback to leadName
+    const displayName = currentCall.parameters?.firstName ? 
+      `${currentCall.parameters.firstName} ${currentCall.parameters.lastName || ''}` : 
+      currentCall.leadName;
     
-    if (!currentCall) return { bg: 'bg-white', text: 'FREE' };
+    // Get phone number from parameters or fallback to phoneNumber
+    const phoneNumber = currentCall.parameters?.To || currentCall.phoneNumber;
     
     switch (currentCall.status) {
       case 'connecting':
       case 'ringing':
         return { 
-          bg: 'bg-green-100/50',
-          text: `Attempting ${currentCall.leadName || currentCall.phoneNumber || ''}`,
-          badgeClass: 'bg-green-100 text-green-800'
+          bg: 'bg-yellow-50',
+          text: `Dialing${displayName ? ` ${displayName}` : ''}`,
+          badgeClass: 'bg-yellow-100 text-yellow-800',
+          subText: phoneNumber,
+          icon: 'phone'
         };
       case 'in-progress':
         return {
-          bg: 'bg-green-500/20',
-          text: `Connected ${formatDuration(callDuration)}`,
-          badgeClass: 'bg-green-500 text-white'
+          bg: 'bg-green-50',
+          text: `Connected (${formatDuration(callDuration)})`,
+          badgeClass: 'bg-green-500 text-white',
+          subText: displayName || phoneNumber,
+          companyName: currentCall.parameters?.company,
+          icon: 'active'
         };
       case 'completed':
       case 'failed':
       case 'busy':
       case 'no-answer':
         return {
-          bg: 'bg-red-100/50',
-          text: 'Disconnected',
-          badgeClass: 'bg-red-100 text-red-800'
+          bg: 'bg-red-50',
+          text: currentCall.status === 'completed' ? 'Call Ended' : 
+                currentCall.status === 'busy' ? 'Line Busy' :
+                currentCall.status === 'no-answer' ? 'No Answer' : 'Call Failed',
+          badgeClass: 'bg-red-100 text-red-800',
+          subText: displayName || phoneNumber,
+          icon: 'ended'
         };
       default:
-        return { bg: 'bg-white', text: 'FREE', badgeClass: 'bg-white text-gray-600' };
+        return { 
+          bg: 'bg-gray-50', 
+          text: 'Available',
+          badgeClass: 'bg-gray-100 text-gray-600' 
+        };
     }
   };
 
@@ -79,23 +108,39 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
   return (
     <Card className={`transition-all duration-300 ${status.bg}`}>
       <CardContent className="p-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Phone className="h-4 w-4 text-gray-600" />
-            <span className="text-gray-600">Line {lineNumber}</span>
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <Phone className="h-4 w-4 text-gray-600" />
+              <span className="font-medium text-gray-700">Line {lineNumber}</span>
+            </div>
+            <Badge 
+              variant="outline" 
+              className={`${status.badgeClass || ''} border-gray-200`}
+            >
+              {status.text}
+            </Badge>
           </div>
-          <Badge 
-            variant="outline" 
-            className={`${status.badgeClass || ''} border-gray-200`}
-          >
-            {status.text}
-          </Badge>
+          
+          {status.subText && (
+            <div className="text-sm text-gray-600 font-medium">
+              {status.subText}
+            </div>
+          )}
+          
+          {status.companyName && (
+            <div className="text-xs text-gray-500">
+              {status.companyName}
+            </div>
+          )}
+          
+          {currentCall?.status === 'in-progress' && (
+            <div className="flex items-center gap-1 text-xs text-gray-500">
+              <Timer className="h-3 w-3" />
+              {formatDuration(callDuration)}
+            </div>
+          )}
         </div>
-        {currentCall?.phoneNumber && (
-          <div className="mt-2 text-sm text-gray-500">
-            {currentCall.phoneNumber}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
