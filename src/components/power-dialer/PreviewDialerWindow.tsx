@@ -87,6 +87,57 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
   }, [currentCall]);
 
+  useEffect(() => {
+    if (window.Twilio && window.Twilio.Device) {
+      const device = window.Twilio.Device;
+      
+      const handleIncoming = (call: any) => {
+        console.log("Incoming call detected:", call);
+      };
+      
+      const handleConnect = (call: any) => {
+        console.log("Call connected:", call);
+        if (currentCall) {
+          setActiveCallsInProgress(prev => {
+            const lineId = '1';
+            return {
+              ...prev,
+              [lineId]: {
+                ...(prev[lineId] || {}),
+                status: 'in-progress',
+                startTime: new Date()
+              }
+            };
+          });
+        }
+      };
+      
+      const handleDisconnect = (call: any) => {
+        console.log("Call disconnected:", call);
+        setActiveCallsInProgress(prev => {
+          const lineId = '1';
+          return {
+            ...prev,
+            [lineId]: {
+              ...(prev[lineId] || {}),
+              status: 'completed'
+            }
+          };
+        });
+      };
+      
+      device.on('incoming', handleIncoming);
+      device.on('connect', handleConnect);
+      device.on('disconnect', handleDisconnect);
+      
+      return () => {
+        device.off('incoming', handleIncoming);
+        device.off('connect', handleConnect);
+        device.off('disconnect', handleDisconnect);
+      };
+    }
+  }, [currentCall]);
+
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);
     setError(null);
@@ -211,7 +262,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   };
 
   const handleCallComplete = useCallback(() => {
-    // This will be called after each call is completed
     console.log('Call completed, ready for next call');
   }, []);
 
