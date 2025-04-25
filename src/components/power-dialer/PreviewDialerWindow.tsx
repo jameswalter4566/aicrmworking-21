@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -68,6 +67,25 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       isActivePowerDialing 
     });
   }, [sessionId, autoDialerActive, isActivePowerDialing]);
+
+  useEffect(() => {
+    if (currentCall) {
+      console.log('Current call updated:', currentCall);
+      setActiveCallsInProgress({
+        '1': {
+          contact: {
+            phone1: currentCall.parameters?.To || 'Unknown',
+            firstName: currentCall.parameters?.firstName || 'Current',
+            lastName: currentCall.parameters?.lastName || 'Lead'
+          },
+          status: currentCall.status || 'connecting',
+          startTime: currentCall.status === 'in-progress' ? new Date() : undefined
+        }
+      });
+    } else {
+      setActiveCallsInProgress({});
+    }
+  }, [currentCall]);
 
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);
@@ -197,25 +215,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     console.log('Call completed, ready for next call');
   }, []);
 
-  // Example of active calls we'll track
-  useEffect(() => {
-    if (currentCall) {
-      setActiveCallsInProgress({
-        '1': {
-          contact: {
-            phone1: currentCall.parameters?.To || 'Unknown',
-            firstName: 'Current',
-            lastName: 'Lead'
-          },
-          status: currentCall.status || 'connecting',
-          startTime: currentCall.status === 'in-progress' ? new Date() : undefined
-        }
-      });
-    } else {
-      setActiveCallsInProgress({});
-    }
-  }, [currentCall]);
-
   return (
     <>
       <Card className="bg-gray-800 p-4 rounded-lg">
@@ -226,7 +225,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               lineNumber={line}
               currentCall={line === 1 && Object.values(activeCallsInProgress)[0] ? {
                 phoneNumber: Object.values(activeCallsInProgress)[0]?.contact?.phone1,
-                leadName: `${Object.values(activeCallsInProgress)[0]?.contact?.firstName} ${Object.values(activeCallsInProgress)[0]?.contact?.lastName}`,
+                leadName: `${Object.values(activeCallsInProgress)[0]?.contact?.firstName || ''} ${Object.values(activeCallsInProgress)[0]?.contact?.lastName || ''}`.trim() || 
+                          Object.values(activeCallsInProgress)[0]?.contact?.phone1,
                 status: Object.values(activeCallsInProgress)[0]?.status,
                 startTime: Object.values(activeCallsInProgress)[0]?.status === 'in-progress' ? 
                   new Date(Object.values(activeCallsInProgress)[0]?.startTime || new Date()) : undefined

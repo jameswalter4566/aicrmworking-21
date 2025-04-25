@@ -45,6 +45,7 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
     
     switch (currentCall.status) {
       case 'connecting':
+      case 'ringing':
         return { 
           bg: 'bg-green-100/50',
           text: `Attempting ${currentCall.leadName || currentCall.phoneNumber}`
@@ -81,8 +82,9 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
             variant="outline" 
             className={`
               ${currentCall?.status === 'in-progress' ? 'bg-green-500 text-white' : 
-                currentCall?.status === 'connecting' ? 'bg-green-100 text-green-800' :
-                currentCall?.status === 'completed' || currentCall?.status === 'failed' ? 'bg-red-100 text-red-800' :
+                (currentCall?.status === 'connecting' || currentCall?.status === 'ringing') ? 'bg-green-100 text-green-800' :
+                (currentCall?.status === 'completed' || currentCall?.status === 'failed' || 
+                 currentCall?.status === 'busy' || currentCall?.status === 'no-answer') ? 'bg-red-100 text-red-800' :
                 'bg-white text-gray-600'} 
               border-gray-200
             `}
