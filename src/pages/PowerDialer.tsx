@@ -128,24 +128,24 @@ export default function PowerDialer() {
     
     const newLineStatuses = new Map();
     
-    const callEntries = Object.entries(activeCalls);
-    
-    callEntries.forEach(([leadId, callData], index) => {
-      const call = callData as ActiveCall;
-      const lineNumber = index + 1;
-      
-      const leadInfo = leads.find(lead => lead.id === leadId);
-      
-      const callInfo = {
-        phoneNumber: call.phoneNumber,
-        leadName: leadInfo?.name || "Unknown Lead", 
-        status: call.status,
-        startTime: call.status === 'in-progress' ? new Date() : undefined,
-        company: leadInfo?.company || "Unknown Company"
-      };
-      
-      console.log(`Assigning call to line ${lineNumber}:`, callInfo);
-      newLineStatuses.set(lineNumber, callInfo);
+    Object.entries(activeCalls).forEach(([leadId, call], index) => {
+      if (index < 3) { // Only track first 3 lines
+        const lineNumber = index + 1;
+        const leadInfo = leads.find(lead => lead.id === leadId);
+        
+        if (call) {
+          const callInfo = {
+            phoneNumber: call.phoneNumber,
+            leadName: leadInfo?.name || "Unknown Lead", 
+            status: call.status,
+            startTime: call.status === 'in-progress' ? new Date() : undefined,
+            company: leadInfo?.company
+          };
+          
+          console.log(`Assigning call to line ${lineNumber}:`, callInfo);
+          newLineStatuses.set(lineNumber, callInfo);
+        }
+      }
     });
     
     setCurrentLineStatuses(newLineStatuses);
@@ -335,7 +335,7 @@ export default function PowerDialer() {
           <LineDisplay 
             key={lineNumber}
             lineNumber={lineNumber} 
-            currentCall={getCallInfoForLine(lineNumber)}
+            currentCall={currentLineStatuses.get(lineNumber)}
           />
         ))}
       </div>
