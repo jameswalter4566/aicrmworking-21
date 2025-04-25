@@ -111,12 +111,6 @@ export default function PowerDialer() {
     }
   }, [isScriptLoaded]);
 
-  useEffect(() => {
-    if (currentCall) {
-      console.log('PowerDialer - Current call updated:', currentCall);
-    }
-  }, [currentCall]);
-
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
       .filter((lead) =>
@@ -185,17 +179,6 @@ export default function PowerDialer() {
         toast({
           title: "Call Initiated",
           description: `Calling ${lead.name}...`,
-        });
-        
-        setCurrentCall({
-          parameters: {
-            To: lead.phone,
-            firstName: lead.name.split(' ')[0],
-            lastName: lead.name.split(' ').slice(1).join(' '),
-            leadId: lead.id,
-            company: lead.company
-          },
-          status: 'connecting'
         });
       }
     } catch (error: any) {
@@ -284,7 +267,7 @@ export default function PowerDialer() {
       </Card>
 
       <PreviewDialerWindow 
-        currentCall={currentCall || Object.values(twilioState.activeCalls)[0]}
+        currentCall={Object.values(twilioState.activeCalls)[0]}
         onDisposition={handleDisposition}
         onEndCall={() => Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id))}
       />
@@ -319,10 +302,8 @@ export default function PowerDialer() {
                           {call.phoneNumber}
                         </p>
                       </div>
-                      <Badge variant={call.status === 'in-progress' ? "default" : 
-                         (call.status === 'connecting' || call.status === 'ringing') ? "outline" :
-                         call.status === 'completed' ? 'outline' : 'outline'}>
-                        {(call.status === 'connecting' || call.status === 'ringing') ? 'Ringing' : 
+                      <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
+                        {call.status === 'connecting' ? 'Ringing' : 
                          call.status === 'in-progress' ? 'Connected' :
                          call.status === 'completed' ? 'Ended' : 
                          call.status}

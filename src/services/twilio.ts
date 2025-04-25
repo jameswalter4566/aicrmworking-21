@@ -1,3 +1,4 @@
+
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -136,15 +137,7 @@ class TwilioService {
 
         this.device.on("disconnect", (call: any) => {
           console.log(`Call disconnected: ${call.sid || 'unknown'}`);
-          const params = call.customParameters || new Map();
-          const leadId = params.get('leadId');
-          const phoneNumber = params.get('phoneNumber');
-          
-          console.log(`Call disconnected with leadId: ${leadId}, phoneNumber: ${phoneNumber}`);
-          
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
-          
-          this.callDisconnectListeners.forEach(listener => listener());
         });
 
         this.device.on("cancel", (call: any) => {
@@ -155,8 +148,6 @@ class TwilioService {
             title: "Call Canceled",
             description: "The call was canceled or not answered.",
           });
-          
-          this.callDisconnectListeners.forEach(listener => listener());
         });
 
         this.device.on("incoming", (call: any) => {
@@ -329,8 +320,6 @@ class TwilioService {
             title: "Call Connected",
             description: "You're now connected to the call.",
           });
-          
-          call.status = 'in-progress';
         });
         
         call.on('disconnect', () => {
@@ -340,7 +329,6 @@ class TwilioService {
             description: "The call has been disconnected.",
           });
           
-          call.status = 'completed';
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
           
           this.callDisconnectListeners.forEach(listener => listener());
@@ -353,24 +341,10 @@ class TwilioService {
             description: "The recipient didn't answer the call.",
           });
           
-          call.status = 'no-answer';
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
           
           this.callDisconnectListeners.forEach(listener => listener());
         });
-        
-        console.log('Initial call status:', call.status);
-        
-        if (!call.status) {
-          call.status = 'connecting';
-        }
-        
-        const statusInterval = setInterval(() => {
-          console.log('Current call status:', call.status);
-          if (['completed', 'failed', 'busy', 'no-answer'].includes(call.status)) {
-            clearInterval(statusInterval);
-          }
-        }, 2000);
         
         return { 
           success: true, 
@@ -476,7 +450,6 @@ class TwilioService {
       return 'no-call';
     }
     
-    console.log(`Current status for lead ${leadId}:`, call.status || 'unknown');
     return call.status || 'unknown';
   }
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,7 +51,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [autoDialerActive, setAutoDialerActive] = useState(false);
   const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
   const [isProcessingCall, setIsProcessingCall] = useState(false);
-  const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
   const { user } = useAuth();
   
   useEffect(() => {
@@ -68,39 +66,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       isActivePowerDialing 
     });
   }, [sessionId, autoDialerActive, isActivePowerDialing]);
-
-  // Updated to properly map current call data to the LineDisplay component
-  useEffect(() => {
-    if (currentCall) {
-      console.log('Current call updated in PreviewDialerWindow:', currentCall);
-      
-      // Extract phone information
-      const phoneNumber = currentCall.parameters?.To || 'Unknown';
-      const firstName = currentCall.parameters?.firstName || '';
-      const lastName = currentCall.parameters?.lastName || '';
-      const leadName = `${firstName} ${lastName}`.trim() || phoneNumber;
-      
-      setActiveCallsInProgress({
-        '1': {
-          contact: {
-            phone1: phoneNumber,
-            firstName: firstName,
-            lastName: lastName
-          },
-          status: currentCall.status || 'connecting',
-          startTime: currentCall.status === 'in-progress' ? new Date() : undefined
-        }
-      });
-      
-      console.log('Set active calls to:', {
-        phone: phoneNumber,
-        name: leadName,
-        status: currentCall.status || 'connecting'
-      });
-    } else {
-      setActiveCallsInProgress({});
-    }
-  }, [currentCall]);
 
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);
@@ -238,13 +203,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
             <LineDisplay 
               key={line} 
               lineNumber={line}
-              currentCall={line === 1 && Object.values(activeCallsInProgress)[0] ? {
-                phoneNumber: Object.values(activeCallsInProgress)[0]?.contact?.phone1,
-                leadName: `${Object.values(activeCallsInProgress)[0]?.contact?.firstName || ''} ${Object.values(activeCallsInProgress)[0]?.contact?.lastName || ''}`.trim() || 
-                          Object.values(activeCallsInProgress)[0]?.contact?.phone1,
-                status: Object.values(activeCallsInProgress)[0]?.status,
-                startTime: Object.values(activeCallsInProgress)[0]?.status === 'in-progress' ? 
-                  new Date(Object.values(activeCallsInProgress)[0]?.startTime || new Date()) : undefined
+              currentCall={line === 1 && Object.values(callsInProgress)[0] ? {
+                phoneNumber: Object.values(callsInProgress)[0]?.contact?.phone1,
+                leadName: `${Object.values(callsInProgress)[0]?.contact?.firstName} ${Object.values(callsInProgress)[0]?.contact?.lastName}`,
+                status: Object.values(callsInProgress)[0]?.status,
+                startTime: Object.values(callsInProgress)[0]?.status === 'in-progress' ? 
+                  new Date(Object.values(callsInProgress)[0]?.startTime) : undefined
               } : undefined}
             />
           ))}

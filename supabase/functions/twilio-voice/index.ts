@@ -68,43 +68,6 @@ serve(async (req) => {
     return `+${digitsOnly}`;
   };
 
-  // Function to log call events to the call_logs table
-  const logCallEvent = async (data: any) => {
-    try {
-      const requestBody = {
-        sid: data.CallSid || "",
-        status: data.CallStatus || "unknown",
-        from_number: data.From || data.Caller || null,
-        to_number: data.To || data.Called || null,
-        duration: data.CallDuration ? parseInt(data.CallDuration, 10) : 0,
-        timestamp: new Date().toISOString(),
-        line_number: 1
-      };
-
-      const statusLoggerUrl = "https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/call-status-logger";
-      
-      console.log(`Logging call event to call_logs: ${JSON.stringify(requestBody)}`);
-      
-      const formData = new FormData();
-      Object.entries(requestBody).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          formData.append(key, value.toString());
-        }
-      });
-      
-      const response = await fetch(statusLoggerUrl, {
-        method: 'POST',
-        body: formData
-      });
-      
-      if (!response.ok) {
-        console.error(`Failed to log call status: ${response.status} ${response.statusText}`);
-      }
-    } catch (error) {
-      console.error("Error logging call event:", error);
-    }
-  };
-
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -129,11 +92,6 @@ serve(async (req) => {
         formData[key] = value;
       }
       console.log(`[${requestId}] Received form data request:`, JSON.stringify(formData));
-    }
-    
-    // Log all incoming call status updates
-    if (formData.CallSid && (formData.CallStatus || formData.DialCallStatus)) {
-      logCallEvent(formData);
     }
 
     // Extract session ID
