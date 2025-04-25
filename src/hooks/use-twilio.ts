@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
@@ -22,28 +23,7 @@ interface AudioChunk {
   conferenceName?: string; // Added to support conference calls
 }
 
-// Type for the hook return value to ensure TypeScript knows what we're returning
-export interface UseTwilioReturn {
-  initialized: boolean;
-  isLoading: boolean;
-  activeCalls: Record<string, ActiveCall>;
-  microphoneActive: boolean;
-  audioStreaming: boolean;
-  audioTested: boolean;
-  audioOutputDevices: MediaDeviceInfo[];
-  currentAudioDevice: string;
-  makeCall: (phoneNumber: string, leadId: string | number) => Promise<any>;
-  endCall: (leadId: string | number) => Promise<boolean>;
-  endAllCalls: () => Promise<boolean>;
-  toggleMute: (leadId: string | number, mute?: boolean) => boolean;
-  toggleSpeaker: (leadId: string | number, speakerOn?: boolean) => boolean;
-  setAudioOutputDevice: (deviceId: string) => Promise<boolean>;
-  refreshAudioDevices: () => Promise<MediaDeviceInfo[]>;
-  testAudio: (deviceId: string) => Promise<boolean>;
-  joinConference?: (conferenceName: string) => boolean;
-}
-
-export const useTwilio = (): UseTwilioReturn => {
+export const useTwilio = () => {
   const [initialized, setInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [activeCalls, setActiveCalls] = useState<Record<string, ActiveCall>>({});
@@ -54,7 +34,7 @@ export const useTwilio = (): UseTwilioReturn => {
   const [currentAudioDevice, setCurrentAudioDevice] = useState<string>('');
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
-
+  
   const webSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
@@ -326,6 +306,7 @@ export const useTwilio = (): UseTwilioReturn => {
     console.log("Microphone audio capture stopped");
   }, []);
 
+  // Define endCall before it's used
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
     
@@ -360,6 +341,7 @@ export const useTwilio = (): UseTwilioReturn => {
     return false;
   }, [activeCalls, stopCapturingMicrophone]);
 
+  // Define endAllCalls here, before it's used
   const endAllCalls = useCallback(async () => {
     Object.values(statusCheckIntervals.current).forEach(intervalId => {
       clearInterval(intervalId);
@@ -502,6 +484,7 @@ export const useTwilio = (): UseTwilioReturn => {
     
     console.log(`Setting up call monitoring for ${usingBrowser ? 'browser' : 'REST API'} call: ${callSid}`);
     
+    // If this is a conference call, store the conference name ref
     if (conferenceName) {
       activeConferenceNameRef.current = conferenceName;
     }
@@ -674,6 +657,7 @@ export const useTwilio = (): UseTwilioReturn => {
 
     console.log(`Placing call to ${phoneNumber}`);
     
+    // Format the phone number properly if needed
     let formattedPhoneNumber = phoneNumber;
     if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
       formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
@@ -681,11 +665,13 @@ export const useTwilio = (): UseTwilioReturn => {
     
     setupWebSocket();
     
+    // Always include the leadId when making calls
     const result = await twilioService.makeCall(formattedPhoneNumber, String(leadId));
     
     if (result.success && (result.callSid || result.browserCallSid)) {
       const leadIdStr = String(leadId);
       
+      // Use the result data to determine if this is a conference call
       const isConferenceCall = result.conferenceName && result.phoneCallSid && result.browserCallSid;
       const callSidToUse = result.callSid || result.browserCallSid || 'browser-call';
       
@@ -710,6 +696,7 @@ export const useTwilio = (): UseTwilioReturn => {
         description: `Calling ${formattedPhoneNumber}... Audio will stream through your browser when connected.`,
       });
       
+      // If this is a conference call, join the conference
       if (isConferenceCall && result.conferenceName) {
         joinConference(result.conferenceName);
       }
@@ -723,7 +710,7 @@ export const useTwilio = (): UseTwilioReturn => {
       });
     }
 
-    return { success: true };
+    return result;
   }, [initialized, monitorCallStatus, microphoneActive, audioStreaming, setupWebSocket, joinConference, endAllCalls]);
 
   const toggleMute = useCallback((leadId: string | number, mute?: boolean) => {
@@ -841,16 +828,6 @@ export const useTwilio = (): UseTwilioReturn => {
     }
   }, [currentAudioDevice, setAudioOutputDevice]);
 
-  const testAudio = useCallback(async (deviceId: string): Promise<boolean> => {
-    try {
-      const result = await twilioService.testAudioOutput(deviceId);
-      return result;
-    } catch (err) {
-      console.error("Audio test failed:", err);
-      return false;
-    }
-  }, []);
-
   useEffect(() => {
     try {
       const savedDevice = localStorage.getItem('preferredAudioDevice');
@@ -885,6 +862,6 @@ export const useTwilio = (): UseTwilioReturn => {
     setAudioOutputDevice,
     refreshAudioDevices,
     joinConference,
-    testAudio
+    testAudio: (deviceId: string) => twilioService.testAudioOutput(deviceId)
   };
 };

@@ -9,72 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      call_logs: {
-        Row: {
-          created_at: string
-          duration: number | null
-          from_number: string | null
-          id: string
-          line_number: number
-          sid: string
-          status: string
-          timestamp: string
-          to_number: string | null
-        }
-        Insert: {
-          created_at?: string
-          duration?: number | null
-          from_number?: string | null
-          id?: string
-          line_number: number
-          sid: string
-          status: string
-          timestamp?: string
-          to_number?: string | null
-        }
-        Update: {
-          created_at?: string
-          duration?: number | null
-          from_number?: string | null
-          id?: string
-          line_number?: number
-          sid?: string
-          status?: string
-          timestamp?: string
-          to_number?: string | null
-        }
-        Relationships: []
-      }
-      call_status_updates: {
-        Row: {
-          call_sid: string
-          created_at: string
-          data: Json
-          id: string
-          session_id: string
-          status: string
-          timestamp: string
-        }
-        Insert: {
-          call_sid: string
-          created_at?: string
-          data: Json
-          id?: string
-          session_id: string
-          status: string
-          timestamp?: string
-        }
-        Update: {
-          call_sid?: string
-          created_at?: string
-          data?: Json
-          id?: string
-          session_id?: string
-          status?: string
-          timestamp?: string
-        }
-        Relationships: []
-      }
       calling_list_leads: {
         Row: {
           added_at: string
@@ -919,7 +853,6 @@ export type Database = {
           end_timestamp: string | null
           id: string
           machine_detection_result: string | null
-          session_id: string | null
           start_timestamp: string | null
           status: string
           twilio_call_sid: string | null
@@ -933,7 +866,6 @@ export type Database = {
           end_timestamp?: string | null
           id?: string
           machine_detection_result?: string | null
-          session_id?: string | null
           start_timestamp?: string | null
           status?: string
           twilio_call_sid?: string | null
@@ -947,7 +879,6 @@ export type Database = {
           end_timestamp?: string | null
           id?: string
           machine_detection_result?: string | null
-          session_id?: string | null
           start_timestamp?: string | null
           status?: string
           twilio_call_sid?: string | null
@@ -1148,7 +1079,15 @@ export type Database = {
           session_id: string | null
           total_count: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "dialing_session_leads_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "dialing_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {

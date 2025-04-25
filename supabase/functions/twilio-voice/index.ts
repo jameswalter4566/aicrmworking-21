@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import twilio from "npm:twilio@4.10.0";
 
@@ -95,7 +96,6 @@ serve(async (req) => {
 
     // Extract session ID
     const sessionId = formData.sessionId || formData.dialingSessionId || 'default-session';
-    console.log(`[${requestId}] Processing for session: ${sessionId}`);
     
     // Initialize session tracking if needed
     if (!callAttempts.has(sessionId)) {
@@ -171,44 +171,7 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced logging
-    console.log(`[${requestId}] Call details:`, {
-      phoneNumber,
-      callSid,
-      status: dialCallStatus || formData.CallStatus,
-      isDialAction,
-      errorCode,
-      errorMessage
-    });
-
-    // Updated call status tracking
-    if (callSid && !callStatusData.has(callSid) && phoneNumber) {
-      const statusData = {
-        callSid,
-        sessionId,
-        phoneNumber: normalizedPhone,
-        startTime: Date.now(),
-        lastUpdateTime: Date.now(),
-        currentStatus: formData.CallStatus || 'unknown',
-        attempts: 0,
-        wasDialed: false,
-        dialComplete: false,
-        errorCode: errorCode || undefined,
-        errorMessage: errorMessage || undefined
-      };
-
-      callStatusData.set(callSid, statusData);
-      console.log(`[${requestId}] Initialized call tracking:`, statusData);
-    }
-
-    // Enhanced status update handling
     if (phoneNumber) {
-      console.log(`[${requestId}] Processing call to ${phoneNumber}`, {
-        currentAttempts: sessionActiveDialing.get(normalizedPhone) || 0,
-        isDialAction,
-        sessionId
-      });
-
       // Check for concurrent dialing attempts to the same number
       const currentAttempts = sessionActiveDialing.get(normalizedPhone) || 0;
       if (currentAttempts > 0 && !isDialAction) {
@@ -230,14 +193,10 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced dial action handling with detailed logging
+    // Handle dial action with proper handling of error codes
     if (isDialAction) {
-      console.log(`[${requestId}] Processing dial action:`, {
-        status: dialCallStatus,
-        error: errorCode,
-        duration: Date.now() - (dialTimeouts.get(callSid) || Date.now())
-      });
-
+      console.log(`[${requestId}] Processing dial action response: Status=${dialCallStatus}, Error=${errorCode}`);
+      
       // Clean up tracking for this number
       if (normalizedPhone) {
         const currentActive = sessionActiveDialing.get(normalizedPhone) || 0;
@@ -263,22 +222,47 @@ serve(async (req) => {
       }
 
       // Handle call completion cases
-      const response = new twiml.VoiceResponse();
-      
       if (dialCallStatus === "completed" || dialCallStatus === "answered") {
-        console.log(`[${requestId}] Call ${callSid} completed successfully`);
+        dialTimeouts.delete(callSid);
+        console.log(`[${requestId}] Call ${callSid} was answered and completed normally`);
+        
+        const response = new twiml.VoiceResponse();
         response.hangup();
-      } else if (dialCallStatus === "busy") {
+        return new Response(response.toString(), { headers: corsHeaders });
+      } 
+      else if (dialCallStatus === "no-answer" && dialDuration >= DIAL_TIMEOUT_MS) {
+        console.log(`[${requestId}] Call ${callSid} rang for 30+ seconds with no answer`);
+        
+        const response = new twiml.VoiceResponse();
+        response.say("This number did not answer after 30 seconds.");
+        response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      }
+      else if (dialCallStatus === "busy") {
         console.log(`[${requestId}] Number ${phoneNumber} is busy`);
+        
+        const response = new twiml.VoiceResponse();
         response.say("The number is busy. Please try again later.");
         response.hangup();
-      } else if (dialCallStatus === "failed") {
-        console.log(`[${requestId}] Call failed:`, { errorCode, errorMessage });
+        
+        return new Response(response.toString(), { headers: corsHeaders });
+      } 
+      else if (dialCallStatus === "failed") {
+        // Include error code in the log if available
+        const logMessage = errorCode ? 
+          `[${requestId}] Call to ${phoneNumber} failed with error code ${errorCode}: ${errorMessage}` :
+          `[${requestId}] Call to ${phoneNumber} failed, will allow future attempts`;
+        
+        console.log(logMessage);
+        
+        const response = new twiml.VoiceResponse();
+        // This is the key change - using the updated message that matches what we set elsewhere in the code
         response.say("The call could not be connected. The system will try again later.");
         response.hangup();
+        
+        return new Response(response.toString(), { headers: corsHeaders });
       }
-
-      return new Response(response.toString(), { headers: corsHeaders });
     }
 
     // Handle different request types
