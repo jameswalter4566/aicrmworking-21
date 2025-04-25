@@ -158,7 +158,7 @@ Deno.serve(async (req) => {
       company: call.contact?.company
     };
     
-    // Try to store the call status update in Supabase table for clients to poll
+    // Try to store the call status update in Supabase table
     try {
       await supabase
         .from('call_status_updates')
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
         });
     } catch (dbError) {
       console.log('Error writing to call_status_updates table, using memory store instead:', dbError.message);
-      // If the database table doesn't exist, use the memory store
+      // If the database write fails, use the memory store
       storeCallStatusUpdate(call.session_id, statusUpdate);
     }
     

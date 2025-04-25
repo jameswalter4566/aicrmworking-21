@@ -45,6 +45,36 @@ export type Database = {
         }
         Relationships: []
       }
+      call_status_updates: {
+        Row: {
+          call_sid: string
+          created_at: string
+          data: Json
+          id: string
+          session_id: string
+          status: string
+          timestamp: string
+        }
+        Insert: {
+          call_sid: string
+          created_at?: string
+          data: Json
+          id?: string
+          session_id: string
+          status: string
+          timestamp?: string
+        }
+        Update: {
+          call_sid?: string
+          created_at?: string
+          data?: Json
+          id?: string
+          session_id?: string
+          status?: string
+          timestamp?: string
+        }
+        Relationships: []
+      }
       calling_list_leads: {
         Row: {
           added_at: string

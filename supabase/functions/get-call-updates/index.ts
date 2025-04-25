@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -52,18 +53,12 @@ Deno.serve(async (req) => {
         .order('timestamp', { ascending: false })
         .limit(20);
       
-      if (error && error.code === '42P01') {
-        // Table doesn't exist, fall back to memory store
-        console.log('call_status_updates table does not exist, using memory store');
-        const sessionUpdates = memoryCallStatusStore[sessionId] || [];
-        updates = sessionUpdates.filter(update => 
-          update.timestamp > parseInt(lastTimestamp.toString())
-        ).slice(0, 20);
-      } else if (error) {
+      if (error) {
         throw error;
-      } else {
-        updates = dbUpdates;
       }
+      
+      updates = dbUpdates || [];
+      
     } catch (dbError) {
       console.error('Database error:', dbError);
       // Fall back to memory store on any database error
@@ -88,24 +83,3 @@ Deno.serve(async (req) => {
   }
 });
 
-// This function can be called from other edge functions to store a status update in memory
-export function storeCallStatusUpdate(sessionId: string, statusData: any) {
-  if (!memoryCallStatusStore[sessionId]) {
-    memoryCallStatusStore[sessionId] = [];
-  }
-  
-  const update = {
-    session_id: sessionId,
-    timestamp: Date.now(),
-    data: statusData,
-  };
-  
-  memoryCallStatusStore[sessionId].push(update);
-  
-  // Keep only the latest 100 updates per session to avoid memory issues
-  if (memoryCallStatusStore[sessionId].length > 100) {
-    memoryCallStatusStore[sessionId] = memoryCallStatusStore[sessionId].slice(-100);
-  }
-  
-  return update;
-}
