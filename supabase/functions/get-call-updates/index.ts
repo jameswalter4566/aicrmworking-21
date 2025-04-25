@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
     
     if (req.method === 'POST') {
       const body = await req.json();
+      console.log('Received request body:', body);
       sessionId = body.sessionId;
       lastTimestamp = body.lastTimestamp || '0';
     } else {
@@ -40,11 +41,14 @@ Deno.serve(async (req) => {
     if (!sessionId) {
       throw new Error('Session ID is required');
     }
+
+    console.log(`Fetching updates for session ${sessionId} since timestamp ${lastTimestamp}`);
     
     let updates = [];
     
     try {
       // Try to get updates from the database first
+      console.log('Querying call_status_updates table...');
       const { data: dbUpdates, error } = await supabase
         .from('call_status_updates')
         .select('*')
@@ -54,32 +58,56 @@ Deno.serve(async (req) => {
         .limit(20);
       
       if (error) {
+        console.error('Database query error:', error);
         throw error;
       }
       
-      updates = dbUpdates || [];
+      console.log('Database query results:', dbUpdates);
+      
+      if (dbUpdates && dbUpdates.length > 0) {
+        updates = dbUpdates.map(update => ({
+          ...update,
+          data: {
+            ...update.data,
+            timestamp: new Date(update.timestamp).getTime()
+          }
+        }));
+        console.log('Processed updates:', updates);
+      }
       
     } catch (dbError) {
       console.error('Database error:', dbError);
       // Fall back to memory store on any database error
+      console.log('Falling back to memory store...');
       const sessionUpdates = memoryCallStatusStore[sessionId] || [];
       updates = sessionUpdates.filter(update => 
         update.timestamp > parseInt(lastTimestamp.toString())
       ).slice(0, 20);
+      console.log('Memory store updates:', updates);
     }
     
     // Return the updates
-    return new Response(JSON.stringify({ updates }), {
+    return new Response(JSON.stringify({ 
+      updates,
+      debug: {
+        sessionId,
+        lastTimestamp,
+        updateCount: updates.length,
+        timestamp: new Date().toISOString()
+      }
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error) {
     console.error('Error in get-call-updates function:', error);
     
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: error.stack
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     });
   }
 });
-
