@@ -168,7 +168,10 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 
   const handleStartPowerDialing = async () => {
     if (!sessionId) {
-      toast.error("No active session found");
+      toast({
+        title: "No active session found",
+        description: "Please select a list and create a dialing session first.",
+      });
       return;
     }
 
@@ -178,12 +181,17 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       setAutoDialerActive(true);
       setIsActivePowerDialing(true);
       
-      toast.success("Power dialing sequence started", {
-        description: "The system will now automatically dial leads in queue"
+      toast({
+        title: "Power Dialing Session Started",
+        description: "The system will now automatically dial leads in queue",
       });
     } catch (error) {
       console.error("Error starting power dialing:", error);
-      toast.error("Failed to start power dialing");
+      toast({
+        title: "Failed to start power dialing",
+        description: error instanceof Error ? error.message : "Failed to start dialing",
+        variant: "destructive",
+      });
       setAutoDialerActive(false);
       setIsActivePowerDialing(false);
     } finally {
@@ -284,11 +292,13 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       </div>
                     )}
 
-                    <AutoDialerController 
-                      sessionId={sessionId}
-                      isActive={autoDialerActive}
-                      onCallComplete={handleCallComplete}
-                    />
+                    {autoDialerActive && (
+                      <AutoDialerController 
+                        sessionId={sessionId}
+                        isActive={autoDialerActive}
+                        onCallComplete={handleCallComplete}
+                      />
+                    )}
                   </>
                 )}
                 

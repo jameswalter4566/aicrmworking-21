@@ -103,6 +103,10 @@ export default function PowerDialer() {
   const [currentCall, setCurrentCall] = useState<ActiveCall | null>(null);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
   const [currentLineStatuses, setCurrentLineStatuses] = useState<Map<number, any>>(new Map());
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isProcessingCall, setIsProcessingCall] = useState(false);
+  const [autoDialerActive, setAutoDialerActive] = useState(false);
+  const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
 
   const {
     initialized,
@@ -692,6 +696,53 @@ export default function PowerDialer() {
       </Card>
     </div>
   );
+
+  const handleStartPowerDialing = async () => {
+    if (!sessionId) {
+      toast({
+        title: "No active session found",
+        description: "Please select a list and create a dialing session first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setIsProcessingCall(true);
+      await twilioService.initializeTwilioDevice();
+      setAutoDialerActive(true);
+      setIsActivePowerDialing(true);
+      
+      // Initialize audio capture
+      const micAccess = await twilioService.initializeAudioContext();
+      if (!micAccess) {
+        toast({
+          title: "Microphone Access Required",
+          description: "Please allow microphone access to start dialing.",
+          variant: "destructive",
+        });
+        setAutoDialerActive(false);
+        setIsActivePowerDialing(false);
+        return;
+      }
+      
+      toast({
+        title: "Power Dialing Session Started",
+        description: "The system will now automatically dial leads in queue",
+      });
+    } catch (error) {
+      console.error("Error starting power dialing:", error);
+      toast({
+        title: "Failed to Start",
+        description: "Could not start power dialing session. Please try again.",
+        variant: "destructive",
+      });
+      setAutoDialerActive(false);
+      setIsActivePowerDialing(false);
+    } finally {
+      setIsProcessingCall(false);
+    }
+  };
 
   return (
     <MainLayout>
