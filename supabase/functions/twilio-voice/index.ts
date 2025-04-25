@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import twilio from "npm:twilio@4.10.0";
 
@@ -36,44 +37,6 @@ const activeDialingAttempts = new Map<string, Map<string, number>>();
 // Track dial timeouts for proper call disposition
 const dialTimeouts = new Map<string, number>();
 const DIAL_TIMEOUT_MS = 30000; // 30 seconds as per requirement
-
-// Add a function to report call status to our status tracking endpoint
-async function reportCallStatus(callSid: string, status: string, phoneNumber: string, sessionId: string) {
-  try {
-    console.log(`Reporting call status: ${status} for call ${callSid} to session ${sessionId}`);
-    
-    const statusData = {
-      callSid,
-      status,
-      timestamp: Date.now(),
-      phoneNumber,
-      leadName: 'Call from Twilio',
-      sessionId
-    };
-    
-    // Report to our get-call-updates function which stores status in database
-    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-webhook?callId=${callSid}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        'CallSid': callSid,
-        'CallStatus': status,
-        'SessionId': sessionId,
-        'To': phoneNumber
-      })
-    });
-    
-    if (!response.ok) {
-      console.error(`Failed to report call status: ${response.status} ${response.statusText}`);
-    } else {
-      console.log(`Successfully reported call status to webhook`);
-    }
-  } catch (error) {
-    console.error("Error reporting call status:", error);
-  }
-}
 
 serve(async (req) => {
   console.log("Received request to Twilio Voice function");
@@ -131,7 +94,7 @@ serve(async (req) => {
       console.log(`[${requestId}] Received form data request:`, JSON.stringify(formData));
     }
 
-    // Extract session ID - add default if not provided
+    // Extract session ID
     const sessionId = formData.sessionId || formData.dialingSessionId || 'default-session';
     
     // Initialize session tracking if needed
@@ -230,17 +193,6 @@ serve(async (req) => {
       }
     }
 
-    // If we have a callSid and status, report the status automatically
-    if (formData.CallSid && formData.CallStatus) {
-      // Automatically report any call status updates we receive
-      reportCallStatus(
-        formData.CallSid, 
-        formData.CallStatus, 
-        phoneNumber || formData.To || 'unknown', 
-        sessionId
-      );
-    }
-    
     // Handle dial action with proper handling of error codes
     if (isDialAction) {
       console.log(`[${requestId}] Processing dial action response: Status=${dialCallStatus}, Error=${errorCode}`);
@@ -389,14 +341,6 @@ serve(async (req) => {
       const twimlResponse = response.toString();
       console.log(`[${requestId}] Generated TwiML for JSON request:`, twimlResponse);
       
-      // Report that we're initiating a call
-      reportCallStatus(
-        `browser-call-${Date.now()}`,
-        'initiating',
-        formattedPhone,
-        sessionId
-      );
-      
       return new Response(twimlResponse, { headers: corsHeaders });
     } else if (formData.CallStatus === "ringing" && formData.phoneNumber) {
       // This is a form data request for an outbound call
@@ -421,16 +365,6 @@ serve(async (req) => {
       
       const twimlResponse = response.toString();
       console.log(`[${requestId}] Generated TwiML for form request:`, twimlResponse);
-      
-      // Report call status
-      if (formData.CallSid) {
-        reportCallStatus(
-          formData.CallSid,
-          'ringing',
-          formattedPhone,
-          sessionId
-        );
-      }
       
       return new Response(twimlResponse, { headers: corsHeaders });
     } else if (formData.CallSid && formData.Caller && !formData.phoneNumber) {
