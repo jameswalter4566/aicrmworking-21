@@ -29,7 +29,7 @@ const callStatusData = new Map<string, {
   dialComplete: boolean;
 }>();
 
-const lastAttemptTimestamps = new Map<string, Map<string, number>>();
+// Track active dialing attempts for concurrent call prevention
 const activeDialingAttempts = new Map<string, Map<string, number>>();
 
 // Track dial timeouts for proper call disposition
@@ -78,7 +78,6 @@ serve(async (req) => {
     // Initialize session tracking if needed
     if (!callAttempts.has(sessionId)) {
       callAttempts.set(sessionId, new Map<string, number>());
-      lastAttemptTimestamps.set(sessionId, new Map<string, number>());
       activeDialingAttempts.set(sessionId, new Map<string, number>());
       noAnswerTimeouts.set(sessionId, new Map<string, number>());
       console.log(`[${requestId}] Created new session tracking for session ${sessionId}`);
@@ -86,7 +85,6 @@ serve(async (req) => {
     
     // Get the session-specific tracking data
     const sessionCallAttempts = callAttempts.get(sessionId)!;
-    const sessionLastAttempts = lastAttemptTimestamps.get(sessionId)!;
     const sessionActiveDialing = activeDialingAttempts.get(sessionId)!;
     const sessionNoAnswerTimeouts = noAnswerTimeouts.get(sessionId)!;
 
@@ -128,8 +126,6 @@ serve(async (req) => {
     }
 
     if (phoneNumber) {
-      sessionLastAttempts.set(normalizedPhone, Date.now());
-      
       // Check for concurrent dialing attempts to the same number
       const currentAttempts = sessionActiveDialing.get(normalizedPhone) || 0;
       if (currentAttempts > 0 && !isDialAction) {
@@ -205,21 +201,12 @@ serve(async (req) => {
         return new Response(response.toString(), { headers: corsHeaders });
       } 
       else if (dialCallStatus === "failed") {
-        const attempts = sessionCallAttempts.get(normalizedPhone) || 0;
+        // Instead of returning an error message, simply log the failure and allow the system
+        // to continue normally without preventing future attempts
+        console.log(`[${requestId}] Call to ${phoneNumber} failed, but no longer blocking future attempts`);
         
-        if (attempts >= MAX_ATTEMPTS) {
-          console.log(`[${requestId}] Max attempts (${MAX_ATTEMPTS}) reached for ${phoneNumber}`);
-          
-          const response = new twiml.VoiceResponse();
-          response.say("The call cannot be completed at this time. Maximum retry attempts reached.");
-          response.hangup();
-          
-          return new Response(response.toString(), { headers: corsHeaders });
-        }
-        
-        // Return TwiML for failed calls
         const response = new twiml.VoiceResponse();
-        response.say("Call failed. You may retry this number later.");
+        response.say("The call could not be connected. The system will try again later.");
         response.hangup();
         
         return new Response(response.toString(), { headers: corsHeaders });
@@ -267,6 +254,7 @@ serve(async (req) => {
       
       if (callAttempts.has(targetSessionId)) {
         callAttempts.set(targetSessionId, new Map<string, number>());
+        activeDialingAttempts.set(targetSessionId, new Map<string, number>());
         console.log(`[${requestId}] Cleared call attempts for session ${targetSessionId}`);
       }
       
