@@ -1,6 +1,5 @@
 
 export interface CallStatus {
-  // Updated to include 'connecting' and 'ringing' as valid statuses
   status: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   
   // Call metadata
@@ -26,7 +25,6 @@ export interface ActiveCall {
     email?: string;
     id?: string;
   };
-  // Updated to match CallStatus type
   status: 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer';
   startTime?: Date;
   endTime?: Date;
