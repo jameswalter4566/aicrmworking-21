@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { twilioService } from '@/services/twilio';
@@ -107,11 +106,11 @@ export function useCallStatus() {
           schema: 'public',
           table: 'predictive_dialer_calls'
         },
-        (payload) => {
+        async (payload) => {
           const { new: newData } = payload;
           if (!newData) return;
           
-          // Safely cast newData to a record type to avoid TypeScript errors
+          // Safely cast newData to a record type
           const typedNewData = newData as Record<string, any>;
           
           // Check if this record has a contact_id (leadId)
@@ -119,6 +118,27 @@ export function useCallStatus() {
             const leadId = String(typedNewData.contact_id);
             
             if (leadId) {
+              // If call is in progress, fetch lead details
+              if (typedNewData.status === 'in_progress') {
+                try {
+                  // Call the lead-connected function to get lead details
+                  const { data: leadData, error } = await supabase.functions.invoke('lead-connected', {
+                    body: { leadId }
+                  });
+
+                  if (error) {
+                    console.error('Error fetching lead details:', error);
+                    toast.error('Failed to load lead details');
+                  }
+
+                  if (leadData) {
+                    console.log('Lead details received:', leadData);
+                  }
+                } catch (err) {
+                  console.error('Error invoking lead-connected function:', err);
+                }
+              }
+
               setCallStatuses(prev => {
                 const update: CallStatusUpdate = {
                   callSid: typedNewData.twilio_call_sid as string,
