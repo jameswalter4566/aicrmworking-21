@@ -59,6 +59,9 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
   const [isProcessingCall, setIsProcessingCall] = useState(false);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
+  const [isDialing, setIsDialing] = useState(false);
+  const [forceSkeleton, setForceSkeleton] = useState(true);
+  const [sessionActive, setSessionActive] = useState(false);
   const { user } = useAuth();
   const { callStatuses } = useCallStatus();
 
@@ -66,9 +69,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
   const [callNotes, setCallNotes] = useState('');
   
-  const [isDialing, setIsDialing] = useState(true);
-  const [forceSkeleton, setForceSkeleton] = useState(true);
-
   useEffect(() => {
     const timer = setTimeout(() => {
       setForceSkeleton(false);
@@ -259,7 +259,9 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         description: "The system will now automatically dial leads in queue"
       });
       
-      setTimeout(() => setForceSkeleton(false), 1500);
+      setTimeout(() => {
+        setForceSkeleton(false);
+      }, 1500);
     } catch (error) {
       console.error("Error starting power dialing:", error);
       toast.error("Failed to start power dialing");
@@ -346,6 +348,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
     return phone;
   };
+
+  useEffect(() => {
+    if (sessionId) {
+      setSessionActive(true);
+    }
+  }, [sessionId]);
 
   return (
     <>
@@ -554,7 +562,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                         onCallComplete={handleCallComplete}
                       />
                       
-                      {isDialing && <ConnectedLeadPanel isConnected={false} isDialing={true} forceSkeleton={forceSkeleton} />}
+                      <ConnectedLeadPanel 
+                        isConnected={false} 
+                        isDialing={isDialing}
+                        forceSkeleton={forceSkeleton}
+                        sessionActive={sessionActive && !currentCall}
+                      />
                     </>
                   )}
                   

@@ -15,16 +15,19 @@ interface ConnectedLeadPanelProps {
   isConnected: boolean;
   isDialing?: boolean;
   forceSkeleton?: boolean;
+  sessionActive?: boolean;
 }
 
 export const ConnectedLeadPanel = ({ 
   leadData, 
   isConnected, 
   isDialing = false,
-  forceSkeleton = false
+  forceSkeleton = false,
+  sessionActive = false
 }: ConnectedLeadPanelProps) => {
-  // Always show skeletons when explicitly forced, when dialing, or when connected without lead data
-  const showSkeletons = forceSkeleton || isDialing || (!leadData && isConnected);
+  // Always show skeletons when explicitly forced, when dialing, when session is active without lead data,
+  // or when connected without lead data
+  const showSkeletons = forceSkeleton || isDialing || sessionActive || (!leadData && isConnected);
 
   return (
     <Card className="mt-4">
@@ -40,6 +43,11 @@ export const ConnectedLeadPanel = ({
             {isConnected && (
               <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
                 Connected
+              </span>
+            )}
+            {sessionActive && !isDialing && !isConnected && (
+              <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded-full">
+                Session Active
               </span>
             )}
           </div>
