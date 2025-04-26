@@ -65,6 +65,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
   const [callNotes, setCallNotes] = useState('');
+  const [isDialing, setIsDialing] = useState(false);
 
   useEffect(() => {
     if (isDialingStarted) {
@@ -102,6 +103,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
             console.log('Lead data received:', data);
             setCurrentLead(data.lead);
             setLeadNotes(data.notes || []);
+            setIsDialing(false);
           } else {
             console.warn('Lead data response was not successful:', data);
           }
@@ -220,6 +222,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
 
     try {
+      // Set dialing state IMMEDIATELY when button is clicked
+      setIsDialing(true);
       setIsProcessingCall(true);
       await twilioService.initializeTwilioDevice();
       setAutoDialerActive(true);
@@ -233,8 +237,10 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       toast.error("Failed to start power dialing");
       setAutoDialerActive(false);
       setIsActivePowerDialing(false);
+      setIsDialing(false); // Reset dialing state if there's an error
     } finally {
       setIsProcessingCall(false);
+      // Leave isDialing true until a call connects or explicitly fails
     }
   };
 

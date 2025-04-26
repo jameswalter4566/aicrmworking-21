@@ -13,11 +13,11 @@ interface ConnectedLeadPanelProps {
     mailing_address?: string;
   };
   isConnected: boolean;
-  isDialing?: boolean; // New prop to show skeletons when dialing
+  isDialing?: boolean;
 }
 
 export const ConnectedLeadPanel = ({ leadData, isConnected, isDialing = false }: ConnectedLeadPanelProps) => {
-  // Show skeletons if we're dialing or if we're connected but don't have lead data yet
+  // Show skeletons if we're dialing OR if we're connected but don't have lead data yet
   const showSkeletons = isDialing || (isConnected && !leadData);
 
   return (

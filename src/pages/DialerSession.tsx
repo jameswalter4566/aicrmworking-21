@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -59,7 +60,7 @@ const DialerSession = () => {
     
     try {
       setIsCallingNext(true);
-      setIsDialing(true);
+      setIsDialing(true); // Set dialing state immediately
       setConnectedLeadData(null);
       
       const { data, error } = await supabase.functions.invoke('get-next-lead', {
@@ -91,10 +92,6 @@ const DialerSession = () => {
         toast("Calling", {
           description: `Calling ${data.name || data.phoneNumber}...`
         });
-      }
-      
-      if (data?.leadId) {
-        setConnectedLeadData(null);
       }
     } catch (err) {
       console.error('Error getting next lead:', err);
@@ -200,10 +197,11 @@ const DialerSession = () => {
       };
 
       fetchLeadData();
-    } else if (!hasActiveCall) {
+    } else if (!hasActiveCall && !isCallingNext) {
+      // Only reset isDialing if we're not in the process of calling the next lead
       setIsDialing(false);
     }
-  }, [twilioState.activeCalls, hasActiveCall]);
+  }, [twilioState.activeCalls, hasActiveCall, activeCall?.leadId, activeCall?.status]);
 
   useEffect(() => {
     if (activeCall?.status === 'completed' || activeCall?.status === 'failed') {
