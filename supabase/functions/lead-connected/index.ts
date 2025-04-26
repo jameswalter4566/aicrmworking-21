@@ -31,7 +31,19 @@ Deno.serve(async (req) => {
     const { data: leadByUuid, error: uuidError } = await supabase
       .from('leads')
       .select(`
-        *,
+        id,
+        first_name,
+        last_name,
+        phone1,
+        phone2,
+        email,
+        mailing_address,
+        property_address,
+        disposition,
+        mortgage_data,
+        tags,
+        created_at,
+        updated_at,
         lead_notes (
           id,
           content,
@@ -58,7 +70,7 @@ Deno.serve(async (req) => {
         .eq('lead_id', leadByUuid.id)
         .order('created_at', { ascending: false });
 
-      // Get additional lead data like mortgage information if it exists
+      // Get mortgage data if it exists
       const { data: mortgageData } = await supabase
         .from('mortgage_leads')
         .select('*')
