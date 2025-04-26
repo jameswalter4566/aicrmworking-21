@@ -35,26 +35,102 @@ Deno.serve(async (req) => {
     const isUuid = typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
     console.log(`Lead ID appears to be a ${isUuid ? 'UUID' : 'numeric ID'}: ${leadId}`);
 
-    // Get the lead details using the appropriate query
+    // First, check if this ID might be in the dialing_session_leads
+    if (isUuid) {
+      console.log('Checking if this is a dialing session lead ID first');
+      const { data: dialingLead, error: dialingLeadError } = await supabase
+        .from('dialing_session_leads')
+        .select('*, lead_id')
+        .eq('id', leadId)
+        .maybeSingle();
+      
+      if (dialingLead && dialingLead.lead_id) {
+        console.log(`Found in dialing_session_leads with lead_id: ${dialingLead.lead_id}`);
+        
+        // Now try to get the actual lead with this ID
+        const { data: actualLead, error: actualLeadError } = await supabase
+          .from('leads')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            phone1,
+            phone2,
+            email,
+            mailing_address,
+            property_address,
+            disposition,
+            created_at,
+            updated_at
+          `)
+          .eq('id', dialingLead.lead_id)
+          .maybeSingle();
+        
+        if (actualLead) {
+          console.log(`Successfully found lead: ${actualLead.first_name} ${actualLead.last_name}`);
+          
+          // Get lead notes
+          const { data: notes, error: notesError } = await supabase
+            .from('lead_notes')
+            .select('*')
+            .eq('lead_id', actualLead.id)
+            .order('created_at', { ascending: false });
+
+          if (notesError) {
+            console.error('Error fetching lead notes:', notesError);
+          }
+
+          console.log(`Retrieved ${notes?.length || 0} notes for lead`);
+
+          // If we received call data, log it as a lead activity
+          if (callData && callData.status && actualLead.id) {
+            try {
+              const activityType = callData.status === 'in-progress' ? 'call_connected' : 
+                                 callData.status === 'completed' ? 'call_ended' : 'call_status_change';
+              
+              const description = callData.status === 'in-progress' ? 'Call connected' : 
+                               callData.status === 'completed' ? 'Call ended' : 
+                               `Call status changed to ${callData.status}`;
+              
+              const { error: activityError } = await supabase
+                .from('lead_activities')
+                .insert({
+                  lead_id: actualLead.id,
+                  type: activityType,
+                  description: description,
+                  timestamp: callData.timestamp || new Date().toISOString()
+                });
+              
+              if (activityError) {
+                console.error('Error logging lead activity:', activityError);
+              } else {
+                console.log(`Successfully logged lead activity: ${activityType}`);
+              }
+            } catch (err) {
+              console.error('Error creating lead activity:', err);
+            }
+          }
+
+          return new Response(JSON.stringify({ 
+            success: true,
+            lead: actualLead,
+            notes: notes || [],
+            callData
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          });
+        }
+      }
+    }
+
+    // If not found in dialing session leads, try a direct lookup
+    // For UUID, try to query by uuid directly (requires the leads table to have UUID primary key)
     let leadQuery;
     if (isUuid) {
-      console.log('Querying with UUID format');
-      leadQuery = supabase
-        .from('leads')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          phone1,
-          phone2,
-          email,
-          mailing_address,
-          property_address,
-          disposition,
-          created_at,
-          updated_at
-        `)
-        .eq('id', leadId);
+      console.log('Attempting direct UUID query (if supported by schema)');
+      // Try a different approach, treating the UUID as a string in a stringified WHERE clause
+      leadQuery = supabase.rpc('find_lead_by_string_id', { lead_string_id: leadId });
     } else {
       console.log('Querying with numeric ID format');
       // Try to convert to numeric if it's not a UUID
@@ -81,50 +157,27 @@ Deno.serve(async (req) => {
     }
 
     // Execute the query
-    const { data: lead, error: leadError } = await leadQuery.single();
+    const { data: result, error: leadError } = await leadQuery;
 
     if (leadError) {
       console.error('Error fetching lead details:', leadError);
-      // If first attempt fails, try with the alternative method
-      if (isUuid) {
-        console.log('Retrying with numeric ID format');
-        const numericId = Number(leadId);
-        if (isNaN(numericId)) {
-          throw leadError;
-        }
-        const { data: retryLead, error: retryError } = await supabase
-          .from('leads')
-          .select(`
-            id,
-            first_name,
-            last_name,
-            phone1,
-            phone2,
-            email,
-            mailing_address,
-            property_address,
-            disposition,
-            created_at,
-            updated_at
-          `)
-          .eq('id', numericId)
-          .single();
-        
-        if (retryError) {
-          console.error('Error on retry:', retryError);
-          throw retryError;
-        }
-        
-        if (!retryLead) {
-          throw new Error('Lead not found even after retry');
-        }
-        
-        console.log(`Found lead on retry: ${retryLead.first_name} ${retryLead.last_name}`);
-        lead = retryLead;
-      } else {
+      
+      // Try another fallback approach for any type of ID
+      console.log('Trying general fallback query');
+      const { data: allLeadsResult, error: allLeadsError } = await supabase
+        .from('leads')
+        .select('*')
+        .limit(1);
+      
+      if (allLeadsError || !allLeadsResult || allLeadsResult.length === 0) {
+        console.error('Final fallback failed:', allLeadsError);
         throw leadError;
       }
+      
+      console.log(`Found a sample lead with ID: ${allLeadsResult[0].id} (fallback)`);
     }
+
+    const lead = result?.[0] || null;
 
     if (!lead) {
       console.warn(`No lead found with ID: ${leadId}`);
@@ -205,7 +258,7 @@ Deno.serve(async (req) => {
     if (callData && callData.status) {
       try {
         const activityType = callData.status === 'in-progress' ? 'call_connected' : 
-                            callData.status === 'completed' ? 'call_ended' : 'call_status_change';
+                          callData.status === 'completed' ? 'call_ended' : 'call_status_change';
         
         const description = callData.status === 'in-progress' ? 'Call connected' : 
                           callData.status === 'completed' ? 'Call ended' : 

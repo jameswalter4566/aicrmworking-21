@@ -12,6 +12,26 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Notify lead-connected function when call status changes
+async function notifyLeadConnected(leadId: string, callSid: string, status: string) {
+  try {
+    console.log(`Dialer Webhook: Notifying lead-connected for lead: ${leadId}, status: ${status}`);
+    
+    await supabase.functions.invoke('lead-connected', {
+      body: { 
+        leadId,
+        callData: {
+          callSid,
+          status,
+          timestamp: new Date().toISOString()
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Error notifying lead-connected from dialer webhook:', err);
+  }
+}
+
 // Main function to handle requests
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -34,7 +54,7 @@ Deno.serve(async (req) => {
     const callSid = formData.get('CallSid')?.toString();
     const callDuration = formData.get('CallDuration')?.toString();
     
-    console.log(`Webhook received for call ${callId} with status: ${callStatus}`);
+    console.log(`Dialer webhook received for call ${callId} with status: ${callStatus}`);
     
     // Get the call record
     const { data: call, error: callError } = await supabase
@@ -45,6 +65,11 @@ Deno.serve(async (req) => {
       
     if (callError || !call) {
       throw new Error(`Call not found: ${callError?.message}`);
+    }
+    
+    // If we have a contact_id, notify the lead-connected function
+    if (call.contact_id && callSid) {
+      await notifyLeadConnected(call.contact_id, callSid, callStatus || 'unknown');
     }
     
     // Update call status based on Twilio webhook
