@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -32,15 +32,19 @@ export const ConnectedLeadPanel = ({
                         (isConnected && !leadData);
   
   // For debugging
-  console.log('ConnectedLeadPanel render:', { 
-    leadData, 
-    isConnected, 
-    isDialing, 
-    showSkeletons 
-  });
+  useEffect(() => {
+    console.log('ConnectedLeadPanel render with data:', { 
+      leadData, 
+      isConnected, 
+      isDialing, 
+      showSkeletons,
+      hasData: !!leadData
+    });
+  }, [leadData, isConnected, isDialing, showSkeletons]);
 
   const getFormattedName = () => {
-    if (!leadData?.first_name && !leadData?.last_name) return '';
+    if (!leadData) return '';
+    if (!leadData.first_name && !leadData.last_name) return '';
     return `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
   };
 
@@ -79,7 +83,7 @@ export const ConnectedLeadPanel = ({
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
                   <div className="text-sm mt-1">
-                    {getFormattedName()}
+                    {getFormattedName() || "---"}
                   </div>
                 )}
               </div>
@@ -89,7 +93,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.phone1 || ''}</div>
+                  <div className="text-sm mt-1">{leadData?.phone1 || "---"}</div>
                 )}
               </div>
               
@@ -98,7 +102,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.email || ''}</div>
+                  <div className="text-sm mt-1">{leadData?.email || "---"}</div>
                 )}
               </div>
             </div>
@@ -112,7 +116,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.property_address || ''}</div>
+                  <div className="text-sm mt-1">{leadData?.property_address || "---"}</div>
                 )}
               </div>
               
@@ -121,7 +125,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.mailing_address || ''}</div>
+                  <div className="text-sm mt-1">{leadData?.mailing_address || "---"}</div>
                 )}
               </div>
             </div>
