@@ -1,4 +1,3 @@
-
 import { toast } from "@/components/ui/use-toast";
 
 export interface TwilioCallResult {
@@ -9,8 +8,21 @@ export interface TwilioCallResult {
   conferenceName?: string;
   message?: string;
   error?: string;
-  twilioErrorCode?: number;  // Added this property
+  twilioErrorCode?: number;
   leadId?: string | number;
+}
+
+export interface CallStatusListener {
+  (update: {
+    callSid?: string;
+    status: string;
+    phoneNumber?: string;
+    startTime?: Date;
+    endTime?: Date;
+    leadId?: string;
+    errorCode?: string;
+    errorMessage?: string;
+  }): void;
 }
 
 class TwilioService {
@@ -21,6 +33,7 @@ class TwilioService {
   private isCleaningUp: boolean = false;
   private soundsInitialized: boolean = false;
   private callDisconnectListeners: Array<() => void> = [];
+  private callStatusListeners: CallStatusListener[] = [];
 
   async initializeAudioContext(): Promise<boolean> {
     try {
@@ -124,6 +137,12 @@ class TwilioService {
             variant: "destructive",
           });
           
+          this.notifyCallStatusListeners({
+            status: 'error',
+            errorCode: errorCode,
+            errorMessage: errorMessage
+          });
+          
           try {
             if (this.activeCalls.length > 0) {
               console.log("Cleaning up calls after error");
@@ -138,11 +157,35 @@ class TwilioService {
         this.device.on("disconnect", (call: any) => {
           console.log(`Call disconnected: ${call.sid || 'unknown'}`);
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          const params = call.customParameters || new Map();
+          const leadId = params.get('leadId');
+          
+          if (leadId) {
+            this.notifyCallStatusListeners({
+              callSid: call.sid,
+              status: 'completed',
+              leadId: leadId,
+              endTime: new Date()
+            });
+          }
         });
 
         this.device.on("cancel", (call: any) => {
           console.log(`Call canceled: ${call.sid || 'unknown'}`);
           this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          const params = call.customParameters || new Map();
+          const leadId = params.get('leadId');
+          
+          if (leadId) {
+            this.notifyCallStatusListeners({
+              callSid: call.sid,
+              status: 'canceled',
+              leadId: leadId,
+              endTime: new Date()
+            });
+          }
           
           toast({
             title: "Call Canceled",
@@ -165,19 +208,63 @@ class TwilioService {
             
             this.activeCalls.push(call);
             
+            this.notifyCallStatusListeners({
+              callSid: call.sid,
+              status: 'connecting',
+              phoneNumber: phoneNumber,
+              leadId: leadId,
+              startTime: new Date()
+            });
+            
             call.on('error', (error: any) => {
               console.error('Call error:', error);
+              
+              this.notifyCallStatusListeners({
+                callSid: call.sid,
+                status: 'error',
+                leadId: leadId,
+                errorMessage: error.message,
+                errorCode: error.code
+              });
+              
+              toast({
+                title: "Call Error",
+                description: `Error during call: ${error.message || error}`,
+                variant: "destructive",
+              });
+              
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+              
+              if (error.code === '31005') {
+                console.log("Attempting recovery from connection error");
+                setTimeout(() => {
+                  this.hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
+                }, 1000);
+              }
             });
             
             call.on('disconnect', () => {
               console.log('Call disconnected');
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+              
+              this.notifyCallStatusListeners({
+                callSid: call.sid,
+                status: 'completed',
+                leadId: leadId,
+                endTime: new Date()
+              });
             });
             
             call.on('cancel', () => {
               console.log('Call was cancelled');
               this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+              
+              this.notifyCallStatusListeners({
+                callSid: call.sid,
+                status: 'canceled',
+                leadId: leadId,
+                endTime: new Date()
+              });
             });
           } else {
             console.log("Incoming call without phone number target, rejecting");
@@ -296,8 +383,25 @@ class TwilioService {
         
         console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
         
+        this.notifyCallStatusListeners({
+          callSid: call.sid || 'browser-call',
+          status: 'connecting',
+          phoneNumber: formattedPhoneNumber,
+          leadId: leadId,
+          startTime: new Date()
+        });
+        
         call.on('error', (error: any) => {
           console.error('Call error:', error);
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'error',
+            leadId: leadId,
+            errorMessage: error.message,
+            errorCode: error.code
+          });
+          
           toast({
             title: "Call Error",
             description: `Error during call: ${error.message || error}`,
@@ -316,6 +420,15 @@ class TwilioService {
         
         call.on('accept', () => {
           console.log('Call accepted, audio connection established');
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'in-progress',
+            leadId: leadId,
+            phoneNumber: formattedPhoneNumber,
+            startTime: new Date()
+          });
+          
           toast({
             title: "Call Connected",
             description: "You're now connected to the call.",
@@ -324,6 +437,14 @@ class TwilioService {
         
         call.on('disconnect', () => {
           console.log('Call disconnected');
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'completed',
+            leadId: leadId,
+            endTime: new Date()
+          });
+          
           toast({
             title: "Call Ended",
             description: "The call has been disconnected.",
@@ -336,6 +457,14 @@ class TwilioService {
         
         call.on('cancel', () => {
           console.log('Call was cancelled or not answered');
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'canceled',
+            leadId: leadId,
+            endTime: new Date()
+          });
+          
           toast({
             title: "Call Not Answered",
             description: "The recipient didn't answer the call.",
@@ -497,6 +626,56 @@ class TwilioService {
         listener => listener !== callback
       );
     };
+  }
+
+  onCallStatusChange(listener: CallStatusListener): () => void {
+    this.callStatusListeners.push(listener);
+    
+    return () => {
+      this.callStatusListeners = this.callStatusListeners.filter(l => l !== listener);
+    };
+  }
+  
+  private notifyCallStatusListeners(update: {
+    callSid?: string;
+    status: string;
+    phoneNumber?: string;
+    startTime?: Date;
+    endTime?: Date;
+    leadId?: string;
+    errorMessage?: string;
+    errorCode?: string;
+  }): void {
+    for (const listener of this.callStatusListeners) {
+      try {
+        listener(update);
+      } catch (error) {
+        console.error('Error in call status listener:', error);
+      }
+    }
+  }
+  
+  getActiveCalls(): Record<string, any> {
+    const result: Record<string, any> = {};
+    
+    for (const call of this.activeCalls) {
+      try {
+        const params = call.customParameters || new Map();
+        const leadId = params.get('leadId');
+        
+        if (leadId) {
+          result[leadId] = {
+            sid: call.sid,
+            status: call.status(),
+            parameters: Object.fromEntries(params.entries())
+          };
+        }
+      } catch (error) {
+        console.error('Error getting active call info:', error);
+      }
+    }
+    
+    return result;
   }
 
   cleanup(): void {

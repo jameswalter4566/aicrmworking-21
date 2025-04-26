@@ -44,7 +44,16 @@ Deno.serve(async (req) => {
       machineDetection: 'DetectMessageEnd',
       machineDetectionTimeout: 30,
       statusCallback: statusCallbackUrl,
-      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+      statusCallbackEvent: [
+        'initiated', 
+        'ringing', 
+        'answered', 
+        'completed',
+        'busy',
+        'no-answer',
+        'failed', 
+        'canceled'
+      ],
       statusCallbackMethod: 'POST',
       url: machineDetectionUrl,
     });

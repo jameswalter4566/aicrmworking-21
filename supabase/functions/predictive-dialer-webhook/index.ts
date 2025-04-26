@@ -33,8 +33,13 @@ Deno.serve(async (req) => {
     const callStatus = formData.get('CallStatus')?.toString();
     const callSid = formData.get('CallSid')?.toString();
     const callDuration = formData.get('CallDuration')?.toString();
+    const errorCode = formData.get('ErrorCode')?.toString();
+    const errorMessage = formData.get('ErrorMessage')?.toString();
     
     console.log(`Webhook received for call ${callId} with status: ${callStatus}`);
+    if (errorCode || errorMessage) {
+      console.log(`Error information: Code=${errorCode}, Message=${errorMessage}`);
+    }
     
     // Get the call record
     const { data: call, error: callError } = await supabase
@@ -60,7 +65,10 @@ Deno.serve(async (req) => {
           .update({
             status: 'completed',
             end_timestamp: new Date().toISOString(),
-            duration: callDuration ? parseInt(callDuration) : null
+            duration: callDuration ? parseInt(callDuration) : null,
+            // Store error information if available
+            error_code: errorCode,
+            error_message: errorMessage
           })
           .eq('id', callId);
           
@@ -113,8 +121,15 @@ Deno.serve(async (req) => {
         break;
         
       default:
-        // For other statuses (ringing, queued, etc.), just log
+        // For other statuses (ringing, queued, etc.), log and update
         console.log(`Received status update: ${callStatus} for call ${callId}`);
+        
+        await supabase
+          .from('predictive_dialer_calls')
+          .update({
+            status: callStatus || call.status
+          })
+          .eq('id', callId);
     }
     
     return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
