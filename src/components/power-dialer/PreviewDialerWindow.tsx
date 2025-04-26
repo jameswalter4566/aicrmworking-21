@@ -68,7 +68,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
   const [callNotes, setCallNotes] = useState('');
-  
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setForceSkeleton(false);
@@ -563,10 +563,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       />
                       
                       <ConnectedLeadPanel 
-                        isConnected={false} 
-                        isDialing={isDialing}
-                        forceSkeleton={forceSkeleton}
-                        sessionActive={sessionActive && !currentCall}
+                        leadData={currentLead}
                       />
                     </>
                   )}

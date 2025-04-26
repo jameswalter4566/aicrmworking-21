@@ -335,9 +335,6 @@ const DialerSession = () => {
             
             <ConnectedLeadPanel 
               leadData={connectedLeadData}
-              isConnected={hasActiveCall && activeCall?.status === 'in-progress'}
-              isDialing={isDialing}
-              sessionActive={!!sessionData}
             />
             
             <LeadDetailsPanel 
