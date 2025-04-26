@@ -132,6 +132,109 @@ export default function PowerDialer() {
     }
   }, [isScriptLoaded]);
 
+  useEffect(() => {
+    if (connectedLeadData) {
+      console.log('[PowerDialer] Lead data received and set in state:', {
+        raw: connectedLeadData,
+        formatted: {
+          name: `${connectedLeadData.first_name || ''} ${connectedLeadData.last_name || ''}`.trim(),
+          phone: connectedLeadData.phone1,
+          email: connectedLeadData.email
+        }
+      });
+    }
+  }, [connectedLeadData]);
+
+  useEffect(() => {
+    const activeCall = Object.values(twilioState.activeCalls)[0];
+    console.log('[PowerDialer] Active call status changed:', activeCall?.status);
+    console.log('[PowerDialer] Active call leadId:', activeCall?.leadId);
+    
+    if (activeCall?.status === 'in-progress' && activeCall.leadId) {
+      const fetchLeadData = async () => {
+        try {
+          console.log('[PowerDialer] Fetching lead data for:', activeCall.leadId);
+          setIsDialing(true);
+          
+          console.log('[PowerDialer] Making API request to lead-connected function with:', {
+            leadId: activeCall.leadId,
+            callData: {
+              callSid: activeCall.callSid,
+              status: activeCall.status,
+              timestamp: new Date().toISOString()
+            }
+          });
+
+          const { data, error } = await supabase.functions.invoke('lead-connected', {
+            body: { 
+              leadId: activeCall.leadId,
+              callData: {
+                callSid: activeCall.callSid,
+                status: activeCall.status || 'unknown',
+                timestamp: new Date().toISOString()
+              }
+            }
+          });
+
+          if (error) {
+            console.error('[PowerDialer] Error from lead-connected:', error);
+            throw error;
+          }
+
+          console.log('[PowerDialer] Raw response from lead-connected:', data);
+          
+          if (data?.lead) {
+            console.log('[PowerDialer] Lead data found in response:', JSON.stringify(data.lead));
+            
+            const leadInfo = {
+              first_name: data.lead.first_name || 'Unknown',
+              last_name: data.lead.last_name || 'Contact',
+              phone1: data.lead.phone1 || activeCall.phoneNumber || '---',
+              email: data.lead.email || '---',
+              property_address: data.lead.property_address || '---',
+              mailing_address: data.lead.mailing_address || '---'
+            };
+            
+            console.log('[PowerDialer] Setting connected lead data:', leadInfo);
+            setConnectedLeadData(leadInfo);
+            
+            window.dispatchEvent(new CustomEvent('leadDataUpdated', { 
+              detail: leadInfo 
+            }));
+          } else {
+            console.log('[PowerDialer] No lead data in response, creating fallback data');
+            const fallbackData = {
+              first_name: 'Unknown',
+              last_name: 'Contact',
+              phone1: activeCall.phoneNumber || '---',
+              email: '---',
+              property_address: '---',
+              mailing_address: '---'
+            };
+            setConnectedLeadData(fallbackData);
+          }
+          
+          setIsDialing(false);
+        } catch (err) {
+          console.error('[PowerDialer] Error fetching lead data:', err);
+          const errorFallbackData = {
+            first_name: 'Error',
+            last_name: 'Loading Lead',
+            phone1: activeCall.phoneNumber || '---',
+            email: '---',
+            property_address: '---',
+            mailing_address: '---'
+          };
+          setConnectedLeadData(errorFallbackData);
+          toast.error('Failed to load lead details');
+          setIsDialing(false);
+        }
+      };
+
+      fetchLeadData();
+    }
+  }, [twilioState.activeCalls]);
+
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
       .filter((lead) =>
@@ -230,474 +333,6 @@ export default function PowerDialer() {
     
     handleEndCall(currentCall.parameters.leadId);
   };
-
-  useEffect(() => {
-    const activeCall = Object.values(twilioState.activeCalls)[0];
-    console.log('[PowerDialer] Active call status changed:', activeCall?.status);
-    console.log('[PowerDialer] Active call leadId:', activeCall?.leadId);
-    
-    if (activeCall?.leadId) {
-      const fetchLeadData = async () => {
-        try {
-          console.log('[PowerDialer] Fetching lead data for:', activeCall.leadId);
-          setIsDialing(true);
-          
-          console.log('[PowerDialer] Making API request to lead-connected function');
-          const { data, error } = await supabase.functions.invoke('lead-connected', {
-            body: { 
-              leadId: activeCall.leadId,
-              callData: {
-                callSid: activeCall.callSid,
-                status: activeCall.status || 'unknown',
-                timestamp: new Date().toISOString()
-              }
-            }
-          });
-
-          if (error) {
-            console.error('[PowerDialer] Error from lead-connected:', error);
-            throw error;
-          }
-          
-          console.log('[PowerDialer] FULL RAW RESPONSE from lead-connected:', data);
-          console.log('[PowerDialer] Response type:', typeof data);
-          console.log('[PowerDialer] Has lead property?', data && 'lead' in data);
-          
-          if (data?.lead) {
-            console.log('[PowerDialer] Lead data found in response:', JSON.stringify(data.lead));
-            
-            const leadInfo = {
-              first_name: data.lead.first_name || 'Unknown',
-              last_name: data.lead.last_name || 'Contact',
-              phone1: data.lead.phone1 || activeCall.phoneNumber || '---',
-              email: data.lead.email || '---',
-              property_address: data.lead.property_address || '---',
-              mailing_address: data.lead.mailing_address || '---'
-            };
-            
-            console.log('[PowerDialer] Processed lead data to set in state:', JSON.stringify(leadInfo));
-            
-            setConnectedLeadData(leadInfo);
-            console.log('[PowerDialer] State update triggered with lead data');
-            
-            window.dispatchEvent(new CustomEvent('leadDataUpdated', { detail: leadInfo }));
-          } else {
-            console.log('[PowerDialer] No lead data in response, creating fallback data');
-            const fallbackData = {
-              first_name: 'Unknown',
-              last_name: 'Contact',
-              phone1: activeCall.phoneNumber || '---',
-              email: '---',
-              property_address: '---',
-              mailing_address: '---'
-            };
-            setConnectedLeadData(fallbackData);
-          }
-          
-          setIsDialing(false);
-        } catch (err) {
-          console.error('[PowerDialer] Error fetching lead data:', err);
-          const errorFallbackData = {
-            first_name: 'Error',
-            last_name: 'Loading Lead',
-            phone1: activeCall.phoneNumber || '---',
-            email: '---',
-            property_address: '---',
-            mailing_address: '---'
-          };
-          setConnectedLeadData(errorFallbackData);
-          toast.error('Failed to load lead details');
-          setIsDialing(false);
-        }
-      };
-
-      fetchLeadData();
-    }
-  }, [twilioState.activeCalls]);
-
-  useEffect(() => {
-    const handleLeadDataUpdated = (event: any) => {
-      console.log("[PowerDialer] Lead data updated event received with data:", event.detail);
-    };
-    
-    window.addEventListener('leadDataUpdated', handleLeadDataUpdated);
-    
-    return () => {
-      window.removeEventListener('leadDataUpdated', handleLeadDataUpdated);
-    };
-  }, []);
-
-  useEffect(() => {
-    console.log('Rendering PowerDialer with state:', {
-      hasData: !!connectedLeadData,
-      isDialing,
-      hasActiveCall,
-      callStatus: Object.values(twilioState.activeCalls)[0]?.status,
-      leadDataKeys: connectedLeadData ? Object.keys(connectedLeadData) : [],
-      leadDataValues: connectedLeadData ? {
-        first_name: connectedLeadData.first_name,
-        last_name: connectedLeadData.last_name,
-        phone1: connectedLeadData.phone1
-      } : null
-    });
-  }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
-
-  const DialerTab = () => (
-    <div className="flex flex-col space-y-4">
-      <Card className="bg-muted/50">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex justify-between items-center">
-            System Controls
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  const success = await twilioState.endAllCalls();
-                  if (success) {
-                    toast("System Reset", {
-                      description: "All active calls have been terminated. The system has been reset."
-                    });
-                  }
-                }}
-              >
-                Reset All Calls
-              </Button>
-              
-              <Button
-                variant="default" 
-                size="sm"
-                onClick={async () => {
-                  const initialized = await twilioService.initializeTwilioDevice();
-                  if (initialized) {
-                    toast("System Reinitialized", {
-                      description: "The phone system has been reinitialized with a new token."
-                    });
-                  }
-                }}
-              >
-                Reinitialize System
-              </Button>
-            </div>
-          </CardTitle>
-          <CardDescription>
-            Reset your system and terminate all active calls if you encounter any issues
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      <PreviewDialerWindow 
-        currentCall={Object.values(twilioState.activeCalls)[0]}
-        onDisposition={handleDisposition}
-        onEndCall={() => Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id))}
-      />
-
-      {Object.keys(twilioState.activeCalls).length > 0 && (
-        <Card className="bg-muted/50">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex justify-between items-center">
-              Active Call
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => 
-                  twilioState.endAllCalls()
-                }
-              >
-                End All Calls
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pb-2">
-            {Object.entries(twilioState.activeCalls).map(([leadId, call]) => (
-              <div key={leadId} className="mb-4">
-                {leads.find(l => l.id === leadId) && (
-                  <div className="flex flex-col space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-medium">
-                          {leads.find(l => l.id === leadId)?.name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {call.phoneNumber}
-                        </p>
-                      </div>
-                      <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
-                        {call.status === 'connecting' ? 'Ringing' : 
-                         call.status === 'in-progress' ? 'Connected' :
-                         call.status === 'completed' ? 'Ended' : 
-                         call.status}
-                      </Badge>
-                    </div>
-                    
-                    <CallControls
-                      leadId={leadId}
-                      phoneNumber={call.phoneNumber}
-                      activeCall={call}
-                      onCall={(phone, id) => {}}
-                      onHangup={() => handleEndCall(leadId)}
-                      onToggleMute={(id) => twilioState.toggleMute(id)}
-                      onToggleSpeaker={(id) => twilioState.toggleSpeaker(id)}
-                      audioOutputDevices={twilioState.audioOutputDevices}
-                      currentAudioDevice={twilioState.currentAudioDevice}
-                      onChangeAudioDevice={(deviceId) => twilioState.setAudioOutputDevice(deviceId)}
-                      onRefreshDevices={() => twilioState.refreshAudioDevices()}
-                      onTestAudio={(deviceId) => twilioState.testAudio(deviceId || '')}
-                    />
-                    
-                    {!call.audioActive && call.status === 'in-progress' && (
-                      <Alert variant="destructive" className="mt-2">
-                        <AlertTitle>Audio Warning</AlertTitle>
-                        <AlertDescription>
-                          Microphone appears to be inactive. Check your browser permissions.
-                        </AlertDescription>
-                      </Alert>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      <ConnectedLeadPanel 
-        leadData={connectedLeadData}
-      />
-
-      <Card className="h-full overflow-hidden flex flex-col">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle>Dialing Queue</CardTitle>
-            <div className="flex space-x-2">
-              <Select value={filterStatus} onValueChange={setFilterStatus}>
-                <SelectTrigger className="w-[130px] h-8 text-xs">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="New">New</SelectItem>
-                  <SelectItem value="Attempted">Attempted</SelectItem>
-                  <SelectItem value="Contacted">Contacted</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[130px] h-8 text-xs">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="priority">Priority</SelectItem>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="company">Company</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <CardDescription>
-            {filteredAndSortedLeads.length} leads ready to call
-          </CardDescription>
-        </CardHeader>
-        <ScrollArea className="flex-1 h-[calc(100vh-450px)]">
-          <CardContent>
-            <div className="space-y-3">
-              {filteredAndSortedLeads.map((lead) => (
-                <Card key={lead.id} className="p-3 hover:bg-accent/50">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <div className="font-medium">{lead.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {lead.company}
-                      </div>
-                      <div className="text-sm">{lead.phone}</div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <Badge
-                        variant={
-                          lead.status === "New"
-                            ? "default"
-                            : lead.status === "Attempted"
-                            ? "secondary"
-                            : "outline"
-                        }
-                        className="mb-2"
-                      >
-                        {lead.status}
-                      </Badge>
-                      <Badge
-                        variant={
-                          lead.priority === "High"
-                            ? "destructive"
-                            : lead.priority === "Medium"
-                            ? "default"
-                            : "outline"
-                        }
-                        className="mb-2"
-                      >
-                        {lead.priority}
-                      </Badge>
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() => handleCallLead(lead)}
-                        disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0}
-                        className="w-16 h-8"
-                      >
-                        <Phone className="mr-1 h-3 w-3" /> Call
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </CardContent>
-        </ScrollArea>
-      </Card>
-    </div>
-  );
-
-  const SettingsTab = () => (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Audio Settings</CardTitle>
-          <CardDescription>
-            Configure your audio devices for calls
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <Alert variant={twilioState.microphoneActive ? "default" : "destructive"}>
-              <InfoCircledIcon className="h-4 w-4" />
-              <AlertTitle>Microphone Status</AlertTitle>
-              <AlertDescription>
-                {twilioState.microphoneActive 
-                  ? "Microphone is active and ready for calls."
-                  : "Microphone access is not available. Check browser permissions."}
-              </AlertDescription>
-            </Alert>
-            
-            <AudioDeviceSelector 
-              onDeviceChange={async (deviceId) => {
-                const success = await twilioState.setAudioOutputDevice(deviceId);
-                return success;
-              }}
-              onRefreshDevices={async () => {
-                return twilioState.refreshAudioDevices();
-              }}
-              onTestAudio={async (deviceId) => {
-                return twilioState.testAudio(deviceId);
-              }}
-              devices={twilioState.audioOutputDevices}
-              currentDeviceId={twilioState.currentAudioDevice}
-            />
-            
-            <div className="flex justify-between">
-              <Button 
-                variant="outline" 
-                onClick={() => setIsAudioDebugOpen(true)}
-              >
-                Advanced Diagnostics
-              </Button>
-              
-              <Button 
-                onClick={async () => {
-                  const deviceId = twilioState.currentAudioDevice;
-                  if (deviceId) {
-                    const result = await twilioState.testAudio(deviceId);
-                    if (result) {
-                      toast("Audio Test", {
-                        description: "Audio playback successful. If you didn't hear anything, check your volume settings."
-                      });
-                    } else {
-                      toast("Audio Test Failed", {
-                        description: "Could not play audio test. Check your speakers and volume."
-                      });
-                    }
-                  }
-                }}
-              >
-                Test Audio
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <GlobalAudioSettings />
-
-      {!twilioState.initialized && (
-        <Card className="bg-muted/50">
-          <CardHeader>
-            <CardTitle className="text-lg">Initialize Phone System</CardTitle>
-            <CardDescription>
-              Set up the phone system for making and receiving calls
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <AudioInitializer />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-
-  const ScriptsTab = () => (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Call Scripts</CardTitle>
-          <CardDescription>
-            Customizable scripts for different call scenarios
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="opening">Opening Script</Label>
-              <ScrollArea className="h-24 border rounded-md p-2 mt-1">
-                <div className="p-2">
-                  Hello, my name is [Your Name] calling from [Company Name]. 
-                  I'm reaching out today because we've been working with companies 
-                  like yours to [brief value proposition]. Do you have a few minutes 
-                  to chat about how we might be able to help your business?
-                </div>
-              </ScrollArea>
-            </div>
-
-            <div>
-              <Label htmlFor="objection">Objection Handling</Label>
-              <ScrollArea className="h-24 border rounded-md p-2 mt-1">
-                <div className="p-2">
-                  I understand your concern about [objection]. Many of our current 
-                  clients initially felt the same way. What they found, however, 
-                  was that [counter to objection with specific benefit/result]. 
-                  Would it make sense to at least explore if we could achieve 
-                  similar results for your business?
-                </div>
-              </ScrollArea>
-            </div>
-
-            <div>
-              <Label htmlFor="closing">Closing Script</Label>
-              <ScrollArea className="h-24 border rounded-md p-2 mt-1">
-                <div className="p-2">
-                  Based on what we've discussed, I think the next step would be to 
-                  [specific action - demo, meeting with specialist, etc.]. We have 
-                  availability on [propose specific times]. What works best for your schedule?
-                </div>
-              </ScrollArea>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex justify-between">
-          <Button variant="outline">Add New Script</Button>
-          <Button>Save Changes</Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
 
   return (
     <MainLayout>
