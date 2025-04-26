@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { twilioService } from '@/services/twilio';
@@ -48,6 +49,9 @@ export function useCallStatus() {
               startTime: call.status === 'in-progress' ? new Date() : undefined,
               leadId: leadId
             };
+
+            // Also notify lead-connected function about active calls
+            notifyLeadConnected(leadId, call.sid, call.status || 'unknown');
           });
           
           setCallStatuses(initialStatuses);
@@ -63,7 +67,12 @@ export function useCallStatus() {
     getInitialStatus();
     
     // Subscribe to Twilio SDK call events
-    const unsubscribe = twilioService.onCallStatusChange((update) => {
+    const unsubscribe = twilioService.onCallStatusChange(async (update) => {
+      // Send to lead-connected for any status update
+      if (update.leadId && update.callSid) {
+        await notifyLeadConnected(update.leadId, update.callSid, update.status);
+      }
+
       setCallStatuses(prev => {
         const newStatuses = { ...prev };
         
@@ -95,6 +104,35 @@ export function useCallStatus() {
     };
   }, []);
 
+  // Helper function to notify lead-connected edge function
+  const notifyLeadConnected = async (leadId: string, callSid?: string, status?: string) => {
+    if (!leadId) return;
+    
+    try {
+      console.log(`Notifying lead-connected for lead: ${leadId}, status: ${status}`);
+      
+      // Send call status data to lead-connected edge function
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
+        body: { 
+          leadId,
+          callData: {
+            callSid,
+            status,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Error notifying lead-connected:', error);
+      } else if (data) {
+        console.log('Lead details successfully retrieved:', data.lead ? 'Found' : 'Not found');
+      }
+    } catch (err) {
+      console.error('Error invoking lead-connected function:', err);
+    }
+  };
+
   // Subscribe to real-time database updates for call statuses
   useEffect(() => {
     const channel = supabase
@@ -118,26 +156,12 @@ export function useCallStatus() {
             const leadId = String(typedNewData.contact_id);
             
             if (leadId) {
-              // If call is in progress, fetch lead details
-              if (typedNewData.status === 'in_progress') {
-                try {
-                  // Call the lead-connected function to get lead details
-                  const { data: leadData, error } = await supabase.functions.invoke('lead-connected', {
-                    body: { leadId }
-                  });
-
-                  if (error) {
-                    console.error('Error fetching lead details:', error);
-                    toast.error('Failed to load lead details');
-                  }
-
-                  if (leadData) {
-                    console.log('Lead details received:', leadData);
-                  }
-                } catch (err) {
-                  console.error('Error invoking lead-connected function:', err);
-                }
-              }
+              // Always notify lead-connected function for any call status change
+              await notifyLeadConnected(
+                leadId, 
+                typedNewData.twilio_call_sid as string || undefined, 
+                typedNewData.status as string || 'unknown'
+              );
 
               setCallStatuses(prev => {
                 const update: CallStatusUpdate = {
@@ -185,6 +209,11 @@ export function useCallStatus() {
 
   // Method to manually update call status
   const updateCallStatus = (leadId: string, update: Partial<CallStatusUpdate>) => {
+    // Notify lead-connected when status is manually updated
+    if (update.status) {
+      notifyLeadConnected(leadId, update.callSid, update.status);
+    }
+
     setCallStatuses(prev => ({
       ...prev,
       [leadId]: {

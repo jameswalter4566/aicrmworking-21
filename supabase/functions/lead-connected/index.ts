@@ -19,13 +19,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { leadId } = await req.json();
+    const requestBody = await req.json();
+    const { leadId, callData } = requestBody;
 
     if (!leadId) {
       throw new Error('Lead ID is required');
     }
 
-    console.log('Fetching lead details for:', leadId);
+    console.log(`Lead connected function called for leadId: ${leadId}`);
+    if (callData) {
+      console.log(`Call data received: callSid=${callData.callSid}, status=${callData.status}, timestamp=${callData.timestamp}`);
+    }
 
     // Get the lead details
     const { data: lead, error: leadError } = await supabase
@@ -47,8 +51,23 @@ Deno.serve(async (req) => {
       .single();
 
     if (leadError) {
+      console.error('Error fetching lead details:', leadError);
       throw leadError;
     }
+
+    if (!lead) {
+      console.warn(`No lead found with ID: ${leadId}`);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: 'Lead not found',
+        callData
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      });
+    }
+
+    console.log(`Found lead: ${lead.first_name} ${lead.last_name}`);
 
     // Get lead notes
     const { data: notes, error: notesError } = await supabase
@@ -58,13 +77,46 @@ Deno.serve(async (req) => {
       .order('created_at', { ascending: false });
 
     if (notesError) {
+      console.error('Error fetching lead notes:', notesError);
       throw notesError;
+    }
+
+    console.log(`Retrieved ${notes?.length || 0} notes for lead`);
+
+    // If we received call data, log it as a lead activity
+    if (callData && callData.status) {
+      try {
+        const activityType = callData.status === 'in-progress' ? 'call_connected' : 
+                            callData.status === 'completed' ? 'call_ended' : 'call_status_change';
+        
+        const description = callData.status === 'in-progress' ? 'Call connected' : 
+                          callData.status === 'completed' ? 'Call ended' : 
+                          `Call status changed to ${callData.status}`;
+        
+        const { error: activityError } = await supabase
+          .from('lead_activities')
+          .insert({
+            lead_id: leadId,
+            type: activityType,
+            description: description,
+            timestamp: callData.timestamp || new Date().toISOString()
+          });
+        
+        if (activityError) {
+          console.error('Error logging lead activity:', activityError);
+        } else {
+          console.log(`Successfully logged lead activity: ${activityType}`);
+        }
+      } catch (err) {
+        console.error('Error creating lead activity:', err);
+      }
     }
 
     return new Response(JSON.stringify({ 
       success: true,
       lead,
-      notes: notes || []
+      notes: notes || [],
+      callData
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
