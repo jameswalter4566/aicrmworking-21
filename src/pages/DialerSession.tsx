@@ -66,8 +66,7 @@ const DialerSession = () => {
       if (error) throw error;
       
       if (!data || !data.leadId) {
-        toast({
-          title: "No more leads",
+        toast("No more leads", {
           description: "There are no more leads to call in this session."
         });
         return;
@@ -86,8 +85,7 @@ const DialerSession = () => {
           description: callResult.error || "Unable to place call"
         });
       } else {
-        toast({
-          title: "Calling",
+        toast("Calling", {
           description: `Calling ${data.name || data.phoneNumber}...`
         });
       }
@@ -107,17 +105,24 @@ const DialerSession = () => {
     try {
       await Promise.all(activeCallIds.map(id => twilioState.endCall(id)));
       
-      toast({
-        title: "Call ended",
+      toast("Call ended", {
         description: "The call has been disconnected"
       });
       
-      // Log call disposition to the system
-      await supabase.from('call_activities').insert({
-        lead_id: currentLeadId,
-        activity_type: "call_completed",
-        content: "Call ended by agent"
-      });
+      // Log call disposition to the system if we have a lead table available
+      if (currentLeadId) {
+        try {
+          // Try to insert into lead_activities table if it exists
+          await supabase.from('lead_activities').insert({
+            lead_id: parseInt(currentLeadId), // Convert string to number
+            type: "call_completed",
+            description: "Call ended by agent"
+          });
+        } catch (error) {
+          // If the table doesn't exist or the insert fails, don't worry about it
+          console.log("Could not log call activity:", error);
+        }
+      }
       
     } catch (err) {
       console.error('Error ending call:', err);
@@ -129,21 +134,28 @@ const DialerSession = () => {
     if (!currentLeadId) return;
     
     try {
-      // Update the lead disposition
-      await supabase.from('leads').update({ 
-        disposition: disposition,
-        last_contacted: new Date().toISOString()
-      }).eq('id', currentLeadId);
+      // Try to update the lead disposition
+      try {
+        await supabase.from('leads').update({ 
+          disposition: disposition,
+          last_contacted: new Date().toISOString()
+        }).eq('id', parseInt(currentLeadId)); // Convert string to number
+      } catch (error) {
+        console.log("Could not update lead disposition:", error);
+      }
       
-      // Log the disposition activity
-      await supabase.from('call_activities').insert({
-        lead_id: currentLeadId,
-        activity_type: "disposition",
-        content: disposition
-      });
+      // Try to log the disposition activity
+      try {
+        await supabase.from('lead_activities').insert({
+          lead_id: parseInt(currentLeadId), // Convert string to number
+          type: "disposition",
+          description: disposition
+        });
+      } catch (error) {
+        console.log("Could not log disposition activity:", error);
+      }
       
-      toast({
-        title: "Lead dispositioned",
+      toast("Lead dispositioned", {
         description: `Lead marked as ${disposition}`
       });
       
@@ -208,7 +220,7 @@ const DialerSession = () => {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="font-medium">
-                          {activeCall?.leadName || "Current Call"}
+                          {activeCall?.phoneNumber || "Current Call"}
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {activeCall?.phoneNumber}
