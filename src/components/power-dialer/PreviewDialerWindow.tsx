@@ -63,6 +63,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
+  const [callNotes, setCallNotes] = useState('');
 
   useEffect(() => {
     if (isDialingStarted) {
@@ -99,7 +100,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
           if (data && data.success) {
             console.log('Lead data received:', data);
             setCurrentLead(data.lead);
-            setLeadNotes(data.notes);
+            setLeadNotes(data.notes || []);
           } else {
             console.warn('Lead data response was not successful:', data);
           }
@@ -241,6 +242,45 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     console.log('Call completed, ready for next call');
   }, []);
 
+  const handleCallNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setCallNotes(e.target.value);
+  };
+  
+  const saveCallNotes = async () => {
+    if (!currentLead?.id || !callNotes.trim()) return;
+    
+    try {
+      const noteData = {
+        lead_id: currentLead.id,
+        content: callNotes,
+        created_by: user?.email || 'System'
+      };
+      
+      const { data, error } = await supabase
+        .from('lead_notes')
+        .insert(noteData);
+      
+      if (error) throw error;
+      
+      toast.success('Call notes saved successfully');
+      setCallNotes(''); // Clear notes after saving
+      
+      // Refresh notes
+      const { data: refreshedNotes } = await supabase
+        .from('lead_notes')
+        .select('*')
+        .eq('lead_id', currentLead.id)
+        .order('created_at', { ascending: false });
+        
+      if (refreshedNotes) {
+        setLeadNotes(refreshedNotes);
+      }
+    } catch (err) {
+      console.error('Error saving call notes:', err);
+      toast.error('Failed to save call notes');
+    }
+  };
+
   const activeCallsForDisplay = React.useMemo(() => {
     const displayCalls: Record<number, any> = {};
     
@@ -264,6 +304,16 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     return displayCalls;
   }, [currentCall, callStatuses]);
 
+  const formatPhoneNumber = (phone: string) => {
+    if (!phone) return '';
+    const cleaned = phone.replace(/\D/g, '');
+    const match = cleaned.match(/^(\d{1})(\d{3})(\d{3})(\d{4})$/);
+    if (match) {
+      return `+${match[1]} (${match[2]}) ${match[3]}-${match[4]}`;
+    }
+    return phone;
+  };
+
   return (
     <>
       <Card className="bg-gray-800 p-4 rounded-lg">
@@ -280,7 +330,137 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 
       <div className="grid grid-cols-4 gap-4 mt-4">
         <div className="col-span-3">
-          {currentCall ? (
+          {currentCall && currentCall.status === 'in-progress' ? (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-medium flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-5 w-5 text-green-500" />
+                    Active Call
+                  </div>
+                  <Badge className="bg-green-500">In Progress</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <Avatar className="h-14 w-14">
+                      <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
+                        {currentLead?.first_name ? currentLead.first_name[0] : '?'}
+                        {currentLead?.last_name ? currentLead.last_name[0] : ''}
+                      </AvatarFallback>
+                    </Avatar>
+                    
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold">
+                        {currentLead ? `${currentLead.first_name} ${currentLead.last_name}` : 'Loading contact...'}
+                      </h3>
+                      
+                      <div className="grid grid-cols-2 gap-2 mt-2">
+                        {currentLead?.phone1 && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Phone className="h-4 w-4 text-gray-400" />
+                            {formatPhoneNumber(currentLead.phone1)}
+                          </div>
+                        )}
+                        
+                        {currentLead?.email && (
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Mail className="h-4 w-4 text-gray-400" />
+                            {currentLead.email}
+                          </div>
+                        )}
+                        
+                        {currentLead?.property_address && (
+                          <div className="flex items-start gap-2 text-sm text-gray-600 col-span-2">
+                            <MapPin className="h-4 w-4 mt-0.5 text-gray-400" />
+                            <span>{currentLead.property_address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="destructive" 
+                        size="sm"
+                        onClick={onEndCall}
+                      >
+                        <PhoneOff className="h-4 w-4 mr-2" />
+                        End Call
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 mt-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium">Call Notes</h4>
+                      <textarea 
+                        className="w-full h-32 p-2 border rounded-md text-sm"
+                        placeholder="Enter call notes here..."
+                        value={callNotes}
+                        onChange={handleCallNotesChange}
+                      />
+                      <Button 
+                        variant="default" 
+                        size="sm" 
+                        onClick={saveCallNotes}
+                        disabled={!callNotes.trim()}
+                      >
+                        Save Notes
+                      </Button>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-medium flex justify-between items-center">
+                        <span>Existing Notes</span>
+                        <Badge variant="outline" className="text-xs">
+                          {leadNotes.length}
+                        </Badge>
+                      </h4>
+                      <ScrollArea className="h-40 border rounded-md p-2">
+                        {leadNotes.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">No notes available</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {leadNotes.map((note, index) => (
+                              <div key={note.id || index} className="text-sm p-2 bg-gray-50 rounded">
+                                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                  <span>{note.created_by || 'System'}</span>
+                                  <span>{new Date(note.created_at).toLocaleString()}</span>
+                                </div>
+                                <p>{note.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </ScrollArea>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 border-t pt-4">
+                    <h4 className="font-medium mb-2">Lead Disposition</h4>
+                    <DispositionSelector 
+                      currentDisposition={currentLead?.disposition || 'Not Contacted'} 
+                      onDispositionChange={(disposition) => {
+                        if (currentLead?.id) {
+                          leadProfileService.updateDisposition(currentLead.id, disposition)
+                            .then(() => {
+                              setCurrentLead({...currentLead, disposition});
+                              toast.success(`Disposition updated to ${disposition}`);
+                            })
+                            .catch(err => {
+                              console.error('Error updating disposition:', err);
+                              toast.error('Failed to update disposition');
+                            });
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ) : currentCall ? (
             <LeadDetailsPanel 
               leadId={currentCall?.parameters?.leadId}
               isActive={currentCall?.status === 'in-progress'}
@@ -306,7 +486,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       Start Dialing
                     </Button>
                   </div>
-                ) : !currentCall ? (
+                ) : (
                   <div className="space-y-4">
                     {sessionId && (
                       <>
@@ -435,55 +615,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                         />
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-4">
-                      <Avatar className="h-12 w-12">
-                        <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
-                          {currentCall.parameters.To ? currentCall.parameters.To[0].toUpperCase() : '?'}
-                        </AvatarFallback>
-                      </Avatar>
-                      
-                      <div className="flex-1">
-                        <h3 className="text-lg font-semibold">
-                          {currentCall.parameters.To || 'Unknown Contact'}
-                        </h3>
-                        <div className="text-sm text-gray-500 space-y-1">
-                          <p>Company: {currentCall.parameters.company || 'Unknown'}</p>
-                          <p>Phone: {currentCall.parameters.To || 'N/A'}</p>
-                          <p>Status: Active Call</p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button 
-                          variant="destructive" 
-                          size="sm"
-                          onClick={onEndCall}
-                        >
-                          <PhoneOff className="h-4 w-4 mr-2" />
-                          End Call
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                          onClick={(e) => handleDeleteLead(currentCall?.parameters?.leadId, e)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="border-t pt-4">
-                      <h4 className="font-medium mb-2">Call Notes</h4>
-                      <textarea 
-                        className="w-full h-20 p-2 border rounded-md text-sm"
-                        placeholder="Enter call notes here..."
-                      />
-                    </div>
                   </div>
                 )}
               </CardContent>
