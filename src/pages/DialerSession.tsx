@@ -174,9 +174,8 @@ const DialerSession = () => {
     }
   };
 
-  const activeCall = Object.values(twilioState.activeCalls)[0];
-
   useEffect(() => {
+    const activeCall = Object.values(twilioState.activeCalls)[0];
     console.log('Active call status changed:', activeCall?.status);
     console.log('Active call leadId:', activeCall?.leadId);
     
@@ -207,25 +206,42 @@ const DialerSession = () => {
             console.log('Setting connected lead data from API response:', data.lead);
             
             const leadInfo = {
-              first_name: data.lead.first_name,
-              last_name: data.lead.last_name,
-              phone1: data.lead.phone1,
-              email: data.lead.email,
-              property_address: data.lead.property_address,
-              mailing_address: data.lead.mailing_address
+              first_name: data.lead.first_name || 'Unknown',
+              last_name: data.lead.last_name || 'Contact',
+              phone1: data.lead.phone1 || activeCall.phoneNumber || '---',
+              email: data.lead.email || '---',
+              property_address: data.lead.property_address || '---', 
+              mailing_address: data.lead.mailing_address || '---'
             };
             
             console.log('Mapped lead data for component:', leadInfo);
             setConnectedLeadData(leadInfo);
-            setIsDialing(false);
           } else {
-            console.log('No lead data in response');
-            setConnectedLeadData(null);
+            console.log('No lead data in response, creating fallback data');
+            const fallbackData = {
+              first_name: 'Unknown',
+              last_name: 'Contact',
+              phone1: activeCall.phoneNumber || '---',
+              email: '---',
+              property_address: '---',
+              mailing_address: '---'
+            };
+            setConnectedLeadData(fallbackData);
           }
+          setIsDialing(false);
         } catch (err) {
           console.error('Error fetching lead data:', err);
+          const errorFallbackData = {
+            first_name: 'Error',
+            last_name: 'Loading Lead',
+            phone1: activeCall.phoneNumber || '---',
+            email: '---',
+            property_address: '---',
+            mailing_address: '---'
+          };
+          setConnectedLeadData(errorFallbackData);
           toast.error('Failed to load lead details');
-          setConnectedLeadData(null);
+          setIsDialing(false);
         }
       };
 

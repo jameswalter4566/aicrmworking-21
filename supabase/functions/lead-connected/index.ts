@@ -27,6 +27,18 @@ Deno.serve(async (req) => {
 
     console.log(`Lead connected function called for leadId: ${leadId}`);
     
+    // Generate default data in case no lead is found
+    const defaultLeadData = {
+      id: leadId,
+      first_name: "Unknown",
+      last_name: "Contact", 
+      phone1: callData?.phoneNumber || "",
+      email: "",
+      property_address: "No address on file",
+      mailing_address: "No address on file",
+      disposition: "Not Contacted"
+    };
+    
     // First try to find the lead using the session_uuid
     const { data: leadByUuid, error: uuidError } = await supabase
       .from('leads')
@@ -62,6 +74,8 @@ Deno.serve(async (req) => {
 
     // Data successfully found by UUID
     if (leadByUuid) {
+      console.log(`Found lead via session UUID: ${leadByUuid.first_name} ${leadByUuid.last_name}`);
+      
       // Log activity if we have call data
       await logLeadActivity(leadByUuid.id, callData);
 
@@ -69,13 +83,13 @@ Deno.serve(async (req) => {
         success: true,
         lead: {
           id: leadByUuid.id,
-          first_name: leadByUuid.first_name || '',
-          last_name: leadByUuid.last_name || '',
-          phone1: leadByUuid.phone1 || '',
-          email: leadByUuid.email || '',
-          property_address: leadByUuid.property_address || '',
-          mailing_address: leadByUuid.mailing_address || '',
-          disposition: leadByUuid.disposition || 'Not Contacted',
+          first_name: leadByUuid.first_name || defaultLeadData.first_name,
+          last_name: leadByUuid.last_name || defaultLeadData.last_name,
+          phone1: leadByUuid.phone1 || defaultLeadData.phone1,
+          email: leadByUuid.email || defaultLeadData.email,
+          property_address: leadByUuid.property_address || defaultLeadData.property_address,
+          mailing_address: leadByUuid.mailing_address || defaultLeadData.mailing_address,
+          disposition: leadByUuid.disposition || defaultLeadData.disposition,
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -142,27 +156,13 @@ Deno.serve(async (req) => {
           if (actualLead) {
             console.log(`Successfully found lead via originalLeadId: ${actualLead.first_name} ${actualLead.last_name}`);
             console.log(`Lead data being returned: ${JSON.stringify({
-              first_name: actualLead.first_name,
-              last_name: actualLead.last_name,
-              phone1: actualLead.phone1,
-              email: actualLead.email,
-              property_address: actualLead.property_address,
-              mailing_address: actualLead.mailing_address
+              first_name: actualLead.first_name || defaultLeadData.first_name,
+              last_name: actualLead.last_name || defaultLeadData.last_name,
+              phone1: actualLead.phone1 || defaultLeadData.phone1,
+              email: actualLead.email || defaultLeadData.email,
+              property_address: actualLead.property_address || defaultLeadData.property_address, 
+              mailing_address: actualLead.mailing_address || defaultLeadData.mailing_address
             })}`);
-            
-            // Get lead notes
-            const { data: notes } = await supabase
-              .from('lead_notes')
-              .select('*')
-              .eq('lead_id', actualLead.id)
-              .order('created_at', { ascending: false });
-            
-            // Get additional lead data like mortgage information if it exists
-            const { data: mortgageData } = await supabase
-              .from('mortgage_leads')
-              .select('*')
-              .eq('lead_id', actualLead.id)
-              .maybeSingle();
 
             // Log activity if we have call data
             await logLeadActivity(actualLead.id, callData);
@@ -170,12 +170,15 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ 
               success: true,
               lead: {
-                ...actualLead,
-                mortgageData: mortgageData || null
-              },
-              notes: notes || [],
-              callData,
-              originalLeadId: effectiveOriginalLeadId
+                id: actualLead.id,
+                first_name: actualLead.first_name || defaultLeadData.first_name,
+                last_name: actualLead.last_name || defaultLeadData.last_name,
+                phone1: actualLead.phone1 || defaultLeadData.phone1,
+                email: actualLead.email || defaultLeadData.email,
+                property_address: actualLead.property_address || defaultLeadData.property_address,
+                mailing_address: actualLead.mailing_address || defaultLeadData.mailing_address,
+                disposition: actualLead.disposition || defaultLeadData.disposition,
+              }
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200,
@@ -190,17 +193,21 @@ Deno.serve(async (req) => {
         const extractedData = extractLeadDataFromNotes(dialingLead.notes);
         console.log(`Returning extracted data from notes: ${JSON.stringify(extractedData)}`);
         
+        // Combine extracted data with default data
+        const combinedData = {
+          id: leadId,
+          first_name: extractedData.first_name || defaultLeadData.first_name,
+          last_name: extractedData.last_name || defaultLeadData.last_name,
+          phone1: extractedData.phone1 || defaultLeadData.phone1,
+          email: extractedData.email || defaultLeadData.email,
+          property_address: extractedData.property_address || defaultLeadData.property_address,
+          mailing_address: extractedData.mailing_address || defaultLeadData.mailing_address,
+          disposition: extractedData.disposition || defaultLeadData.disposition
+        };
+        
         return new Response(JSON.stringify({ 
           success: true,
-          lead: {
-            id: leadId,
-            // Extract any basic info we can from notes
-            ...extractedData
-          },
-          notes: [],
-          callData,
-          originalLeadId: callData?.originalLeadId,
-          source: 'dialing_session_lead_only'
+          lead: combinedData
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
@@ -220,17 +227,21 @@ Deno.serve(async (req) => {
           const extractedData = extractLeadDataFromNotes(dialingLeadByLeadId.notes);
           console.log(`Returning extracted data from notes: ${JSON.stringify(extractedData)}`);
           
+          // Combine extracted data with default data
+          const combinedData = {
+            id: leadId,
+            first_name: extractedData.first_name || defaultLeadData.first_name,
+            last_name: extractedData.last_name || defaultLeadData.last_name,
+            phone1: extractedData.phone1 || defaultLeadData.phone1,
+            email: extractedData.email || defaultLeadData.email,
+            property_address: extractedData.property_address || defaultLeadData.property_address,
+            mailing_address: extractedData.mailing_address || defaultLeadData.mailing_address,
+            disposition: extractedData.disposition || defaultLeadData.disposition
+          };
+          
           return new Response(JSON.stringify({ 
             success: true,
-            lead: {
-              id: leadId,
-              // Extract what we can from notes
-              ...extractedData
-            },
-            notes: [],
-            callData,
-            originalLeadId: callData?.originalLeadId,
-            source: 'dialing_session_lead_by_lead_id'
+            lead: combinedData
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
@@ -420,18 +431,10 @@ Deno.serve(async (req) => {
     }
 
     // If we still haven't found anything, return a simplified response to prevent errors
+    console.log("No lead found, returning default lead data");
     return new Response(JSON.stringify({ 
       success: true,
-      lead: {
-        id: leadId,
-        first_name: 'Unknown',
-        last_name: 'Contact',
-        phone1: callData?.phoneNumber || '',
-        email: '',
-        property_address: '',
-        mailing_address: '',
-        disposition: 'Not Contacted',
-      }
+      lead: defaultLeadData
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -441,18 +444,20 @@ Deno.serve(async (req) => {
     console.error('Error in lead-connected function:', error);
     
     // Even on error, return a valid lead structure
+    const errorLeadData = {
+      id: 'error',
+      first_name: 'Error',
+      last_name: 'Loading Lead',
+      phone1: '',
+      email: '',
+      property_address: '',
+      mailing_address: '',
+      disposition: 'Error',
+    };
+    
     return new Response(JSON.stringify({ 
       success: true,
-      lead: {
-        id: 'error',
-        first_name: 'Error',
-        last_name: 'Loading Lead',
-        phone1: '',
-        email: '',
-        property_address: '',
-        mailing_address: '',
-        disposition: 'Error',
-      },
+      lead: errorLeadData,
       error: error.message 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -15,9 +15,9 @@ interface ConnectedLeadPanelProps {
 }
 
 export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
-  // Show skeletons only if we don't have leadData
-  const showSkeletons = !leadData;
-
+  console.log("ConnectedLeadPanel rendering with data:", leadData);
+  
+  // Always show data if available, otherwise show skeletons
   const getFormattedName = () => {
     if (!leadData) return '';
     return `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
@@ -37,7 +37,7 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-gray-500">Name</label>
-                {showSkeletons ? (
+                {!leadData ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
                   <div className="text-sm mt-1 font-medium">{getFormattedName() || "---"}</div>
@@ -46,7 +46,7 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
               
               <div>
                 <label className="text-sm text-gray-500">Phone</label>
-                {showSkeletons ? (
+                {!leadData ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
                   <div className="text-sm mt-1 font-medium">{leadData?.phone1 || "---"}</div>
@@ -55,7 +55,7 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
               
               <div>
                 <label className="text-sm text-gray-500">Email</label>
-                {showSkeletons ? (
+                {!leadData ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
                   <div className="text-sm mt-1 font-medium">{leadData?.email || "---"}</div>
@@ -69,7 +69,7 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-gray-500">Property Address</label>
-                {showSkeletons ? (
+                {!leadData ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
                   <div className="text-sm mt-1 font-medium">{leadData?.property_address || "---"}</div>
@@ -78,7 +78,7 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
               
               <div>
                 <label className="text-sm text-gray-500">Mailing Address</label>
-                {showSkeletons ? (
+                {!leadData ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
                   <div className="text-sm mt-1 font-medium">{leadData?.mailing_address || "---"}</div>
