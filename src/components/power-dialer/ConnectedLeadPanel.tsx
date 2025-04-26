@@ -25,9 +25,19 @@ export const ConnectedLeadPanel = ({
   forceSkeleton = false,
   sessionActive = false
 }: ConnectedLeadPanelProps) => {
-  // Always show skeletons when explicitly forced, when dialing, when session is active without lead data, 
-  // or when connected without lead data
-  const showSkeletons = forceSkeleton || isDialing || (sessionActive && !leadData) || (isConnected && !leadData);
+  // Improved logic: Only show skeletons when we're really waiting for data
+  const showSkeletons = forceSkeleton || 
+                        isDialing || 
+                        (sessionActive && !leadData) || 
+                        (isConnected && !leadData);
+  
+  // For debugging
+  console.log('ConnectedLeadPanel render:', { 
+    leadData, 
+    isConnected, 
+    isDialing, 
+    showSkeletons 
+  });
 
   const getFormattedName = () => {
     if (!leadData?.first_name && !leadData?.last_name) return '';

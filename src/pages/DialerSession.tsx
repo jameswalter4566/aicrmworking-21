@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -25,6 +26,11 @@ const DialerSession = () => {
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
+  
+  // For debugging
+  useEffect(() => {
+    console.log('Connected lead data updated:', connectedLeadData);
+  }, [connectedLeadData]);
   
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -59,8 +65,8 @@ const DialerSession = () => {
     
     try {
       setIsCallingNext(true);
-      setIsDialing(true); // Set dialing state immediately
-      setConnectedLeadData(null);
+      setIsDialing(true);
+      setConnectedLeadData(null); // Clear previous lead data
       
       const { data, error } = await supabase.functions.invoke('get-next-lead', {
         body: { sessionId }
@@ -125,6 +131,9 @@ const DialerSession = () => {
         }
       }
       
+      // Clear connected lead data on call end
+      setConnectedLeadData(null);
+      
     } catch (err) {
       console.error('Error ending call:', err);
       toast.error('Failed to end call');
@@ -170,9 +179,15 @@ const DialerSession = () => {
   const activeCall = Object.values(twilioState.activeCalls)[0];
 
   useEffect(() => {
+    // Debug active call state changes
+    console.log('Active call status changed:', activeCall?.status);
+    console.log('Active call leadId:', activeCall?.leadId);
+    
     if (activeCall?.status === 'in-progress' && activeCall.leadId) {
       const fetchLeadData = async () => {
         try {
+          console.log('Fetching lead data for:', activeCall.leadId);
+          
           const { data, error } = await supabase.functions.invoke('lead-connected', {
             body: { 
               leadId: activeCall.leadId,
@@ -184,9 +199,23 @@ const DialerSession = () => {
             }
           });
 
-          if (error) throw error;
+          if (error) {
+            console.error('Error from lead-connected:', error);
+            throw error;
+          }
+          
+          console.log('Response from lead-connected:', data);
           
           if (data?.lead) {
+            console.log('Setting connected lead data from API response:', {
+              first_name: data.lead.first_name,
+              last_name: data.lead.last_name,
+              phone1: data.lead.phone1,
+              email: data.lead.email,
+              property_address: data.lead.property_address,
+              mailing_address: data.lead.mailing_address
+            });
+            
             setConnectedLeadData({
               first_name: data.lead.first_name,
               last_name: data.lead.last_name,
@@ -197,6 +226,8 @@ const DialerSession = () => {
             });
             
             setIsDialing(false);
+          } else {
+            console.log('No lead data in response');
           }
         } catch (err) {
           console.error('Error fetching lead data:', err);
@@ -207,13 +238,20 @@ const DialerSession = () => {
       fetchLeadData();
     } else if (!hasActiveCall && !isCallingNext) {
       setIsDialing(false);
-      setConnectedLeadData(null);
+      
+      // Clear connected lead data when the call is disconnected
+      if (connectedLeadData) {
+        console.log('Call disconnected, clearing lead data');
+        setConnectedLeadData(null);
+      }
     }
   }, [twilioState.activeCalls, hasActiveCall, activeCall?.leadId, activeCall?.status]);
 
   useEffect(() => {
     if (activeCall?.status === 'completed' || activeCall?.status === 'failed') {
       setIsDialing(false);
+      // Ensure lead data is cleared when call is completed or failed
+      setConnectedLeadData(null);
     }
   }, [activeCall?.status]);
 
@@ -307,6 +345,7 @@ const DialerSession = () => {
               leadData={connectedLeadData}
               isConnected={hasActiveCall && activeCall?.status === 'in-progress'}
               isDialing={isDialing}
+              sessionActive={!!sessionData}
             />
             
             <LeadDetailsPanel 
