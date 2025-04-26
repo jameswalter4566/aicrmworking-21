@@ -30,6 +30,7 @@ import { AutoDialerController } from './AutoDialerController';
 import { twilioService } from "@/services/twilio";
 import { LineDisplay } from './LineDisplay';
 import { useCallStatus } from '@/hooks/use-call-status';
+import { LeadDetailsPanel } from './LeadDetailsPanel';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -239,214 +240,218 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         </div>
       </Card>
 
-      <div className="grid grid-cols-4 gap-4 mt-0">
-        <Card className="col-span-3">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Phone className="h-5 w-5 text-green-500" />
-                Preview Dialer
-              </div>
-              {currentCall && (
-                <Badge variant="outline" className="bg-green-50 text-green-700">
-                  On Call
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {!isDialingStarted ? (
-              <div className="flex flex-col items-center justify-center py-12">
-                <Button 
-                  onClick={() => setIsDialingStarted(true)}
-                  className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
-                >
-                  <Play className="h-6 w-6" />
-                  Start Dialing
-                </Button>
-              </div>
-            ) : !currentCall ? (
-              <div className="space-y-4">
-                {sessionId && (
-                  <>
-                    <DialerQueueMonitor sessionId={sessionId} />
+      <div className="grid grid-cols-4 gap-4 mt-4">
+        <div className="col-span-3">
+          {currentCall ? (
+            <LeadDetailsPanel 
+              leadId={currentCall?.parameters?.leadId}
+              isActive={currentCall?.status === 'in-progress'}
+            />
+          ) : (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg font-medium flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-5 w-5 text-green-500" />
+                    Preview Dialer
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!isDialingStarted ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Button 
+                      onClick={() => setIsDialingStarted(true)}
+                      className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
+                    >
+                      <Play className="h-6 w-6" />
+                      Start Dialing
+                    </Button>
+                  </div>
+                ) : !currentCall ? (
+                  <div className="space-y-4">
+                    {sessionId && (
+                      <>
+                        <DialerQueueMonitor sessionId={sessionId} />
+                        
+                        {!autoDialerActive && (
+                          <div className="flex justify-center my-4">
+                            <Button
+                              onClick={handleStartPowerDialing}
+                              className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                              disabled={isCreatingSession || isProcessingCall}
+                            >
+                              {isProcessingCall ? (
+                                <Loader2 className="h-5 w-5 animate-spin" />
+                              ) : (
+                                <Phone className="h-5 w-5" />
+                              )}
+                              Start Power Dialing
+                            </Button>
+                          </div>
+                        )}
+
+                        <AutoDialerController 
+                          sessionId={sessionId}
+                          isActive={autoDialerActive}
+                          onCallComplete={handleCallComplete}
+                        />
+                      </>
+                    )}
                     
-                    {!autoDialerActive && (
-                      <div className="flex justify-center my-4">
-                        <Button
-                          onClick={handleStartPowerDialing}
-                          className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
-                          disabled={isCreatingSession || isProcessingCall}
+                    {error && (
+                      <Alert variant="destructive">
+                        <AlertTitle>Error</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                      </Alert>
+                    )}
+                    
+                    {sessionId ? (
+                      <div className="text-center py-6">
+                        <Badge className="mb-4 bg-green-100 text-green-800 py-2 px-4 text-sm">
+                          Session Active
+                        </Badge>
+                        <p className="text-lg font-medium">Dialing session has been created successfully!</p>
+                        <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId}</p>
+                      </div>
+                    ) : selectedListId && (
+                      <div className="mb-4 flex justify-center">
+                        <Button 
+                          onClick={handleBeginDialing}
+                          className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                          disabled={isCreatingSession}
                         >
-                          {isProcessingCall ? (
+                          {isCreatingSession ? (
                             <Loader2 className="h-5 w-5 animate-spin" />
                           ) : (
                             <Phone className="h-5 w-5" />
                           )}
-                          Start Power Dialing
+                          {isCreatingSession ? 'Creating Session...' : 'Begin Dialing'}
                         </Button>
                       </div>
                     )}
 
-                    <AutoDialerController 
-                      sessionId={sessionId}
-                      isActive={autoDialerActive}
-                      onCallComplete={handleCallComplete}
-                    />
-                  </>
-                )}
-                
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                
-                {sessionId ? (
-                  <div className="text-center py-6">
-                    <Badge className="mb-4 bg-green-100 text-green-800 py-2 px-4 text-sm">
-                      Session Active
-                    </Badge>
-                    <p className="text-lg font-medium">Dialing session has been created successfully!</p>
-                    <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId}</p>
-                  </div>
-                ) : selectedListId && (
-                  <div className="mb-4 flex justify-center">
-                    <Button 
-                      onClick={handleBeginDialing}
-                      className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
-                      disabled={isCreatingSession}
-                    >
-                      {isCreatingSession ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <Phone className="h-5 w-5" />
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-medium">Select a Calling List</h3>
+                      {selectedListId && !sessionId && (
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setSelectedListId(null)}
+                          className="text-sm"
+                          disabled={isCreatingSession}
+                        >
+                          Change List
+                        </Button>
                       )}
-                      {isCreatingSession ? 'Creating Session...' : 'Begin Dialing'}
-                    </Button>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-medium">Select a Calling List</h3>
-                  {selectedListId && !sessionId && (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSelectedListId(null)}
-                      className="text-sm"
-                      disabled={isCreatingSession}
-                    >
-                      Change List
-                    </Button>
-                  )}
-                </div>
-                
-                {isLoadingLists ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
-                    Loading calling lists...
-                  </div>
-                ) : callingLists.length === 0 ? (
-                  <div className="text-center py-8">
-                    <List className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                    <p className="text-gray-500">No calling lists found.</p>
-                    <p className="text-sm text-gray-400">Create a calling list first to start dialing.</p>
+                    </div>
+                    
+                    {isLoadingLists ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
+                        Loading calling lists...
+                      </div>
+                    ) : callingLists.length === 0 ? (
+                      <div className="text-center py-8">
+                        <List className="h-12 w-12 mx-auto text-gray-400 mb-3" />
+                        <p className="text-gray-500">No calling lists found.</p>
+                        <p className="text-sm text-gray-400">Create a calling list first to start dialing.</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {callingLists.map((list) => (
+                          <Card 
+                            key={list.id}
+                            className={`
+                              cursor-pointer transition-all
+                              ${selectedListId === list.id ? 'ring-2 ring-green-500' : 'hover:bg-gray-50'}
+                            `}
+                            onClick={() => !sessionId && setSelectedListId(list.id)}
+                          >
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h4 className="font-medium">{list.name}</h4>
+                                  <p className="text-sm text-gray-500">
+                                    {list.leadCount} leads • Created {new Date(list.createdAt).toLocaleDateString()}
+                                  </p>
+                                </div>
+                                {selectedListId === list.id && (
+                                  <Badge className="bg-green-50 text-green-600">
+                                    Selected
+                                  </Badge>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {selectedListId && !sessionId && (
+                      <div className="mt-6 space-y-4">
+                        <LeadSelectionPanel 
+                          listId={selectedListId}
+                          onLeadsSelected={(leads) => {
+                            console.log('Selected leads:', leads);
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 ) : (
-                  <div className="grid gap-4">
-                    {callingLists.map((list) => (
-                      <Card 
-                        key={list.id}
-                        className={`
-                          cursor-pointer transition-all
-                          ${selectedListId === list.id ? 'ring-2 ring-green-500' : 'hover:bg-gray-50'}
-                        `}
-                        onClick={() => !sessionId && setSelectedListId(list.id)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="font-medium">{list.name}</h4>
-                              <p className="text-sm text-gray-500">
-                                {list.leadCount} leads • Created {new Date(list.createdAt).toLocaleDateString()}
-                              </p>
-                            </div>
-                            {selectedListId === list.id && (
-                              <Badge className="bg-green-50 text-green-600">
-                                Selected
-                              </Badge>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-                
-                {selectedListId && !sessionId && (
-                  <div className="mt-6 space-y-4">
-                    <LeadSelectionPanel 
-                      listId={selectedListId}
-                      onLeadsSelected={(leads) => {
-                        console.log('Selected leads:', leads);
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
-                      {currentCall.parameters.To ? currentCall.parameters.To[0].toUpperCase() : '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold">
-                      {currentCall.parameters.To || 'Unknown Contact'}
-                    </h3>
-                    <div className="text-sm text-gray-500 space-y-1">
-                      <p>Company: {currentCall.parameters.company || 'Unknown'}</p>
-                      <p>Phone: {currentCall.parameters.To || 'N/A'}</p>
-                      <p>Status: Active Call</p>
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
+                          {currentCall.parameters.To ? currentCall.parameters.To[0].toUpperCase() : '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold">
+                          {currentCall.parameters.To || 'Unknown Contact'}
+                        </h3>
+                        <div className="text-sm text-gray-500 space-y-1">
+                          <p>Company: {currentCall.parameters.company || 'Unknown'}</p>
+                          <p>Phone: {currentCall.parameters.To || 'N/A'}</p>
+                          <p>Status: Active Call</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="destructive" 
+                          size="sm"
+                          onClick={onEndCall}
+                        >
+                          <PhoneOff className="h-4 w-4 mr-2" />
+                          End Call
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
+                          onClick={(e) => handleDeleteLead(currentCall?.parameters?.leadId, e)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium mb-2">Call Notes</h4>
+                      <textarea 
+                        className="w-full h-20 p-2 border rounded-md text-sm"
+                        placeholder="Enter call notes here..."
+                      />
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="destructive" 
-                      size="sm"
-                      onClick={onEndCall}
-                    >
-                      <PhoneOff className="h-4 w-4 mr-2" />
-                      End Call
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-50"
-                      onClick={(e) => handleDeleteLead(currentCall?.parameters?.leadId, e)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="border-t pt-4">
-                  <h4 className="font-medium mb-2">Call Notes</h4>
-                  <textarea 
-                    className="w-full h-20 p-2 border rounded-md text-sm"
-                    placeholder="Enter call notes here..."
-                  />
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         <Card className="bg-gray-800 text-white">
           <CardHeader className="pb-2">
