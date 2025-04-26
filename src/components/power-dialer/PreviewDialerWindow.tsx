@@ -1,738 +1,321 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  Phone, 
-  UserX, 
-  PhoneOff, 
-  MessageSquare, 
-  Ban, 
-  PhoneMissed,
-  Clock,
-  RotateCcw,
-  Pause,
-  StopCircle,
-  Play,
-  Trash2,
-  List,
-  Loader2,
-  Mail,
-  MapPin
-} from 'lucide-react';
-import { ScrollArea } from "@/components/ui/scroll-area";
-import LeadSelectionPanel from './LeadSelectionPanel';
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useAuth } from "@/context/AuthContext";
-import DialerQueueMonitor from './DialerQueueMonitor';
-import { AutoDialerController } from './AutoDialerController';
-import { twilioService } from "@/services/twilio";
-import { LineDisplay } from './LineDisplay';
-import { useCallStatus } from '@/hooks/use-call-status';
-import { LeadDetailsPanel } from './LeadDetailsPanel';
-import DispositionSelector from '@/components/DispositionSelector';
-import { leadProfileService } from '@/services/leadProfile';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Phone } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
+import { ConnectedLeadPanel } from './ConnectedLeadPanel';
 
 interface PreviewDialerWindowProps {
-  currentCall: any;
-  onDisposition: (type: string) => void;
-  onEndCall: () => void;
+  currentCall?: any;
+  onDisposition?: (type: string) => void;
+  onEndCall?: () => void;
 }
 
-const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
+const PreviewDialerWindow = ({
   currentCall,
   onDisposition,
-  onEndCall
-}) => {
-  const [isDialingStarted, setIsDialingStarted] = useState(false);
+  onEndCall,
+}: PreviewDialerWindowProps) => {
   const [callingLists, setCallingLists] = useState<any[]>([]);
-  const [selectedListId, setSelectedListId] = useState<string | null>(null);
-  const [isLoadingLists, setIsLoadingLists] = useState(false);
-  const [isCreatingSession, setIsCreatingSession] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [selectedList, setSelectedList] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [autoDialerActive, setAutoDialerActive] = useState(false);
-  const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
-  const [isProcessingCall, setIsProcessingCall] = useState(false);
-  const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
-  const { user } = useAuth();
-  const { callStatuses } = useCallStatus();
-
-  const [currentLead, setCurrentLead] = useState<any>(null);
-  const [leadNotes, setLeadNotes] = useState<any[]>([]);
-  const [callNotes, setCallNotes] = useState('');
+  const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [sessionStats, setSessionStats] = useState<any>(null);
+  const [isDialing, setIsDialing] = useState(false);
+  const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
 
   useEffect(() => {
-    if (isDialingStarted) {
-      fetchCallingLists();
-    }
-  }, [isDialingStarted]);
-
-  useEffect(() => {
-    console.log('Session state update:', { 
-      sessionId, 
-      autoDialerActive, 
-      isActivePowerDialing 
-    });
-  }, [sessionId, autoDialerActive, isActivePowerDialing]);
-
-  useEffect(() => {
-    console.log('Call statuses updated:', callStatuses);
-  }, [callStatuses]);
-
-  useEffect(() => {
-    const fetchLeadData = async () => {
-      if (currentCall?.parameters?.leadId && currentCall.status === 'in-progress') {
-        try {
-          console.log('Fetching lead data for:', currentCall.parameters.leadId);
-          const { data, error } = await supabase.functions.invoke('lead-connected', {
-            body: { leadId: currentCall.parameters.leadId }
-          });
-
-          if (error) {
-            console.error('Error from lead-connected function:', error);
-            throw error;
-          }
-
-          if (data && data.success) {
-            console.log('Lead data received:', data);
-            setCurrentLead(data.lead);
-            setLeadNotes(data.notes || []);
-          } else {
-            console.warn('Lead data response was not successful:', data);
-          }
-        } catch (err) {
-          console.error('Error fetching lead data:', err);
-          toast.error('Failed to load lead details');
-        }
-      }
-    };
-
-    fetchLeadData();
-  }, [currentCall?.parameters?.leadId, currentCall?.status]);
-
-  const fetchCallingLists = async () => {
-    setIsLoadingLists(true);
-    setError(null);
-    try {
-      const { data, error } = await supabase.functions.invoke('get-calling-lists');
-      
-      if (error) {
-        console.error("Error fetching calling lists:", error);
-        setError("Failed to load calling lists. Please try again.");
-        toast.error("Failed to load calling lists");
-        return;
-      }
-
-      setCallingLists(data || []);
-    } catch (error) {
-      console.error("Error in fetchCallingLists:", error);
-      setError("An unexpected error occurred while loading lists.");
-      toast.error("Failed to load calling lists");
-    } finally {
-      setIsLoadingLists(false);
-    }
-  };
-
-  const handleDeleteLead = async (leadId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    
-    if (!window.confirm('Are you sure you want to delete this lead? This action cannot be undone.')) {
-      return;
-    }
-    
-    try {
-      const { error } = await supabase.functions.invoke('delete-lead', {
-        body: { leadId }
-      });
-      
-      if (error) {
-        console.error("Error deleting lead:", error);
-        toast.error("Failed to delete lead");
-        return;
-      }
-      
-      toast.success("Lead deleted successfully");
-      // Notify parent component or refresh data as needed
-    } catch (error) {
-      console.error("Error in handleDeleteLead:", error);
-      toast.error("Failed to delete lead");
-    }
-  };
-
-  const handleBeginDialing = async () => {
-    if (!selectedListId) {
-      toast.error("Please select a calling list first");
-      return;
-    }
-    
-    setIsCreatingSession(true);
-    setError(null);
-    
-    try {
-      const selectedList = callingLists.find(list => list.id === selectedListId);
-      const sessionName = selectedList ? `Dialing Session for ${selectedList.name}` : undefined;
-      
-      console.log("Starting dialing session with:", { listId: selectedListId, sessionName });
-      
-      const { data, error } = await supabase.functions.invoke('start-dialing-session', {
-        body: { 
-          listId: selectedListId,
-          sessionName
-        }
-      });
-      
-      if (error) {
-        console.error("Error starting dialing session:", error);
-        setError("Failed to start dialing session. Please try again.");
-        toast.error("Failed to start dialing session", {
-          description: error.message || "Unable to begin dialing"
-        });
-        return;
-      }
-      
-      console.log("Dialing session created successfully:", data);
-      setSessionId(data.sessionId);
-      setAutoDialerActive(false);
-      
-      toast.success("Dialing Session Started", {
-        description: `Preparing to dial ${data.totalLeads} leads`
-      });
-    } catch (error) {
-      console.error("Unexpected error in handleBeginDialing:", error);
-      setError("An unexpected error occurred. Please try again later.");
-      toast.error("Failed to start dialing session", {
-        description: "An unexpected error occurred"
-      });
-    } finally {
-      setIsCreatingSession(false);
-    }
-  };
-
-  const handleStartPowerDialing = async () => {
-    if (!sessionId) {
-      toast.error("No active session found");
-      return;
-    }
-
-    try {
-      setIsProcessingCall(true);
-      await twilioService.initializeTwilioDevice();
-      setAutoDialerActive(true);
-      setIsActivePowerDialing(true);
-      
-      toast.success("Power dialing sequence started", {
-        description: "The system will now automatically dial leads in queue"
-      });
-    } catch (error) {
-      console.error("Error starting power dialing:", error);
-      toast.error("Failed to start power dialing");
-      setAutoDialerActive(false);
-      setIsActivePowerDialing(false);
-    } finally {
-      setIsProcessingCall(false);
-    }
-  };
-
-  const handleCallComplete = useCallback(() => {
-    // This will be called after each call is completed
-    console.log('Call completed, ready for next call');
+    // Fetch calling lists when component mounts
+    fetchCallingLists();
   }, []);
 
-  const handleCallNotesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setCallNotes(e.target.value);
-  };
-  
-  const saveCallNotes = async () => {
-    if (!currentLead?.id || !callNotes.trim()) return;
-    
+  // When currentCall changes and is active, update the connected lead data
+  useEffect(() => {
+    if (currentCall?.status === 'in-progress' && currentCall?.leadId) {
+      setConnectedLeadData(null); // Reset before fetching new data
+      fetchLeadData(currentCall.leadId);
+    } else if (!currentCall || currentCall?.status === 'completed') {
+      setIsDialing(false);
+    }
+  }, [currentCall]);
+
+  const fetchCallingLists = async () => {
     try {
-      const noteData = {
-        lead_id: currentLead.id,
-        content: callNotes,
-        created_by: user?.email || 'System'
-      };
-      
-      const { data, error } = await supabase
-        .from('lead_notes')
-        .insert(noteData);
-      
+      const { data, error } = await supabase.functions.invoke('get-calling-lists');
+
+      if (error) throw new Error(error.message);
+      if (data && data.lists) {
+        setCallingLists(data.lists);
+      }
+    } catch (err: any) {
+      console.error('Error fetching calling lists:', err);
+      toast.error('Failed to load calling lists');
+    }
+  };
+
+  const fetchLeadData = async (leadId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
+        body: { 
+          leadId,
+          callData: {
+            callSid: currentCall?.callSid,
+            status: currentCall?.status,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
       if (error) throw error;
-      
-      toast.success('Call notes saved successfully');
-      setCallNotes(''); // Clear notes after saving
-      
-      // Refresh notes
-      const { data: refreshedNotes } = await supabase
-        .from('lead_notes')
-        .select('*')
-        .eq('lead_id', currentLead.id)
-        .order('created_at', { ascending: false });
-        
-      if (refreshedNotes) {
-        setLeadNotes(refreshedNotes);
+      if (data?.lead) {
+        console.log('Lead data fetched:', data.lead);
+        setConnectedLeadData(data.lead);
       }
     } catch (err) {
-      console.error('Error saving call notes:', err);
-      toast.error('Failed to save call notes');
+      console.error('Error fetching lead data:', err);
     }
   };
 
-  const activeCallsForDisplay = React.useMemo(() => {
-    const displayCalls: Record<number, any> = {};
-    
-    if (currentCall) {
-      displayCalls[1] = {
-        phoneNumber: currentCall.parameters?.To || 'Unknown',
-        leadName: 'Current Call',
-        status: currentCall.status || 'connecting',
-        startTime: currentCall.status === 'in-progress' ? new Date() : undefined
-      };
-    }
-    
-    Object.entries(callStatuses).forEach(([leadId, callStatus], index) => {
-      const lineNumber = Object.keys(displayCalls).length + 1;
-      
-      if (lineNumber <= 3) {
-        displayCalls[lineNumber] = callStatus;
-      }
-    });
-    
-    return displayCalls;
-  }, [currentCall, callStatuses]);
+  const handleSelectList = (listId: string) => {
+    setSelectedList(listId);
+  };
 
-  const formatPhoneNumber = (phone: string) => {
-    if (!phone) return '';
-    const cleaned = phone.replace(/\D/g, '');
-    const match = cleaned.match(/^(\d{1})(\d{3})(\d{3})(\d{4})$/);
-    if (match) {
-      return `+${match[1]} (${match[2]}) ${match[3]}-${match[4]}`;
+  const startDialingSession = async () => {
+    if (!selectedList) {
+      toast.error('Please select a calling list first');
+      return;
     }
-    return phone;
+
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase.functions.invoke('start-dialing-session', {
+        body: {
+          listId: selectedList,
+          sessionName: `Dialing Session for ${callingLists.find(l => l.id === selectedList)?.name || 'unknown'}`
+        }
+      });
+
+      if (error) throw error;
+      
+      if (data?.sessionId) {
+        setSessionId(data.sessionId);
+        setIsSessionActive(true);
+        setSessionStats({
+          totalLeads: data.leadCount,
+          queued: data.leadCount,
+          completed: 0,
+          inProgress: 0
+        });
+        
+        toast.success('Dialing session created successfully');
+      }
+    } catch (err: any) {
+      console.error('Error starting dialing session:', err);
+      toast.error('Failed to start dialing session');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startPowerDialing = async () => {
+    if (!sessionId) {
+      toast.error('No active dialing session');
+      return;
+    }
+
+    try {
+      setIsDialing(true); // Set dialing state to true BEFORE we call the API
+      toast('Starting power dialer...', {
+        description: 'The system will begin dialing leads from your selected list.'
+      });
+      
+      // This would typically trigger the actual dialing through an API call
+      // For now, we just set the state to show we're dialing
+      
+      // Redirect to the dialer session page
+      window.location.href = `/dialer-session?id=${sessionId}`;
+    } catch (err) {
+      console.error('Error starting power dialer:', err);
+      toast.error('Failed to start power dialer');
+      setIsDialing(false);
+    }
   };
 
   return (
     <>
-      <Card className="bg-gray-800 p-4 rounded-lg">
-        <div className="grid grid-cols-3 gap-4">
-          {[1, 2, 3].map((line) => (
-            <LineDisplay 
-              key={line} 
-              lineNumber={line}
-              currentCall={activeCallsForDisplay[line]}
-            />
-          ))}
-        </div>
-      </Card>
-
-      <div className="grid grid-cols-4 gap-4 mt-4">
-        <div className="col-span-3">
-          {currentCall && currentCall.status === 'in-progress' ? (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-green-500" />
-                    Active Call
-                  </div>
-                  <Badge>In Progress</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    <Avatar className="h-14 w-14">
-                      <AvatarFallback className="bg-blue-100 text-blue-600 text-lg">
-                        {currentLead?.first_name ? currentLead.first_name[0] : '?'}
-                        {currentLead?.last_name ? currentLead.last_name[0] : ''}
-                      </AvatarFallback>
-                    </Avatar>
-                    
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold">
-                        {currentLead ? `${currentLead.first_name} ${currentLead.last_name}` : 'Loading contact...'}
-                      </h3>
-                      
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        {currentLead?.phone1 && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Phone className="h-4 w-4 text-gray-400" />
-                            {formatPhoneNumber(currentLead.phone1)}
-                          </div>
-                        )}
-                        
-                        {currentLead?.email && (
-                          <div className="flex items-center gap-2 text-sm text-gray-600">
-                            <Mail className="h-4 w-4 text-gray-400" />
-                            {currentLead.email}
-                          </div>
-                        )}
-                        
-                        {currentLead?.property_address && (
-                          <div className="flex items-start gap-2 text-sm text-gray-600 col-span-2">
-                            <MapPin className="h-4 w-4 mt-0.5 text-gray-400" />
-                            <span>{currentLead.property_address}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={onEndCall}
-                      >
-                        <PhoneOff className="h-4 w-4 mr-2" />
-                        End Call
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 mt-4">
-                    <div className="space-y-2">
-                      <h4 className="font-medium">Call Notes</h4>
-                      <textarea 
-                        className="w-full h-32 p-2 border rounded-md text-sm"
-                        placeholder="Enter call notes here..."
-                        value={callNotes}
-                        onChange={handleCallNotesChange}
-                      />
-                      <Button 
-                        variant="default" 
-                        size="sm" 
-                        onClick={saveCallNotes}
-                        disabled={!callNotes.trim()}
-                      >
-                        Save Notes
-                      </Button>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <h4 className="font-medium flex justify-between items-center">
-                        <span>Existing Notes</span>
-                        <Badge variant="outline" className="text-xs">
-                          {leadNotes.length}
-                        </Badge>
-                      </h4>
-                      <ScrollArea className="h-40 border rounded-md p-2">
-                        {leadNotes.length === 0 ? (
-                          <p className="text-sm text-gray-500 text-center py-4">No notes available</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {leadNotes.map((note, index) => (
-                              <div key={note.id || index} className="text-sm p-2 bg-gray-50 rounded">
-                                <div className="flex justify-between text-xs text-gray-500 mb-1">
-                                  <span>{note.created_by || 'System'}</span>
-                                  <span>{new Date(note.created_at).toLocaleString()}</span>
-                                </div>
-                                <p>{note.content}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </ScrollArea>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 border-t pt-4">
-                    <h4 className="font-medium mb-2">Lead Disposition</h4>
-                    <DispositionSelector 
-                      currentDisposition={currentLead?.disposition || 'Not Contacted'} 
-                      onDispositionChange={(disposition) => {
-                        if (currentLead?.id) {
-                          leadProfileService.updateDisposition(currentLead.id, disposition)
-                            .then(() => {
-                              setCurrentLead({...currentLead, disposition});
-                              toast.success(`Disposition updated to ${disposition}`);
-                            })
-                            .catch(err => {
-                              console.error('Error updating disposition:', err);
-                              toast.error('Failed to update disposition');
-                            });
-                        }
-                      }}
-                    />
-                  </div>
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-medium">Queue Status</h3>
+            <button 
+              onClick={fetchCallingLists} 
+              className="p-1 rounded-full hover:bg-gray-100"
+              aria-label="Refresh"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 2v6h-6"></path>
+                <path d="M3 12a9 9 0 0 1 15-6.7L21 8"></path>
+                <path d="M3 22v-6h6"></path>
+                <path d="M21 12a9 9 0 0 1-15 6.7L3 16"></path>
+              </svg>
+            </button>
+          </div>
+          
+          {/* Show warning if there are issues */}
+          {sessionStats && sessionStats.queueWarning && (
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
+              <div className="flex">
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    {sessionStats.queueWarning}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-          ) : currentCall ? (
-            <LeadDetailsPanel 
-              leadId={currentCall?.parameters?.leadId}
-              isActive={currentCall?.status === 'in-progress'}
-            />
-          ) : (
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg font-medium flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-5 w-5 text-green-500" />
-                    Preview Dialer
-                  </div>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!isDialingStarted ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <Button 
-                      onClick={() => setIsDialingStarted(true)}
-                      className="bg-green-500 hover:bg-green-600 text-white px-8 py-6 text-lg rounded-lg flex items-center gap-3"
-                    >
-                      <Play className="h-6 w-6" />
-                      Start Dialing
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {sessionId && (
-                      <>
-                        <DialerQueueMonitor sessionId={sessionId} />
-                        
-                        {!autoDialerActive && (
-                          <div className="flex justify-center my-4">
-                            <Button
-                              onClick={handleStartPowerDialing}
-                              className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
-                              disabled={isCreatingSession || isProcessingCall}
-                            >
-                              {isProcessingCall ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <Phone className="h-5 w-5" />
-                              )}
-                              Start Power Dialing
-                            </Button>
-                          </div>
-                        )}
-
-                        <AutoDialerController 
-                          sessionId={sessionId}
-                          isActive={autoDialerActive}
-                          onCallComplete={handleCallComplete}
-                        />
-                      </>
-                    )}
-                    
-                    {error && (
-                      <Alert variant="destructive">
-                        <AlertTitle>Error</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                      </Alert>
-                    )}
-                    
-                    {sessionId ? (
-                      <div className="text-center py-6">
-                        <Badge className="mb-4 bg-green-100 text-green-800 py-2 px-4 text-sm">
-                          Session Active
-                        </Badge>
-                        <p className="text-lg font-medium">Dialing session has been created successfully!</p>
-                        <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId}</p>
-                      </div>
-                    ) : selectedListId && (
-                      <div className="mb-4 flex justify-center">
-                        <Button 
-                          onClick={handleBeginDialing}
-                          className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
-                          disabled={isCreatingSession}
-                        >
-                          {isCreatingSession ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            <Phone className="h-5 w-5" />
-                          )}
-                          {isCreatingSession ? 'Creating Session...' : 'Begin Dialing'}
-                        </Button>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-medium">Select a Calling List</h3>
-                      {selectedListId && !sessionId && (
-                        <Button 
-                          variant="outline" 
-                          onClick={() => setSelectedListId(null)}
-                          className="text-sm"
-                          disabled={isCreatingSession}
-                        >
-                          Change List
-                        </Button>
-                      )}
-                    </div>
-                    
-                    {isLoadingLists ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-gray-400" />
-                        Loading calling lists...
-                      </div>
-                    ) : callingLists.length === 0 ? (
-                      <div className="text-center py-8">
-                        <List className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-                        <p className="text-gray-500">No calling lists found.</p>
-                        <p className="text-sm text-gray-400">Create a calling list first to start dialing.</p>
-                      </div>
-                    ) : (
-                      <div className="grid gap-4">
-                        {callingLists.map((list) => (
-                          <Card 
-                            key={list.id}
-                            className={`
-                              cursor-pointer transition-all
-                              ${selectedListId === list.id ? 'ring-2 ring-green-500' : 'hover:bg-gray-50'}
-                            `}
-                            onClick={() => !sessionId && setSelectedListId(list.id)}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <h4 className="font-medium">{list.name}</h4>
-                                  <p className="text-sm text-gray-500">
-                                    {list.leadCount} leads • Created {new Date(list.createdAt).toLocaleDateString()}
-                                  </p>
-                                </div>
-                                {selectedListId === list.id && (
-                                  <Badge variant="outline">
-                                    Selected
-                                  </Badge>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    )}
-                    
-                    {selectedListId && !sessionId && (
-                      <div className="mt-6 space-y-4">
-                        <LeadSelectionPanel 
-                          listId={selectedListId}
-                          onLeadsSelected={(leads) => {
-                            console.log('Selected leads:', leads);
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           )}
-        </div>
-
-        <Card className="bg-gray-800 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium text-white">Disposition</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[calc(100vh-650px)]">
-              <div className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                  onClick={() => onDisposition('contact')}
-                >
-                  <Phone className="mr-2 h-4 w-4 text-green-400" />
-                  Contact
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('no-contact')}
-                >
-                  <UserX className="mr-2 h-4 w-4 text-gray-400" />
-                  No Contact
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('bad-number')}
-                >
-                  <PhoneMissed className="mr-2 h-4 w-4 text-red-400" />
-                  Bad Number
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('drop-message')}
-                >
-                  <MessageSquare className="mr-2 h-4 w-4 text-blue-400" />
-                  Drop Message
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('dnc-contact')}
-                >
-                  <Ban className="mr-2 h-4 w-4 text-yellow-400" />
-                  DNC Contact
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('dnc-number')}
-                >
-                  <PhoneOff className="mr-2 h-4 w-4 text-orange-400" />
-                  DNC Number
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('callback')}
-                >
-                  <Clock className="mr-2 h-4 w-4 text-purple-400" />
-                  Quick Callback
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('redial')}
-                >
-                  <RotateCcw className="mr-2 h-4 w-4 text-indigo-400" />
-                  Redial
-                </Button>
+          
+          <div className="grid grid-cols-4 gap-4">
+            <div className="bg-gray-50 p-3 rounded-md text-center">
+              <div className="text-2xl font-bold text-blue-500">
+                {sessionStats?.queued || 0}
               </div>
-              
-              <div className="pt-4 border-t border-gray-600 mt-4 space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                >
-                  <Pause className="mr-2 h-4 w-4" />
-                  Pause
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={onEndCall}
-                >
-                  <PhoneOff className="mr-2 h-4 w-4" />
-                  Hang Up
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-center bg-red-900/50 hover:bg-red-900 text-white border-red-900"
-                >
-                  <StopCircle className="mr-2 h-4 w-4 text-red-400" />
-                  Stop
-                </Button>
+              <div className="text-sm text-gray-600 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Queued
               </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-      </div>
+            </div>
+            
+            <div className="bg-gray-50 p-3 rounded-md text-center">
+              <div className="text-2xl font-bold text-orange-500">
+                {sessionStats?.inProgress || 0}
+              </div>
+              <div className="text-sm text-gray-600 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                  <path d="M15 3h6v6"></path>
+                  <path d="M10 14L21 3"></path>
+                </svg>
+                In Progress
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 p-3 rounded-md text-center">
+              <div className="text-2xl font-bold text-green-500">
+                {sessionStats?.completed || 0}
+              </div>
+              <div className="text-sm text-gray-600 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                Completed
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 p-3 rounded-md text-center">
+              <div className="text-2xl font-bold text-purple-500">
+                {sessionStats?.totalLeads || 0}
+              </div>
+              <div className="text-sm text-gray-600 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12" y2="8"></line>
+                </svg>
+                Total
+              </div>
+            </div>
+          </div>
+          
+          {/* Dialing Actions */}
+          <div className="mt-6 flex justify-center">
+            {!isSessionActive ? (
+              selectedList && (
+                <Button 
+                  onClick={startDialingSession} 
+                  disabled={isLoading || !selectedList} 
+                  className="bg-green-500 hover:bg-green-600 text-white"
+                >
+                  {isLoading ? 'Creating Session...' : 'Begin Dialing'}
+                </Button>
+              )
+            ) : (
+              <Button 
+                onClick={startPowerDialing} 
+                disabled={isLoading} 
+                className="bg-green-500 hover:bg-green-600 text-white"
+              >
+                <Phone className="mr-2 h-4 w-4" />
+                Start Power Dialing
+              </Button>
+            )}
+          </div>
+          
+          {/* Session Status */}
+          {isSessionActive && (
+            <>
+              <div className="mt-6 flex justify-center">
+                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                  Session Active
+                </Badge>
+              </div>
+              <div className="mt-2 text-center">
+                <p className="text-gray-700">Dialing session has been created successfully!</p>
+                <p className="text-sm text-gray-500 mt-1">Session ID: {sessionId}</p>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+      
+      {/* Connected Lead Details */}
+      <ConnectedLeadPanel 
+        leadData={connectedLeadData}
+        isConnected={!!currentCall && currentCall.status === 'in-progress'} 
+        isDialing={isDialing}
+      />
+      
+      {/* Calling List Selection */}
+      {!isSessionActive && (
+        <>
+          <h3 className="font-medium mb-2">Select a Calling List</h3>
+          <div className="space-y-2">
+            {callingLists.map((list) => (
+              <div 
+                key={list.id} 
+                className={`border rounded-lg p-4 cursor-pointer transition-all ${selectedList === list.id ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}
+                onClick={() => handleSelectList(list.id)}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="font-medium">{list.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {list.lead_count} leads • Created {new Date(list.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                  
+                  {selectedList === list.id && (
+                    <Badge className="ml-2">Selected</Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+            
+            {callingLists.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                No calling lists found. Create a calling list to start dialing.
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 };
