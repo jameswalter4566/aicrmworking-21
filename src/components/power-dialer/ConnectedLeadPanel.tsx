@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,14 +15,9 @@ interface ConnectedLeadPanelProps {
 }
 
 export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
-  // Add a ref to track renders
-  const renderCount = useRef(0);
-  
-  // Debug logging to track data flow and component renders
+  // Debug logging to track data flow
   useEffect(() => {
-    renderCount.current += 1;
-    
-    console.log(`[ConnectedLeadPanel] RENDER #${renderCount.current} with data:`, leadData);
+    console.log("[ConnectedLeadPanel] Received lead data:", leadData);
     
     if (leadData) {
       console.log("[ConnectedLeadPanel] Lead details available:", {
@@ -32,18 +27,9 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
         property_address: leadData.property_address || '---',
         mailing_address: leadData.mailing_address || '---'
       });
-      
-      // Log all keys and values to ensure data structure is as expected
-      console.log("[ConnectedLeadPanel] Raw leadData keys:", Object.keys(leadData));
-      console.log("[ConnectedLeadPanel] Raw leadData values:", Object.values(leadData));
     } else {
       console.log("[ConnectedLeadPanel] No lead data available");
     }
-    
-    // Force DOM to update
-    setTimeout(() => {
-      console.log("[ConnectedLeadPanel] DOM update check after timeout");
-    }, 0);
   }, [leadData]);
 
   // Format the lead name consistently
@@ -57,7 +43,6 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
 
   // Display skeleton loader when no data is available
   if (!leadData) {
-    console.log("[ConnectedLeadPanel] Rendering skeleton (no data)");
     return (
       <Card className="mt-4">
         <CardHeader className="pb-2">
@@ -103,14 +88,12 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
     );
   }
 
-  // When data is available, display it with additional debug info
-  console.log("[ConnectedLeadPanel] Rendering filled data");
+  // When data is available, display it
   return (
     <Card className="mt-4 border-2 border-green-500">
-      <CardHeader className="pb-2 bg-green-50">
-        <CardTitle className="text-lg flex justify-between">
-          <span>Lead Details - {getFormattedName()}</span>
-          <span className="text-xs text-green-700">Data Present</span>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg">
+          Lead Details - {getFormattedName()}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -149,12 +132,6 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
               </div>
             </div>
           </div>
-        </div>
-
-        {/* Debug info section */}
-        <div className="mt-4 p-2 bg-gray-100 rounded text-xs">
-          <div className="font-semibold">Debug Info</div>
-          <div>Raw data keys: {Object.keys(leadData).join(', ')}</div>
         </div>
       </CardContent>
     </Card>
