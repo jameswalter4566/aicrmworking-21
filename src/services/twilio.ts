@@ -1,5 +1,4 @@
 import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
 export interface TwilioCallResult {
   success: boolean;
@@ -26,20 +25,11 @@ export interface CallStatusListener {
   }): void;
 }
 
-interface CallOptions {
-  originalLeadId?: string | number;
-  callBack?: string;
-  conferenceType?: string;
-}
-
 class TwilioService {
-  private token: string | null = null;
   private device: any = null;
   private audioContext: AudioContext | null = null;
-  private audioPlayer: HTMLAudioElement | null = null;
-  private microphoneStream: MediaStream | null = null;
-  private currentAudioDeviceId: string = '';
-  private tokenExpirationTime: number = 0;
+  private preferredAudioDevice: string | null = null;
+  private activeCalls: any[] = [];
   private isCleaningUp: boolean = false;
   private soundsInitialized: boolean = false;
   private callDisconnectListeners: Array<() => void> = [];
@@ -313,14 +303,14 @@ class TwilioService {
   }
 
   getCurrentAudioDevice(): string {
-    return this.currentAudioDeviceId || 'default';
+    return this.preferredAudioDevice || 'default';
   }
 
   async setAudioOutputDevice(deviceId: string): Promise<boolean> {
     try {
       if (this.device && this.device.audio) {
         await this.device.audio.speakerDevices.set(deviceId);
-        this.currentAudioDeviceId = deviceId;
+        this.preferredAudioDevice = deviceId;
         console.log(`Set audio output device to: ${deviceId}`);
         return true;
       } else {
@@ -340,7 +330,7 @@ class TwilioService {
         return false;
       }
 
-      const testDevice = deviceId || this.currentAudioDeviceId || 'default';
+      const testDevice = deviceId || this.preferredAudioDevice || 'default';
       console.log(`Testing audio output device: ${testDevice}`);
 
       await this.device.audio.speakerDevices.test('/sounds/test-tone.mp3');
@@ -351,63 +341,157 @@ class TwilioService {
     }
   }
 
-  async makeCall(phoneNumber: string, leadId: string | number, options: CallOptions = {}): Promise<TwilioCallResult> {
+  async makeCall(phoneNumber: string, leadId: string): Promise<TwilioCallResult> {
     try {
-      console.log(`Making call to ${phoneNumber} for lead ${leadId} with options:`, options);
-      
-      if (!phoneNumber) {
-        return { success: false, error: "Phone number is required" };
-      }
-      
-      if (!this.token || Date.now() >= this.tokenExpirationTime - 60000) {
-        await this.initializeTwilioDevice();
+      if (!this.device) {
+        console.error("Twilio device not initialized.");
+        return { success: false, error: "Twilio device not initialized." };
       }
 
-      if (!this.device) {
-        return { success: false, error: "Twilio device not initialized" };
-      }
-      
-      // Make sure our phone number is in E.164 format
+      this.activeCalls = [];
+
       let formattedPhoneNumber = phoneNumber;
       if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
         formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
       }
       
+      console.log(`Attempting to call ${formattedPhoneNumber} via browser client`);
+      
       try {
-        // Prepare the parameters to pass to the call
-        const callParams: Record<string, string> = {
-          To: formattedPhoneNumber,
-          leadId: String(leadId)
-        };
-        
-        // Add the original lead ID if provided
-        if (options.originalLeadId) {
-          callParams.originalLeadId = String(options.originalLeadId);
+        if (this.device.calls && this.device.calls.length > 0) {
+          console.warn("Device has active calls before making new call. Cleaning up...");
+          this.device.disconnectAll();
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
         
-        console.log("Initiating call with params:", callParams);
+        if (this.device.state !== 'registered') {
+          console.log("Device not registered, attempting to register...");
+          await this.device.register();
+          
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
         
-        // Connect the call using the device
-        const call = await this.device.connect({ params: callParams });
+        const call = await this.device.connect({
+          params: {
+            phoneNumber: formattedPhoneNumber,
+            leadId: leadId.toString()
+          }
+        });
         
-        return {
-          success: true,
-          callSid: call.parameters?.CallSid || 'browser-call',
+        this.activeCalls.push(call);
+        
+        console.log(`Browser client call connected with SID: ${call.sid || 'unknown'}`);
+        
+        this.notifyCallStatusListeners({
+          callSid: call.sid || 'browser-call',
+          status: 'connecting',
           phoneNumber: formattedPhoneNumber,
-          browserCallSid: call.parameters?.CallSid || null
-        };
-      } catch (error: any) {
-        console.error("Error connecting call:", error);
+          leadId: leadId,
+          startTime: new Date()
+        });
+        
+        call.on('error', (error: any) => {
+          console.error('Call error:', error);
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'error',
+            leadId: leadId,
+            errorMessage: error.message,
+            errorCode: error.code
+          });
+          
+          toast({
+            title: "Call Error",
+            description: `Error during call: ${error.message || error}`,
+            variant: "destructive",
+          });
+          
+          this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          if (error.code === '31005') {
+            console.log("Attempting recovery from connection error");
+            setTimeout(() => {
+              this.hangupAllCalls().catch(e => console.warn("Recovery cleanup error:", e));
+            }, 1000);
+          }
+        });
+        
+        call.on('accept', () => {
+          console.log('Call accepted, audio connection established');
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'in-progress',
+            leadId: leadId,
+            phoneNumber: formattedPhoneNumber,
+            startTime: new Date()
+          });
+          
+          toast({
+            title: "Call Connected",
+            description: "You're now connected to the call.",
+          });
+        });
+        
+        call.on('disconnect', () => {
+          console.log('Call disconnected');
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'completed',
+            leadId: leadId,
+            endTime: new Date()
+          });
+          
+          toast({
+            title: "Call Ended",
+            description: "The call has been disconnected.",
+          });
+          
+          this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          this.callDisconnectListeners.forEach(listener => listener());
+        });
+        
+        call.on('cancel', () => {
+          console.log('Call was cancelled or not answered');
+          
+          this.notifyCallStatusListeners({
+            callSid: call.sid,
+            status: 'canceled',
+            leadId: leadId,
+            endTime: new Date()
+          });
+          
+          toast({
+            title: "Call Not Answered",
+            description: "The recipient didn't answer the call.",
+          });
+          
+          this.activeCalls = this.activeCalls.filter(c => c.sid !== call.sid);
+          
+          this.callDisconnectListeners.forEach(listener => listener());
+        });
+        
         return { 
-          success: false, 
-          error: error.message || "Error connecting call" 
+          success: true, 
+          callSid: call.sid || 'browser-call',
+          leadId: leadId
+        };
+      } catch (deviceError: any) {
+        console.warn("Browser-based call initiation failed. Error:", deviceError);
+        return {
+          success: false,
+          error: deviceError.message || "Failed to initiate call through the browser"
         };
       }
     } catch (error: any) {
-      console.error("Error in makeCall:", error);
-      return { 
-        success: false, 
-        error: error.message || "Error initiating call" 
+      console.error("Error making call:", error);
+      return {
+        success: false,
+        error: error.message || "Unknown error making call"
       };
     }
   }
