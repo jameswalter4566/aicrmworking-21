@@ -1,3 +1,4 @@
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -140,20 +141,28 @@ Deno.serve(async (req) => {
       
       console.log(`Found ${actualLeads.length} valid leads to add to session`, actualLeads[0]);
       
-      const sessionLeads = actualLeads.map(lead => {
+      // Prepare session leads data
+      const sessionLeads = [];
+      
+      // Process each lead - now AWAITING the UUID update
+      for (const lead of actualLeads) {
+        // Generate UUID for this lead
         const leadUuid = crypto.randomUUID();
-        supabaseClient
+        
+        // Update lead with session UUID - AWAIT THIS OPERATION
+        const { error: updateError } = await supabaseClient
           .from('leads')
           .update({ session_uuid: leadUuid })
-          .eq('id', lead.id)
-          .then(() => {
-            console.log(`Updated lead ${lead.id} with session UUID ${leadUuid}`);
-          })
-          .catch(error => {
-            console.error(`Failed to update lead ${lead.id} with UUID:`, error);
-          });
+          .eq('id', lead.id);
         
-        return {
+        if (updateError) {
+          console.error(`Failed to update lead ${lead.id} with UUID:`, updateError);
+        } else {
+          console.log(`Updated lead ${lead.id} with session UUID ${leadUuid}`);
+        }
+        
+        // Add to session leads array
+        sessionLeads.push({
           session_id: sessionData.id,
           lead_id: leadUuid,
           status: 'queued',
@@ -167,8 +176,8 @@ Deno.serve(async (req) => {
             email: lead.email
           }),
           original_lead_id: lead.id.toString()
-        };
-      });
+        });
+      }
       
       const BATCH_SIZE = 50;
       let insertedCount = 0;
@@ -189,6 +198,7 @@ Deno.serve(async (req) => {
           
           for (const lead of batch) {
             try {
+              // Send notification with both leadId and originalLeadId
               await supabaseClient.functions.invoke('lead-connected', {
                 body: { 
                   leadId: lead.lead_id,
