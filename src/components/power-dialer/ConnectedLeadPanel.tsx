@@ -17,9 +17,19 @@ interface ConnectedLeadPanelProps {
 export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
   // Enhanced logging to debug data flow
   useEffect(() => {
-    console.log("ConnectedLeadPanel received data:", leadData);
-    console.log("ConnectedLeadPanel data type:", typeof leadData);
-    console.log("ConnectedLeadPanel data keys:", leadData ? Object.keys(leadData) : 'null');
+    console.log("[ConnectedLeadPanel] Rendering with data:", leadData);
+    console.log("[ConnectedLeadPanel] Data type:", typeof leadData);
+    console.log("[ConnectedLeadPanel] Data keys:", leadData ? Object.keys(leadData) : 'null');
+    
+    if (leadData) {
+      console.log("[ConnectedLeadPanel] Lead details:", {
+        name: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown Name',
+        phone: leadData.phone1 || '---',
+        email: leadData.email || '---',
+        property_address: leadData.property_address || '---',
+        mailing_address: leadData.mailing_address || '---'
+      });
+    }
   }, [leadData]);
   
   // ALWAYS show data if leadData exists, regardless of any other conditions
@@ -29,8 +39,12 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
     return `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown Name';
   };
 
+  // Debug output to verify rendering
+  console.log("[ConnectedLeadPanel] About to render. Has data:", !!leadData);
+
   // If we have no lead data at all, show minimal UI with default values
   if (!leadData) {
+    console.log("[ConnectedLeadPanel] Rendering skeleton - no data available");
     return (
       <Card className="mt-4">
         <CardHeader className="pb-2">
@@ -77,11 +91,12 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
   }
 
   // Always show data if leadData exists
+  console.log("[ConnectedLeadPanel] Rendering with actual data:", getFormattedName());
   return (
     <Card className="mt-4">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">
-          Lead Details
+          Lead Details {getFormattedName() ? `- ${getFormattedName()}` : ''}
         </CardTitle>
       </CardHeader>
       <CardContent>

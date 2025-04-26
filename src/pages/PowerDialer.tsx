@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,8 @@ export default function PowerDialer() {
         'Phone:', connectedLeadData.phone1,
         'Email:', connectedLeadData.email
       );
+    } else {
+      console.log('[PowerDialer] No lead data available yet');
     }
   }, [connectedLeadData]);
 
@@ -237,6 +240,7 @@ export default function PowerDialer() {
           console.log('[PowerDialer] Fetching lead data for:', activeCall.leadId);
           setIsDialing(true);
           
+          console.log('[PowerDialer] Making API request to lead-connected function');
           const { data, error } = await supabase.functions.invoke('lead-connected', {
             body: { 
               leadId: activeCall.leadId,
@@ -269,6 +273,7 @@ export default function PowerDialer() {
             
             console.log('[PowerDialer] Forcing lead data for component:', leadInfo);
             setConnectedLeadData(leadInfo);
+            console.log('[PowerDialer] State update triggered with data:', leadInfo);
           } else {
             console.log('[PowerDialer] No lead data in response, creating fallback data');
             const fallbackData = {
@@ -279,6 +284,7 @@ export default function PowerDialer() {
               property_address: '---',
               mailing_address: '---'
             };
+            console.log('[PowerDialer] Setting fallback data:', fallbackData);
             setConnectedLeadData(fallbackData);
           }
           
@@ -295,6 +301,7 @@ export default function PowerDialer() {
             property_address: '---',
             mailing_address: '---'
           };
+          console.log('[PowerDialer] Setting error fallback data:', errorFallbackData);
           setConnectedLeadData(errorFallbackData);
           toast.error('Failed to load lead details');
           setIsDialing(false);
@@ -320,7 +327,12 @@ export default function PowerDialer() {
       isDialing,
       hasActiveCall,
       callStatus: Object.values(twilioState.activeCalls)[0]?.status,
-      leadDataKeys: connectedLeadData ? Object.keys(connectedLeadData) : []
+      leadDataKeys: connectedLeadData ? Object.keys(connectedLeadData) : [],
+      leadDataValues: connectedLeadData ? {
+        first_name: connectedLeadData.first_name,
+        last_name: connectedLeadData.last_name,
+        phone1: connectedLeadData.phone1
+      } : null
     });
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
 
@@ -744,6 +756,13 @@ export default function PowerDialer() {
             <ScriptsTab />
           </TabsContent>
         </Tabs>
+        
+        {connectedLeadData && (
+          <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border">
+            <h3 className="font-bold">Debug: Lead Data Present</h3>
+            <pre className="text-xs">{JSON.stringify(connectedLeadData, null, 2)}</pre>
+          </div>
+        )}
         
         <TwilioAudioPlayer sound="/sounds/test-tone.mp3" />
       </div>
