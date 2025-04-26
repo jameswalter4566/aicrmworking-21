@@ -141,10 +141,10 @@ Deno.serve(async (req) => {
           .eq('id', contact.id);
         
         // Define webhook URLs for Twilio
-        const statusCallbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-webhook?callId=${callData.id}`;
-        const machineDetectionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-machine-detection?callId=${callData.id}`;
+        const statusCallbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-webhook?callId=${callData.id}&originalLeadId=${contact.id}`;
+        const machineDetectionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/predictive-dialer-machine-detection?callId=${callData.id}&originalLeadId=${contact.id}`;
         
-        // Place the call using Twilio
+        // Place the call using Twilio with custom parameters
         const twilioCall = await twilioClient.calls.create({
           to: contact.phone_number,
           from: twilioPhoneNumber,
@@ -154,6 +154,11 @@ Deno.serve(async (req) => {
           statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
           statusCallbackMethod: 'POST',
           url: machineDetectionUrl,
+          // Add custom parameters that will be returned in webhooks
+          customParameters: JSON.stringify({
+            originalLeadId: contact.id,
+            contactName: contact.name
+          })
         });
         
         // Update call record with Twilio SID

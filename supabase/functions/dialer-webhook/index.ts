@@ -12,9 +12,9 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Notify lead-connected function when call status changes
-async function notifyLeadConnected(leadId: string, callSid: string, status: string, dialingSessionId?: string) {
+async function notifyLeadConnected(leadId: string, callSid: string, status: string, originalLeadId?: string) {
   try {
-    console.log(`Dialer Webhook: Notifying lead-connected for lead: ${leadId}, status: ${status}, session: ${dialingSessionId}`);
+    console.log(`Dialer Webhook: Notifying lead-connected for lead: ${leadId}, originalLeadId: ${originalLeadId}, status: ${status}`);
     
     await supabase.functions.invoke('lead-connected', {
       body: { 
@@ -23,8 +23,7 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
           callSid,
           status,
           timestamp: new Date().toISOString(),
-          dialingSessionId,
-          originalLeadId: leadId
+          originalLeadId: originalLeadId || leadId
         }
       }
     });
@@ -41,10 +40,10 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Get callId from URL parameters
+    // Get parameters from URL
     const url = new URL(req.url);
     const callId = url.searchParams.get('callId');
-    const dialingSessionId = url.searchParams.get('sessionId');
+    const originalLeadId = url.searchParams.get('originalLeadId');
     
     if (!callId) {
       throw new Error('Call ID is required');
@@ -58,6 +57,7 @@ Deno.serve(async (req) => {
     const customParams = formData.get('CustomParameters')?.toString();
     
     console.log(`Dialer webhook received for call ${callId} with status: ${callStatus}`);
+    console.log('URL originalLeadId:', originalLeadId);
     console.log('Custom parameters:', customParams);
     
     // Get the call record with expanded contact and session data
@@ -77,23 +77,23 @@ Deno.serve(async (req) => {
     }
 
     // Extract the original lead ID from notes if available
-    let originalLeadId = null;
+    let originalLeadIdFromNotes = null;
     if (call.notes) {
       try {
         const notesData = JSON.parse(call.notes);
-        originalLeadId = notesData.originalLeadId;
+        originalLeadIdFromNotes = notesData.originalLeadId;
       } catch (e) {
         console.warn('Could not parse notes JSON:', e);
       }
     }
     
-    // If we have a contact_id or original lead ID, notify the lead-connected function
-    if ((call.contact_id || originalLeadId) && callSid) {
+    // Pass both IDs to lead-connected function
+    if ((call.contact_id || originalLeadIdFromNotes) && callSid) {
       await notifyLeadConnected(
-        originalLeadId || call.contact_id,
-        callSid,
+        originalLeadIdFromNotes || call.contact_id, 
+        callSid, 
         callStatus || 'unknown',
-        call.session_id
+        originalLeadId || call.contact_id
       );
     }
     
