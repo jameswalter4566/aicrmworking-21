@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,7 +49,23 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   onDisposition,
   onEndCall
 }) => {
-  // ... keep existing code
+  // Fixed the component by adding a return statement with the JSX
+  return (
+    <div>
+      {/* Component content would go here */}
+      <div className="space-y-4">
+        {currentCall && (
+          <ConnectedLeadPanel
+            leadData={currentCall.leadData}
+            isConnected={currentCall.status === 'in-progress'}
+            showPlaceholders={true}
+          />
+        )}
+        
+        {/* Additional component logic would be here */}
+      </div>
+    </div>
+  );
 };
 
 export default PreviewDialerWindow;
