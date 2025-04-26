@@ -65,7 +65,6 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Get leads from the calling list
     const { data: listLeads, error: leadsError } = await supabaseClient
       .from('calling_list_leads')
       .select('lead_id')
@@ -88,7 +87,6 @@ Deno.serve(async (req) => {
     
     console.log(`Found ${listLeads.length} leads for list ${listId}`);
     
-    // Create dialing session with a proper name
     const finalSessionName = sessionName || `Dialing Session - ${new Date().toLocaleString()}`;
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('dialing_sessions')
@@ -116,14 +114,12 @@ Deno.serve(async (req) => {
     console.log(`Created dialing session with ID: ${sessionData.id}`);
     
     try {
-      // Get all lead IDs that we need to process
       const leadIds = listLeads.map(item => item.lead_id);
       console.log(`Processing ${leadIds.length} leads to add to session`);
       
-      // Get actual leads data to ensure we have valid records
       const { data: actualLeads, error: leadsQueryError } = await supabaseClient
         .from('leads')
-        .select('*')  // Get full lead data
+        .select('*')
         .in('id', leadIds);
       
       if (leadsQueryError) {
@@ -144,29 +140,35 @@ Deno.serve(async (req) => {
       
       console.log(`Found ${actualLeads.length} valid leads to add to session`, actualLeads[0]);
       
-      // Create UUIDs for lead_id values
       const sessionLeads = actualLeads.map(lead => {
-        // Generate a random UUID for each lead entry
         const leadUuid = crypto.randomUUID();
+        supabaseClient
+          .from('leads')
+          .update({ session_uuid: leadUuid })
+          .eq('id', lead.id)
+          .then(() => {
+            console.log(`Updated lead ${lead.id} with session UUID ${leadUuid}`);
+          })
+          .catch(error => {
+            console.error(`Failed to update lead ${lead.id} with UUID:`, error);
+          });
+        
         return {
           session_id: sessionData.id,
-          lead_id: leadUuid,  // Use UUID format
+          lead_id: leadUuid,
           status: 'queued',
           priority: 1,
           attempt_count: 0,
-          // Store the original lead ID as metadata in notes along with other details
           notes: JSON.stringify({ 
-            originalLeadId: lead.id,  // Added original lead ID
+            originalLeadId: lead.id,
             firstName: lead.first_name,
             lastName: lead.last_name,
             phone: lead.phone1,
             email: lead.email
           }),
-          original_lead_id: lead.id.toString()  // Added a column to store original lead ID
+          original_lead_id: lead.id.toString()
         };
       });
-      
-      console.log("First lead in batch to insert:", sessionLeads[0]);
       
       const BATCH_SIZE = 50;
       let insertedCount = 0;
@@ -185,7 +187,6 @@ Deno.serve(async (req) => {
           insertedCount += batch.length;
           console.log(`Inserted batch ${i / BATCH_SIZE + 1} with ${batch.length} leads with 'queued' status`);
           
-          // Notify lead-connected for each lead IMMEDIATELY after insertion
           for (const lead of batch) {
             try {
               await supabaseClient.functions.invoke('lead-connected', {
@@ -207,7 +208,6 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Double-check that leads were actually inserted with queued status
       const { data: queuedLeads, error: queueCheckError } = await supabaseClient
         .from('dialing_session_leads')
         .select('id, status, lead_id, notes')
@@ -223,7 +223,6 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Update session with accurate count of actually inserted leads
       if (insertedCount > 0) {
         await supabaseClient
           .from('dialing_sessions')
@@ -231,7 +230,6 @@ Deno.serve(async (req) => {
           .eq('id', sessionData.id);
       }
       
-      // Force refresh the session_queue_stats view
       const { data: refreshStats, error: refreshError } = await supabaseClient
         .rpc('get_next_session_lead', { p_session_id: sessionData.id })
         .limit(0);

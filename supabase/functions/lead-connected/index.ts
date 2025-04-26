@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -28,20 +27,35 @@ Deno.serve(async (req) => {
 
     console.log(`Lead connected function called for leadId: ${leadId}`);
     
-    // Log detailed callData information including the originalLeadId
-    if (callData) {
-      const { callSid, status, timestamp, originalLeadId } = callData;
-      console.log(`Call data received: callSid=${callSid}, status=${status}, timestamp=${timestamp}`);
-      console.log(`Original Lead ID from callData: ${originalLeadId}`);
-    }
+    // First try to find the lead using the session_uuid
+    const { data: leadByUuid, error: uuidError } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('session_uuid', leadId)
+      .single();
+      
+    if (leadByUuid) {
+      console.log(`Found lead via session UUID: ${leadByUuid.first_name} ${leadByUuid.last_name}`);
+      
+      // Get lead notes
+      const { data: notes } = await supabase
+        .from('lead_notes')
+        .select('*')
+        .eq('lead_id', leadByUuid.id)
+        .order('created_at', { ascending: false });
 
-    // First determine if the leadId is a UUID format
-    const isUuid = typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
-    console.log(`Lead ID appears to be a ${isUuid ? 'UUID' : 'numeric ID'}: ${leadId}`);
-    
-    // Log the Original Lead ID if it exists in callData
-    if (callData?.originalLeadId) {
-      console.log(`Working with original lead ID from callData: ${callData.originalLeadId}`);
+      // Log activity if we have call data
+      await logLeadActivity(leadByUuid.id, callData);
+
+      return new Response(JSON.stringify({ 
+        success: true,
+        lead: leadByUuid,
+        notes: notes || [],
+        callData
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
     }
 
     // STRATEGY 1: Check if this is a dialing session lead first - this is most likely with power dialer

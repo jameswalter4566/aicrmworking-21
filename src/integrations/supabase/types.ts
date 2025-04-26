@@ -510,6 +510,7 @@ export type Database = {
           phone1: string | null
           phone2: string | null
           property_address: string | null
+          session_uuid: string | null
           tags: string[] | null
           updated_at: string | null
         }
@@ -529,6 +530,7 @@ export type Database = {
           phone1?: string | null
           phone2?: string | null
           property_address?: string | null
+          session_uuid?: string | null
           tags?: string[] | null
           updated_at?: string | null
         }
@@ -548,6 +550,7 @@ export type Database = {
           phone1?: string | null
           phone2?: string | null
           property_address?: string | null
+          session_uuid?: string | null
           tags?: string[] | null
           updated_at?: string | null
         }
