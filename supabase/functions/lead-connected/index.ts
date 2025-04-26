@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -43,20 +44,51 @@ Deno.serve(async (req) => {
         .select('*')
         .eq('lead_id', leadByUuid.id)
         .order('created_at', { ascending: false });
+        
+      // Get lead activities
+      const { data: activities } = await supabase
+        .from('lead_activities')
+        .select('*')
+        .eq('lead_id', leadByUuid.id)
+        .order('timestamp', { ascending: false })
+        .limit(10);
+
+      // Format the lead data into a more comprehensive format
+      const formattedLead = {
+        id: leadByUuid.id,
+        firstName: leadByUuid.first_name,
+        lastName: leadByUuid.last_name,
+        phone1: leadByUuid.phone1,
+        phone2: leadByUuid.phone2,
+        email: leadByUuid.email,
+        mailingAddress: leadByUuid.mailing_address,
+        propertyAddress: leadByUuid.property_address,
+        disposition: leadByUuid.disposition,
+        tags: leadByUuid.tags || [],
+        avatar: leadByUuid.avatar,
+        createdAt: leadByUuid.created_at,
+        updatedAt: leadByUuid.updated_at,
+        mortgageData: leadByUuid.mortgage_data,
+        isMortgageLead: leadByUuid.is_mortgage_lead
+      };
 
       // Log activity if we have call data
       await logLeadActivity(leadByUuid.id, callData);
 
       return new Response(JSON.stringify({ 
         success: true,
-        lead: leadByUuid,
+        lead: formattedLead,
         notes: notes || [],
+        activities: activities || [],
         callData
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       });
     }
+
+    // Check if this is a UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
 
     // STRATEGY 1: Check if this is a dialing session lead first - this is most likely with power dialer
     if (isUuid) {
@@ -91,19 +123,7 @@ Deno.serve(async (req) => {
           console.log(`Using effective original lead ID: ${effectiveOriginalLeadId}`);
           const { data: actualLead, error: actualLeadError } = await supabase
             .from('leads')
-            .select(`
-              id,
-              first_name,
-              last_name,
-              phone1,
-              phone2,
-              email,
-              mailing_address,
-              property_address,
-              disposition,
-              created_at,
-              updated_at
-            `)
+            .select(`*`)
             .eq('id', effectiveOriginalLeadId)
             .maybeSingle();
           
@@ -116,14 +136,42 @@ Deno.serve(async (req) => {
               .select('*')
               .eq('lead_id', actualLead.id)
               .order('created_at', { ascending: false });
+              
+            // Get lead activities
+            const { data: activities } = await supabase
+              .from('lead_activities')
+              .select('*')
+              .eq('lead_id', actualLead.id)
+              .order('timestamp', { ascending: false })
+              .limit(10);
+
+            // Format the lead data
+            const formattedLead = {
+              id: actualLead.id,
+              firstName: actualLead.first_name,
+              lastName: actualLead.last_name,
+              phone1: actualLead.phone1,
+              phone2: actualLead.phone2,
+              email: actualLead.email,
+              mailingAddress: actualLead.mailing_address,
+              propertyAddress: actualLead.property_address,
+              disposition: actualLead.disposition,
+              tags: actualLead.tags || [],
+              avatar: actualLead.avatar,
+              createdAt: actualLead.created_at,
+              updatedAt: actualLead.updated_at,
+              mortgageData: actualLead.mortgage_data,
+              isMortgageLead: actualLead.is_mortgage_lead
+            };
 
             // Log activity if we have call data
             await logLeadActivity(actualLead.id, callData);
 
             return new Response(JSON.stringify({ 
               success: true,
-              lead: actualLead,
+              lead: formattedLead,
               notes: notes || [],
+              activities: activities || [],
               callData,
               originalLeadId: effectiveOriginalLeadId
             }), {
@@ -137,14 +185,16 @@ Deno.serve(async (req) => {
         
         // If we reached here, we found the dialing_session_lead but couldn't get a lead record
         // Return a partial success with what we have
+        const leadDataFromNotes = extractLeadDataFromNotes(dialingLead.notes);
         return new Response(JSON.stringify({ 
           success: true,
           lead: {
             id: leadId,
             // Extract any basic info we can from notes
-            ...extractLeadDataFromNotes(dialingLead.notes)
+            ...leadDataFromNotes
           },
           notes: [],
+          activities: [],
           callData,
           originalLeadId: callData?.originalLeadId,
           source: 'dialing_session_lead_only'
@@ -164,14 +214,16 @@ Deno.serve(async (req) => {
           
         if (dialingLeadByLeadId?.notes) {
           console.log('Found match by lead_id in dialing_session_leads');
+          const leadDataFromNotes = extractLeadDataFromNotes(dialingLeadByLeadId.notes);
           return new Response(JSON.stringify({ 
             success: true,
             lead: {
               id: leadId,
               // Extract what we can from notes
-              ...extractLeadDataFromNotes(dialingLeadByLeadId.notes)
+              ...leadDataFromNotes
             },
             notes: [],
+            activities: [],
             callData,
             originalLeadId: callData?.originalLeadId,
             source: 'dialing_session_lead_by_lead_id'
@@ -211,14 +263,42 @@ Deno.serve(async (req) => {
             .select('*')
             .eq('lead_id', fullLead.id)
             .order('created_at', { ascending: false });
+            
+          // Get lead activities
+          const { data: activities } = await supabase
+            .from('lead_activities')
+            .select('*')
+            .eq('lead_id', fullLead.id)
+            .order('timestamp', { ascending: false })
+            .limit(10);
+
+          // Format the lead data
+          const formattedLead = {
+            id: fullLead.id,
+            firstName: fullLead.first_name,
+            lastName: fullLead.last_name,
+            phone1: fullLead.phone1,
+            phone2: fullLead.phone2,
+            email: fullLead.email,
+            mailingAddress: fullLead.mailing_address,
+            propertyAddress: fullLead.property_address,
+            disposition: fullLead.disposition,
+            tags: fullLead.tags || [],
+            avatar: fullLead.avatar,
+            createdAt: fullLead.created_at,
+            updatedAt: fullLead.updated_at,
+            mortgageData: fullLead.mortgage_data,
+            isMortgageLead: fullLead.is_mortgage_lead
+          };
 
           // Log activity if we have call data
           await logLeadActivity(fullLead.id, callData);
 
           return new Response(JSON.stringify({ 
             success: true,
-            lead: fullLead,
+            lead: formattedLead,
             notes: notes || [],
+            activities: activities || [],
             callData,
             originalLeadId: callData?.originalLeadId
           }), {
@@ -251,14 +331,42 @@ Deno.serve(async (req) => {
           .select('*')
           .eq('lead_id', numericLead.id)
           .order('created_at', { ascending: false });
+          
+        // Get lead activities
+        const { data: activities } = await supabase
+          .from('lead_activities')
+          .select('*')
+          .eq('lead_id', numericLead.id)
+          .order('timestamp', { ascending: false })
+          .limit(10);
+
+        // Format the lead data
+        const formattedLead = {
+          id: numericLead.id,
+          firstName: numericLead.first_name,
+          lastName: numericLead.last_name,
+          phone1: numericLead.phone1,
+          phone2: numericLead.phone2,
+          email: numericLead.email,
+          mailingAddress: numericLead.mailing_address,
+          propertyAddress: numericLead.property_address,
+          disposition: numericLead.disposition,
+          tags: numericLead.tags || [],
+          avatar: numericLead.avatar,
+          createdAt: numericLead.created_at,
+          updatedAt: numericLead.updated_at,
+          mortgageData: numericLead.mortgage_data,
+          isMortgageLead: numericLead.is_mortgage_lead
+        };
 
         // Log activity if we have call data
         await logLeadActivity(numericLead.id, callData);
 
         return new Response(JSON.stringify({ 
           success: true,
-          lead: numericLead,
+          lead: formattedLead,
           notes: notes || [],
+          activities: activities || [],
           callData,
           originalLeadId: callData?.originalLeadId
         }), {
@@ -279,13 +387,15 @@ Deno.serve(async (req) => {
       
     if (allDialingLeads?.notes) {
       console.log('Found potential match in dialing_session_leads notes');
+      const leadDataFromNotes = extractLeadDataFromNotes(allDialingLeads.notes);
       return new Response(JSON.stringify({ 
         success: true,
         lead: {
           id: leadId,
-          ...extractLeadDataFromNotes(allDialingLeads.notes)
+          ...leadDataFromNotes
         },
         notes: [],
+        activities: [],
         callData,
         originalLeadId: callData?.originalLeadId,
         source: 'dialing_session_lead_notes_search'
@@ -359,9 +469,9 @@ function extractLeadDataFromNotes(notesString: string | null): any {
   try {
     const notesData = JSON.parse(notesString);
     return {
-      first_name: notesData.firstName || notesData.first_name,
-      last_name: notesData.lastName || notesData.last_name,
-      phone1: notesData.phone,
+      firstName: notesData.firstName || notesData.first_name,
+      lastName: notesData.lastName || notesData.last_name,
+      phone1: notesData.phone || notesData.phone1,
       email: notesData.email,
       // Add any other fields we might find in notes
     };
