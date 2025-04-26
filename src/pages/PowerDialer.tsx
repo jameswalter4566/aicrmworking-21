@@ -219,47 +219,6 @@ export default function PowerDialer() {
     handleEndCall(currentCall.parameters.leadId);
   };
 
-  const forceLeadData = async (leadId: string) => {
-    console.log('[PowerDialer] Force loading lead data for:', leadId);
-    try {
-      const { data, error } = await supabase.functions.invoke('lead-connected', {
-        body: { 
-          leadId,
-          force: true,
-          callData: {
-            callSid: Object.values(twilioState.activeCalls)[0]?.callSid,
-            status: 'force_loaded',
-            timestamp: new Date().toISOString()
-          }
-        }
-      });
-
-      if (error) throw error;
-      
-      if (data?.lead) {
-        console.log('[PowerDialer] Force setting lead data:', data.lead);
-        
-        setConnectedLeadData({
-          first_name: data.lead.first_name || '',
-          last_name: data.lead.last_name || '',
-          phone1: data.lead.phone1 || '',
-          email: data.lead.email || '',
-          property_address: data.lead.property_address || '',
-          mailing_address: data.lead.mailing_address || ''
-        });
-        
-        setIsDialing(false);
-        
-        toast.success('Lead data forcefully loaded');
-      } else {
-        throw new Error('No lead data in response');
-      }
-    } catch (err) {
-      console.error('[PowerDialer] Force load error:', err);
-      toast.error('Failed to force load lead data');
-    }
-  };
-
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     console.log('[PowerDialer] Active call status changed:', activeCall?.status);
@@ -385,21 +344,6 @@ export default function PowerDialer() {
                 }}
               >
                 Reinitialize System
-              </Button>
-              
-              <Button
-                variant="default" 
-                size="sm"
-                onClick={() => {
-                  const activeCall = Object.values(twilioState.activeCalls)[0];
-                  if (activeCall?.leadId) {
-                    forceLeadData(activeCall.leadId);
-                  } else {
-                    toast.error('No active call to force load data from');
-                  }
-                }}
-              >
-                Force Load Data
               </Button>
             </div>
           </CardTitle>
