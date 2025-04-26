@@ -34,7 +34,7 @@ import { Phone } from "lucide-react";
 import TwilioScript from "@/components/TwilioScript";
 import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
-import { toast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
 
 const SAMPLE_LEADS = [
