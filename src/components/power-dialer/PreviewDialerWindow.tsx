@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,7 @@ import { useCallStatus } from '@/hooks/use-call-status';
 import { LeadDetailsPanel } from './LeadDetailsPanel';
 import DispositionSelector from '@/components/DispositionSelector';
 import { leadProfileService } from '@/services/leadProfile';
+import { ConnectedLeadPanel } from './ConnectedLeadPanel';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -146,6 +148,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       setIsLoadingLists(false);
     }
   };
+
+  useEffect(() => {
+    if (isDialingStarted) {
+      fetchCallingLists();
+    }
+  }, [isDialingStarted]);
 
   const handleDeleteLead = async (leadId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -350,7 +358,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               isDialing={isDialing}
               leadData={null}
             />
-          ) : (
+          ) : currentCall && currentCall.status === 'in-progress' ? (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-medium flex items-center justify-between">
@@ -480,11 +488,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 </div>
               </CardContent>
             </Card>
-          ) : currentCall ? (
-            <LeadDetailsPanel 
-              leadId={currentCall?.parameters?.leadId}
-              isActive={currentCall?.status === 'in-progress'}
-            />
           ) : (
             <Card>
               <CardHeader className="pb-2">
