@@ -111,42 +111,48 @@ export function useCallStatus() {
           const { new: newData } = payload;
           if (!newData) return;
           
-          const leadId = newData.contact_id as string;
-          
-          if (leadId) {
-            setCallStatuses(prev => {
-              const update: CallStatusUpdate = {
-                callSid: newData.twilio_call_sid,
-                status: newData.status,
-                startTime: newData.start_timestamp ? new Date(newData.start_timestamp) : undefined,
-                endTime: newData.end_timestamp ? new Date(newData.end_timestamp) : undefined,
-                duration: newData.duration,
-                leadId
-              };
-              
-              // Only update if this is new information
-              if (!prev[leadId] || 
-                  prev[leadId].status !== update.status ||
-                  prev[leadId].callSid !== update.callSid) {
+          // Type guard to check if newData has the required properties
+          if (typeof newData === 'object' && 'contact_id' in newData) {
+            const leadId = newData.contact_id as string;
+            
+            if (leadId) {
+              setCallStatuses(prev => {
+                const update: CallStatusUpdate = {
+                  // Safely access properties with type checking
+                  callSid: 'twilio_call_sid' in newData ? newData.twilio_call_sid as string : undefined,
+                  status: 'status' in newData ? newData.status as string : 'unknown',
+                  startTime: 'start_timestamp' in newData && newData.start_timestamp 
+                    ? new Date(newData.start_timestamp as string) : undefined,
+                  endTime: 'end_timestamp' in newData && newData.end_timestamp 
+                    ? new Date(newData.end_timestamp as string) : undefined,
+                  duration: 'duration' in newData ? newData.duration as number : undefined,
+                  leadId
+                };
                 
-                // If call failed or had an error, show a toast notification
-                if (update.status === 'failed' && (update.errorCode || update.errorMessage)) {
-                  toast.error(`Call error: ${update.errorMessage || 'Unknown error'}`, {
-                    description: `Error code: ${update.errorCode || 'Unknown'}`
-                  });
+                // Only update if this is new information
+                if (!prev[leadId] || 
+                    prev[leadId].status !== update.status ||
+                    prev[leadId].callSid !== update.callSid) {
+                  
+                  // If call failed or had an error, show a toast notification
+                  if (update.status === 'failed' && (update.errorCode || update.errorMessage)) {
+                    toast.error(`Call error: ${update.errorMessage || 'Unknown error'}`, {
+                      description: `Error code: ${update.errorCode || 'Unknown'}`
+                    });
+                  }
+                  
+                  return {
+                    ...prev,
+                    [leadId]: {
+                      ...(prev[leadId] || {}),
+                      ...update
+                    }
+                  };
                 }
                 
-                return {
-                  ...prev,
-                  [leadId]: {
-                    ...(prev[leadId] || {}),
-                    ...update
-                  }
-                };
-              }
-              
-              return prev;
-            });
+                return prev;
+              });
+            }
           }
         }
       )
