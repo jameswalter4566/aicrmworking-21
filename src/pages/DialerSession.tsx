@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -175,21 +176,21 @@ const DialerSession = () => {
   };
 
   useEffect(() => {
-    const activeCall = Object.values(twilioState.activeCalls)[0];
-    console.log('Active call status changed:', activeCall?.status);
-    console.log('Active call leadId:', activeCall?.leadId);
+    const firstActiveCall = Object.values(twilioState.activeCalls)[0]; 
+    console.log('Active call status changed:', firstActiveCall?.status);
+    console.log('Active call leadId:', firstActiveCall?.leadId);
     
-    if (activeCall?.status === 'in-progress' && activeCall.leadId) {
+    if (firstActiveCall?.status === 'in-progress' && firstActiveCall.leadId) {
       const fetchLeadData = async () => {
         try {
-          console.log('Fetching lead data for:', activeCall.leadId);
+          console.log('Fetching lead data for:', firstActiveCall.leadId);
           
           const { data, error } = await supabase.functions.invoke('lead-connected', {
             body: { 
-              leadId: activeCall.leadId,
+              leadId: firstActiveCall.leadId,
               callData: {
-                callSid: activeCall.callSid,
-                status: activeCall.status,
+                callSid: firstActiveCall.callSid,
+                status: firstActiveCall.status,
                 timestamp: new Date().toISOString()
               }
             }
@@ -208,7 +209,7 @@ const DialerSession = () => {
             const leadInfo = {
               first_name: data.lead.first_name || 'Unknown',
               last_name: data.lead.last_name || 'Contact',
-              phone1: data.lead.phone1 || activeCall.phoneNumber || '---',
+              phone1: data.lead.phone1 || firstActiveCall.phoneNumber || '---',
               email: data.lead.email || '---',
               property_address: data.lead.property_address || '---', 
               mailing_address: data.lead.mailing_address || '---'
@@ -221,7 +222,7 @@ const DialerSession = () => {
             const fallbackData = {
               first_name: 'Unknown',
               last_name: 'Contact',
-              phone1: activeCall.phoneNumber || '---',
+              phone1: firstActiveCall.phoneNumber || '---',
               email: '---',
               property_address: '---',
               mailing_address: '---'
@@ -234,7 +235,7 @@ const DialerSession = () => {
           const errorFallbackData = {
             first_name: 'Error',
             last_name: 'Loading Lead',
-            phone1: activeCall.phoneNumber || '---',
+            phone1: firstActiveCall.phoneNumber || '---',
             email: '---',
             property_address: '---',
             mailing_address: '---'
@@ -251,17 +252,20 @@ const DialerSession = () => {
       
       if (connectedLeadData) {
         console.log('Call disconnected, clearing lead data');
-        setConnectedLeadData(null);
+        // Uncomment this line if you want to clear the lead data when call ends
+        // setConnectedLeadData(null);
       }
     }
-  }, [twilioState.activeCalls, hasActiveCall, activeCall?.leadId, activeCall?.status]);
+  }, [twilioState.activeCalls, hasActiveCall, isCallingNext]);
 
   useEffect(() => {
-    if (activeCall?.status === 'completed' || activeCall?.status === 'failed') {
+    const firstActiveCall = Object.values(twilioState.activeCalls)[0];
+    if (firstActiveCall?.status === 'completed' || firstActiveCall?.status === 'failed') {
       setIsDialing(false);
-      setConnectedLeadData(null);
+      // Uncomment this line if you want to clear the lead data when call ends
+      // setConnectedLeadData(null);
     }
-  }, [activeCall?.status]);
+  }, [twilioState.activeCalls]);
 
   return (
     <MainLayout>
@@ -310,23 +314,23 @@ const DialerSession = () => {
                     <div className="flex justify-between items-center">
                       <div>
                         <p className="font-medium">
-                          {activeCall?.phoneNumber || "Current Call"}
+                          {Object.values(twilioState.activeCalls)[0]?.phoneNumber || "Current Call"}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {activeCall?.phoneNumber}
+                          {Object.values(twilioState.activeCalls)[0]?.phoneNumber}
                         </p>
-                        <Badge className="mt-2" variant={activeCall?.status === 'in-progress' ? "default" : "outline"}>
-                          {activeCall?.status === 'connecting' ? 'Ringing' : 
-                           activeCall?.status === 'in-progress' ? 'Connected' :
-                           activeCall?.status === 'completed' ? 'Ended' : 
-                           activeCall?.status}
+                        <Badge className="mt-2" variant={Object.values(twilioState.activeCalls)[0]?.status === 'in-progress' ? "default" : "outline"}>
+                          {Object.values(twilioState.activeCalls)[0]?.status === 'connecting' ? 'Ringing' : 
+                           Object.values(twilioState.activeCalls)[0]?.status === 'in-progress' ? 'Connected' :
+                           Object.values(twilioState.activeCalls)[0]?.status === 'completed' ? 'Ended' : 
+                           Object.values(twilioState.activeCalls)[0]?.status}
                         </Badge>
                       </div>
                       
                       <Button 
                         variant="destructive"
                         onClick={handleEndCall}
-                        disabled={!activeCall || activeCall.status === 'completed'}
+                        disabled={!Object.values(twilioState.activeCalls)[0] || Object.values(twilioState.activeCalls)[0].status === 'completed'}
                       >
                         <PhoneOff className="mr-2 h-4 w-4" />
                         End Call
