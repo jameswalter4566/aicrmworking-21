@@ -108,6 +108,14 @@ export default function PowerDialer() {
 
   useEffect(() => {
     console.log('[PowerDialer] connectedLeadData updated:', connectedLeadData);
+    
+    if (connectedLeadData) {
+      console.log('[PowerDialer] Lead details available:',
+        'Name:', connectedLeadData.first_name, connectedLeadData.last_name,
+        'Phone:', connectedLeadData.phone1,
+        'Email:', connectedLeadData.email
+      );
+    }
   }, [connectedLeadData]);
 
   useEffect(() => {
