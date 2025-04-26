@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -13,9 +12,9 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Notify lead-connected function when call status changes
-async function notifyLeadConnected(leadId: string, callSid: string, status: string) {
+async function notifyLeadConnected(leadId: string, callSid: string, status: string, dialingSessionId?: string) {
   try {
-    console.log(`Dialer Webhook: Notifying lead-connected for lead: ${leadId}, status: ${status}`);
+    console.log(`Dialer Webhook: Notifying lead-connected for lead: ${leadId}, status: ${status}, session: ${dialingSessionId}`);
     
     await supabase.functions.invoke('lead-connected', {
       body: { 
@@ -23,7 +22,9 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
         callData: {
           callSid,
           status,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          dialingSessionId,
+          originalLeadId: leadId
         }
       }
     });
@@ -43,6 +44,7 @@ Deno.serve(async (req) => {
     // Get callId from URL parameters
     const url = new URL(req.url);
     const callId = url.searchParams.get('callId');
+    const dialingSessionId = url.searchParams.get('sessionId');
     
     if (!callId) {
       throw new Error('Call ID is required');
@@ -53,23 +55,46 @@ Deno.serve(async (req) => {
     const callStatus = formData.get('CallStatus')?.toString();
     const callSid = formData.get('CallSid')?.toString();
     const callDuration = formData.get('CallDuration')?.toString();
+    const customParams = formData.get('CustomParameters')?.toString();
     
     console.log(`Dialer webhook received for call ${callId} with status: ${callStatus}`);
+    console.log('Custom parameters:', customParams);
     
-    // Get the call record
+    // Get the call record with expanded contact and session data
     const { data: call, error: callError } = await supabase
-      .from('predictive_dialer_calls')
-      .select('*, contact:contact_id(*), agent:agent_id(*)')
+      .from('dialing_session_leads')
+      .select(`
+        *,
+        contact:contact_id(*),
+        agent:agent_id(*),
+        dialing_session:session_id(*)
+      `)
       .eq('id', callId)
       .single();
       
     if (callError || !call) {
       throw new Error(`Call not found: ${callError?.message}`);
     }
+
+    // Extract the original lead ID from notes if available
+    let originalLeadId = null;
+    if (call.notes) {
+      try {
+        const notesData = JSON.parse(call.notes);
+        originalLeadId = notesData.originalLeadId;
+      } catch (e) {
+        console.warn('Could not parse notes JSON:', e);
+      }
+    }
     
-    // If we have a contact_id, notify the lead-connected function
-    if (call.contact_id && callSid) {
-      await notifyLeadConnected(call.contact_id, callSid, callStatus || 'unknown');
+    // If we have a contact_id or original lead ID, notify the lead-connected function
+    if ((call.contact_id || originalLeadId) && callSid) {
+      await notifyLeadConnected(
+        originalLeadId || call.contact_id,
+        callSid,
+        callStatus || 'unknown',
+        call.session_id
+      );
     }
     
     // Update call status based on Twilio webhook
