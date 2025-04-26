@@ -45,6 +45,42 @@ export type Database = {
         }
         Relationships: []
       }
+      call_mappings: {
+        Row: {
+          browser_call_sid: string | null
+          call_sid: string
+          created_at: string | null
+          id: string
+          lead_details: Json | null
+          lead_id: string
+          original_lead_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          browser_call_sid?: string | null
+          call_sid: string
+          created_at?: string | null
+          id?: string
+          lead_details?: Json | null
+          lead_id: string
+          original_lead_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          browser_call_sid?: string | null
+          call_sid?: string
+          created_at?: string | null
+          id?: string
+          lead_details?: Json | null
+          lead_id?: string
+          original_lead_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       call_status_updates: {
         Row: {
           call_sid: string
@@ -215,6 +251,7 @@ export type Database = {
           last_attempt: string | null
           lead_id: string
           notes: string | null
+          original_lead_id: string | null
           priority: number | null
           session_id: string
           status: string
@@ -228,6 +265,7 @@ export type Database = {
           last_attempt?: string | null
           lead_id: string
           notes?: string | null
+          original_lead_id?: string | null
           priority?: number | null
           session_id: string
           status?: string
@@ -241,6 +279,7 @@ export type Database = {
           last_attempt?: string | null
           lead_id?: string
           notes?: string | null
+          original_lead_id?: string | null
           priority?: number | null
           session_id?: string
           status?: string

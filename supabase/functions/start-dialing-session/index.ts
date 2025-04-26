@@ -1,5 +1,3 @@
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -7,7 +5,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -156,14 +154,15 @@ serve(async (req) => {
           status: 'queued',
           priority: 1,
           attempt_count: 0,
-          // Store the original lead ID as metadata in notes or other field
+          // Store the original lead ID as metadata in notes along with other details
           notes: JSON.stringify({ 
-            originalLeadId: lead.id,
+            originalLeadId: lead.id,  // Added original lead ID
             firstName: lead.first_name,
             lastName: lead.last_name,
             phone: lead.phone1,
             email: lead.email
-          })
+          }),
+          original_lead_id: lead.id.toString()  // Added a column to store original lead ID
         };
       });
       
@@ -185,6 +184,23 @@ serve(async (req) => {
         } else {
           insertedCount += batch.length;
           console.log(`Inserted batch ${i / BATCH_SIZE + 1} with ${batch.length} leads with 'queued' status`);
+          
+          // Notify lead-connected for each lead IMMEDIATELY after insertion
+          for (const lead of batch) {
+            try {
+              await supabaseClient.functions.invoke('lead-connected', {
+                body: { 
+                  leadId: lead.lead_id,
+                  callData: {
+                    originalLeadId: lead.original_lead_id
+                  }
+                }
+              });
+            } catch (notificationError) {
+              console.error(`Error notifying lead-connected for lead ${lead.lead_id}:`, notificationError);
+            }
+          }
+          
           if (insertData) {
             console.log(`First lead in batch response: ${JSON.stringify(insertData[0])}`);
           }
