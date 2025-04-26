@@ -25,13 +25,13 @@ export const ConnectedLeadPanel = ({
   forceSkeleton = false,
   sessionActive = false
 }: ConnectedLeadPanelProps) => {
-  // Show skeletons during appropriate states
+  // Modified logic to ensure we show skeletons only until we have data
   const showSkeletons = forceSkeleton || 
-                        isDialing || 
-                        (sessionActive && !leadData) || 
-                        (isConnected && !leadData);
+                       (isDialing && !leadData) || 
+                       (sessionActive && !leadData) || 
+                       (isConnected && !leadData);
   
-  // For debugging
+  // Enhanced debugging to track the component state
   useEffect(() => {
     console.log('ConnectedLeadPanel render with data:', { 
       leadData, 
@@ -39,10 +39,13 @@ export const ConnectedLeadPanel = ({
       isDialing, 
       showSkeletons,
       hasData: !!leadData,
+      dataKeys: leadData ? Object.keys(leadData) : [],
       first_name: leadData?.first_name,
       last_name: leadData?.last_name,
       phone1: leadData?.phone1,
-      email: leadData?.email
+      email: leadData?.email,
+      property_address: leadData?.property_address,
+      mailing_address: leadData?.mailing_address
     });
   }, [leadData, isConnected, isDialing, showSkeletons]);
 
