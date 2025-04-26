@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,29 +24,16 @@ export const ConnectedLeadPanel = ({
   forceSkeleton = false,
   sessionActive = false
 }: ConnectedLeadPanelProps) => {
-  // Modified logic to ensure we show skeletons only until we have data
-  const showSkeletons = forceSkeleton || 
-                       (isDialing && !leadData) || 
-                       (sessionActive && !leadData) || 
-                       (isConnected && !leadData);
+  const showSkeletons = forceSkeleton && !leadData;
   
-  // Enhanced debugging to track the component state
   useEffect(() => {
-    console.log('ConnectedLeadPanel render with data:', { 
+    console.log('ConnectedLeadPanel force render with:', { 
       leadData, 
-      isConnected, 
-      isDialing, 
       showSkeletons,
       hasData: !!leadData,
-      dataKeys: leadData ? Object.keys(leadData) : [],
-      first_name: leadData?.first_name,
-      last_name: leadData?.last_name,
-      phone1: leadData?.phone1,
-      email: leadData?.email,
-      property_address: leadData?.property_address,
-      mailing_address: leadData?.mailing_address
+      dataKeys: leadData ? Object.keys(leadData) : []
     });
-  }, [leadData, isConnected, isDialing, showSkeletons]);
+  }, [leadData, showSkeletons]);
 
   const getFormattedName = () => {
     if (!leadData) return '';
@@ -61,19 +47,14 @@ export const ConnectedLeadPanel = ({
         <CardTitle className="text-lg flex justify-between">
           Connected Lead Details
           <div className="flex space-x-2">
-            {isDialing && !isConnected && (
+            {leadData && (
+              <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
+                Data Loaded
+              </span>
+            )}
+            {!leadData && isDialing && (
               <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full">
                 Loading...
-              </span>
-            )}
-            {isConnected && (
-              <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
-                Connected
-              </span>
-            )}
-            {sessionActive && !isDialing && !isConnected && (
-              <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded-full">
-                Session Active
               </span>
             )}
           </div>
