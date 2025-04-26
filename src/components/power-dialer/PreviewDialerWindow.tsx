@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
+import { ConnectedLeadPanel } from './ConnectedLeadPanel';
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -495,27 +496,35 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       <>
                         <DialerQueueMonitor sessionId={sessionId} />
                         
-                        {!autoDialerActive && (
-                          <div className="flex justify-center my-4">
-                            <Button
-                              onClick={handleStartPowerDialing}
-                              className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
-                              disabled={isCreatingSession || isProcessingCall}
-                            >
-                              {isProcessingCall ? (
-                                <Loader2 className="h-5 w-5 animate-spin" />
-                              ) : (
-                                <Phone className="h-5 w-5" />
-                              )}
-                              Start Power Dialing
-                            </Button>
+                        {!autoDialerActive && !isActivePowerDialing && (
+                          <div className="text-center py-6">
+                            <Badge className="mb-4 bg-green-100 text-green-800 py-2 px-4 text-sm">
+                              Session Active
+                            </Badge>
+                            <p className="text-lg font-medium">Dialing session has been created successfully!</p>
+                            <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId}</p>
+                            
+                            <div className="flex justify-center mt-6">
+                              <Button
+                                onClick={handleStartPowerDialing}
+                                className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                                disabled={isCreatingSession || isProcessingCall}
+                              >
+                                {isProcessingCall ? (
+                                  <Loader2 className="h-5 w-5 animate-spin" />
+                                ) : (
+                                  <Phone className="h-5 w-5" />
+                                )}
+                                Start Power Dialing
+                              </Button>
+                            </div>
                           </div>
                         )}
 
                         {autoDialerActive && (
                           <ConnectedLeadPanel
-                            leadData={null}
-                            isConnected={false}
+                            leadData={currentLead}
+                            isConnected={currentCall?.status === 'in-progress'}
                             showPlaceholders={showSkeletonPlaceholders}
                           />
                         )}
@@ -535,16 +544,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       </Alert>
                     )}
                     
-                    {sessionId && !autoDialerActive ? (
-                      <div className="text-center py-6">
-                        <Badge className="mb-4 bg-green-100 text-green-800 py-2 px-4 text-sm">
-                          Session Active
-                        </Badge>
-                        <p className="text-lg font-medium">Dialing session has been created successfully!</p>
-                        <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId}</p>
-                      </div>
-                    ) : null}
-
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-medium">Select a Calling List</h3>
                       {selectedListId && !sessionId && (
@@ -618,115 +617,117 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
           )}
         </div>
 
-        <Card className="bg-gray-800 text-white">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-medium text-white">Disposition</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-[calc(100vh-650px)]">
-              <div className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                  onClick={() => onDisposition('contact')}
-                >
-                  <Phone className="mr-2 h-4 w-4 text-green-400" />
-                  Contact
-                </Button>
+        <div className="lg:col-span-1">
+          <Card className="bg-gray-800 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium text-white">Disposition</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[calc(100vh-650px)]">
+                <div className="space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
+                    onClick={() => onDisposition('contact')}
+                  >
+                    <Phone className="mr-2 h-4 w-4 text-green-400" />
+                    Contact
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={() => onDisposition('no-contact')}
+                  >
+                    <UserX className="mr-2 h-4 w-4 text-gray-400" />
+                    No Contact
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={() => onDisposition('bad-number')}
+                  >
+                    <PhoneMissed className="mr-2 h-4 w-4 text-red-400" />
+                    Bad Number
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={() => onDisposition('drop-message')}
+                  >
+                    <MessageSquare className="mr-2 h-4 w-4 text-blue-400" />
+                    Drop Message
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={() => onDisposition('dnc-contact')}
+                  >
+                    <Ban className="mr-2 h-4 w-4 text-yellow-400" />
+                    DNC Contact
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={() => onDisposition('dnc-number')}
+                  >
+                    <PhoneOff className="mr-2 h-4 w-4 text-orange-400" />
+                    DNC Number
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={() => onDisposition('callback')}
+                  >
+                    <Clock className="mr-2 h-4 w-4 text-purple-400" />
+                    Quick Callback
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={() => onDisposition('redial')}
+                  >
+                    <RotateCcw className="mr-2 h-4 w-4 text-indigo-400" />
+                    Redial
+                  </Button>
+                </div>
                 
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('no-contact')}
-                >
-                  <UserX className="mr-2 h-4 w-4 text-gray-400" />
-                  No Contact
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('bad-number')}
-                >
-                  <PhoneMissed className="mr-2 h-4 w-4 text-red-400" />
-                  Bad Number
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('drop-message')}
-                >
-                  <MessageSquare className="mr-2 h-4 w-4 text-blue-400" />
-                  Drop Message
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('dnc-contact')}
-                >
-                  <Ban className="mr-2 h-4 w-4 text-yellow-400" />
-                  DNC Contact
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('dnc-number')}
-                >
-                  <PhoneOff className="mr-2 h-4 w-4 text-orange-400" />
-                  DNC Number
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('callback')}
-                >
-                  <Clock className="mr-2 h-4 w-4 text-purple-400" />
-                  Quick Callback
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={() => onDisposition('redial')}
-                >
-                  <RotateCcw className="mr-2 h-4 w-4 text-indigo-400" />
-                  Redial
-                </Button>
-              </div>
-              
-              <div className="pt-4 border-t border-gray-600 mt-4 space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                >
-                  <Pause className="mr-2 h-4 w-4" />
-                  Pause
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={onEndCall}
-                >
-                  <PhoneOff className="mr-2 h-4 w-4" />
-                  Hang Up
-                </Button>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-center bg-red-900/50 hover:bg-red-900 text-white border-red-900"
-                >
-                  <StopCircle className="mr-2 h-4 w-4 text-red-400" />
-                  Stop
-                </Button>
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                <div className="pt-4 border-t border-gray-600 mt-4 space-y-2">
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                  >
+                    <Pause className="mr-2 h-4 w-4" />
+                    Pause
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                    onClick={onEndCall}
+                  >
+                    <PhoneOff className="mr-2 h-4 w-4" />
+                    Hang Up
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-center bg-red-900/50 hover:bg-red-900 text-white border-red-900"
+                  >
+                    <StopCircle className="mr-2 h-4 w-4 text-red-400" />
+                    Stop
+                  </Button>
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </>
   );

@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Phone, MapPin, User, Notes } from "lucide-react";
+import { Mail, Phone, MapPin, User, MessageSquare } from "lucide-react";
 
 interface ConnectedLeadPanelProps {
   leadData?: {
@@ -131,7 +131,7 @@ export const ConnectedLeadPanel = ({ leadData, isConnected, showPlaceholders = f
         
         <div className="mt-4">
           <h3 className="font-medium mb-2 flex items-center gap-1">
-            <Notes className="h-4 w-4" /> Notes
+            <MessageSquare className="h-4 w-4" /> Notes
           </h3>
           {showSkeletons ? (
             <Skeleton className="h-24 w-full" />
