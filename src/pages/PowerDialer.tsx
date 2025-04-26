@@ -107,7 +107,7 @@ export default function PowerDialer() {
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
 
   useEffect(() => {
-    console.log('[PowerDialer] connectedLeadData state:', connectedLeadData);
+    console.log('[PowerDialer] connectedLeadData state updated:', connectedLeadData);
   }, [connectedLeadData]);
 
   useEffect(() => {
@@ -128,7 +128,6 @@ export default function PowerDialer() {
     if (window.Twilio && window.Twilio.Device) {
       console.log("Twilio device available:", window.Twilio.Device);
       setTwilioReady(true);
-      
       return () => {};
     }
   }, [isScriptLoaded]);
@@ -260,12 +259,13 @@ export default function PowerDialer() {
             throw error;
           }
           
-          console.log('[PowerDialer] Full response from lead-connected:', data);
+          console.log('[PowerDialer] FULL RAW RESPONSE from lead-connected:', data);
+          console.log('[PowerDialer] Response type:', typeof data);
+          console.log('[PowerDialer] Has lead property?', data && 'lead' in data);
           
           if (data?.lead) {
-            console.log('[PowerDialer] Setting connected lead data from response:', data.lead);
+            console.log('[PowerDialer] Lead data found in response:', JSON.stringify(data.lead));
             
-            // Ensure all required fields are present
             const leadInfo = {
               first_name: data.lead.first_name || 'Unknown',
               last_name: data.lead.last_name || 'Contact',
@@ -275,21 +275,12 @@ export default function PowerDialer() {
               mailing_address: data.lead.mailing_address || '---'
             };
             
-            console.log('[PowerDialer] Processed lead data:', leadInfo);
+            console.log('[PowerDialer] Processed lead data to set in state:', JSON.stringify(leadInfo));
             
-            // Force a state update with lead data
-            setConnectedLeadData(null); // Clear first to force re-render
-            // Use setTimeout to ensure the state update happens in a separate render cycle
-            setTimeout(() => {
-              setConnectedLeadData(leadInfo);
-              console.log('[PowerDialer] Set connected lead data:', leadInfo);
-              
-              // Force refresh to ensure UI updates
-              setTimeout(() => {
-                const refreshEvent = new Event('forceRefresh');
-                window.dispatchEvent(refreshEvent);
-              }, 100);
-            }, 50);
+            setConnectedLeadData(leadInfo);
+            console.log('[PowerDialer] State update triggered with lead data');
+            
+            window.dispatchEvent(new CustomEvent('leadDataUpdated', { detail: leadInfo }));
           } else {
             console.log('[PowerDialer] No lead data in response, creating fallback data');
             const fallbackData = {
@@ -303,9 +294,7 @@ export default function PowerDialer() {
             setConnectedLeadData(fallbackData);
           }
           
-          setTimeout(() => {
-            setIsDialing(false);
-          }, 500);
+          setIsDialing(false);
         } catch (err) {
           console.error('[PowerDialer] Error fetching lead data:', err);
           const errorFallbackData = {
@@ -327,23 +316,16 @@ export default function PowerDialer() {
   }, [twilioState.activeCalls]);
 
   useEffect(() => {
-    const handleForceRefresh = () => {
-      console.log("[PowerDialer] Force refresh triggered");
-      // This is just to trigger a component update
+    const handleLeadDataUpdated = (event: any) => {
+      console.log("[PowerDialer] Lead data updated event received with data:", event.detail);
     };
     
-    window.addEventListener('forceRefresh', handleForceRefresh);
+    window.addEventListener('leadDataUpdated', handleLeadDataUpdated);
     
     return () => {
-      window.removeEventListener('forceRefresh', handleForceRefresh);
+      window.removeEventListener('leadDataUpdated', handleLeadDataUpdated);
     };
   }, []);
-
-  useEffect(() => {
-    if (connectedLeadData) {
-      console.log("[PowerDialer] LEAD DATA STATE UPDATED:", JSON.stringify(connectedLeadData));
-    }
-  }, [connectedLeadData]);
 
   useEffect(() => {
     console.log('Rendering PowerDialer with state:', {
@@ -753,7 +735,7 @@ export default function PowerDialer() {
             <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
               {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
             </Badge>
-            <Badge variant={connectedLeadData ? "success" : "outline"}>
+            <Badge variant={connectedLeadData ? "default" : "outline"}>
               {connectedLeadData ? "Lead Data Present" : "No Lead Data"}
             </Badge>
           </div>
@@ -800,7 +782,9 @@ export default function PowerDialer() {
                 </button>
                 <button 
                   onClick={() => {
-                    setConnectedLeadData({...connectedLeadData});
+                    const updatedData = {...connectedLeadData};
+                    setConnectedLeadData(null);
+                    setTimeout(() => setConnectedLeadData(updatedData), 50);
                     console.log("Force rerender triggered");
                   }}
                   className="bg-orange-500 text-white px-2 py-1 rounded text-xs"
