@@ -267,7 +267,7 @@ export default function PowerDialer() {
             setTimeout(() => {
               setIsDialing(false);
               console.log('[PowerDialer] Setting isDialing to false after data load');
-            }, 300);
+            }, 500);
           } else {
             console.log('[PowerDialer] No lead data in response');
             setConnectedLeadData(null);
