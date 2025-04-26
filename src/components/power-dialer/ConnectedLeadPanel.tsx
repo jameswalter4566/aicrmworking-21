@@ -25,9 +25,14 @@ export const ConnectedLeadPanel = ({
   forceSkeleton = false,
   sessionActive = false
 }: ConnectedLeadPanelProps) => {
-  // Always show skeletons when explicitly forced, when dialing, when session is active without lead data,
+  // Always show skeletons when explicitly forced, when dialing, when session is active without lead data, 
   // or when connected without lead data
   const showSkeletons = forceSkeleton || isDialing || (sessionActive && !leadData) || (isConnected && !leadData);
+
+  const getFormattedName = () => {
+    if (!leadData?.first_name && !leadData?.last_name) return '';
+    return `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
+  };
 
   return (
     <Card className="mt-4">
@@ -64,7 +69,7 @@ export const ConnectedLeadPanel = ({
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
                   <div className="text-sm mt-1">
-                    {leadData?.first_name || ''} {leadData?.last_name || ''}
+                    {getFormattedName()}
                   </div>
                 )}
               </div>
@@ -111,17 +116,6 @@ export const ConnectedLeadPanel = ({
               </div>
             </div>
           </div>
-        </div>
-        
-        <div className="mt-4">
-          <h3 className="font-medium mb-2">Notes</h3>
-          {showSkeletons ? (
-            <Skeleton className="h-24 w-full" />
-          ) : (
-            <div className="text-sm p-3 bg-gray-50 rounded-lg min-h-[6rem]">
-              {leadData ? "No notes available" : "No notes available"}
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>
