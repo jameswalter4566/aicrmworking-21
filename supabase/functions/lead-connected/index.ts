@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -31,13 +30,47 @@ Deno.serve(async (req) => {
       console.log(`Call data received: callSid=${callData.callSid}, status=${callData.status}, timestamp=${callData.timestamp}`);
     }
 
-    // First determine if the leadId is a UUID format
-    const isUuid = typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
-    console.log(`Lead ID appears to be a ${isUuid ? 'UUID' : 'numeric ID'}: ${leadId}`);
+    // First check if we have a call mapping
+    if (callData?.callSid) {
+      const { data: callMapping, error: mappingError } = await supabase
+        .from('call_mappings')
+        .select('*')
+        .eq('call_sid', callData.callSid)
+        .maybeSingle();
 
-    // STRATEGY 1: Check if this is a dialing session lead first - this is most likely with power dialer
+      if (callMapping) {
+        console.log('Found call mapping:', callMapping);
+        
+        // Update call status
+        await supabase
+          .from('call_mappings')
+          .update({ 
+            status: callData.status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('call_sid', callData.callSid);
+
+        // If we have lead details stored, use them
+        if (callMapping.lead_details) {
+          return new Response(JSON.stringify({
+            success: true,
+            lead: callMapping.lead_details,
+            notes: [], // Could be enhanced to fetch notes if needed
+            callData
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          });
+        }
+      }
+    }
+
+    // If no mapping found or no lead details, proceed with existing lookup logic
+    const isUuid = typeof leadId === 'string' && 
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
+
+    // STRATEGY 1: Check dialing session leads
     if (isUuid) {
-      console.log('Checking if this is a dialing session lead ID first');
       const { data: dialingLead, error: dialingLeadError } = await supabase
         .from('dialing_session_leads')
         .select('*, notes')
@@ -47,23 +80,18 @@ Deno.serve(async (req) => {
       if (dialingLead) {
         console.log(`Found in dialing_session_leads with ID: ${dialingLead.id}`);
         
-        // Try to extract the original lead ID from the notes field if it exists
         let originalLeadId = null;
         if (dialingLead.notes) {
           try {
             const notesData = JSON.parse(dialingLead.notes);
-            if (notesData.originalLeadId) {
-              originalLeadId = notesData.originalLeadId;
-              console.log(`Found original lead ID in notes: ${originalLeadId}`);
-            }
+            originalLeadId = notesData.originalLeadId;
           } catch (parseError) {
             console.log(`Could not parse notes JSON: ${parseError.message}`);
           }
         }
 
-        // If we have an original lead ID from notes, fetch that lead
         if (originalLeadId) {
-          const { data: actualLead, error: actualLeadError } = await supabase
+          const { data: actualLead } = await supabase
             .from('leads')
             .select(`
               id,
@@ -82,8 +110,22 @@ Deno.serve(async (req) => {
             .maybeSingle();
           
           if (actualLead) {
-            console.log(`Successfully found lead via originalLeadId: ${actualLead.first_name} ${actualLead.last_name}`);
-            
+            // Store mapping for future lookups
+            if (callData?.callSid) {
+              await supabase
+                .from('call_mappings')
+                .upsert({
+                  call_sid: callData.callSid,
+                  browser_call_sid: callData.browserCallSid || null,
+                  lead_id: leadId,
+                  original_lead_id: originalLeadId,
+                  lead_details: actualLead,
+                  status: callData.status
+                })
+                .select()
+                .single();
+            }
+
             // Get lead notes
             const { data: notes } = await supabase
               .from('lead_notes')
@@ -91,7 +133,6 @@ Deno.serve(async (req) => {
               .eq('lead_id', actualLead.id)
               .order('created_at', { ascending: false });
 
-            // Log activity if we have call data
             await logLeadActivity(actualLead.id, callData);
 
             return new Response(JSON.stringify({ 
@@ -103,18 +144,14 @@ Deno.serve(async (req) => {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200,
             });
-          } else {
-            console.log(`Could not find lead with originalLeadId: ${originalLeadId}`);
           }
         }
         
-        // If we reached here, we found the dialing_session_lead but couldn't get a lead record
-        // Return a partial success with what we have
+        // Return partial success with dialing session data
         return new Response(JSON.stringify({ 
           success: true,
           lead: {
             id: leadId,
-            // Extract any basic info we can from notes
             ...extractLeadDataFromNotes(dialingLead.notes)
           },
           notes: [],
@@ -124,33 +161,6 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
-      } else {
-        console.log('No dialing session lead found, checking dialing_session_leads by lead_id');
-        
-        // Try to match UUID as lead_id in dialing_session_leads
-        const { data: dialingLeadByLeadId } = await supabase
-          .from('dialing_session_leads')
-          .select('*, notes')
-          .eq('lead_id', leadId)
-          .maybeSingle();
-          
-        if (dialingLeadByLeadId?.notes) {
-          console.log('Found match by lead_id in dialing_session_leads');
-          return new Response(JSON.stringify({ 
-            success: true,
-            lead: {
-              id: leadId,
-              // Extract what we can from notes
-              ...extractLeadDataFromNotes(dialingLeadByLeadId.notes)
-            },
-            notes: [],
-            callData,
-            source: 'dialing_session_lead_by_lead_id'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
-        }
       }
     }
 
@@ -234,31 +244,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // If we still haven't found anything, try one last approach: searching dialing_session_leads
-    console.log('Trying to lookup in dialing_session_leads');
-    const { data: allDialingLeads, error: allDialingError } = await supabase
-      .from('dialing_session_leads')
-      .select('notes')
-      .filter('notes', 'ilike', `%${leadId}%`)
-      .maybeSingle();
-      
-    if (allDialingLeads?.notes) {
-      console.log('Found potential match in dialing_session_leads notes');
-      return new Response(JSON.stringify({ 
-        success: true,
-        lead: {
-          id: leadId,
-          ...extractLeadDataFromNotes(allDialingLeads.notes)
-        },
-        notes: [],
-        callData,
-        source: 'dialing_session_lead_notes_search'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
-    }
-
     // If we still haven't found anything, return a 404
     console.log(`No lead found with ID: ${leadId}`);
     
@@ -269,11 +254,11 @@ Deno.serve(async (req) => {
       callData
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200, // Return 200 instead of 404 so call data is still accessible
+      status: 200,
     });
+
   } catch (error) {
     console.error('Error in lead-connected function:', error);
-    
     return new Response(JSON.stringify({ 
       success: false, 
       error: error.message 
