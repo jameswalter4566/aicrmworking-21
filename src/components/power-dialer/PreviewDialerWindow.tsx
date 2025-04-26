@@ -66,6 +66,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
   const [callNotes, setCallNotes] = useState('');
+  // Initialize isDialing as true to show skeletons immediately on load
   const [isDialing, setIsDialing] = useState(true);
 
   const resetDialingState = () => {
