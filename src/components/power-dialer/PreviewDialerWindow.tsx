@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -338,7 +339,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                     <Phone className="h-5 w-5 text-green-500" />
                     Active Call
                   </div>
-                  <Badge className="bg-green-500">In Progress</Badge>
+                  <Badge>In Progress</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -594,7 +595,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                                   </p>
                                 </div>
                                 {selectedListId === list.id && (
-                                  <Badge className="bg-green-50 text-green-600">
+                                  <Badge variant="outline">
                                     Selected
                                   </Badge>
                                 )}
