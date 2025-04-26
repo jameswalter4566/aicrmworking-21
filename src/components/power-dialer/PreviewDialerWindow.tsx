@@ -17,7 +17,9 @@ import {
   Play,
   Trash2,
   List,
-  Loader2
+  Loader2,
+  Mail,
+  MapPin
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
@@ -31,6 +33,8 @@ import { twilioService } from "@/services/twilio";
 import { LineDisplay } from './LineDisplay';
 import { useCallStatus } from '@/hooks/use-call-status';
 import { LeadDetailsPanel } from './LeadDetailsPanel';
+import DispositionSelector from '@/components/DispositionSelector';
+import { leadProfileService } from '@/services/leadProfile';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -57,6 +61,10 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const { user } = useAuth();
   const { callStatuses } = useCallStatus();
 
+  // New state for lead data
+  const [currentLead, setCurrentLead] = useState<any>(null);
+  const [leadNotes, setLeadNotes] = useState<any[]>([]);
+
   useEffect(() => {
     if (isDialingStarted) {
       fetchCallingLists();
@@ -74,6 +82,30 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   useEffect(() => {
     console.log('Call statuses updated:', callStatuses);
   }, [callStatuses]);
+
+  useEffect(() => {
+    const fetchLeadData = async () => {
+      if (currentCall?.parameters?.leadId && currentCall.status === 'in-progress') {
+        try {
+          const { data, error } = await supabase.functions.invoke('lead-connected', {
+            body: { leadId: currentCall.parameters.leadId }
+          });
+
+          if (error) throw error;
+
+          if (data.success) {
+            setCurrentLead(data.lead);
+            setLeadNotes(data.notes);
+          }
+        } catch (err) {
+          console.error('Error fetching lead data:', err);
+          toast.error('Failed to load lead details');
+        }
+      }
+    };
+
+    fetchLeadData();
+  }, [currentCall?.parameters?.leadId, currentCall?.status]);
 
   const fetchCallingLists = async () => {
     setIsLoadingLists(true);
