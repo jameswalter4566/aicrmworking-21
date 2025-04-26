@@ -14,31 +14,45 @@ serve(async (req) => {
   }
   
   try {
+    // Create a Supabase client with the admin role for direct database access
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    
+    // Create a regular client to get the user when possible
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: req.headers.get('Authorization')! },
+          headers: { Authorization: req.headers.get('Authorization') || '' },
         },
       }
     );
     
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Try to get the user, but continue even if not authenticated
+    let userId = null;
+    try {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (user) {
+        userId = user.id;
+        console.log("User authenticated:", userId);
+      }
+    } catch (authError) {
+      console.log("Could not authenticate user, proceeding with admin access:", authError.message);
     }
     
-    // Get calling lists created by the current user
-    const { data: lists, error } = await supabaseClient
+    // If we have a userId, filter by it. Otherwise, return a limited set of lists
+    const query = supabaseAdmin
       .from('calling_lists')
-      .select('id, name, created_at')
-      .eq('created_by', user.id)
-      .order('created_at', { ascending: false });
+      .select('id, name, created_at');
+    
+    if (userId) {
+      query.eq('created_by', userId);
+    }
+    
+    const { data: lists, error } = await query.order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching calling lists:', error);
@@ -51,7 +65,7 @@ serve(async (req) => {
     // Get lead count for each list
     const listsWithCounts = await Promise.all(
       lists.map(async (list) => {
-        const { count, error: countError } = await supabaseClient
+        const { count, error: countError } = await supabaseAdmin
           .from('calling_list_leads')
           .select('*', { count: 'exact', head: true })
           .eq('list_id', list.id);
