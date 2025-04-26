@@ -106,7 +106,6 @@ export default function PowerDialer() {
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
 
-  // Enhanced debug logging for lead data
   useEffect(() => {
     console.log('[PowerDialer] connectedLeadData state:', connectedLeadData);
   }, [connectedLeadData]);
@@ -280,9 +279,16 @@ export default function PowerDialer() {
             
             // Force a state update with lead data
             setConnectedLeadData(null); // Clear first to force re-render
+            // Use setTimeout to ensure the state update happens in a separate render cycle
             setTimeout(() => {
               setConnectedLeadData(leadInfo);
               console.log('[PowerDialer] Set connected lead data:', leadInfo);
+              
+              // Force refresh to ensure UI updates
+              setTimeout(() => {
+                const refreshEvent = new Event('forceRefresh');
+                window.dispatchEvent(refreshEvent);
+              }, 100);
             }, 50);
           } else {
             console.log('[PowerDialer] No lead data in response, creating fallback data');
@@ -321,13 +327,23 @@ export default function PowerDialer() {
   }, [twilioState.activeCalls]);
 
   useEffect(() => {
-    const activeCall = Object.values(twilioState.activeCalls)[0];
-    if (activeCall?.status === 'completed' || activeCall?.status === 'failed') {
-      setIsDialing(false);
-      setConnectedLeadData(null);
-      console.log('[PowerDialer] Call completed/failed, cleared lead data and dialing state');
+    const handleForceRefresh = () => {
+      console.log("[PowerDialer] Force refresh triggered");
+      // This is just to trigger a component update
+    };
+    
+    window.addEventListener('forceRefresh', handleForceRefresh);
+    
+    return () => {
+      window.removeEventListener('forceRefresh', handleForceRefresh);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (connectedLeadData) {
+      console.log("[PowerDialer] LEAD DATA STATE UPDATED:", JSON.stringify(connectedLeadData));
     }
-  }, [twilioState.activeCalls]);
+  }, [connectedLeadData]);
 
   useEffect(() => {
     console.log('Rendering PowerDialer with state:', {
@@ -701,11 +717,13 @@ export default function PowerDialer() {
     </div>
   );
 
-  // Add debug overlay for lead data state
   return (
     <MainLayout>
       <TwilioScript
-        onLoad={() => setIsScriptLoaded(true)}
+        onLoad={() => {
+          console.log("[PowerDialer] Twilio script loaded");
+          setIsScriptLoaded(true);
+        }}
         onError={(err) => console.error("TwilioScript error:", err)}
       />
       
@@ -734,6 +752,9 @@ export default function PowerDialer() {
             </Badge>
             <Badge variant={twilioState.audioStreaming ? "default" : "outline"}>
               {twilioState.audioStreaming ? "Streaming Active" : "Streaming Inactive"}
+            </Badge>
+            <Badge variant={connectedLeadData ? "success" : "outline"}>
+              {connectedLeadData ? "Lead Data Present" : "No Lead Data"}
             </Badge>
           </div>
         </div>
@@ -766,16 +787,41 @@ export default function PowerDialer() {
           </TabsContent>
         </Tabs>
         
-        {/* Debug overlay to show lead data state */}
-        {connectedLeadData && (
-          <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border border-green-500 z-50 max-w-md">
-            <h3 className="font-bold flex justify-between">
+        {connectedLeadData ? (
+          <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border-2 border-green-600 z-50 max-w-md">
+            <h3 className="font-bold flex justify-between items-center">
               <span>Debug: Lead Data Present</span>
-              <button onClick={() => console.log('Current lead data:', connectedLeadData)}>
-                Log Data
-              </button>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => console.log('Current lead data:', connectedLeadData)}
+                  className="bg-blue-500 text-white px-2 py-1 rounded text-xs"
+                >
+                  Log Data
+                </button>
+                <button 
+                  onClick={() => {
+                    setConnectedLeadData({...connectedLeadData});
+                    console.log("Force rerender triggered");
+                  }}
+                  className="bg-orange-500 text-white px-2 py-1 rounded text-xs"
+                >
+                  Force Rerender
+                </button>
+              </div>
             </h3>
-            <pre className="text-xs overflow-auto max-h-40">{JSON.stringify(connectedLeadData, null, 2)}</pre>
+            <pre className="text-xs overflow-auto max-h-40 bg-gray-100 p-2 mt-2">
+              {JSON.stringify(connectedLeadData, null, 2)}
+            </pre>
+            <div className="mt-2 text-xs text-red-500">
+              If data above is present but not showing in UI, check component props passing
+            </div>
+          </div>
+        ) : (
+          <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border border-red-300 z-50">
+            <h3 className="font-bold text-red-500">Debug: No Lead Data in State</h3>
+            <div className="text-xs mt-1">
+              API request may have failed or state update issue
+            </div>
           </div>
         )}
         
