@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -15,12 +15,7 @@ interface ConnectedLeadPanelProps {
 }
 
 export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
-  // Simple debug logging
-  useEffect(() => {
-    console.log('ConnectedLeadPanel received leadData:', leadData);
-  }, [leadData]);
-
-  // Only check if we have leadData
+  // Show skeletons only if we don't have leadData
   const showSkeletons = !leadData;
 
   const getFormattedName = () => {
@@ -45,9 +40,7 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1 font-medium">
-                    {getFormattedName() || "---"}
-                  </div>
+                  <div className="text-sm mt-1 font-medium">{getFormattedName() || "---"}</div>
                 )}
               </div>
               
