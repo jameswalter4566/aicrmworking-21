@@ -23,8 +23,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -224,7 +222,7 @@ export default function PowerDialer() {
     console.log('[PowerDialer] Active call status changed:', activeCall?.status);
     console.log('[PowerDialer] Active call leadId:', activeCall?.leadId);
     
-    if (activeCall?.status === 'in-progress' && activeCall.leadId) {
+    if (activeCall?.leadId) {
       const fetchLeadData = async () => {
         try {
           console.log('[PowerDialer] Fetching lead data for:', activeCall.leadId);
@@ -235,7 +233,7 @@ export default function PowerDialer() {
               leadId: activeCall.leadId,
               callData: {
                 callSid: activeCall.callSid,
-                status: activeCall.status,
+                status: activeCall.status || 'unknown',
                 timestamp: new Date().toISOString()
               }
             }
@@ -261,7 +259,6 @@ export default function PowerDialer() {
             };
             
             console.log('[PowerDialer] Forcing lead data for component:', leadInfo);
-            
             setConnectedLeadData(leadInfo);
           } else {
             console.log('[PowerDialer] No lead data in response, creating fallback data');
@@ -296,13 +293,8 @@ export default function PowerDialer() {
       };
 
       fetchLeadData();
-    } else if ((!hasActiveCall || (activeCall && activeCall.status !== 'in-progress')) && !isDialing) {
-      console.log('[PowerDialer] Call disconnected, clearing lead data');
-      if (connectedLeadData) {
-        setConnectedLeadData(null);
-      }
     }
-  }, [twilioState.activeCalls, hasActiveCall]);
+  }, [twilioState.activeCalls]);
 
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];

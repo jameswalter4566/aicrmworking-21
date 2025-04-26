@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -65,7 +64,6 @@ const DialerSession = () => {
     try {
       setIsCallingNext(true);
       setIsDialing(true);
-      setConnectedLeadData(null); // Clear previous lead data
       
       const { data, error } = await supabase.functions.invoke('get-next-lead', {
         body: { sessionId }
@@ -82,6 +80,8 @@ const DialerSession = () => {
       }
       
       setCurrentLeadId(data.leadId);
+      
+      fetchLeadData(data.leadId);
       
       await twilioService.initializeTwilioDevice();
       
@@ -103,6 +103,67 @@ const DialerSession = () => {
       setIsDialing(false);
     } finally {
       setIsCallingNext(false);
+    }
+  };
+
+  const fetchLeadData = async (leadId: string) => {
+    try {
+      console.log('Directly fetching lead data for:', leadId);
+      
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
+        body: { 
+          leadId: leadId,
+          callData: {
+            status: 'preparing',
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Error from lead-connected:', error);
+        throw error;
+      }
+      
+      console.log('Response from lead-connected:', data);
+      
+      if (data?.lead) {
+        console.log('Setting connected lead data from direct fetch:', data.lead);
+        
+        const leadInfo = {
+          first_name: data.lead.first_name || 'Unknown',
+          last_name: data.lead.last_name || 'Contact',
+          phone1: data.lead.phone1 || '---',
+          email: data.lead.email || '---',
+          property_address: data.lead.property_address || '---', 
+          mailing_address: data.lead.mailing_address || '---'
+        };
+        
+        console.log('Mapped lead data for component:', leadInfo);
+        setConnectedLeadData(leadInfo);
+      } else {
+        console.log('No lead data in direct fetch, creating fallback data');
+        const fallbackData = {
+          first_name: 'Unknown',
+          last_name: 'Contact',
+          phone1: '---',
+          email: '---',
+          property_address: '---',
+          mailing_address: '---'
+        };
+        setConnectedLeadData(fallbackData);
+      }
+    } catch (err) {
+      console.error('Error directly fetching lead data:', err);
+      const errorFallbackData = {
+        first_name: 'Error',
+        last_name: 'Loading Lead',
+        phone1: '---',
+        email: '---',
+        property_address: '---',
+        mailing_address: '---'
+      };
+      setConnectedLeadData(errorFallbackData);
     }
   };
 
@@ -249,12 +310,6 @@ const DialerSession = () => {
       fetchLeadData();
     } else if (!hasActiveCall && !isCallingNext) {
       setIsDialing(false);
-      
-      if (connectedLeadData) {
-        console.log('Call disconnected, clearing lead data');
-        // Uncomment this line if you want to clear the lead data when call ends
-        // setConnectedLeadData(null);
-      }
     }
   }, [twilioState.activeCalls, hasActiveCall, isCallingNext]);
 
@@ -262,8 +317,6 @@ const DialerSession = () => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     if (firstActiveCall?.status === 'completed' || firstActiveCall?.status === 'failed') {
       setIsDialing(false);
-      // Uncomment this line if you want to clear the lead data when call ends
-      // setConnectedLeadData(null);
     }
   }, [twilioState.activeCalls]);
 
