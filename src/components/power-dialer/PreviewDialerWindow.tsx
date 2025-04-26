@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +58,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [isActivePowerDialing, setIsActivePowerDialing] = useState(false);
   const [isProcessingCall, setIsProcessingCall] = useState(false);
   const [activeCallsInProgress, setActiveCallsInProgress] = useState<Record<string, any>>({});
+  const [showSkeletonPlaceholders, setShowSkeletonPlaceholders] = useState(false);
   const { user } = useAuth();
   const { callStatuses } = useCallStatus();
 
@@ -221,6 +221,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 
     try {
       setIsProcessingCall(true);
+      setShowSkeletonPlaceholders(true);
       await twilioService.initializeTwilioDevice();
       setAutoDialerActive(true);
       setIsActivePowerDialing(true);
@@ -233,6 +234,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       toast.error("Failed to start power dialing");
       setAutoDialerActive(false);
       setIsActivePowerDialing(false);
+      setShowSkeletonPlaceholders(false);
     } finally {
       setIsProcessingCall(false);
     }
@@ -510,6 +512,14 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                           </div>
                         )}
 
+                        {autoDialerActive && (
+                          <ConnectedLeadPanel
+                            leadData={null}
+                            isConnected={false}
+                            showPlaceholders={showSkeletonPlaceholders}
+                          />
+                        )}
+
                         <AutoDialerController 
                           sessionId={sessionId}
                           isActive={autoDialerActive}
@@ -525,7 +535,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                       </Alert>
                     )}
                     
-                    {sessionId ? (
+                    {sessionId && !autoDialerActive ? (
                       <div className="text-center py-6">
                         <Badge className="mb-4 bg-green-100 text-green-800 py-2 px-4 text-sm">
                           Session Active
@@ -533,22 +543,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                         <p className="text-lg font-medium">Dialing session has been created successfully!</p>
                         <p className="text-sm text-gray-500 mt-2">Session ID: {sessionId}</p>
                       </div>
-                    ) : selectedListId && (
-                      <div className="mb-4 flex justify-center">
-                        <Button 
-                          onClick={handleBeginDialing}
-                          className="bg-crm-blue hover:bg-crm-blue/90 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
-                          disabled={isCreatingSession}
-                        >
-                          {isCreatingSession ? (
-                            <Loader2 className="h-5 w-5 animate-spin" />
-                          ) : (
-                            <Phone className="h-5 w-5" />
-                          )}
-                          {isCreatingSession ? 'Creating Session...' : 'Begin Dialing'}
-                        </Button>
-                      </div>
-                    )}
+                    ) : null}
 
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-medium">Select a Calling List</h3>

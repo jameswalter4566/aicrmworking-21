@@ -21,6 +21,7 @@ const DialerSession = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isCallingNext, setIsCallingNext] = useState(false);
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
+  const [showSkeletonPlaceholders, setShowSkeletonPlaceholders] = useState(false);
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
@@ -58,6 +59,7 @@ const DialerSession = () => {
     
     try {
       setIsCallingNext(true);
+      setShowSkeletonPlaceholders(true);
       
       const { data, error } = await supabase.functions.invoke('get-next-lead', {
         body: { sessionId }
@@ -69,6 +71,7 @@ const DialerSession = () => {
         toast("No more leads", {
           description: "There are no more leads to call in this session."
         });
+        setShowSkeletonPlaceholders(false);
         return;
       }
       
@@ -82,6 +85,7 @@ const DialerSession = () => {
         toast.error("Call failed", {
           description: callResult.error || "Unable to place call"
         });
+        setShowSkeletonPlaceholders(false);
       } else {
         toast("Calling", {
           description: `Calling ${data.name || data.phoneNumber}...`
@@ -94,6 +98,7 @@ const DialerSession = () => {
     } catch (err) {
       console.error('Error getting next lead:', err);
       toast.error('Failed to get next lead');
+      setShowSkeletonPlaceholders(false);
     } finally {
       setIsCallingNext(false);
     }
@@ -185,6 +190,7 @@ const DialerSession = () => {
           if (error) throw error;
           if (data?.lead) {
             setConnectedLeadData(data.lead);
+            setShowSkeletonPlaceholders(false);
           }
         } catch (err) {
           console.error('Error fetching lead data:', err);
@@ -285,6 +291,7 @@ const DialerSession = () => {
             <ConnectedLeadPanel 
               leadData={connectedLeadData}
               isConnected={hasActiveCall && Object.values(twilioState.activeCalls)[0]?.status === 'in-progress'}
+              showPlaceholders={showSkeletonPlaceholders || isCallingNext}
             />
             
             <LeadDetailsPanel 
