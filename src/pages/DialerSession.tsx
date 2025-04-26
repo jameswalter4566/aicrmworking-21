@@ -77,7 +77,6 @@ const DialerSession = () => {
       }
       
       setCurrentLeadId(data.leadId);
-      console.log("Starting call to lead:", data.leadId);
       
       await twilioService.initializeTwilioDevice();
       
@@ -92,6 +91,10 @@ const DialerSession = () => {
         toast("Calling", {
           description: `Calling ${data.name || data.phoneNumber}...`
         });
+      }
+      
+      if (data?.leadId) {
+        setConnectedLeadData(null);
       }
     } catch (err) {
       console.error('Error getting next lead:', err);
@@ -126,7 +129,6 @@ const DialerSession = () => {
         }
       }
       
-      setIsDialing(false);
     } catch (err) {
       console.error('Error ending call:', err);
       toast.error('Failed to end call');
@@ -181,15 +183,13 @@ const DialerSession = () => {
               callData: {
                 callSid: activeCall.callSid,
                 status: activeCall.status,
-                timestamp: new Date().toISOString(),
-                originalLeadId: activeCall.originalLeadId
+                timestamp: new Date().toISOString()
               }
             }
           });
 
           if (error) throw error;
           if (data?.lead) {
-            console.log('Lead data fetched:', data.lead);
             setConnectedLeadData(data.lead);
             setIsDialing(false);
           }
