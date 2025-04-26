@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
 import { ConnectedLeadPanel } from "@/components/power-dialer/ConnectedLeadPanel";
 import { supabase } from "@/integrations/supabase/client";
+import { Label } from "@/components/ui/label";
 
 const SAMPLE_LEADS = [
   {
