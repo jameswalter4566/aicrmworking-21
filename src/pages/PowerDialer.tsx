@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -37,6 +36,8 @@ import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "sonner";
 import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
+import { ConnectedLeadPanel } from "@/components/power-dialer/ConnectedLeadPanel";
+import { supabase } from "@/integrations/supabase/client";
 
 const SAMPLE_LEADS = [
   {
@@ -99,9 +100,16 @@ export default function PowerDialer() {
   const [twilioReady, setTwilioReady] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
   const [callInProgress, setCallInProgress] = useState(false);
-  const [currentCall, setCurrentCall] = useState(null);
+  const [currentCall, setCurrentCall] = useState<any>(null);
+  const [isDialing, setIsDialing] = useState(false);
+  const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
 
   const twilioState = useTwilio();
+  const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
+
+  useEffect(() => {
+    console.log('[PowerDialer] connectedLeadData updated:', connectedLeadData);
+  }, [connectedLeadData]);
 
   useEffect(() => {
     if (window.Twilio && window.Twilio.Device) {
@@ -150,6 +158,7 @@ export default function PowerDialer() {
     
     try {
       setIsDialing(true);
+      setConnectedLeadData(null);
       
       const initialized = await twilioService.initializeTwilioDevice();
       console.log("Twilio initialization:", initialized ? "successful" : "failed");
@@ -197,6 +206,7 @@ export default function PowerDialer() {
     await twilioState.endCall(leadId);
     updateLeadStatus(leadId, "Contacted");
     setCallInProgress(false);
+    setConnectedLeadData(null);
   };
 
   const handleDisposition = (type: string) => {
@@ -209,7 +219,78 @@ export default function PowerDialer() {
     handleEndCall(currentCall.parameters.leadId);
   };
 
-  const [isDialing, setIsDialing] = useState(false);
+  useEffect(() => {
+    const activeCall = Object.values(twilioState.activeCalls)[0];
+    console.log('[PowerDialer] Active call status changed:', activeCall?.status);
+    console.log('[PowerDialer] Active call leadId:', activeCall?.leadId);
+    
+    if (activeCall?.status === 'in-progress' && activeCall.leadId) {
+      const fetchLeadData = async () => {
+        try {
+          console.log('[PowerDialer] Fetching lead data for:', activeCall.leadId);
+          
+          const { data, error } = await supabase.functions.invoke('lead-connected', {
+            body: { 
+              leadId: activeCall.leadId,
+              callData: {
+                callSid: activeCall.callSid,
+                status: activeCall.status,
+                timestamp: new Date().toISOString()
+              }
+            }
+          });
+
+          if (error) {
+            console.error('[PowerDialer] Error from lead-connected:', error);
+            throw error;
+          }
+          
+          console.log('[PowerDialer] Response from lead-connected:', data);
+          
+          if (data?.lead) {
+            console.log('[PowerDialer] Setting connected lead data:', data.lead);
+            
+            const leadInfo = {
+              first_name: data.lead.first_name || '',
+              last_name: data.lead.last_name || '',
+              phone1: data.lead.phone1 || '',
+              email: data.lead.email || '',
+              property_address: data.lead.property_address || '',
+              mailing_address: data.lead.mailing_address || ''
+            };
+            
+            console.log('[PowerDialer] Mapped lead data for component:', leadInfo);
+            setConnectedLeadData(leadInfo);
+            setIsDialing(false);
+          } else {
+            console.log('[PowerDialer] No lead data in response');
+            setConnectedLeadData(null);
+          }
+        } catch (err) {
+          console.error('[PowerDialer] Error fetching lead data:', err);
+          toast.error('Failed to load lead details');
+          setConnectedLeadData(null);
+        }
+      };
+
+      fetchLeadData();
+    } else if (!hasActiveCall && !isDialing) {
+      setIsDialing(false);
+      
+      if (connectedLeadData) {
+        console.log('[PowerDialer] Call disconnected, clearing lead data');
+        setConnectedLeadData(null);
+      }
+    }
+  }, [twilioState.activeCalls, hasActiveCall]);
+
+  useEffect(() => {
+    const activeCall = Object.values(twilioState.activeCalls)[0];
+    if (activeCall?.status === 'completed' || activeCall?.status === 'failed') {
+      setIsDialing(false);
+      setConnectedLeadData(null);
+    }
+  }, [twilioState.activeCalls]);
 
   const DialerTab = () => (
     <div className="flex flex-col space-y-4">
@@ -329,6 +410,13 @@ export default function PowerDialer() {
           </CardContent>
         </Card>
       )}
+
+      <ConnectedLeadPanel 
+        leadData={connectedLeadData}
+        isConnected={hasActiveCall && Object.values(twilioState.activeCalls)[0]?.status === 'in-progress'}
+        isDialing={isDialing}
+        sessionActive={true}
+      />
 
       <Card className="h-full overflow-hidden flex flex-col">
         <CardHeader className="pb-2">
