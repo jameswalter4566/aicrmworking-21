@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -608,6 +609,22 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                             console.log('Selected leads:', leads);
                           }}
                         />
+                        
+                        {/* Add the Begin Dialing button */}
+                        <div className="flex justify-center mt-6">
+                          <Button
+                            onClick={handleBeginDialing}
+                            className="bg-green-500 hover:bg-green-600 text-white px-8 py-4 text-lg rounded-lg flex items-center gap-3"
+                            disabled={isCreatingSession}
+                          >
+                            {isCreatingSession ? (
+                              <Loader2 className="h-5 w-5 animate-spin" />
+                            ) : (
+                              <Phone className="h-5 w-5" />
+                            )}
+                            Begin Dialing
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
