@@ -27,22 +27,13 @@ Deno.serve(async (req) => {
     }
 
     console.log(`Lead connected function called for leadId: ${leadId}`);
-    
-    // Log detailed callData information including the originalLeadId
     if (callData) {
-      const { callSid, status, timestamp, originalLeadId } = callData;
-      console.log(`Call data received: callSid=${callSid}, status=${status}, timestamp=${timestamp}`);
-      console.log(`Original Lead ID from callData: ${originalLeadId}`);
+      console.log(`Call data received: callSid=${callData.callSid}, status=${callData.status}, timestamp=${callData.timestamp}`);
     }
 
     // First determine if the leadId is a UUID format
     const isUuid = typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId);
     console.log(`Lead ID appears to be a ${isUuid ? 'UUID' : 'numeric ID'}: ${leadId}`);
-    
-    // Log the Original Lead ID if it exists in callData
-    if (callData?.originalLeadId) {
-      console.log(`Working with original lead ID from callData: ${callData.originalLeadId}`);
-    }
 
     // STRATEGY 1: Check if this is a dialing session lead first - this is most likely with power dialer
     if (isUuid) {
@@ -70,11 +61,8 @@ Deno.serve(async (req) => {
           }
         }
 
-        // If we have an original lead ID from notes or from callData, fetch that lead
-        const effectiveOriginalLeadId = originalLeadId || callData?.originalLeadId;
-        
-        if (effectiveOriginalLeadId) {
-          console.log(`Using effective original lead ID: ${effectiveOriginalLeadId}`);
+        // If we have an original lead ID from notes, fetch that lead
+        if (originalLeadId) {
           const { data: actualLead, error: actualLeadError } = await supabase
             .from('leads')
             .select(`
@@ -90,7 +78,7 @@ Deno.serve(async (req) => {
               created_at,
               updated_at
             `)
-            .eq('id', effectiveOriginalLeadId)
+            .eq('id', originalLeadId)
             .maybeSingle();
           
           if (actualLead) {
@@ -110,14 +98,13 @@ Deno.serve(async (req) => {
               success: true,
               lead: actualLead,
               notes: notes || [],
-              callData,
-              originalLeadId: effectiveOriginalLeadId
+              callData
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200,
             });
           } else {
-            console.log(`Could not find lead with originalLeadId: ${effectiveOriginalLeadId}`);
+            console.log(`Could not find lead with originalLeadId: ${originalLeadId}`);
           }
         }
         
@@ -132,7 +119,6 @@ Deno.serve(async (req) => {
           },
           notes: [],
           callData,
-          originalLeadId: callData?.originalLeadId,
           source: 'dialing_session_lead_only'
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -159,7 +145,6 @@ Deno.serve(async (req) => {
             },
             notes: [],
             callData,
-            originalLeadId: callData?.originalLeadId,
             source: 'dialing_session_lead_by_lead_id'
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -170,12 +155,10 @@ Deno.serve(async (req) => {
     }
 
     // STRATEGY 2: Try to find the lead using our database function
-    // Always try originalLeadId first if it exists in callData
-    const idToSearch = callData?.originalLeadId || leadId;
-    console.log(`Trying database function to find lead by string ID: ${idToSearch}`);
+    console.log('Trying database function to find lead by string ID');
     try {
       const { data: functionResult, error: functionError } = await supabase
-        .rpc('find_lead_by_string_id', { lead_string_id: idToSearch });
+        .rpc('find_lead_by_string_id', { lead_string_id: leadId });
       
       if (functionError) {
         console.log(`Database function error: ${functionError.message}`);
@@ -205,8 +188,7 @@ Deno.serve(async (req) => {
             success: true,
             lead: fullLead,
             notes: notes || [],
-            callData,
-            originalLeadId: callData?.originalLeadId
+            callData
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
@@ -218,10 +200,9 @@ Deno.serve(async (req) => {
     }
 
     // STRATEGY 3: Try direct numeric query if possible
-    const numericIdToTry = callData?.originalLeadId || leadId;
-    if (!isNaN(Number(numericIdToTry))) {
-      console.log(`Trying direct numeric query with ID: ${numericIdToTry}`);
-      const numericId = Number(numericIdToTry);
+    if (!isNaN(Number(leadId))) {
+      console.log('Trying direct numeric query');
+      const numericId = Number(leadId);
       const { data: numericLead, error: numericLeadError } = await supabase
         .from('leads')
         .select('*')
@@ -245,8 +226,7 @@ Deno.serve(async (req) => {
           success: true,
           lead: numericLead,
           notes: notes || [],
-          callData,
-          originalLeadId: callData?.originalLeadId
+          callData
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
@@ -256,11 +236,10 @@ Deno.serve(async (req) => {
 
     // If we still haven't found anything, try one last approach: searching dialing_session_leads
     console.log('Trying to lookup in dialing_session_leads');
-    const searchId = callData?.originalLeadId || leadId;
     const { data: allDialingLeads, error: allDialingError } = await supabase
       .from('dialing_session_leads')
       .select('notes')
-      .filter('notes', 'ilike', `%${searchId}%`)
+      .filter('notes', 'ilike', `%${leadId}%`)
       .maybeSingle();
       
     if (allDialingLeads?.notes) {
@@ -273,7 +252,6 @@ Deno.serve(async (req) => {
         },
         notes: [],
         callData,
-        originalLeadId: callData?.originalLeadId,
         source: 'dialing_session_lead_notes_search'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -288,8 +266,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: false, 
       message: 'Lead not found, but call data is available',
-      callData,
-      originalLeadId: callData?.originalLeadId
+      callData
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200, // Return 200 instead of 404 so call data is still accessible
