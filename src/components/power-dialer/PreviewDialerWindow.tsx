@@ -61,7 +61,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const { user } = useAuth();
   const { callStatuses } = useCallStatus();
 
-  // New state for lead data
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
 
@@ -87,15 +86,22 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     const fetchLeadData = async () => {
       if (currentCall?.parameters?.leadId && currentCall.status === 'in-progress') {
         try {
+          console.log('Fetching lead data for:', currentCall.parameters.leadId);
           const { data, error } = await supabase.functions.invoke('lead-connected', {
             body: { leadId: currentCall.parameters.leadId }
           });
 
-          if (error) throw error;
+          if (error) {
+            console.error('Error from lead-connected function:', error);
+            throw error;
+          }
 
-          if (data.success) {
+          if (data && data.success) {
+            console.log('Lead data received:', data);
             setCurrentLead(data.lead);
             setLeadNotes(data.notes);
+          } else {
+            console.warn('Lead data response was not successful:', data);
           }
         } catch (err) {
           console.error('Error fetching lead data:', err);

@@ -112,20 +112,19 @@ export function useCallStatus() {
           if (!newData) return;
           
           // Type guard to check if newData has the required properties
-          if (typeof newData === 'object' && 'contact_id' in newData) {
-            const leadId = newData.contact_id as string;
+          if (typeof newData === 'object' && newData !== null) {
+            // Safely check if contact_id exists and it's a string or number
+            const leadId = newData.contact_id !== undefined ? String(newData.contact_id) : null;
             
             if (leadId) {
               setCallStatuses(prev => {
                 const update: CallStatusUpdate = {
                   // Safely access properties with type checking
-                  callSid: 'twilio_call_sid' in newData ? newData.twilio_call_sid as string : undefined,
-                  status: 'status' in newData ? newData.status as string : 'unknown',
-                  startTime: 'start_timestamp' in newData && newData.start_timestamp 
-                    ? new Date(newData.start_timestamp as string) : undefined,
-                  endTime: 'end_timestamp' in newData && newData.end_timestamp 
-                    ? new Date(newData.end_timestamp as string) : undefined,
-                  duration: 'duration' in newData ? newData.duration as number : undefined,
+                  callSid: typeof newData.twilio_call_sid === 'string' ? newData.twilio_call_sid : undefined,
+                  status: typeof newData.status === 'string' ? newData.status : 'unknown',
+                  startTime: newData.start_timestamp ? new Date(newData.start_timestamp as string) : undefined,
+                  endTime: newData.end_timestamp ? new Date(newData.end_timestamp as string) : undefined,
+                  duration: typeof newData.duration === 'number' ? newData.duration : undefined,
                   leadId
                 };
                 
