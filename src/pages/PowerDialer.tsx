@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -134,19 +135,15 @@ export default function PowerDialer() {
 
   const handleCallLead = async (lead: any) => {
     if (!twilioState.initialized && !isScriptLoaded) {
-      toast({
-        title: "Phone System Not Ready",
-        description: "Please wait for the phone system to initialize.",
-        variant: "destructive",
+      toast("Phone System Not Ready", {
+        description: "Please wait for the phone system to initialize."
       });
       return;
     }
 
     if (callInProgress) {
-      toast({
-        title: "Call Already in Progress",
-        description: "Please end the current call before starting a new one.",
-        variant: "destructive",
+      toast("Call Already in Progress", {
+        description: "Please end the current call before starting a new one."
       });
       return;
     }
@@ -168,17 +165,14 @@ export default function PowerDialer() {
       
       if (!callResult.success) {
         console.error("Call failed:", JSON.stringify(callResult));
-        toast({
-          title: "Call Failed",
-          description: callResult.error || "Unable to place call. Please check if the number is valid.",
-          variant: "destructive",
+        toast("Call Failed", {
+          description: callResult.error || "Unable to place call. Please check if the number is valid."
         });
         setCallInProgress(false);
         setIsDialing(false);
       } else {
-        toast({
-          title: "Call Initiated",
-          description: `Calling ${lead.name}...`,
+        toast("Call Initiated", {
+          description: `Calling ${lead.name}...`
         });
       }
     } catch (error: any) {
@@ -187,10 +181,8 @@ export default function PowerDialer() {
       setCallInProgress(false);
       setIsDialing(false);
       
-      toast({
-        title: "Call Error",
-        description: error.message || "Error placing call.",
-        variant: "destructive",
+      toast("Call Error", {
+        description: error.message || "Error placing call."
       });
     }
   };
@@ -210,9 +202,8 @@ export default function PowerDialer() {
   const handleDisposition = (type: string) => {
     if (!currentCall) return;
     
-    toast({
-      title: "Call Dispositioned",
-      description: `Call marked as ${type}`,
+    toast("Call Dispositioned", {
+      description: `Call marked as ${type}`
     });
     
     handleEndCall(currentCall.parameters.leadId);
@@ -233,9 +224,8 @@ export default function PowerDialer() {
                 onClick={async () => {
                   const success = await twilioState.endAllCalls();
                   if (success) {
-                    toast({
-                      title: "System Reset",
-                      description: "All active calls have been terminated. The system has been reset.",
+                    toast("System Reset", {
+                      description: "All active calls have been terminated. The system has been reset."
                     });
                   }
                 }}
@@ -249,9 +239,8 @@ export default function PowerDialer() {
                 onClick={async () => {
                   const initialized = await twilioService.initializeTwilioDevice();
                   if (initialized) {
-                    toast({
-                      title: "System Reinitialized",
-                      description: "The phone system has been reinitialized with a new token.",
+                    toast("System Reinitialized", {
+                      description: "The phone system has been reinitialized with a new token."
                     });
                   }
                 }}
@@ -481,15 +470,12 @@ export default function PowerDialer() {
                   if (deviceId) {
                     const result = await twilioState.testAudio(deviceId);
                     if (result) {
-                      toast({
-                        title: "Audio Test",
-                        description: "Audio playback successful. If you didn't hear anything, check your volume settings.",
+                      toast("Audio Test", {
+                        description: "Audio playback successful. If you didn't hear anything, check your volume settings."
                       });
                     } else {
-                      toast({
-                        title: "Audio Test Failed",
-                        description: "Could not play audio test. Check your speakers and volume.",
-                        variant: "destructive",
+                      toast("Audio Test Failed", {
+                        description: "Could not play audio test. Check your speakers and volume."
                       });
                     }
                   }
