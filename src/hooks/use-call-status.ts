@@ -111,20 +111,21 @@ export function useCallStatus() {
           const { new: newData } = payload;
           if (!newData) return;
           
-          // Type guard to check if newData has the required properties
-          if (typeof newData === 'object' && newData !== null) {
-            // Safely check if contact_id exists and it's a string or number
-            const leadId = newData.contact_id !== undefined ? String(newData.contact_id) : null;
+          // Safely cast newData to a record type to avoid TypeScript errors
+          const typedNewData = newData as Record<string, any>;
+          
+          // Check if this record has a contact_id (leadId)
+          if (typedNewData && typedNewData.contact_id) {
+            const leadId = String(typedNewData.contact_id);
             
             if (leadId) {
               setCallStatuses(prev => {
                 const update: CallStatusUpdate = {
-                  // Safely access properties with type checking
-                  callSid: typeof newData.twilio_call_sid === 'string' ? newData.twilio_call_sid : undefined,
-                  status: typeof newData.status === 'string' ? newData.status : 'unknown',
-                  startTime: newData.start_timestamp ? new Date(newData.start_timestamp as string) : undefined,
-                  endTime: newData.end_timestamp ? new Date(newData.end_timestamp as string) : undefined,
-                  duration: typeof newData.duration === 'number' ? newData.duration : undefined,
+                  callSid: typedNewData.twilio_call_sid as string,
+                  status: typedNewData.status as string || 'unknown',
+                  startTime: typedNewData.start_timestamp ? new Date(typedNewData.start_timestamp as string) : undefined,
+                  endTime: typedNewData.end_timestamp ? new Date(typedNewData.end_timestamp as string) : undefined,
+                  duration: typeof typedNewData.duration === 'number' ? typedNewData.duration : undefined,
                   leadId
                 };
                 
