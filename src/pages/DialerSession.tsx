@@ -13,7 +13,7 @@ import TwilioScript from '@/components/TwilioScript';
 import { AudioInitializer } from '@/components/AudioInitializer';
 import { ConnectedLeadPanel } from '@/components/power-dialer/ConnectedLeadPanel';
 
-const DialerSession = () => {
+export default function DialerSession() {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [currentLeadId, setCurrentLeadId] = useState<string | null>(null);
@@ -285,6 +285,7 @@ const DialerSession = () => {
             <ConnectedLeadPanel 
               leadData={connectedLeadData}
               isConnected={hasActiveCall && Object.values(twilioState.activeCalls)[0]?.status === 'in-progress'}
+              showPlaceholders={hasActiveCall || isCallingNext}
             />
             
             <LeadDetailsPanel 
@@ -409,6 +410,4 @@ const DialerSession = () => {
       </div>
     </MainLayout>
   );
-};
-
-export default DialerSession;
+}
