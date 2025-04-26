@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -106,6 +105,11 @@ export default function PowerDialer() {
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
+
+  // Enhanced debug logging for lead data
+  useEffect(() => {
+    console.log('[PowerDialer] connectedLeadData state:', connectedLeadData);
+  }, [connectedLeadData]);
 
   useEffect(() => {
     console.log('[PowerDialer] connectedLeadData updated:', connectedLeadData);
@@ -262,6 +266,7 @@ export default function PowerDialer() {
           if (data?.lead) {
             console.log('[PowerDialer] Setting connected lead data from response:', data.lead);
             
+            // Ensure all required fields are present
             const leadInfo = {
               first_name: data.lead.first_name || 'Unknown',
               last_name: data.lead.last_name || 'Contact',
@@ -271,9 +276,14 @@ export default function PowerDialer() {
               mailing_address: data.lead.mailing_address || '---'
             };
             
-            console.log('[PowerDialer] Forcing lead data for component:', leadInfo);
-            setConnectedLeadData(leadInfo);
-            console.log('[PowerDialer] State update triggered with data:', leadInfo);
+            console.log('[PowerDialer] Processed lead data:', leadInfo);
+            
+            // Force a state update with lead data
+            setConnectedLeadData(null); // Clear first to force re-render
+            setTimeout(() => {
+              setConnectedLeadData(leadInfo);
+              console.log('[PowerDialer] Set connected lead data:', leadInfo);
+            }, 50);
           } else {
             console.log('[PowerDialer] No lead data in response, creating fallback data');
             const fallbackData = {
@@ -284,7 +294,6 @@ export default function PowerDialer() {
               property_address: '---',
               mailing_address: '---'
             };
-            console.log('[PowerDialer] Setting fallback data:', fallbackData);
             setConnectedLeadData(fallbackData);
           }
           
@@ -301,7 +310,6 @@ export default function PowerDialer() {
             property_address: '---',
             mailing_address: '---'
           };
-          console.log('[PowerDialer] Setting error fallback data:', errorFallbackData);
           setConnectedLeadData(errorFallbackData);
           toast.error('Failed to load lead details');
           setIsDialing(false);
@@ -693,6 +701,7 @@ export default function PowerDialer() {
     </div>
   );
 
+  // Add debug overlay for lead data state
   return (
     <MainLayout>
       <TwilioScript
@@ -757,10 +766,16 @@ export default function PowerDialer() {
           </TabsContent>
         </Tabs>
         
+        {/* Debug overlay to show lead data state */}
         {connectedLeadData && (
-          <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border">
-            <h3 className="font-bold">Debug: Lead Data Present</h3>
-            <pre className="text-xs">{JSON.stringify(connectedLeadData, null, 2)}</pre>
+          <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border border-green-500 z-50 max-w-md">
+            <h3 className="font-bold flex justify-between">
+              <span>Debug: Lead Data Present</span>
+              <button onClick={() => console.log('Current lead data:', connectedLeadData)}>
+                Log Data
+              </button>
+            </h3>
+            <pre className="text-xs overflow-auto max-h-40">{JSON.stringify(connectedLeadData, null, 2)}</pre>
           </div>
         )}
         

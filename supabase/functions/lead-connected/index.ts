@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -96,18 +95,23 @@ Deno.serve(async (req) => {
       // Log activity if we have call data
       await logLeadActivity(leadByUuid.id, callData);
 
+      // Explicitly log the full lead data being returned
+      const leadDataToReturn = {
+        id: leadByUuid.id,
+        first_name: leadByUuid.first_name || defaultLeadData.first_name,
+        last_name: leadByUuid.last_name || defaultLeadData.last_name,
+        phone1: leadByUuid.phone1 || defaultLeadData.phone1,
+        email: leadByUuid.email || defaultLeadData.email,
+        property_address: leadByUuid.property_address || defaultLeadData.property_address,
+        mailing_address: leadByUuid.mailing_address || defaultLeadData.mailing_address,
+        disposition: leadByUuid.disposition || defaultLeadData.disposition,
+      };
+      
+      console.log(`Sending lead data to UI: ${JSON.stringify(leadDataToReturn)}`);
+
       return new Response(JSON.stringify({ 
         success: true,
-        lead: {
-          id: leadByUuid.id,
-          first_name: leadByUuid.first_name || defaultLeadData.first_name,
-          last_name: leadByUuid.last_name || defaultLeadData.last_name,
-          phone1: leadByUuid.phone1 || defaultLeadData.phone1,
-          email: leadByUuid.email || defaultLeadData.email,
-          property_address: leadByUuid.property_address || defaultLeadData.property_address,
-          mailing_address: leadByUuid.mailing_address || defaultLeadData.mailing_address,
-          disposition: leadByUuid.disposition || defaultLeadData.disposition,
-        }
+        lead: leadDataToReturn
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,

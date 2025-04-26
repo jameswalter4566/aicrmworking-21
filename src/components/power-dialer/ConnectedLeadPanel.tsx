@@ -15,36 +15,34 @@ interface ConnectedLeadPanelProps {
 }
 
 export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
-  // Enhanced logging to debug data flow
+  // Debug logging to track data flow
   useEffect(() => {
-    console.log("[ConnectedLeadPanel] Rendering with data:", leadData);
-    console.log("[ConnectedLeadPanel] Data type:", typeof leadData);
-    console.log("[ConnectedLeadPanel] Data keys:", leadData ? Object.keys(leadData) : 'null');
+    console.log("[ConnectedLeadPanel] Received lead data:", leadData);
     
     if (leadData) {
-      console.log("[ConnectedLeadPanel] Lead details:", {
-        name: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown Name',
+      console.log("[ConnectedLeadPanel] Lead details available:", {
+        name: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown',
         phone: leadData.phone1 || '---',
         email: leadData.email || '---',
         property_address: leadData.property_address || '---',
         mailing_address: leadData.mailing_address || '---'
       });
+    } else {
+      console.log("[ConnectedLeadPanel] No lead data available");
     }
   }, [leadData]);
-  
-  // ALWAYS show data if leadData exists, regardless of any other conditions
+
+  // Format the lead name consistently
   const getFormattedName = () => {
-    if (!leadData) return '';
-    // Ensure we use the correct property names
-    return `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown Name';
+    if (!leadData) return 'Unknown Contact';
+    const firstName = leadData.first_name || '';
+    const lastName = leadData.last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || 'Unknown Contact';
   };
 
-  // Debug output to verify rendering
-  console.log("[ConnectedLeadPanel] About to render. Has data:", !!leadData);
-
-  // If we have no lead data at all, show minimal UI with default values
+  // Display skeleton loader when no data is available
   if (!leadData) {
-    console.log("[ConnectedLeadPanel] Rendering skeleton - no data available");
     return (
       <Card className="mt-4">
         <CardHeader className="pb-2">
@@ -90,13 +88,12 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
     );
   }
 
-  // Always show data if leadData exists
-  console.log("[ConnectedLeadPanel] Rendering with actual data:", getFormattedName());
+  // When data is available, display it
   return (
-    <Card className="mt-4">
+    <Card className="mt-4 border-2 border-green-500">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">
-          Lead Details {getFormattedName() ? `- ${getFormattedName()}` : ''}
+          Lead Details - {getFormattedName()}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -111,12 +108,12 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
               
               <div>
                 <label className="text-sm text-gray-500">Phone</label>
-                <div className="text-sm mt-1 font-medium">{leadData?.phone1 || "---"}</div>
+                <div className="text-sm mt-1 font-medium">{leadData.phone1 || "---"}</div>
               </div>
               
               <div>
                 <label className="text-sm text-gray-500">Email</label>
-                <div className="text-sm mt-1 font-medium">{leadData?.email || "---"}</div>
+                <div className="text-sm mt-1 font-medium">{leadData.email || "---"}</div>
               </div>
             </div>
           </div>
@@ -126,12 +123,12 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-gray-500">Property Address</label>
-                <div className="text-sm mt-1 font-medium">{leadData?.property_address || "---"}</div>
+                <div className="text-sm mt-1 font-medium">{leadData.property_address || "---"}</div>
               </div>
               
               <div>
                 <label className="text-sm text-gray-500">Mailing Address</label>
-                <div className="text-sm mt-1 font-medium">{leadData?.mailing_address || "---"}</div>
+                <div className="text-sm mt-1 font-medium">{leadData.mailing_address || "---"}</div>
               </div>
             </div>
           </div>
