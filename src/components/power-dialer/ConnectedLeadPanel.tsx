@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -13,10 +14,17 @@ interface ConnectedLeadPanelProps {
   };
   isConnected: boolean;
   isDialing?: boolean;
+  forceSkeleton?: boolean;
 }
 
-export const ConnectedLeadPanel = ({ leadData, isConnected, isDialing = false }: ConnectedLeadPanelProps) => {
-  const showSkeletons = isDialing || (!leadData && isConnected);
+export const ConnectedLeadPanel = ({ 
+  leadData, 
+  isConnected, 
+  isDialing = false,
+  forceSkeleton = false
+}: ConnectedLeadPanelProps) => {
+  // Always show skeletons when explicitly forced, when dialing, or when connected without lead data
+  const showSkeletons = forceSkeleton || isDialing || (!leadData && isConnected);
 
   return (
     <Card className="mt-4">

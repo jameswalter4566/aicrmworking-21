@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,22 +65,34 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
   const [callNotes, setCallNotes] = useState('');
-  // Initialize isDialing as true to show skeletons immediately on load
+  
   const [isDialing, setIsDialing] = useState(true);
-
-  const resetDialingState = () => {
-    setIsDialing(false);
-  };
+  const [forceSkeleton, setForceSkeleton] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!currentCall && !isProcessingCall) {
-        resetDialingState();
-      }
+      setForceSkeleton(false);
     }, 1500);
-
+    
     return () => clearTimeout(timer);
   }, []);
+
+  const resetDialingState = useCallback(() => {
+    if (!currentCall && !isProcessingCall) {
+      setIsDialing(false);
+    }
+  }, [currentCall, isProcessingCall]);
+
+  useEffect(() => {
+    const timer = setTimeout(resetDialingState, 1500);
+    return () => clearTimeout(timer);
+  }, [currentCall, isProcessingCall, resetDialingState]);
+
+  useEffect(() => {
+    if (currentCall) {
+      setIsDialing(true);
+    }
+  }, [currentCall]);
 
   useEffect(() => {
     console.log('Session state update:', { 
@@ -113,7 +124,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
             console.log('Lead data received:', data);
             setCurrentLead(data.lead);
             setLeadNotes(data.notes || []);
-            setIsDialing(false);
+            setTimeout(() => setIsDialing(false), 500);
           } else {
             console.warn('Lead data response was not successful:', data);
           }
@@ -175,7 +186,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       }
       
       toast.success("Lead deleted successfully");
-      // Notify parent component or refresh data as needed
     } catch (error) {
       console.error("Error in handleDeleteLead:", error);
       toast.error("Failed to delete lead");
@@ -238,8 +248,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     }
 
     try {
-      // Set dialing state IMMEDIATELY when button is clicked
-      setIsDialing(true);
+      setIsDialing(true); 
+      setForceSkeleton(true);
       setIsProcessingCall(true);
       await twilioService.initializeTwilioDevice();
       setAutoDialerActive(true);
@@ -248,20 +258,21 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       toast.success("Power dialing sequence started", {
         description: "The system will now automatically dial leads in queue"
       });
+      
+      setTimeout(() => setForceSkeleton(false), 1500);
     } catch (error) {
       console.error("Error starting power dialing:", error);
       toast.error("Failed to start power dialing");
       setAutoDialerActive(false);
       setIsActivePowerDialing(false);
-      setIsDialing(false); // Reset dialing state if there's an error
+      setIsDialing(false);
+      setForceSkeleton(false);
     } finally {
       setIsProcessingCall(false);
-      // Leave isDialing true until a call connects or explicitly fails
     }
   };
 
   const handleCallComplete = useCallback(() => {
-    // This will be called after each call is completed
     console.log('Call completed, ready for next call');
   }, []);
 
@@ -286,9 +297,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       if (error) throw error;
       
       toast.success('Call notes saved successfully');
-      setCallNotes(''); // Clear notes after saving
+      setCallNotes('');
       
-      // Refresh notes
       const { data: refreshedNotes } = await supabase
         .from('lead_notes')
         .select('*')
@@ -543,6 +553,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                         isActive={autoDialerActive}
                         onCallComplete={handleCallComplete}
                       />
+                      
+                      {isDialing && <ConnectedLeadPanel isConnected={false} isDialing={true} forceSkeleton={forceSkeleton} />}
                     </>
                   )}
                   
