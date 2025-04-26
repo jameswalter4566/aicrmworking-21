@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -62,6 +63,14 @@ Deno.serve(async (req) => {
       
     if (leadByUuid) {
       console.log(`Found lead via session UUID: ${leadByUuid.first_name} ${leadByUuid.last_name}`);
+      console.log(`Lead data being returned: ${JSON.stringify({
+        first_name: leadByUuid.first_name,
+        last_name: leadByUuid.last_name,
+        phone1: leadByUuid.phone1,
+        email: leadByUuid.email,
+        property_address: leadByUuid.property_address,
+        mailing_address: leadByUuid.mailing_address
+      })}`);
       
       // Get lead notes
       const { data: notes } = await supabase
@@ -109,9 +118,13 @@ Deno.serve(async (req) => {
         
         // Try to extract the original lead ID from the notes field if it exists
         let originalLeadId = null;
+        let extractedLeadData = {};
         if (dialingLead.notes) {
           try {
             const notesData = JSON.parse(dialingLead.notes);
+            extractedLeadData = notesData;
+            console.log(`Extracted lead data from notes: ${JSON.stringify(extractedLeadData)}`);
+            
             if (notesData.originalLeadId) {
               originalLeadId = notesData.originalLeadId;
               console.log(`Found original lead ID in notes: ${originalLeadId}`);
@@ -148,6 +161,14 @@ Deno.serve(async (req) => {
           
           if (actualLead) {
             console.log(`Successfully found lead via originalLeadId: ${actualLead.first_name} ${actualLead.last_name}`);
+            console.log(`Lead data being returned: ${JSON.stringify({
+              first_name: actualLead.first_name,
+              last_name: actualLead.last_name,
+              phone1: actualLead.phone1,
+              email: actualLead.email,
+              property_address: actualLead.property_address,
+              mailing_address: actualLead.mailing_address
+            })}`);
             
             // Get lead notes
             const { data: notes } = await supabase
@@ -186,12 +207,15 @@ Deno.serve(async (req) => {
         
         // If we reached here, we found the dialing_session_lead but couldn't get a lead record
         // Return a partial success with what we have
+        const extractedData = extractLeadDataFromNotes(dialingLead.notes);
+        console.log(`Returning extracted data from notes: ${JSON.stringify(extractedData)}`);
+        
         return new Response(JSON.stringify({ 
           success: true,
           lead: {
             id: leadId,
             // Extract any basic info we can from notes
-            ...extractLeadDataFromNotes(dialingLead.notes)
+            ...extractedData
           },
           notes: [],
           callData,
@@ -213,12 +237,15 @@ Deno.serve(async (req) => {
           
         if (dialingLeadByLeadId?.notes) {
           console.log('Found match by lead_id in dialing_session_leads');
+          const extractedData = extractLeadDataFromNotes(dialingLeadByLeadId.notes);
+          console.log(`Returning extracted data from notes: ${JSON.stringify(extractedData)}`);
+          
           return new Response(JSON.stringify({ 
             success: true,
             lead: {
               id: leadId,
               // Extract what we can from notes
-              ...extractLeadDataFromNotes(dialingLeadByLeadId.notes)
+              ...extractedData
             },
             notes: [],
             callData,
@@ -268,6 +295,15 @@ Deno.serve(async (req) => {
           .maybeSingle();
           
         if (fullLead) {
+          console.log(`Lead data being returned: ${JSON.stringify({
+            first_name: fullLead.first_name,
+            last_name: fullLead.last_name,
+            phone1: fullLead.phone1,
+            email: fullLead.email,
+            property_address: fullLead.property_address,
+            mailing_address: fullLead.mailing_address
+          })}`);
+          
           // Get lead notes
           const { data: notes } = await supabase
             .from('lead_notes')
@@ -331,6 +367,14 @@ Deno.serve(async (req) => {
         
       if (numericLead) {
         console.log(`Found lead via numeric ID: ${numericLead.first_name} ${numericLead.last_name}`);
+        console.log(`Lead data being returned: ${JSON.stringify({
+          first_name: numericLead.first_name,
+          last_name: numericLead.last_name,
+          phone1: numericLead.phone1,
+          email: numericLead.email,
+          property_address: numericLead.property_address,
+          mailing_address: numericLead.mailing_address
+        })}`);
         
         // Get lead notes
         const { data: notes } = await supabase
@@ -376,11 +420,14 @@ Deno.serve(async (req) => {
       
     if (allDialingLeads?.notes) {
       console.log('Found potential match in dialing_session_leads notes');
+      const extractedData = extractLeadDataFromNotes(allDialingLeads.notes);
+      console.log(`Returning extracted data from notes: ${JSON.stringify(extractedData)}`);
+      
       return new Response(JSON.stringify({ 
         success: true,
         lead: {
           id: leadId,
-          ...extractLeadDataFromNotes(allDialingLeads.notes)
+          ...extractedData
         },
         notes: [],
         callData,
@@ -455,6 +502,8 @@ function extractLeadDataFromNotes(notesString: string | null): any {
   
   try {
     const notesData = JSON.parse(notesString);
+    console.log(`Parsed notes data: ${JSON.stringify(notesData)}`);
+    
     return {
       first_name: notesData.firstName || notesData.first_name,
       last_name: notesData.lastName || notesData.last_name,
