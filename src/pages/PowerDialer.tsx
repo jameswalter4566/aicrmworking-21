@@ -430,10 +430,6 @@ export default function PowerDialer() {
 
       <ConnectedLeadPanel 
         leadData={connectedLeadData}
-        isConnected={hasActiveCall && Object.values(twilioState.activeCalls)[0]?.status === 'in-progress'}
-        isDialing={isDialing}
-        sessionActive={true}
-        forceSkeleton={!connectedLeadData && (isDialing || hasActiveCall)}
       />
 
       <Card className="h-full overflow-hidden flex flex-col">

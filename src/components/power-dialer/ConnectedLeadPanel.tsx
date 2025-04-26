@@ -12,71 +12,27 @@ interface ConnectedLeadPanelProps {
     property_address?: string;
     mailing_address?: string;
   };
-  isConnected: boolean;
-  isDialing?: boolean;
-  forceSkeleton?: boolean;
-  sessionActive?: boolean;
 }
 
-export const ConnectedLeadPanel = ({ 
-  leadData, 
-  isConnected, 
-  isDialing = false,
-  forceSkeleton = false,
-  sessionActive = false
-}: ConnectedLeadPanelProps) => {
-  // Modified logic to ensure we show skeletons only until we have data
-  const showSkeletons = forceSkeleton || 
-                       (isDialing && !leadData) || 
-                       (sessionActive && !leadData) || 
-                       (isConnected && !leadData);
-  
-  // Enhanced debugging to track the component state
+export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
+  // Simple debug logging
   useEffect(() => {
-    console.log('ConnectedLeadPanel render with data:', { 
-      leadData, 
-      isConnected, 
-      isDialing, 
-      showSkeletons,
-      hasData: !!leadData,
-      dataKeys: leadData ? Object.keys(leadData) : [],
-      first_name: leadData?.first_name,
-      last_name: leadData?.last_name,
-      phone1: leadData?.phone1,
-      email: leadData?.email,
-      property_address: leadData?.property_address,
-      mailing_address: leadData?.mailing_address
-    });
-  }, [leadData, isConnected, isDialing, showSkeletons]);
+    console.log('ConnectedLeadPanel received leadData:', leadData);
+  }, [leadData]);
+
+  // Only check if we have leadData
+  const showSkeletons = !leadData;
 
   const getFormattedName = () => {
     if (!leadData) return '';
-    if (!leadData.first_name && !leadData.last_name) return '';
     return `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim();
   };
 
   return (
     <Card className="mt-4">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg flex justify-between">
-          Connected Lead Details
-          <div className="flex space-x-2">
-            {isDialing && !isConnected && (
-              <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full">
-                Loading...
-              </span>
-            )}
-            {isConnected && (
-              <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
-                Connected
-              </span>
-            )}
-            {sessionActive && !isDialing && !isConnected && (
-              <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded-full">
-                Session Active
-              </span>
-            )}
-          </div>
+        <CardTitle className="text-lg">
+          Lead Details
         </CardTitle>
       </CardHeader>
       <CardContent>
