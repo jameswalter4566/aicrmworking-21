@@ -146,28 +146,25 @@ serve(async (req) => {
       
       console.log(`Found ${actualLeads.length} valid leads to add to session`, actualLeads[0]);
       
-      // Create UUIDs for lead_id values
+      // Create session leads with both UUIDs and original lead IDs
       const sessionLeads = actualLeads.map(lead => {
-        // Generate a random UUID for each lead entry
         const leadUuid = crypto.randomUUID();
         return {
           session_id: sessionData.id,
-          lead_id: leadUuid,  // Use UUID format
+          lead_id: leadUuid,  // Keep UUID for dialing session management
+          original_lead_id: lead.id.toString(), // Store original ID directly in the table
           status: 'queued',
           priority: 1,
           attempt_count: 0,
-          // Store the original lead ID as metadata in notes or other field
           notes: JSON.stringify({ 
-            originalLeadId: lead.id,
             firstName: lead.first_name,
             lastName: lead.last_name,
             phone: lead.phone1,
-            email: lead.email
+            email: lead.email,
+            uuid: leadUuid // Store UUID in notes for reference
           })
         };
       });
-      
-      console.log("First lead in batch to insert:", sessionLeads[0]);
       
       const BATCH_SIZE = 50;
       let insertedCount = 0;
@@ -185,25 +182,6 @@ serve(async (req) => {
         } else {
           insertedCount += batch.length;
           console.log(`Inserted batch ${i / BATCH_SIZE + 1} with ${batch.length} leads with 'queued' status`);
-          if (insertData) {
-            console.log(`First lead in batch response: ${JSON.stringify(insertData[0])}`);
-          }
-        }
-      }
-      
-      // Double-check that leads were actually inserted with queued status
-      const { data: queuedLeads, error: queueCheckError } = await supabaseClient
-        .from('dialing_session_leads')
-        .select('id, status, lead_id, notes')
-        .eq('session_id', sessionData.id)
-        .eq('status', 'queued');
-        
-      if (queueCheckError) {
-        console.error('Error checking queued leads:', queueCheckError);
-      } else {
-        console.log(`Verified ${queuedLeads?.length || 0} leads are in 'queued' status`);
-        if (queuedLeads && queuedLeads.length > 0) {
-          console.log('Sample queued lead:', queuedLeads[0]);
         }
       }
       
@@ -230,7 +208,6 @@ serve(async (req) => {
         JSON.stringify({ 
           sessionId: sessionData.id, 
           totalLeads: insertedCount,
-          queuedLeads: queuedLeads?.length || 0,
           message: "Dialing session created successfully" 
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
