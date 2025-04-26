@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -66,6 +67,7 @@ serve(async (req) => {
       );
     }
     
+    // Get leads from the calling list
     const { data: listLeads, error: leadsError } = await supabaseClient
       .from('calling_list_leads')
       .select('lead_id')
@@ -88,6 +90,7 @@ serve(async (req) => {
     
     console.log(`Found ${listLeads.length} leads for list ${listId}`);
     
+    // Create dialing session with a proper name
     const finalSessionName = sessionName || `Dialing Session - ${new Date().toLocaleString()}`;
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('dialing_sessions')
@@ -115,12 +118,14 @@ serve(async (req) => {
     console.log(`Created dialing session with ID: ${sessionData.id}`);
     
     try {
+      // Get all lead IDs that we need to process
       const leadIds = listLeads.map(item => item.lead_id);
       console.log(`Processing ${leadIds.length} leads to add to session`);
       
+      // Get actual leads data to ensure we have valid records
       const { data: actualLeads, error: leadsQueryError } = await supabaseClient
         .from('leads')
-        .select('*')
+        .select('*')  // Get full lead data
         .in('id', leadIds);
       
       if (leadsQueryError) {
@@ -141,21 +146,23 @@ serve(async (req) => {
       
       console.log(`Found ${actualLeads.length} valid leads to add to session`, actualLeads[0]);
       
+      // Create UUIDs for lead_id values
       const sessionLeads = actualLeads.map(lead => {
+        // Generate a random UUID for each lead entry
         const leadUuid = crypto.randomUUID();
         return {
           session_id: sessionData.id,
-          lead_id: leadUuid,
-          original_lead_id: lead.id.toString(),
+          lead_id: leadUuid,  // Use UUID format
           status: 'queued',
           priority: 1,
           attempt_count: 0,
+          // Store the original lead ID as metadata in notes or other field
           notes: JSON.stringify({ 
+            originalLeadId: lead.id,
             firstName: lead.first_name,
             lastName: lead.last_name,
             phone: lead.phone1,
-            email: lead.email,
-            uuid: leadUuid
+            email: lead.email
           })
         };
       });
@@ -184,6 +191,7 @@ serve(async (req) => {
         }
       }
       
+      // Double-check that leads were actually inserted with queued status
       const { data: queuedLeads, error: queueCheckError } = await supabaseClient
         .from('dialing_session_leads')
         .select('id, status, lead_id, notes')
@@ -199,6 +207,7 @@ serve(async (req) => {
         }
       }
       
+      // Update session with accurate count of actually inserted leads
       if (insertedCount > 0) {
         await supabaseClient
           .from('dialing_sessions')
@@ -206,6 +215,7 @@ serve(async (req) => {
           .eq('id', sessionData.id);
       }
       
+      // Force refresh the session_queue_stats view
       const { data: refreshStats, error: refreshError } = await supabaseClient
         .rpc('get_next_session_lead', { p_session_id: sessionData.id })
         .limit(0);
