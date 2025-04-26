@@ -58,12 +58,22 @@ Deno.serve(async (req) => {
         .eq('lead_id', leadByUuid.id)
         .order('created_at', { ascending: false });
 
+      // Get additional lead data like mortgage information if it exists
+      const { data: mortgageData } = await supabase
+        .from('mortgage_leads')
+        .select('*')
+        .eq('lead_id', leadByUuid.id)
+        .maybeSingle();
+
       // Log activity if we have call data
       await logLeadActivity(leadByUuid.id, callData);
 
       return new Response(JSON.stringify({ 
         success: true,
-        lead: leadByUuid,
+        lead: {
+          ...leadByUuid,
+          mortgageData: mortgageData || null
+        },
         notes: notes || [],
         callData
       }), {
@@ -116,6 +126,8 @@ Deno.serve(async (req) => {
               mailing_address,
               property_address,
               disposition,
+              mortgage_data,
+              tags,
               created_at,
               updated_at
             `)
@@ -131,13 +143,23 @@ Deno.serve(async (req) => {
               .select('*')
               .eq('lead_id', actualLead.id)
               .order('created_at', { ascending: false });
+            
+            // Get additional lead data like mortgage information if it exists
+            const { data: mortgageData } = await supabase
+              .from('mortgage_leads')
+              .select('*')
+              .eq('lead_id', actualLead.id)
+              .maybeSingle();
 
             // Log activity if we have call data
             await logLeadActivity(actualLead.id, callData);
 
             return new Response(JSON.stringify({ 
               success: true,
-              lead: actualLead,
+              lead: {
+                ...actualLead,
+                mortgageData: mortgageData || null
+              },
               notes: notes || [],
               callData,
               originalLeadId: effectiveOriginalLeadId
@@ -212,10 +234,24 @@ Deno.serve(async (req) => {
         const leadId = functionResult[0].id;
         console.log(`Found lead with ID ${leadId} using database function`);
         
-        // Now get full lead details
+        // Now get full lead details with enhanced fields
         const { data: fullLead, error: fullLeadError } = await supabase
           .from('leads')
-          .select(`*`)
+          .select(`
+            id,
+            first_name,
+            last_name,
+            phone1,
+            phone2,
+            email,
+            mailing_address,
+            property_address,
+            disposition,
+            mortgage_data,
+            tags,
+            created_at,
+            updated_at
+          `)
           .eq('id', leadId)
           .maybeSingle();
           
@@ -226,13 +262,23 @@ Deno.serve(async (req) => {
             .select('*')
             .eq('lead_id', fullLead.id)
             .order('created_at', { ascending: false });
+          
+          // Get additional lead data like mortgage information if it exists
+          const { data: mortgageData } = await supabase
+            .from('mortgage_leads')
+            .select('*')
+            .eq('lead_id', fullLead.id)
+            .maybeSingle();
 
           // Log activity if we have call data
           await logLeadActivity(fullLead.id, callData);
 
           return new Response(JSON.stringify({ 
             success: true,
-            lead: fullLead,
+            lead: {
+              ...fullLead,
+              mortgageData: mortgageData || null
+            },
             notes: notes || [],
             callData,
             originalLeadId: callData?.originalLeadId
@@ -253,7 +299,21 @@ Deno.serve(async (req) => {
       const numericId = Number(numericIdToTry);
       const { data: numericLead, error: numericLeadError } = await supabase
         .from('leads')
-        .select('*')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          phone1,
+          phone2,
+          email,
+          mailing_address,
+          property_address,
+          disposition,
+          mortgage_data,
+          tags,
+          created_at,
+          updated_at
+        `)
         .eq('id', numericId)
         .maybeSingle();
         
@@ -266,13 +326,23 @@ Deno.serve(async (req) => {
           .select('*')
           .eq('lead_id', numericLead.id)
           .order('created_at', { ascending: false });
+        
+        // Get additional lead data like mortgage information if it exists
+        const { data: mortgageData } = await supabase
+          .from('mortgage_leads')
+          .select('*')
+          .eq('lead_id', numericLead.id)
+          .maybeSingle();
 
         // Log activity if we have call data
         await logLeadActivity(numericLead.id, callData);
 
         return new Response(JSON.stringify({ 
           success: true,
-          lead: numericLead,
+          lead: {
+            ...numericLead,
+            mortgageData: mortgageData || null
+          },
           notes: notes || [],
           callData,
           originalLeadId: callData?.originalLeadId
@@ -376,9 +446,13 @@ function extractLeadDataFromNotes(notesString: string | null): any {
     return {
       first_name: notesData.firstName || notesData.first_name,
       last_name: notesData.lastName || notesData.last_name,
-      phone1: notesData.phone,
+      phone1: notesData.phone || notesData.phoneNumber || notesData.phone1,
       email: notesData.email,
-      // Add any other fields we might find in notes
+      property_address: notesData.propertyAddress || notesData.property_address,
+      mailing_address: notesData.mailingAddress || notesData.mailing_address,
+      // Additional fields that might be in notes
+      disposition: notesData.disposition,
+      tags: notesData.tags
     };
   } catch (e) {
     console.log(`Could not parse notes as JSON: ${e.message}`);
