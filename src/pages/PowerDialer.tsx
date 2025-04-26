@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -162,7 +163,8 @@ export default function PowerDialer() {
       setCallInProgress(true);
       
       const formattedPhone = lead.phone.replace(/\D/g, '');
-      const callResult = await twilioService.makeCall(formattedPhone, lead.id);
+      // Make sure to pass the original lead ID - this is the key change
+      const callResult = await twilioService.makeCall(formattedPhone, lead.id, { originalLeadId: lead.id });
       
       console.log("Call result:", callResult);
       

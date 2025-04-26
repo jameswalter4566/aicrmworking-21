@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -59,6 +60,20 @@ Deno.serve(async (req) => {
     console.log(`Dialer webhook received for call ${callId} with status: ${callStatus}`);
     console.log('URL originalLeadId:', originalLeadId);
     console.log('Custom parameters:', customParams);
+
+    // Try to extract originalLeadId from custom parameters if available
+    let extractedOriginalLeadId = originalLeadId;
+    if (customParams) {
+      try {
+        const params = JSON.parse(customParams);
+        if (params.originalLeadId) {
+          extractedOriginalLeadId = params.originalLeadId;
+          console.log('Extracted originalLeadId from custom parameters:', extractedOriginalLeadId);
+        }
+      } catch (e) {
+        console.log('Error parsing custom parameters:', e);
+      }
+    }
     
     // Get the call record with expanded contact and session data
     const { data: call, error: callError } = await supabase
@@ -87,13 +102,16 @@ Deno.serve(async (req) => {
       }
     }
     
+    // Try to get original lead ID from the database record directly
+    const effectiveOriginalLeadId = extractedOriginalLeadId || call.original_lead_id || originalLeadIdFromNotes;
+    
     // Pass both IDs to lead-connected function
-    if ((call.contact_id || originalLeadIdFromNotes) && callSid) {
+    if ((call.contact_id || call.lead_id || originalLeadIdFromNotes) && callSid) {
       await notifyLeadConnected(
-        originalLeadIdFromNotes || call.contact_id, 
+        call.lead_id || call.contact_id, 
         callSid, 
         callStatus || 'unknown',
-        originalLeadId || call.contact_id
+        effectiveOriginalLeadId
       );
     }
     
