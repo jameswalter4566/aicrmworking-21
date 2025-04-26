@@ -30,7 +30,21 @@ Deno.serve(async (req) => {
     // First try to find the lead using the session_uuid
     const { data: leadByUuid, error: uuidError } = await supabase
       .from('leads')
-      .select('*')
+      .select(`
+        *,
+        lead_notes (
+          id,
+          content,
+          created_at,
+          created_by
+        ),
+        lead_activities (
+          id,
+          type,
+          description,
+          timestamp
+        )
+      `)
       .eq('session_uuid', leadId)
       .single();
       
@@ -59,6 +73,7 @@ Deno.serve(async (req) => {
     }
 
     // STRATEGY 1: Check if this is a dialing session lead first - this is most likely with power dialer
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(leadId);
     if (isUuid) {
       console.log('Checking if this is a dialing session lead ID first');
       const { data: dialingLead, error: dialingLeadError } = await supabase

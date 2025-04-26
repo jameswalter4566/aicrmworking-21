@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -12,6 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import TwilioScript from '@/components/TwilioScript';
 import { AudioInitializer } from '@/components/AudioInitializer';
+import { ConnectedLeadPanel } from '@/components/power-dialer/ConnectedLeadPanel';
 
 const DialerSession = () => {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
@@ -20,12 +20,12 @@ const DialerSession = () => {
   const [sessionData, setSessionData] = useState<any>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [isCallingNext, setIsCallingNext] = useState(false);
+  const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
   
   useEffect(() => {
-    // Extract session ID from URL parameters
     const params = new URLSearchParams(window.location.search);
     const id = params.get('id');
     if (id) {
@@ -74,10 +74,8 @@ const DialerSession = () => {
       
       setCurrentLeadId(data.leadId);
       
-      // Initialize Twilio if needed
       await twilioService.initializeTwilioDevice();
       
-      // Place the call
       const callResult = await twilioService.makeCall(data.phoneNumber, data.leadId);
       
       if (!callResult.success) {
@@ -88,6 +86,10 @@ const DialerSession = () => {
         toast("Calling", {
           description: `Calling ${data.name || data.phoneNumber}...`
         });
+      }
+      
+      if (data?.leadId) {
+        setConnectedLeadData(null);
       }
     } catch (err) {
       console.error('Error getting next lead:', err);
@@ -109,17 +111,14 @@ const DialerSession = () => {
         description: "The call has been disconnected"
       });
       
-      // Log call disposition to the system if we have a lead table available
       if (currentLeadId) {
         try {
-          // Try to insert into lead_activities table if it exists
           await supabase.from('lead_activities').insert({
-            lead_id: parseInt(currentLeadId), // Convert string to number
+            lead_id: parseInt(currentLeadId),
             type: "call_completed",
             description: "Call ended by agent"
           });
         } catch (error) {
-          // If the table doesn't exist or the insert fails, don't worry about it
           console.log("Could not log call activity:", error);
         }
       }
@@ -134,20 +133,18 @@ const DialerSession = () => {
     if (!currentLeadId) return;
     
     try {
-      // Try to update the lead disposition
       try {
         await supabase.from('leads').update({ 
           disposition: disposition,
           last_contacted: new Date().toISOString()
-        }).eq('id', parseInt(currentLeadId)); // Convert string to number
+        }).eq('id', parseInt(currentLeadId));
       } catch (error) {
         console.log("Could not update lead disposition:", error);
       }
       
-      // Try to log the disposition activity
       try {
         await supabase.from('lead_activities').insert({
-          lead_id: parseInt(currentLeadId), // Convert string to number
+          lead_id: parseInt(currentLeadId),
           type: "disposition",
           description: disposition
         });
@@ -159,10 +156,8 @@ const DialerSession = () => {
         description: `Lead marked as ${disposition}`
       });
       
-      // End the current call if still active
       await handleEndCall();
       
-      // Reset the current lead ID
       setCurrentLeadId(null);
     } catch (err) {
       console.error('Error updating disposition:', err);
@@ -170,8 +165,36 @@ const DialerSession = () => {
     }
   };
 
-  // Find the current active call from Twilio state
   const activeCall = Object.values(twilioState.activeCalls)[0];
+
+  useEffect(() => {
+    if (activeCall?.status === 'in-progress' && activeCall.leadId) {
+      const fetchLeadData = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke('lead-connected', {
+            body: { 
+              leadId: activeCall.leadId,
+              callData: {
+                callSid: activeCall.callSid,
+                status: activeCall.status,
+                timestamp: new Date().toISOString()
+              }
+            }
+          });
+
+          if (error) throw error;
+          if (data?.lead) {
+            setConnectedLeadData(data.lead);
+          }
+        } catch (err) {
+          console.error('Error fetching lead data:', err);
+          toast.error('Failed to load lead details');
+        }
+      };
+
+      fetchLeadData();
+    }
+  }, [twilioState.activeCalls]);
 
   return (
     <MainLayout>
@@ -258,6 +281,11 @@ const DialerSession = () => {
                 </div>
               </CardContent>
             </Card>
+            
+            <ConnectedLeadPanel 
+              leadData={connectedLeadData}
+              isConnected={hasActiveCall && Object.values(twilioState.activeCalls)[0]?.status === 'in-progress'}
+            />
             
             <LeadDetailsPanel 
               leadId={currentLeadId || undefined}
