@@ -1,14 +1,18 @@
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ConnectedLeadPanelProps {
   leadData?: {
-    [key: string]: any; // Accept any raw JSON data
+    [key: string]: any;
   };
+  onRefresh?: () => void;
 }
 
-export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
+export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelProps) => {
   // Debug logging to track data flow
   useEffect(() => {
     console.log("[ConnectedLeadPanel] Raw lead data:", leadData);
@@ -17,10 +21,18 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
   // Display skeleton loader when no data is available
   if (!leadData) {
     return (
-      <Card className="mt-4">
+      <Card className="mt-4 relative">
         <CardHeader className="pb-2">
-          <CardTitle className="text-lg">
+          <CardTitle className="text-lg flex justify-between items-center">
             Lead Details
+            <Button 
+              onClick={onRefresh}
+              variant="outline"
+              size="sm"
+              className="absolute top-2 right-2"
+            >
+              Retrieve Latest Lead
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -61,12 +73,20 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
     );
   }
 
-  // When data is available, map raw data to display fields
+  // When data is available, display it
   return (
-    <Card className="mt-4 border-2 border-green-500">
+    <Card className="mt-4 border-2 border-green-500 relative">
       <CardHeader className="pb-2">
-        <CardTitle className="text-lg">
+        <CardTitle className="text-lg flex justify-between items-center">
           Lead Details - {`${leadData?.first_name || ''} ${leadData?.last_name || ''}`}
+          <Button 
+            onClick={onRefresh}
+            variant="outline"
+            size="sm"
+            className="absolute top-2 right-2"
+          >
+            Retrieve Latest Lead
+          </Button>
         </CardTitle>
       </CardHeader>
       <CardContent>
