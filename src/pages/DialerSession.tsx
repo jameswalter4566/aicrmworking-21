@@ -186,8 +186,19 @@ const DialerSession = () => {
           });
 
           if (error) throw error;
+          
           if (data?.lead) {
-            setConnectedLeadData(data.lead);
+            // Map the lead data properly to match what ConnectedLeadPanel expects
+            // The lead-connected function returns data with snake_case properties
+            setConnectedLeadData({
+              first_name: data.lead.first_name,
+              last_name: data.lead.last_name,
+              phone1: data.lead.phone1,
+              email: data.lead.email,
+              property_address: data.lead.property_address,
+              mailing_address: data.lead.mailing_address
+            });
+            
             setIsDialing(false);
           }
         } catch (err) {
@@ -200,6 +211,11 @@ const DialerSession = () => {
     } else if (!hasActiveCall && !isCallingNext) {
       // Only reset isDialing if we're not in the process of calling the next lead
       setIsDialing(false);
+      
+      // Clear the connected lead data when the call is disconnected
+      if (connectedLeadData) {
+        setConnectedLeadData(null);
+      }
     }
   }, [twilioState.activeCalls, hasActiveCall, activeCall?.leadId, activeCall?.status]);
 
