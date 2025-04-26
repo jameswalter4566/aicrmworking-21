@@ -25,7 +25,7 @@ export const ConnectedLeadPanel = ({
   forceSkeleton = false,
   sessionActive = false
 }: ConnectedLeadPanelProps) => {
-  // Improved logic: Only show skeletons when we're really waiting for data
+  // Show skeletons during appropriate states
   const showSkeletons = forceSkeleton || 
                         isDialing || 
                         (sessionActive && !leadData) || 
@@ -38,7 +38,11 @@ export const ConnectedLeadPanel = ({
       isConnected, 
       isDialing, 
       showSkeletons,
-      hasData: !!leadData
+      hasData: !!leadData,
+      first_name: leadData?.first_name,
+      last_name: leadData?.last_name,
+      phone1: leadData?.phone1,
+      email: leadData?.email
     });
   }, [leadData, isConnected, isDialing, showSkeletons]);
 
@@ -82,7 +86,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">
+                  <div className="text-sm mt-1 font-medium">
                     {getFormattedName() || "---"}
                   </div>
                 )}
@@ -93,7 +97,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.phone1 || "---"}</div>
+                  <div className="text-sm mt-1 font-medium">{leadData?.phone1 || "---"}</div>
                 )}
               </div>
               
@@ -102,7 +106,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.email || "---"}</div>
+                  <div className="text-sm mt-1 font-medium">{leadData?.email || "---"}</div>
                 )}
               </div>
             </div>
@@ -116,7 +120,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.property_address || "---"}</div>
+                  <div className="text-sm mt-1 font-medium">{leadData?.property_address || "---"}</div>
                 )}
               </div>
               
@@ -125,7 +129,7 @@ export const ConnectedLeadPanel = ({
                 {showSkeletons ? (
                   <Skeleton className="h-6 w-full mt-1" />
                 ) : (
-                  <div className="text-sm mt-1">{leadData?.mailing_address || "---"}</div>
+                  <div className="text-sm mt-1 font-medium">{leadData?.mailing_address || "---"}</div>
                 )}
               </div>
             </div>

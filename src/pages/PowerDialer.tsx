@@ -245,7 +245,7 @@ export default function PowerDialer() {
             throw error;
           }
           
-          console.log('[PowerDialer] Response from lead-connected:', data);
+          console.log('[PowerDialer] Full response from lead-connected:', data);
           
           if (data?.lead) {
             console.log('[PowerDialer] Setting connected lead data:', data.lead);
@@ -416,6 +416,7 @@ export default function PowerDialer() {
         isConnected={hasActiveCall && Object.values(twilioState.activeCalls)[0]?.status === 'in-progress'}
         isDialing={isDialing}
         sessionActive={true}
+        forceSkeleton={!connectedLeadData && (isDialing || hasActiveCall)}
       />
 
       <Card className="h-full overflow-hidden flex flex-col">
