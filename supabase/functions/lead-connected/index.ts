@@ -10,6 +10,11 @@ const corsHeaders = {
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// Create a Supabase client with the service role key for admin access
+const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
+// Create a regular client for non-admin operations
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 Deno.serve(async (req) => {
@@ -27,30 +32,37 @@ Deno.serve(async (req) => {
     
     // If we have a leadId, fetch it from the leads table
     if (leadId) {
-      // Call retrieve-lead function to get the lead data
-      const { data: leadResponse, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { leadId, exactMatch: true }
-      });
+      try {
+        // Use the admin client to query the database directly instead of calling another function
+        const { data: leadData, error: leadError } = await adminSupabase
+          .from('leads')
+          .select('*')
+          .eq('id', leadId)
+          .maybeSingle();
 
-      if (error) {
-        throw error;
-      }
-
-      if (leadResponse?.data?.[0]) {
-        // Log activity if we have call data
-        if (callData?.callSid) {
-          await logLeadActivity(leadResponse.data[0].id, callData);
+        if (leadError) {
+          console.error('Error fetching lead data:', leadError);
+          throw leadError;
         }
 
-        console.log('Retrieved lead data:', leadResponse.data[0]);
-        
-        return new Response(JSON.stringify({ 
-          success: true,
-          lead: leadResponse.data[0]
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
+        if (leadData) {
+          // Log activity if we have call data
+          if (callData?.callSid) {
+            await logLeadActivity(leadData.id, callData);
+          }
+
+          console.log('Retrieved lead data:', leadData);
+          
+          return new Response(JSON.stringify({ 
+            success: true,
+            lead: leadData
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          });
+        }
+      } catch (error) {
+        console.error('Error retrieving lead:', error);
       }
     }
     
@@ -103,7 +115,7 @@ async function logLeadActivity(leadId: number | string, callData?: any) {
                       callData.status === 'completed' ? 'Call ended' : 
                       `Call status changed to ${callData.status}`;
     
-    await supabase
+    await adminSupabase
       .from('lead_activities')
       .insert({
         lead_id: leadId,
