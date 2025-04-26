@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,8 +16,7 @@ interface ConnectedLeadPanelProps {
 }
 
 export const ConnectedLeadPanel = ({ leadData, isConnected, isDialing = false }: ConnectedLeadPanelProps) => {
-  // Show skeletons if we're dialing OR if we're connected but don't have lead data yet
-  const showSkeletons = isDialing || (isConnected && !leadData);
+  const showSkeletons = isDialing || (!leadData && isConnected);
 
   return (
     <Card className="mt-4">
@@ -28,7 +26,7 @@ export const ConnectedLeadPanel = ({ leadData, isConnected, isDialing = false }:
           <div className="flex space-x-2">
             {isDialing && !isConnected && (
               <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded-full">
-                Dialing...
+                Loading...
               </span>
             )}
             {isConnected && (

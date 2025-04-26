@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,13 +64,21 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
   const [callNotes, setCallNotes] = useState('');
-  const [isDialing, setIsDialing] = useState(false);
+  const [isDialing, setIsDialing] = useState(true);
+
+  const resetDialingState = () => {
+    setIsDialing(false);
+  };
 
   useEffect(() => {
-    if (isDialingStarted) {
-      fetchCallingLists();
-    }
-  }, [isDialingStarted]);
+    const timer = setTimeout(() => {
+      if (!currentCall && !isProcessingCall) {
+        resetDialingState();
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     console.log('Session state update:', { 
@@ -337,7 +344,13 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
 
       <div className="grid grid-cols-4 gap-4 mt-4">
         <div className="col-span-3">
-          {currentCall && currentCall.status === 'in-progress' ? (
+          {!isDialingStarted ? (
+            <ConnectedLeadPanel
+              isConnected={false}
+              isDialing={isDialing}
+              leadData={null}
+            />
+          ) : (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg font-medium flex items-center justify-between">
