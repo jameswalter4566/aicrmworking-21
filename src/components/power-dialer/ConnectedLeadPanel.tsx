@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,14 +42,14 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
   const fetchLatestLead = async () => {
     try {
       setIsLoading(true);
+      console.log('ConnectedLeadPanel: Fetching latest lead...');
       
-      const { data: response, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { 
-          source: 'all',
-          pageSize: 1,
-          page: 0
-        }
-      });
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
       if (error) {
         console.error('ConnectedLeadPanel: Error fetching latest lead:', error);
@@ -56,11 +57,9 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
         return;
       }
 
-      if (response?.data?.[0]) {
-        console.log('ConnectedLeadPanel: Latest lead data fetched:', response.data[0]);
-        setLocalLeadData(response.data[0]);
-        toast.success('Latest lead loaded');
-      }
+      console.log('ConnectedLeadPanel: Latest lead data fetched:', data);
+      setLocalLeadData(data);
+      toast.success('Latest lead loaded');
     } catch (err) {
       console.error('ConnectedLeadPanel: Error in fetchLatestLead:', err);
       toast.error('Failed to retrieve latest lead');

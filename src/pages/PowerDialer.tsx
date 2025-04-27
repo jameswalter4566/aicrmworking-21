@@ -258,10 +258,10 @@ export default function PowerDialer() {
   };
 
   useEffect(() => {
-    console.log('[PowerDialer] Active call status changed:', Object.values(twilioState.activeCalls)[0]?.status);
-    console.log('[PowerDialer] Active call leadId:', Object.values(twilioState.activeCalls)[0]?.leadId);
-    
     const activeCall = Object.values(twilioState.activeCalls)[0];
+    console.log('[PowerDialer] Active call status changed:', activeCall?.status);
+    console.log('[PowerDialer] Active call leadId:', activeCall?.leadId);
+    
     if (activeCall?.leadId) {
       const fetchLeadData = async () => {
         try {
@@ -284,14 +284,34 @@ export default function PowerDialer() {
             throw error;
           }
           
+          console.log('[PowerDialer] Raw response from lead-connected:', rawData);
+          
           if (rawData?.lead) {
-            console.log('[PowerDialer] Setting lead data:', rawData.lead);
+            console.log('[PowerDialer] Setting raw lead data:', rawData.lead);
             setConnectedLeadData(rawData.lead);
+          } else {
+            console.log('[PowerDialer] No lead data in response, using fallback');
+            setConnectedLeadData({
+              first_name: 'Unknown',
+              last_name: 'Contact',
+              phone1: activeCall.phoneNumber || '---',
+              email: '---',
+              property_address: '---',
+              mailing_address: '---'
+            });
           }
           
           setIsDialing(false);
         } catch (err) {
           console.error('[PowerDialer] Error fetching lead data:', err);
+          setConnectedLeadData({
+            first_name: 'Error',
+            last_name: 'Loading Lead',
+            phone1: activeCall.phoneNumber || '---',
+            email: '---',
+            property_address: '---',
+            mailing_address: '---'
+          });
           toast.error('Failed to load lead details');
           setIsDialing(false);
         }
