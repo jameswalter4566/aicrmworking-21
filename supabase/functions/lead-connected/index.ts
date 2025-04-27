@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
@@ -29,7 +28,7 @@ const FALLBACK_LEAD_DATA = {
   avatar: null
 };
 
-async function broadcastLeadFound(lead, callState?: string) {
+async function broadcastLeadFound(lead, callState) {
   if (!lead?.id) {
     console.warn('⚠️ Cannot broadcast: lead or lead.id is missing');
     return;
@@ -42,8 +41,8 @@ async function broadcastLeadFound(lead, callState?: string) {
     // Log before sending the broadcast
     console.log(`📢 Broadcasting lead data to channel: ${channelName}, callState: ${callState}`);
     
-    // Send a broadcast message with the lead data
-    const result = await anonSupabase
+    // Use adminSupabase to ensure the broadcast goes through regardless of auth state
+    const adminResult = await adminSupabase
       .channel(channelName)
       .send({
         type: 'broadcast',
@@ -56,15 +55,29 @@ async function broadcastLeadFound(lead, callState?: string) {
         }
       });
       
+    // Also try with anonymous client as backup
+    const anonResult = await anonSupabase
+      .channel(channelName)
+      .send({
+        type: 'broadcast',
+        event: 'lead_data_update',
+        payload: {
+          lead,
+          callState,
+          timestamp: new Date().toISOString(),
+          source: 'lead_connected_anon'
+        }
+      });
+      
     // Check if broadcast was successful
-    if (result.error) {
-      console.error('❌ Broadcast failed:', result.error);
+    if (adminResult.error && anonResult.error) {
+      console.error('❌ Both broadcasts failed:', adminResult.error, anonResult.error);
     } else {
       console.log('✅ Broadcast successful!');
     }
     
     // Also try sending to a global channel as backup
-    await anonSupabase
+    await adminSupabase
       .channel('global-leads')
       .send({
         type: 'broadcast',
