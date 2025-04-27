@@ -311,7 +311,7 @@ const DialerSession = () => {
     const callStatus = firstActiveCall?.status;
     
     const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
-    const inProgressStatuses = ['connecting', 'in-progress'];
+    const inProgressStatuses = ['connecting', 'in-progress', 'ringing'];
     
     if (completedStatuses.includes(callStatus)) {
       handleCallCompletion();

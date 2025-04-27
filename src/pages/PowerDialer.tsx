@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import MainLayout from "@/components/layouts/MainLayout";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ import TwilioScript from "@/components/TwilioScript";
 import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "sonner";
-import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
+import { PreviewDialerWindow } from "@/components/power-dialer/PreviewDialerWindow";
 import { ConnectedLeadPanel } from "@/components/power-dialer/ConnectedLeadPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
