@@ -14,41 +14,27 @@ serve(async (req) => {
   }
   
   try {
-    // Get authorization header from request
-    const authHeader = req.headers.get('Authorization');
-    
-    if (!authHeader) {
-      console.error('Missing Authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized', details: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Create a client with the Authorization header
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: authHeader },
+          headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
     );
     
-    // Get the authenticated user
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    const { data: { user } } = await supabaseClient.auth.getUser();
     
-    if (authError || !user) {
-      console.error('Authentication error:', authError);
+    if (!user) {
       return new Response(
-        JSON.stringify({ error: 'Unauthorized', details: authError }),
+        JSON.stringify({ error: 'Unauthorized' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
     const requestData = await req.json();
-    const { listId, page = 0, pageSize = 10 } = requestData;
+    const { listId } = requestData;
     
     if (!listId) {
       return new Response(
@@ -57,96 +43,76 @@ serve(async (req) => {
       );
     }
     
-    // Verify the user has access to the list
-    const { data: listAccess, error: listAccessError } = await supabaseClient
+    // Verify user has access to this list
+    const { data: listAccess, error: accessError } = await supabaseClient
       .from('calling_lists')
       .select('id')
       .eq('id', listId)
       .eq('created_by', user.id)
       .maybeSingle();
     
-    if (listAccessError) {
-      console.error('Error checking list access:', listAccessError);
-      return new Response(
-        JSON.stringify({ error: 'Error checking list access', details: listAccessError }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    if (!listAccess) {
+    if (accessError || !listAccess) {
       return new Response(
         JSON.stringify({ error: 'List not found or access denied' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    // Get all leads in the list
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    
-    // First get the list lead entries
-    const { data: listLeads, error: listLeadsError, count } = await supabaseClient
+    // Get the leads in this calling list
+    const { data: listLeads, error: leadsError } = await supabaseClient
       .from('calling_list_leads')
-      .select('lead_id', { count: 'exact' })
-      .eq('list_id', listId)
-      .range(from, to);
+      .select('lead_id')
+      .eq('list_id', listId);
     
-    if (listLeadsError) {
-      console.error('Error fetching list leads:', listLeadsError);
+    if (leadsError) {
+      console.error('Error fetching calling list leads:', leadsError);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch list leads', details: listLeadsError }),
+        JSON.stringify({ error: 'Failed to fetch leads' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
+    // If there are no leads, return empty array
     if (!listLeads || listLeads.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          leads: [],
-          pagination: {
-            page,
-            pageSize,
-            totalCount: 0,
-            totalPages: 0
-          }
-        }),
+        JSON.stringify([]),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    // Then get the actual lead data
     const leadIds = listLeads.map(item => item.lead_id);
-    const { data: leads, error: leadsError } = await supabaseClient
+    
+    // Get the actual lead data
+    const { data: leads, error: leadsDataError } = await supabaseClient
       .from('leads')
-      .select('*')
+      .select('id, first_name, last_name, phone1, email')
       .in('id', leadIds);
     
-    if (leadsError) {
-      console.error('Error fetching leads:', leadsError);
+    if (leadsDataError) {
+      console.error('Error fetching lead details:', leadsDataError);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch leads', details: leadsError }),
+        JSON.stringify({ error: 'Failed to fetch lead details' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    const totalPages = Math.ceil((count || 0) / pageSize);
+    // Transform the data to match the expected format
+    const transformedLeads = leads.map(lead => ({
+      id: lead.id,
+      firstName: lead.first_name,
+      lastName: lead.last_name,
+      phone1: lead.phone1,
+      email: lead.email
+    }));
     
     return new Response(
-      JSON.stringify({
-        leads: leads || [],
-        pagination: {
-          page,
-          pageSize,
-          totalCount: count || 0,
-          totalPages
-        }
-      }),
+      JSON.stringify(transformedLeads),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal Server Error', details: error.message || String(error) }),
+      JSON.stringify({ error: 'Internal Server Error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

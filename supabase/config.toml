@@ -12,9 +12,18 @@ enabled = true
 [functions]
 node_version = 18
 
-# Make only the twilio functions public, the rest should use JWT verification
+# Make these functions public so they don't require authentication
 [functions.twilio-token]
 verify_jwt = false
 
 [functions.twilio-voice]
+verify_jwt = false
+
+[functions.get-calling-lists]
+verify_jwt = false
+
+[functions.get-calling-list]
+verify_jwt = false
+
+[functions.get-calling-list-leads]
 verify_jwt = false

@@ -12,23 +12,12 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Get authorization header from request
-    const authHeader = req.headers.get('Authorization');
-    
-    if (!authHeader) {
-      console.error('Missing Authorization header');
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized', details: 'Missing Authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       {
         global: {
-          headers: { Authorization: authHeader },
+          headers: { Authorization: req.headers.get('Authorization')! },
         },
       }
     );
@@ -55,7 +44,6 @@ Deno.serve(async (req) => {
     
     console.log(`Processing request for listId: ${listId}, sessionName: ${sessionName}, userId: ${user.id}`);
     
-    // Verify the user has access to the list
     const { data: listAccess, error: listAccessError } = await supabaseClient
       .from('calling_lists')
       .select('id')
@@ -78,7 +66,6 @@ Deno.serve(async (req) => {
       );
     }
     
-    // Get leads in the list
     const { data: listLeads, error: leadsError } = await supabaseClient
       .from('calling_list_leads')
       .select('lead_id')
@@ -101,7 +88,6 @@ Deno.serve(async (req) => {
     
     console.log(`Found ${listLeads.length} leads for list ${listId}`);
     
-    // Create the dialing session
     const finalSessionName = sessionName || `Dialing Session - ${new Date().toLocaleString()}`;
     const { data: sessionData, error: sessionError } = await supabaseClient
       .from('dialing_sessions')
@@ -128,7 +114,6 @@ Deno.serve(async (req) => {
     
     console.log(`Created dialing session with ID: ${sessionData.id}`);
     
-    // Process leads for the session
     try {
       const leadIds = listLeads.map(item => item.lead_id);
       console.log(`Processing ${leadIds.length} leads to add to session`);
@@ -156,11 +141,15 @@ Deno.serve(async (req) => {
       
       console.log(`Found ${actualLeads.length} valid leads to add to session`, actualLeads[0]);
       
+      // Prepare session leads data
       const sessionLeads = [];
       
+      // Process each lead - now AWAITING the UUID update
       for (const lead of actualLeads) {
+        // Generate UUID for this lead
         const leadUuid = crypto.randomUUID();
         
+        // Update lead with session UUID - AWAIT THIS OPERATION
         const { error: updateError } = await supabaseClient
           .from('leads')
           .update({ session_uuid: leadUuid })
@@ -172,6 +161,7 @@ Deno.serve(async (req) => {
           console.log(`Updated lead ${lead.id} with session UUID ${leadUuid}`);
         }
         
+        // Add to session leads array
         sessionLeads.push({
           session_id: sessionData.id,
           lead_id: leadUuid,
@@ -208,6 +198,7 @@ Deno.serve(async (req) => {
           
           for (const lead of batch) {
             try {
+              // Send notification with both leadId and originalLeadId
               await supabaseClient.functions.invoke('lead-connected', {
                 body: { 
                   leadId: lead.lead_id,

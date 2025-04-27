@@ -1,5 +1,4 @@
 import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
 
 export interface TwilioCallResult {
   success: boolean;
@@ -60,54 +59,8 @@ class TwilioService {
     return this.audioContext.state === 'running';
   }
   
-  async getAuthToken(): Promise<string | null> {
-    try {
-      const { data } = await supabase.auth.getSession();
-      return data?.session?.access_token || null;
-    } catch (error) {
-      console.error("Error getting auth token:", error);
-      return null;
-    }
-  }
-
-  async getToken(): Promise<string> {
-    try {
-      const browserId = this.getBrowserId();
-      
-      const authToken = await this.getAuthToken();
-      
-      if (!authToken) {
-        console.error("No auth token available");
-        throw new Error("Authentication error. Please login again.");
-      }
-
-      const { data, error } = await supabase.functions.invoke("twilio-token", {
-        body: { identity: browserId }
-      });
-
-      if (error) {
-        console.error("Error getting Twilio token:", error);
-        throw new Error("Failed to get Twilio token");
-      }
-
-      return data.token;
-    } catch (error) {
-      console.error("Error in getToken:", error);
-      throw error;
-    }
-  }
-
   async initializeTwilioDevice(): Promise<boolean> {
     try {
-      const authToken = await this.getAuthToken();
-      
-      if (!authToken) {
-        console.error("No auth token available");
-        throw new Error("Authentication error. Please login again.");
-      }
-      
-      const token = await this.getToken();
-      
       if (this.device) {
         console.log("Cleaning up existing Twilio device before initialization");
         try {
@@ -148,7 +101,7 @@ class TwilioService {
       }
 
       if (window.Twilio && window.Twilio.Device) {
-        this.device = new window.Twilio.Device(token, {
+        this.device = new window.Twilio.Device(data.token, {
           codecPreferences: ["opus", "pcmu"],
           maxCallSignalingTimeoutMs: 30000,
           logLevel: 'debug',
@@ -746,10 +699,6 @@ class TwilioService {
         console.warn("Error during cleanup:", e);
       }
     }
-  }
-
-  private getBrowserId(): string {
-    return window.location.href;
   }
 }
 

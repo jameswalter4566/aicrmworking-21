@@ -102,7 +102,6 @@ export default function PowerDialer() {
   const [currentCall, setCurrentCall] = useState<any>(null);
   const [isDialing, setIsDialing] = useState(false);
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
@@ -231,6 +230,31 @@ export default function PowerDialer() {
     });
     
     handleEndCall(currentCall.parameters.leadId);
+  };
+
+  const refreshLatestLead = async () => {
+    try {
+      console.log('Fetching latest lead...');
+      const { data, error } = await supabase
+        .from('leads')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error) {
+        console.error('Error fetching latest lead:', error);
+        toast.error('Failed to fetch latest lead');
+        return;
+      }
+
+      console.log('Latest lead data:', data);
+      setConnectedLeadData(data);
+      toast.success('Latest lead retrieved');
+    } catch (err) {
+      console.error('Error in refreshLatestLead:', err);
+      toast.error('Failed to retrieve latest lead');
+    }
   };
 
   useEffect(() => {
@@ -476,6 +500,7 @@ export default function PowerDialer() {
 
               <ConnectedLeadPanel 
                 leadData={connectedLeadData}
+                onRefresh={refreshLatestLead}
               />
 
               <Card className="h-full overflow-hidden flex flex-col">

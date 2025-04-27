@@ -1,6 +1,7 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
+// Define CORS headers for browser requests
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -9,6 +10,12 @@ const corsHeaders = {
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// Create a Supabase client with the service role key for admin access
+const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
+// Create a regular client for non-admin operations
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -17,14 +24,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Create a client with the Authorization header from the request
-    const authHeader = req.headers.get('Authorization');
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: {
-        headers: { Authorization: authHeader || '' },
-      },
-    });
-
     const requestBody = await req.json();
     const { leadId, callData } = requestBody;
 
@@ -33,45 +32,37 @@ Deno.serve(async (req) => {
     
     // If we have a leadId, fetch it from the leads table
     if (leadId) {
-      let user = null;
-      
-      // Try to get the authenticated user if we have an auth header
-      if (authHeader) {
-        const { data } = await supabaseClient.auth.getUser();
-        user = data.user;
-      }
-      
-      // For authenticated requests, use the authorization header
-      // For unauthenticated requests, create a request with the params
-      const params = {
-        leadId,
-        exactMatch: true
-      };
-      
-      const { data: leadResponse, error } = await supabaseClient.functions.invoke('retrieve-leads', {
-        body: params
-      });
+      try {
+        // Use the admin client to query the database directly instead of calling another function
+        const { data: leadData, error: leadError } = await adminSupabase
+          .from('leads')
+          .select('*')
+          .eq('id', leadId)
+          .maybeSingle();
 
-      if (error) {
-        console.error('Error retrieving lead:', error);
-        throw error;
-      }
-
-      if (leadResponse?.data?.[0]) {
-        // Log activity if we have call data
-        if (callData?.callSid) {
-          await logLeadActivity(supabaseClient, leadResponse.data[0].id, callData);
+        if (leadError) {
+          console.error('Error fetching lead data:', leadError);
+          throw leadError;
         }
 
-        console.log('Retrieved lead data:', leadResponse.data[0]);
-        
-        return new Response(JSON.stringify({ 
-          success: true,
-          lead: leadResponse.data[0]
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
+        if (leadData) {
+          // Log activity if we have call data
+          if (callData?.callSid) {
+            await logLeadActivity(leadData.id, callData);
+          }
+
+          console.log('Retrieved lead data:', leadData);
+          
+          return new Response(JSON.stringify({ 
+            success: true,
+            lead: leadData
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          });
+        }
+      } catch (error) {
+        console.error('Error retrieving lead:', error);
       }
     }
     
@@ -113,7 +104,7 @@ Deno.serve(async (req) => {
 });
 
 // Helper function to log lead activity based on call data
-async function logLeadActivity(supabaseClient, leadId, callData) {
+async function logLeadActivity(leadId: number | string, callData?: any) {
   if (!callData || !callData.status) return;
   
   try {
@@ -124,7 +115,7 @@ async function logLeadActivity(supabaseClient, leadId, callData) {
                       callData.status === 'completed' ? 'Call ended' : 
                       `Call status changed to ${callData.status}`;
     
-    await supabaseClient
+    await adminSupabase
       .from('lead_activities')
       .insert({
         lead_id: leadId,
