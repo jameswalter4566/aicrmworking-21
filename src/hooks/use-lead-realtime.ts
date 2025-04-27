@@ -1,5 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 export function useLeadRealtime(leadId: string | number | null, userId?: string | null) {
   const [leadData, setLeadData] = useState<any>(null);
@@ -12,6 +14,8 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     
     setIsLoading(true);
     try {
+      console.log(`[useLeadRealtime] Fetching data for lead ID: ${leadId}`);
+      
       const { data, error } = await supabase.functions.invoke('lead-connected', {
         body: { 
           leadId: String(leadId),
@@ -24,18 +28,28 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       });
 
       if (error) {
-        console.error('Error fetching lead data:', error);
+        console.error('[useLeadRealtime] Error fetching lead data:', error);
+        toast.error('Failed to fetch lead data');
         return;
       }
 
+      console.log('[useLeadRealtime] Response from lead-connected:', data);
+      
       if (data?.lead) {
-        console.log('[useLeadRealtime] Received lead data:', data.lead);
+        console.log('[useLeadRealtime] Successfully retrieved lead data:', data.lead);
         setLeadData(data.lead);
         setLeadFound(true);
+        toast.success('Lead data loaded successfully');
+        
+        // Reset the lead found indicator after 3 seconds
         setTimeout(() => setLeadFound(false), 3000);
+      } else {
+        console.warn('[useLeadRealtime] No lead data in response');
+        toast.warning('No lead data found');
       }
     } catch (err) {
-      console.error('Error in lead realtime fetch:', err);
+      console.error('[useLeadRealtime] Error in lead realtime fetch:', err);
+      toast.error('Error fetching lead data');
     } finally {
       setIsLoading(false);
     }
@@ -48,6 +62,8 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       setLeadFound(false);
       return;
     }
+
+    console.log(`[useLeadRealtime] Setting up with leadId: ${leadId}, userId: ${userId || 'none'}`);
 
     // Initial fetch
     fetchLeadData();
@@ -66,6 +82,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         (payload) => {
           console.log('[useLeadRealtime] Realtime update received:', payload);
           if (payload.new) {
+            console.log('[useLeadRealtime] Setting lead data from realtime update:', payload.new);
             setLeadData(payload.new);
             setLeadFound(true);
             setTimeout(() => setLeadFound(false), 3000);
@@ -93,6 +110,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       .subscribe();
 
     return () => {
+      console.log(`[useLeadRealtime] Cleaning up subscriptions for leadId: ${leadId}`);
       supabase.removeChannel(channel);
       supabase.removeChannel(activitiesChannel);
     };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +18,7 @@ interface ConnectedLeadPanelProps {
 
 export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: ConnectedLeadPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const [localLeadFound, setLocalLeadFound] = useState(false);
   const { user } = useAuth();
   const currentLeadId = initialLeadData?.id || null;
   
@@ -31,6 +33,11 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
       realtime: realtimeLeadData,
       display: displayData
     });
+    
+    if (displayData && (realtimeLeadData || localLeadFound === false)) {
+      setLocalLeadFound(true);
+      setTimeout(() => setLocalLeadFound(false), 3000);
+    }
   }, [initialLeadData, realtimeLeadData, displayData]);
 
   const handleRefresh = () => {
@@ -45,10 +52,14 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     }
   };
 
+  // We're using both the hook's leadFound state and our local state
+  const showLeadFound = leadFound || localLeadFound;
+
   return (
     <>
-      <LeadFoundIndicator isVisible={leadFound} />
-      <Card className={`mt-4 ${leadFound ? 'border-2 border-green-500' : ''} relative`}>
+      <LeadFoundIndicator isVisible={showLeadFound} />
+      
+      <Card className={`mt-4 ${showLeadFound ? 'border-2 border-green-500 transition-all duration-500' : ''} relative`}>
         <CardHeader className="pb-2">
           <CardTitle className="text-lg flex justify-between items-center">
             {displayData?.id ? (
@@ -78,88 +89,108 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <h3 className="font-medium mb-2">Contact Information</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-gray-500">Name</label>
-                  <div className="text-sm mt-1 font-medium">
-                    {`${displayData?.first_name || ''} ${displayData?.last_name || ''}`}
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="text-sm text-gray-500">Primary Phone</label>
-                  <div className="text-sm mt-1 font-medium">
-                    {displayData?.phone1 || "---"}
-                  </div>
-                </div>
-
-                {displayData?.phone2 && (
-                  <div>
-                    <label className="text-sm text-gray-500">Secondary Phone</label>
-                    <div className="text-sm mt-1 font-medium">
-                      {displayData?.phone2}
-                    </div>
-                  </div>
-                )}
-                
-                <div>
-                  <label className="text-sm text-gray-500">Email</label>
-                  <div className="text-sm mt-1 font-medium">
-                    {displayData?.email || "---"}
-                  </div>
-                </div>
-
-                {displayData?.disposition && (
-                  <div>
-                    <label className="text-sm text-gray-500">Disposition</label>
-                    <div className="text-sm mt-1 font-medium">
-                      {displayData?.disposition}
-                    </div>
-                  </div>
-                )}
-
-                {displayData?.tags && displayData.tags.length > 0 && (
-                  <div>
-                    <label className="text-sm text-gray-500">Tags</label>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {displayData.tags.map((tag: string) => (
-                        <Badge key={tag} variant="outline">{tag}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+          {isRealtimeLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-[200px]" />
+              <Skeleton className="h-4 w-[160px]" />
+              <Skeleton className="h-4 w-[180px]" />
             </div>
-            
-            <div>
-              <h3 className="font-medium mb-2">Address Information</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm text-gray-500">Property Address</label>
-                  <div className="text-sm mt-1 font-medium">
-                    {displayData?.property_address || "---"}
+          ) : displayData ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="font-medium mb-2">Contact Information</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-gray-500">Name</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {`${displayData?.first_name || ''} ${displayData?.last_name || ''}`}
+                    </div>
                   </div>
-                </div>
-                
-                <div>
-                  <label className="text-sm text-gray-500">Mailing Address</label>
-                  <div className="text-sm mt-1 font-medium">
-                    {displayData?.mailing_address || "---"}
+                  
+                  <div>
+                    <label className="text-sm text-gray-500">Primary Phone</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.phone1 || "---"}
+                    </div>
                   </div>
+
+                  {displayData?.phone2 && (
+                    <div>
+                      <label className="text-sm text-gray-500">Secondary Phone</label>
+                      <div className="text-sm mt-1 font-medium">
+                        {displayData?.phone2}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="text-sm text-gray-500">Email</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.email || "---"}
+                    </div>
+                  </div>
+
+                  {displayData?.disposition && (
+                    <div>
+                      <label className="text-sm text-gray-500">Disposition</label>
+                      <div className="text-sm mt-1 font-medium">
+                        {displayData?.disposition}
+                      </div>
+                    </div>
+                  )}
+
+                  {displayData?.tags && displayData.tags.length > 0 && (
+                    <div>
+                      <label className="text-sm text-gray-500">Tags</label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {displayData.tags.map((tag: string) => (
+                          <Badge key={tag} variant="outline">{tag}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
+              
+              <div>
+                <h3 className="font-medium mb-2">Address Information</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-gray-500">Property Address</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.property_address || "---"}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm text-gray-500">Mailing Address</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.mailing_address || "---"}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground">No lead data available</p>
+              <Button 
+                onClick={handleRefresh}
+                variant="outline" 
+                size="sm"
+                className="mt-2"
+              >
+                Refresh Data
+              </Button>
+            </div>
+          )}
 
           {process.env.NODE_ENV === 'development' && (
             <div className="mt-4 p-2 bg-gray-100 rounded">
               <details>
                 <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
                 <pre className="mt-2 text-xs overflow-auto">
-                  {JSON.stringify(displayData, null, 2)}
+                  {displayData ? JSON.stringify(displayData, null, 2) : "No data available"}
                 </pre>
               </details>
             </div>
