@@ -2,8 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
 
 interface ConnectedLeadPanelProps {
   leadData?: {
@@ -23,8 +21,6 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
       setLocalLeadData(leadData);
     }
   }, [leadData]);
-
-  // Remove the refreshLatestLead function entirely
 
   // Display skeleton loader when no data is available
   if ((!displayData || Object.keys(displayData).length === 0)) {

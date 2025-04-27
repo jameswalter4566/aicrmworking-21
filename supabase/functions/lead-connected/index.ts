@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
     console.log(`Lead connected function called for leadId: ${leadId}`);
     console.log('Call data:', callData);
     
-    // If we have a leadId, fetch it from the leads table
+    // If we have a leadId, fetch it from the database directly instead of using retrieve-leads
     if (leadId) {
       let user = null;
       
@@ -41,37 +41,35 @@ Deno.serve(async (req) => {
         user = data.user;
       }
       
-      // For authenticated requests, use the authorization header
-      // For unauthenticated requests, create a request with the params
-      const params = {
-        leadId,
-        exactMatch: true
-      };
-      
-      const { data: leadResponse, error } = await supabaseClient.functions.invoke('retrieve-leads', {
-        body: params
-      });
+      // Fetch the lead directly from the database instead of calling retrieve-leads
+      const { data: lead, error } = await supabaseClient
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .maybeSingle();
 
       if (error) {
         console.error('Error retrieving lead:', error);
         throw error;
       }
 
-      if (leadResponse?.data?.[0]) {
+      if (lead) {
         // Log activity if we have call data
         if (callData?.callSid) {
-          await logLeadActivity(supabaseClient, leadResponse.data[0].id, callData);
+          await logLeadActivity(supabaseClient, lead.id, callData);
         }
 
-        console.log('Retrieved lead data:', leadResponse.data[0]);
+        console.log(`Retrieved lead directly from database: ${lead.first_name} ${lead.last_name}`);
         
         return new Response(JSON.stringify({ 
           success: true,
-          lead: leadResponse.data[0]
+          lead: lead
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });
+      } else {
+        console.log(`No lead found with ID: ${leadId}`);
       }
     }
     

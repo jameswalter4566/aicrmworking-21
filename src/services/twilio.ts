@@ -1,5 +1,5 @@
-import { toast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface TwilioCallResult {
   success: boolean;
