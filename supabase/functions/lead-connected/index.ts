@@ -28,15 +28,12 @@ Deno.serve(async (req) => {
     console.log(`Lead connected function called for leadId: ${leadId}`);
     console.log('Call data:', callData);
     
-    // Get the numeric ID from callData if available, otherwise try to use the leadId
     let effectiveLeadId = null;
     
-    // First try to get originalLeadId from callData
     if (callData?.originalLeadId) {
       effectiveLeadId = callData.originalLeadId;
       console.log(`Using originalLeadId from callData: ${effectiveLeadId}`);
     } 
-    // If originalLeadId is in notes (some legacy data structure), try to parse it
     else if (callData?.notes) {
       try {
         const notesData = JSON.parse(callData.notes);
@@ -50,25 +47,35 @@ Deno.serve(async (req) => {
     }
     
     if (!effectiveLeadId) {
-      console.log('No numeric leadId found, attempting to use provided leadId:', leadId);
       effectiveLeadId = leadId;
+      console.log(`No numeric leadId found, using provided leadId: ${leadId}`);
     }
 
     if (effectiveLeadId) {
       try {
-        // Convert to number if it's a numeric string to ensure proper type handling
         let numericLeadId = effectiveLeadId;
         if (/^\d+$/.test(String(effectiveLeadId))) {
           numericLeadId = parseInt(String(effectiveLeadId), 10);
           console.log(`Converted lead ID to numeric format: ${numericLeadId}`);
         }
         
-        // SIMPLIFICATION: Use a direct database query with the admin client
-        console.log(`Attempting direct database query for lead with ID: ${numericLeadId}`);
-        
+        // Direct database query with all required fields
         const { data: directLead, error: directError } = await adminSupabase
           .from('leads')
-          .select('*')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            email,
+            phone1,
+            phone2,
+            property_address,
+            mailing_address,
+            disposition,
+            tags,
+            created_at,
+            updated_at
+          `)
           .eq('id', numericLeadId)
           .single();
           
@@ -80,78 +87,45 @@ Deno.serve(async (req) => {
             await logLeadActivity(directLead.id, callData);
           }
           
+          // Return formatted lead data
           return new Response(JSON.stringify({ 
             success: true,
-            lead: directLead
+            lead: {
+              id: directLead.id,
+              first_name: directLead.first_name || "Unknown",
+              last_name: directLead.last_name || "Contact",
+              phone1: directLead.phone1 || callData?.phoneNumber || "---",
+              phone2: directLead.phone2 || "---",
+              email: directLead.email || "---",
+              property_address: directLead.property_address || "---",
+              mailing_address: directLead.mailing_address || "---",
+              disposition: directLead.disposition || "Not Contacted",
+              tags: directLead.tags || [],
+              created_at: directLead.created_at,
+              updated_at: directLead.updated_at
+            }
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
           });
         } else {
           console.log(`Direct database query failed: ${directError?.message || 'No lead found'}`);
-          console.log('Attempting to search by string ID as fallback');
-          
-          // Try searching by string ID
-          const { data: stringSearchLead, error: stringSearchError } = await adminSupabase
-            .from('leads')
-            .select('*')
-            .eq('id', String(effectiveLeadId))
-            .single();
-            
-          if (stringSearchLead && !stringSearchError) {
-            console.log(`Found lead using string ID: ${stringSearchLead.id}`);
-            
-            // Log activity if we have call data
-            if (callData?.callSid || callData?.status) {
-              await logLeadActivity(stringSearchLead.id, callData);
-            }
-            
-            return new Response(JSON.stringify({ 
-              success: true,
-              lead: stringSearchLead
-            }), {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 200,
-            });
-          } else {
-            console.log(`String ID search also failed: ${stringSearchError?.message || 'No lead found'}`);
-          }
+          return fallbackResponse(effectiveLeadId, callData);
         }
       } catch (error) {
         console.error('Error in direct database query:', error);
+        return fallbackResponse(effectiveLeadId, callData);
       }
     }
     
-    // Fallback response with empty data
-    return new Response(JSON.stringify({ 
-      success: true,
-      lead: {
-        id: effectiveLeadId || 'unknown',
-        first_name: "Unknown",
-        last_name: "Contact",
-        phone1: callData?.phoneNumber || "",
-        email: "no-email@example.com",
-        property_address: "No property address on file",
-        mailing_address: "No mailing address on file"
-      }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    return fallbackResponse(effectiveLeadId, callData);
 
   } catch (error) {
     console.error('Error in lead-connected function:', error);
     return new Response(JSON.stringify({ 
       success: false, 
       error: error.message,
-      lead: {
-        first_name: "Error",
-        last_name: "Loading Lead",
-        phone1: "---",
-        email: "---",
-        property_address: "---",
-        mailing_address: "---"
-      }
+      lead: createFallbackLead("Error", "Loading Lead")
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -159,7 +133,36 @@ Deno.serve(async (req) => {
   }
 });
 
-// Helper function to log lead activity based on call data
+function createFallbackLead(firstName: string, lastName: string, phoneNumber?: string) {
+  return {
+    first_name: firstName,
+    last_name: lastName,
+    phone1: phoneNumber || "---",
+    phone2: "---",
+    email: "---",
+    property_address: "---",
+    mailing_address: "---",
+    disposition: "Not Contacted",
+    tags: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+}
+
+function fallbackResponse(leadId: string | number, callData?: any) {
+  return new Response(JSON.stringify({ 
+    success: true,
+    lead: createFallbackLead(
+      "Unknown",
+      "Contact",
+      callData?.phoneNumber
+    )
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status: 200,
+  });
+}
+
 async function logLeadActivity(leadId: number | string, callData?: any) {
   if (!callData) return;
   
@@ -185,3 +188,4 @@ async function logLeadActivity(leadId: number | string, callData?: any) {
     console.error('Error creating lead activity:', err);
   }
 }
+
