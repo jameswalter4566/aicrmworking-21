@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -27,7 +26,6 @@ const DialerSession = () => {
   const [isCallingNext, setIsCallingNext] = useState(false);
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
   const [isDialing, setIsDialing] = useState(false);
-  const [isHangingUp, setIsHangingUp] = useState(false);
 
   const { user } = useAuth();
   const twilioState = useTwilio();
@@ -154,49 +152,37 @@ const DialerSession = () => {
   };
 
   const handleEndCall = async () => {
+    const activeCallIds = Object.keys(twilioState.activeCalls);
+    
+    if (activeCallIds.length === 0) return;
+    
     try {
-      setIsHangingUp(true);
-      const activeCallIds = Object.keys(twilioState.activeCalls);
-      
-      if (activeCallIds.length === 0) {
-        setIsHangingUp(false);
-        return;
-      }
-      
       console.log("Attempting to end calls:", activeCallIds);
       
-      // Direct use of twilioService for more reliable call termination
-      const result = await twilioService.hangupAllCalls();
+      await Promise.all(activeCallIds.map(id => twilioState.endCall(id)));
       
-      if (result) {
-        toast.success("Call ended", {
-          description: "The call has been disconnected"
-        });
-        
-        if (currentLeadId) {
-          try {
-            await supabase.from('lead_activities').insert({
-              lead_id: parseInt(currentLeadId),
-              type: "call_completed",
-              description: "Call ended by agent"
-            });
-          } catch (error) {
-            console.error("Could not log call activity:", error);
-          }
+      toast.success("Call ended", {
+        description: "The call has been disconnected"
+      });
+      
+      if (currentLeadId) {
+        try {
+          await supabase.from('lead_activities').insert({
+            lead_id: parseInt(currentLeadId),
+            type: "call_completed",
+            description: "Call ended by agent"
+          });
+        } catch (error) {
+          console.error("Could not log call activity:", error);
         }
-        
-        setConnectedLeadData(null);
-        setIsDialing(false);
-      } else {
-        toast.error("Failed to end call", {
-          description: "Please try again or reload the page"
-        });
       }
+      
+      setConnectedLeadData(null);
+      setIsDialing(false);
+      
     } catch (err) {
       console.error('Error ending call:', err);
       toast.error('Failed to end call');
-    } finally {
-      setIsHangingUp(false);
     }
   };
 
@@ -333,11 +319,11 @@ const DialerSession = () => {
     const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
     const inProgressStatuses = ['connecting', 'in-progress'];
     
-    if (completedStatuses.includes(callStatus || '')) {
+    if (completedStatuses.includes(callStatus)) {
       handleCallCompletion();
-    } else if (callStatus === 'connecting') { // Fix: Changed 'ringing' to 'connecting'
+    } else if (callStatus === 'ringing') {
       startNoAnswerTimeout();
-    } else if (inProgressStatuses.includes(callStatus || '')) {
+    } else if (inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();
     }
   }, [
@@ -346,35 +332,6 @@ const DialerSession = () => {
     startNoAnswerTimeout, 
     clearTimeoutTimer
   ]);
-
-  const toggleAutoDial = () => {
-    setAutoDialerConfig({
-      ...autoDialerConfig,
-      enabled: !autoDialerConfig.enabled
-    });
-    
-    toast(autoDialerConfig.enabled ? "Auto-dialer paused" : "Auto-dialer resumed", {
-      description: autoDialerConfig.enabled 
-        ? "You will need to manually call the next lead" 
-        : "The system will automatically call the next lead after each call"
-    });
-  };
-
-  const stopDialingSession = async () => {
-    try {
-      await handleEndCall();
-      
-      toast.success("Session stopped", {
-        description: "The dialing session has been ended"
-      });
-      
-      // Navigate back to the sessions list
-      window.location.href = '/power-dialer';
-    } catch (err) {
-      console.error('Error stopping session:', err);
-      toast.error('Failed to stop session');
-    }
-  };
 
   return (
     <MainLayout>
@@ -439,12 +396,10 @@ const DialerSession = () => {
                       <Button 
                         variant="destructive"
                         onClick={handleEndCall}
-                        disabled={!Object.values(twilioState.activeCalls)[0] || 
-                                Object.values(twilioState.activeCalls)[0].status === 'completed' ||
-                                isHangingUp}
+                        disabled={!Object.values(twilioState.activeCalls)[0] || Object.values(twilioState.activeCalls)[0].status === 'completed'}
                       >
                         <PhoneOff className="mr-2 h-4 w-4" />
-                        {isHangingUp ? 'Hanging Up...' : 'End Call'}
+                        End Call
                       </Button>
                     </div>
                   ) : (
@@ -559,51 +514,15 @@ const DialerSession = () => {
                     Do Not Call
                   </Button>
                   
-                  <div className="border-t border-gray-600 pt-3 mt-3 space-y-3">
-                    <Button
-                      variant={autoDialerConfig.enabled ? "outline" : "default"}
-                      className="w-full justify-center items-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                      onClick={toggleAutoDial}
-                    >
-                      {autoDialerConfig.enabled ? (
-                        <>
-                          <PauseCircle className="mr-2 h-4 w-4" />
-                          Pause Auto-Dialer
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="mr-2 h-4 w-4" />
-                          Resume Auto-Dialer
-                        </>
-                      )}
-                    </Button>
-                    
+                  <div className="border-t border-gray-600 pt-3 mt-3">
                     <Button
                       variant="outline"
-                      className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                      className="w-full mb-2 bg-red-700 hover:bg-red-600 text-white border-red-600"
                       onClick={handleEndCall}
-                      disabled={!hasActiveCall || isHangingUp}
+                      disabled={!hasActiveCall}
                     >
                       <PhoneOff className="mr-2 h-4 w-4" />
-                      {isHangingUp ? 'Hanging Up...' : 'Hang Up'}
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      className="w-full justify-center bg-red-800 hover:bg-red-700 text-white border-red-700"
-                      onClick={stopDialingSession}
-                    >
-                      Stop Session
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      className="w-full justify-center bg-green-800 hover:bg-green-700 text-white border-green-700"
-                      onClick={callNextLead}
-                      disabled={isCallingNext || hasActiveCall}
-                    >
-                      <Phone className="mr-2 h-4 w-4" />
-                      {isCallingNext ? 'Calling...' : 'Call Next Lead'}
+                      Hang Up
                     </Button>
                   </div>
                 </div>
