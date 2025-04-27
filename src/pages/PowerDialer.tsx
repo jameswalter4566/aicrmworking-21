@@ -240,6 +240,34 @@ export default function PowerDialer() {
     handleEndCall(currentCall.parameters.leadId);
   };
 
+  const handleCallNextLead = async () => {
+    try {
+      if (Object.keys(twilioState.activeCalls).length > 0) {
+        await twilioState.endAllCalls();
+        setConnectedLeadData(null);
+        
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      const currentLeadIndex = filteredAndSortedLeads.findIndex(
+        lead => lead.id === Object.keys(twilioState.activeCalls)[0]
+      );
+      
+      const nextLead = filteredAndSortedLeads[currentLeadIndex + 1] || filteredAndSortedLeads[0];
+      
+      if (nextLead) {
+        handleCallLead(nextLead);
+      } else {
+        toast("No More Leads", {
+          description: "There are no more leads available to call."
+        });
+      }
+    } catch (err) {
+      console.error('Error transitioning to next lead:', err);
+      toast.error('Failed to transition to next lead');
+    }
+  };
+
   const activeCall = Object.values(twilioState.activeCalls)[0];
   const activeLeadId = activeCall?.leadId || null;
   
@@ -487,6 +515,8 @@ export default function PowerDialer() {
                   Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
                   setConnectedLeadData(null);
                 }}
+                onCallNextLead={handleCallNextLead}
+                isCallingNext={isDialing}
               />
 
               {Object.keys(twilioState.activeCalls).length > 0 && (
