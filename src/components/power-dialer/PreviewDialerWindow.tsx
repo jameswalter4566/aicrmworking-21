@@ -777,6 +777,10 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 <Button 
                   variant="outline" 
                   className="w-full justify-center bg-green-900/50 hover:bg-green-900 text-white border-green-900"
+                  onClick={() => {
+                    // Trigger call end and progression
+                    onEndCall && onEndCall();
+                  }}
                 >
                   <Phone className="mr-2 h-4 w-4 text-green-400" />
                   Call Next Lead
