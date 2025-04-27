@@ -32,7 +32,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           callData: {
             status: 'initial_fetch',
             timestamp: new Date().toISOString(),
-            requestId: crypto.randomUUID() // Add unique request ID for tracking
+            requestId: crypto.randomUUID()
           }
         }
       });
@@ -57,14 +57,12 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       } else {
         console.warn('[useLeadRealtime] No lead data in response');
         setLastError('No lead data found in response');
-        toast.warning('No lead data found');
         return null;
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error('[useLeadRealtime] Error in lead realtime fetch:', err);
       setLastError(errorMsg);
-      toast.error('Error fetching lead data');
       return null;
     } finally {
       setIsLoading(false);
@@ -86,7 +84,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     const channelName = getChannelName(leadId);
     console.log(`[useLeadRealtime] Setting up broadcast listener on channel: ${channelName}`);
 
-    const dataChannel = supabase
+    const broadcastChannel = supabase
       .channel(channelName)
       .on('broadcast', { event: 'lead_data_update' }, (payload) => {
         console.log('[useLeadRealtime] Received broadcast data update:', payload);
@@ -97,14 +95,12 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           setLeadFound(true);
           setLastUpdateTime(new Date());
           setTimeout(() => setLeadFound(false), 3000);
-        } else {
-          console.warn('[useLeadRealtime] Broadcast received but no lead data in payload');
         }
       })
       .subscribe((status) => {
-        console.log(`[useLeadRealtime] Subscription status for channel ${channelName}:`, status);
+        console.log(`[useLeadRealtime] Broadcast subscription status for channel ${channelName}:`, status);
       });
-    
+
     const leadChannel = supabase
       .channel(`lead-updates-${leadId}`)
       .on(
@@ -116,18 +112,14 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           filter: `id=eq.${leadId}`
         },
         (payload) => {
-          console.log('[useLeadRealtime] Realtime update received:', payload);
+          console.log('[useLeadRealtime] Database update received:', payload);
           if (payload.new) {
-            console.log('[useLeadRealtime] Setting lead data from realtime update:', payload.new);
-            setLeadData(payload.new);
-            setLeadFound(true);
-            setLastUpdateTime(new Date());
-            setTimeout(() => setLeadFound(false), 3000);
+            fetchLeadData();
           }
         }
       )
       .subscribe((status) => {
-        console.log(`[useLeadRealtime] Lead table subscription status:`, status);
+        console.log(`[useLeadRealtime] Database subscription status:`, status);
       });
 
     const activitiesChannel = supabase
@@ -140,12 +132,8 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           table: 'lead_activities',
           filter: `lead_id=eq.${leadId}`
         },
-        async (payload) => {
-          console.log('[useLeadRealtime] New lead activity:', payload);
-          const updatedLeadData = await fetchLeadData();
-          if (updatedLeadData) {
-            console.log('[useLeadRealtime] Updated lead data after activity:', updatedLeadData);
-          }
+        async () => {
+          await fetchLeadData();
         }
       )
       .subscribe((status) => {
@@ -154,7 +142,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
 
     return () => {
       console.log(`[useLeadRealtime] Cleaning up subscriptions for leadId: ${leadId}`);
-      supabase.removeChannel(dataChannel);
+      supabase.removeChannel(broadcastChannel);
       supabase.removeChannel(leadChannel);
       supabase.removeChannel(activitiesChannel);
     };
