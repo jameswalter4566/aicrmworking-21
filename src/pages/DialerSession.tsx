@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -32,7 +31,6 @@ const DialerSession = () => {
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
   
-  // Move the useAutoDialer hook up here before we use its return values
   const {
     config: autoDialerConfig,
     setConfig: setAutoDialerConfig,
@@ -310,19 +308,24 @@ const DialerSession = () => {
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
-    // Fix the TypeScript errors by using string literal comparisons instead of type comparisons
-    if (firstActiveCall?.status === 'completed' || 
-        firstActiveCall?.status === 'failed' || 
-        firstActiveCall?.status === 'busy' || 
-        firstActiveCall?.status === 'no-answer' || 
-        firstActiveCall?.status === 'canceled') {
+    const callStatus = firstActiveCall?.status;
+    
+    const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
+    const inProgressStatuses = ['connecting', 'in-progress'];
+    
+    if (completedStatuses.includes(callStatus)) {
       handleCallCompletion();
-    } else if (firstActiveCall?.status === 'ringing') {
+    } else if (callStatus === 'ringing') {
       startNoAnswerTimeout();
-    } else if (firstActiveCall?.status === 'in-progress') {
+    } else if (inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();
     }
-  }, [twilioState.activeCalls, handleCallCompletion, startNoAnswerTimeout, clearTimeoutTimer]);
+  }, [
+    twilioState.activeCalls, 
+    handleCallCompletion, 
+    startNoAnswerTimeout, 
+    clearTimeoutTimer
+  ]);
 
   return (
     <MainLayout>
