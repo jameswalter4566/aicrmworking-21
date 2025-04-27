@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
@@ -12,15 +13,15 @@ const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
 // FALLBACK DATA - Will always be returned in case of any error
 const FALLBACK_LEAD_DATA = {
   id: 999999,
-  first_name: "FUCK",
-  last_name: "YOU",
-  phone1: "555-ERROR",
+  first_name: "FALLBACK",
+  last_name: "DATA",
+  phone1: "555-FALLBACK",
   phone2: "---",
-  email: "fallback@error.com",
-  property_address: "123 FUCK YOU STREET",
-  mailing_address: "456 ERROR AVENUE",
-  disposition: "ERROR",
-  tags: ["error", "fallback"],
+  email: "fallback@example.com",
+  property_address: "123 FALLBACK STREET",
+  mailing_address: "456 FALLBACK AVENUE",
+  disposition: "FALLBACK",
+  tags: ["fallback", "error-handling"],
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   is_mortgage_lead: false,
@@ -75,18 +76,32 @@ Deno.serve(async (req) => {
     // Store the user's association with this lead for realtime filtering
     if (userId && effectiveLeadId) {
       try {
-        // Track which user is accessing which lead - we store this temporarily
-        // This could be in a dedicated table or in a cache for production use
-        const { error } = await adminSupabase
-          .from('lead_activities')
-          .insert({
-            lead_id: typeof effectiveLeadId === 'number' ? effectiveLeadId : parseInt(effectiveLeadId),
-            type: 'lead_access',
-            description: `User ${userId} accessed lead data`,
-          });
-          
-        if (error) {
-          console.warn('⚠️ Could not log lead access:', error.message);
+        // We need to make sure effectiveLeadId is an integer
+        let leadIdForActivity;
+        
+        // Convert to integer if possible
+        if (typeof effectiveLeadId === 'string' && /^\d+$/.test(effectiveLeadId)) {
+          leadIdForActivity = parseInt(effectiveLeadId);
+        } else if (typeof effectiveLeadId === 'number') {
+          leadIdForActivity = effectiveLeadId;
+        }
+        
+        // Only proceed if we have a valid integer lead ID
+        if (leadIdForActivity) {
+          // Track which user is accessing which lead - we store this temporarily
+          const { error } = await adminSupabase
+            .from('lead_activities')
+            .insert({
+              lead_id: leadIdForActivity,
+              type: 'lead_access',
+              description: `User ${userId} accessed lead data`,
+            });
+            
+          if (error) {
+            console.warn('⚠️ Could not log lead access:', error.message);
+          }
+        } else {
+          console.warn('⚠️ Cannot log lead access: invalid lead_id format:', effectiveLeadId);
         }
       } catch (trackError) {
         console.warn('⚠️ Error tracking user-lead association:', trackError.message);
@@ -271,6 +286,17 @@ function formatLeadResponse(lead, callData = null) {
 async function logLeadActivity(leadId, callData, userId = null) {
   if (!callData) return;
   
+  // Make sure leadId is a number for lead_activities table
+  let numericLeadId = leadId;
+  if (typeof leadId === 'string' && /^\d+$/.test(leadId)) {
+    numericLeadId = parseInt(leadId, 10);
+  }
+  
+  if (typeof numericLeadId !== 'number') {
+    console.warn(`Cannot log activity: leadId must be a number, got ${typeof leadId}: ${leadId}`);
+    return;
+  }
+
   const activityType = callData.status === 'in-progress' ? 'call_connected' : 
                        callData.status === 'completed' ? 'call_ended' : 
                        'call_status_change';
@@ -283,14 +309,14 @@ async function logLeadActivity(leadId, callData, userId = null) {
     await adminSupabase
       .from('lead_activities')
       .insert({
-        lead_id: leadId,
+        lead_id: numericLeadId,
         type: activityType,
         description: description + (userId ? ` by user ${userId}` : ''),
         timestamp: callData.timestamp || new Date().toISOString()
       });
     
     console.log('📝 Logged lead activity:', {
-      leadId,
+      leadId: numericLeadId,
       type: activityType,
       description,
       userId

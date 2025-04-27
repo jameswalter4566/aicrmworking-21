@@ -226,7 +226,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
           )}
 
           <div className="mt-4 p-2 bg-gray-100 rounded">
-            <details>
+            <details open>
               <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
               <pre className="mt-2 text-xs overflow-auto">
                 {displayData ? JSON.stringify(displayData, null, 2) : "No data available"}

@@ -10,7 +10,10 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
 
   // Initial fetch to get lead data
   const fetchLeadData = async () => {
-    if (!leadId) return null;
+    if (!leadId) {
+      console.log('[useLeadRealtime] No leadId provided, skipping fetch');
+      return null;
+    }
     
     setIsLoading(true);
     try {
@@ -61,6 +64,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
   // Setup realtime subscription
   useEffect(() => {
     if (!leadId) {
+      console.log('[useLeadRealtime] No leadId provided, clearing data');
       setLeadData(null);
       setLeadFound(false);
       return;
