@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -16,6 +17,13 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
   try {
     console.log(`Dialer Webhook: Notifying lead-connected for lead: ${leadId}, originalLeadId: ${originalLeadId}, status: ${status}`);
     
+    // Map Twilio call status to more UI-friendly call states
+    const callState = status === 'in-progress' ? 'connected' : 
+                      status === 'completed' || status === 'busy' || 
+                      status === 'no-answer' || status === 'failed' || 
+                      status === 'canceled' ? 'disconnected' :
+                      status === 'ringing' || status === 'queued' ? 'dialing' : 'unknown';
+    
     await supabase.functions.invoke('lead-connected', {
       body: { 
         leadId,
@@ -24,9 +32,7 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
           status,
           timestamp: new Date().toISOString(),
           originalLeadId: originalLeadId || leadId,
-          callState: status === 'in-progress' ? 'connected' : 
-                    status === 'completed' ? 'disconnected' :
-                    status === 'ringing' ? 'dialing' : 'unknown'
+          callState
         }
       }
     });
