@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { RefreshCw } from "lucide-react";
 import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { useAuth } from '@/hooks/use-auth';
+import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
 
 interface ConnectedLeadPanelProps {
   leadData?: {
