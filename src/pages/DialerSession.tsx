@@ -295,10 +295,18 @@ const DialerSession = () => {
 
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
-    if (firstActiveCall?.status === 'completed' || firstActiveCall?.status === 'failed') {
-      setIsDialing(false);
+    if (firstActiveCall?.status === 'completed' || 
+        firstActiveCall?.status === 'failed' || 
+        firstActiveCall?.status === 'busy' || 
+        firstActiveCall?.status === 'no-answer' || 
+        firstActiveCall?.status === 'canceled') {
+      handleCallCompletion();
+    } else if (firstActiveCall?.status === 'ringing') {
+      startNoAnswerTimeout();
+    } else if (firstActiveCall?.status === 'in-progress') {
+      clearTimeoutTimer();
     }
-  }, [twilioState.activeCalls]);
+  }, [twilioState.activeCalls, handleCallCompletion, startNoAnswerTimeout, clearTimeoutTimer]);
 
   const {
     config: autoDialerConfig,
@@ -311,20 +319,6 @@ const DialerSession = () => {
     if (!sessionId) return;
     await callNextLead();
   });
-
-  useEffect(() => {
-    const firstActiveCall = Object.values(twilioState.activeCalls)[0];
-    
-    if (firstActiveCall?.status === 'completed' || 
-        firstActiveCall?.status === 'failed' || 
-        firstActiveCall?.status === 'canceled') {
-      handleCallCompletion();
-    } else if (firstActiveCall?.status === 'ringing') {
-      startNoAnswerTimeout();
-    } else if (firstActiveCall?.status === 'in-progress') {
-      clearTimeoutTimer();
-    }
-  }, [twilioState.activeCalls, handleCallCompletion, startNoAnswerTimeout, clearTimeoutTimer]);
 
   return (
     <MainLayout>
