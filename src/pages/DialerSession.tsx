@@ -129,18 +129,20 @@ const DialerSession = () => {
       
       if (data?.lead) {
         console.log('Setting connected lead data from direct fetch:', data.lead);
-        
-        const leadInfo = {
+        setConnectedLeadData({
+          id: data.lead.id,
           first_name: data.lead.first_name || 'Unknown',
           last_name: data.lead.last_name || 'Contact',
           phone1: data.lead.phone1 || '---',
+          phone2: data.lead.phone2 || '---',
           email: data.lead.email || '---',
           property_address: data.lead.property_address || '---', 
-          mailing_address: data.lead.mailing_address || '---'
-        };
-        
-        console.log('Mapped lead data for component:', leadInfo);
-        setConnectedLeadData(leadInfo);
+          mailing_address: data.lead.mailing_address || '---',
+          disposition: data.lead.disposition || 'Not Contacted',
+          tags: data.lead.tags || [],
+          created_at: data.lead.created_at,
+          updated_at: data.lead.updated_at
+        });
       } else {
         console.log('No lead data in direct fetch, creating fallback data');
         const fallbackData = {
@@ -149,7 +151,9 @@ const DialerSession = () => {
           phone1: '---',
           email: '---',
           property_address: '---',
-          mailing_address: '---'
+          mailing_address: '---',
+          disposition: 'Not Contacted',
+          tags: []
         };
         setConnectedLeadData(fallbackData);
       }
@@ -161,7 +165,9 @@ const DialerSession = () => {
         phone1: '---',
         email: '---',
         property_address: '---',
-        mailing_address: '---'
+        mailing_address: '---',
+        disposition: 'Not Contacted',
+        tags: []
       };
       setConnectedLeadData(errorFallbackData);
     }
@@ -266,27 +272,32 @@ const DialerSession = () => {
           
           if (data?.lead) {
             console.log('Setting connected lead data from API response:', data.lead);
-            
-            const leadInfo = {
+            setConnectedLeadData({
+              id: data.lead.id,
               first_name: data.lead.first_name || 'Unknown',
               last_name: data.lead.last_name || 'Contact',
               phone1: data.lead.phone1 || firstActiveCall.phoneNumber || '---',
+              phone2: data.lead.phone2 || '---',
               email: data.lead.email || '---',
               property_address: data.lead.property_address || '---', 
-              mailing_address: data.lead.mailing_address || '---'
-            };
-            
-            console.log('Mapped lead data for component:', leadInfo);
-            setConnectedLeadData(leadInfo);
+              mailing_address: data.lead.mailing_address || '---',
+              disposition: data.lead.disposition || 'Not Contacted',
+              tags: data.lead.tags || [],
+              created_at: data.lead.created_at,
+              updated_at: data.lead.updated_at
+            });
           } else {
             console.log('No lead data in response, creating fallback data');
             const fallbackData = {
               first_name: 'Unknown',
               last_name: 'Contact',
               phone1: firstActiveCall.phoneNumber || '---',
+              phone2: '---',
               email: '---',
               property_address: '---',
-              mailing_address: '---'
+              mailing_address: '---',
+              disposition: 'Not Contacted',
+              tags: []
             };
             setConnectedLeadData(fallbackData);
           }
@@ -297,9 +308,12 @@ const DialerSession = () => {
             first_name: 'Error',
             last_name: 'Loading Lead',
             phone1: firstActiveCall.phoneNumber || '---',
+            phone2: '---',
             email: '---',
             property_address: '---',
-            mailing_address: '---'
+            mailing_address: '---',
+            disposition: 'Not Contacted',
+            tags: []
           };
           setConnectedLeadData(errorFallbackData);
           toast.error('Failed to load lead details');

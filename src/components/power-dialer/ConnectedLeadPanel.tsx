@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
@@ -17,21 +18,17 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
   const [isLoading, setIsLoading] = useState(false);
   const [localLeadData, setLocalLeadData] = useState<any>(leadData);
   
-  // Use either prop data or locally fetched data
   const displayData = localLeadData || leadData;
   
-  // Debug logging to track data flow
   useEffect(() => {
     console.log("[ConnectedLeadPanel] Raw lead data from props:", leadData);
     console.log("[ConnectedLeadPanel] Local lead data state:", localLeadData);
   }, [leadData, localLeadData]);
 
-  // Auto-fetch on mount
   useEffect(() => {
     fetchLatestLead();
   }, []);
 
-  // Update local data when prop data changes
   useEffect(() => {
     if (leadData) {
       setLocalLeadData(leadData);
@@ -77,7 +74,6 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     }
   };
 
-  // Display skeleton loader when no data is available and we're loading
   if ((!displayData || Object.keys(displayData).length === 0) && isLoading) {
     return (
       <Card className="mt-4 relative">
@@ -140,7 +136,6 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     );
   }
 
-  // No data available even after loading attempt
   if (!displayData || Object.keys(displayData).length === 0) {
     return (
       <Card className="mt-4 relative">
@@ -174,7 +169,6 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     );
   }
 
-  // When data is available, display it
   return (
     <Card className="mt-4 border-2 border-green-500 relative">
       <CardHeader className="pb-2">
@@ -211,11 +205,20 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
               </div>
               
               <div>
-                <label className="text-sm text-gray-500">Phone</label>
+                <label className="text-sm text-gray-500">Primary Phone</label>
                 <div className="text-sm mt-1 font-medium">
                   {displayData?.phone1 || "---"}
                 </div>
               </div>
+
+              {displayData?.phone2 && (
+                <div>
+                  <label className="text-sm text-gray-500">Secondary Phone</label>
+                  <div className="text-sm mt-1 font-medium">
+                    {displayData?.phone2}
+                  </div>
+                </div>
+              )}
               
               <div>
                 <label className="text-sm text-gray-500">Email</label>
@@ -223,6 +226,26 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
                   {displayData?.email || "---"}
                 </div>
               </div>
+
+              {displayData?.disposition && (
+                <div>
+                  <label className="text-sm text-gray-500">Disposition</label>
+                  <div className="text-sm mt-1 font-medium">
+                    {displayData?.disposition}
+                  </div>
+                </div>
+              )}
+
+              {displayData?.tags && displayData.tags.length > 0 && (
+                <div>
+                  <label className="text-sm text-gray-500">Tags</label>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {displayData.tags.map((tag: string) => (
+                      <Badge key={tag} variant="outline">{tag}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           
@@ -246,7 +269,6 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
           </div>
         </div>
 
-        {/* Debug data display */}
         {process.env.NODE_ENV === 'development' && (
           <div className="mt-4 p-2 bg-gray-100 rounded">
             <details>
