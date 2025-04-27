@@ -5,7 +5,7 @@ import { twilioService } from '@/services/twilio';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff, Play, Pause, Stop } from 'lucide-react';
+import { Phone, PhoneOff, PlayCircle, PauseCircle } from 'lucide-react';
 import { LeadDetailsPanel } from '@/components/power-dialer/LeadDetailsPanel';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -157,9 +157,11 @@ const DialerSession = () => {
     if (activeCallIds.length === 0) return;
     
     try {
+      console.log("Attempting to end calls:", activeCallIds);
+      
       await Promise.all(activeCallIds.map(id => twilioState.endCall(id)));
       
-      toast("Call ended", {
+      toast.success("Call ended", {
         description: "The call has been disconnected"
       });
       
@@ -171,7 +173,7 @@ const DialerSession = () => {
             description: "Call ended by agent"
           });
         } catch (error) {
-          console.log("Could not log call activity:", error);
+          console.error("Could not log call activity:", error);
         }
       }
       
@@ -194,7 +196,7 @@ const DialerSession = () => {
           last_contacted: new Date().toISOString()
         }).eq('id', parseInt(currentLeadId));
       } catch (error) {
-        console.log("Could not update lead disposition:", error);
+        console.error("Could not update lead disposition:", error);
       }
       
       try {
@@ -204,16 +206,20 @@ const DialerSession = () => {
           description: disposition
         });
       } catch (error) {
-        console.log("Could not log disposition activity:", error);
+        console.error("Could not log disposition activity:", error);
       }
       
-      toast("Lead dispositioned", {
+      toast.success("Lead dispositioned", {
         description: `Lead marked as ${disposition}`
       });
       
       await handleEndCall();
       
       setCurrentLeadId(null);
+      
+      if (autoDialerConfig.enabled) {
+        await callNextLead();
+      }
     } catch (err) {
       console.error('Error updating disposition:', err);
       toast.error('Failed to update disposition');
@@ -440,6 +446,7 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('Contact')}
+                    disabled={!hasActiveCall}
                   >
                     Contact
                   </Button>
@@ -448,6 +455,7 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('No Answer')}
+                    disabled={!hasActiveCall}
                   >
                     No Answer
                   </Button>
@@ -456,6 +464,7 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('Voicemail')}
+                    disabled={!hasActiveCall}
                   >
                     Left Voicemail
                   </Button>
@@ -464,6 +473,7 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('Interested')}
+                    disabled={!hasActiveCall}
                   >
                     Interested
                   </Button>
@@ -472,6 +482,7 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('Not Interested')}
+                    disabled={!hasActiveCall}
                   >
                     Not Interested
                   </Button>
@@ -480,6 +491,7 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('Call Back')}
+                    disabled={!hasActiveCall}
                   >
                     Call Back
                   </Button>
@@ -488,6 +500,7 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('Wrong Number')}
+                    disabled={!hasActiveCall}
                   >
                     Wrong Number
                   </Button>
@@ -496,9 +509,22 @@ const DialerSession = () => {
                     variant="outline" 
                     className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                     onClick={() => handleDisposition('DNC')}
+                    disabled={!hasActiveCall}
                   >
                     Do Not Call
                   </Button>
+                  
+                  <div className="border-t border-gray-600 pt-3 mt-3">
+                    <Button
+                      variant="outline"
+                      className="w-full mb-2 bg-red-700 hover:bg-red-600 text-white border-red-600"
+                      onClick={handleEndCall}
+                      disabled={!hasActiveCall}
+                    >
+                      <PhoneOff className="mr-2 h-4 w-4" />
+                      Hang Up
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
