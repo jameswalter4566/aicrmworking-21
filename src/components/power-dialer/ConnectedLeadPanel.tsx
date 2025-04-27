@@ -16,8 +16,8 @@ interface ConnectedLeadPanelProps {
 
 export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [localLeadData, setLocalLeadData] = useState<any>(leadData);
-  
+  const [localLeadData, setLocalLeadData] = useState<any>(null);
+
   const displayData = localLeadData || leadData;
   
   useEffect(() => {
@@ -37,12 +37,9 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
   }, [leadData, localLeadData]);
 
   useEffect(() => {
-    fetchLatestLead();
-  }, []);
-
-  useEffect(() => {
     if (leadData) {
       setLocalLeadData(leadData);
+      console.log("[ConnectedLeadPanel] Updated local lead data from props:", leadData);
     }
   }, [leadData]);
 
@@ -59,13 +56,13 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
       });
 
       if (error) {
-        console.error('ConnectedLeadPanel: Error fetching latest lead:', error);
+        console.error('[ConnectedLeadPanel] Error fetching latest lead:', error);
         toast.error('Failed to fetch latest lead');
         return;
       }
 
       if (response?.data?.[0]) {
-        console.log('ConnectedLeadPanel: Latest lead data fetched:', response.data[0]);
+        console.log('[ConnectedLeadPanel] Latest lead data fetched:', response.data[0]);
         
         // Convert API response format to match our expected format
         const formattedLeadData = {
@@ -87,7 +84,7 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
         toast.success('Latest lead loaded');
       }
     } catch (err) {
-      console.error('ConnectedLeadPanel: Error in fetchLatestLead:', err);
+      console.error('[ConnectedLeadPanel] Error in fetchLatestLead:', err);
       toast.error('Failed to retrieve latest lead');
     } finally {
       setIsLoading(false);
@@ -102,7 +99,40 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     }
   };
 
-  if ((!displayData || Object.keys(displayData).length === 0) && isLoading) {
+  if ((!displayData || Object.keys(displayData || {}).length === 0) && !isLoading) {
+    return (
+      <Card className="mt-4 relative">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex justify-between items-center">
+            Lead Details - No Lead Data Available
+            <Button 
+              onClick={handleRefresh}
+              variant="outline"
+              size="sm"
+              className="absolute top-2 right-2"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Loading...
+                </>
+              ) : (
+                'Retrieve Latest Lead'
+              )}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="p-4 text-center text-muted-foreground">
+            <p>No lead data available. Connect a call or retrieve the latest lead.</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isLoading) {
     return (
       <Card className="mt-4 relative">
         <CardHeader className="pb-2">
@@ -158,39 +188,6 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
                 </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (!displayData || Object.keys(displayData).length === 0) {
-    return (
-      <Card className="mt-4 relative">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-lg flex justify-between items-center">
-            Lead Details - No Lead Data Available
-            <Button 
-              onClick={handleRefresh}
-              variant="outline"
-              size="sm"
-              className="absolute top-2 right-2"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Loading...
-                </>
-              ) : (
-                'Retrieve Latest Lead'
-              )}
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="p-4 text-center text-muted-foreground">
-            <p>No lead data available. Try retrieving the latest lead.</p>
           </div>
         </CardContent>
       </Card>

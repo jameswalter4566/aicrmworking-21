@@ -16,13 +16,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log('🔍 Lead connected function called');
     const requestBody = await req.json();
     const { leadId, callData } = requestBody;
     
-    console.log('🔍 Lead connected function called with:', {
-      leadId,
-      callData: JSON.stringify(callData, null, 2)
-    });
+    console.log('📌 Request body:', JSON.stringify(requestBody, null, 2));
 
     // Get effective lead ID
     let effectiveLeadId = null;
@@ -60,7 +58,9 @@ Deno.serve(async (req) => {
       console.log('🔢 Converted lead ID to numeric:', numericLeadId);
     }
 
-    // Fetch lead data with all fields
+    console.log(`⏳ Attempting to find lead with ID: ${numericLeadId}`);
+
+    // Try to find the lead directly in the database with all fields
     const { data: lead, error } = await adminSupabase
       .from('leads')
       .select(`
@@ -86,6 +86,55 @@ Deno.serve(async (req) => {
 
     if (error) {
       console.error('❌ Database error:', error.message);
+      
+      // Try searching by UUID if numeric ID failed
+      if (typeof leadId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(leadId)) {
+        console.log('🔄 Trying to find lead by UUID instead');
+        
+        const { data: uuidLead, error: uuidError } = await adminSupabase
+          .from('leads')
+          .select(`
+            id,
+            first_name,
+            last_name,
+            email,
+            phone1,
+            phone2,
+            property_address,
+            mailing_address,
+            disposition,
+            tags,
+            created_at,
+            updated_at,
+            created_by,
+            is_mortgage_lead,
+            mortgage_data,
+            avatar
+          `)
+          .eq('session_uuid', leadId)
+          .single();
+          
+        if (uuidError || !uuidLead) {
+          console.error('❌ UUID search failed:', uuidError?.message);
+          return createFallbackResponse(leadId, callData, error.message);
+        }
+        
+        console.log('✅ Successfully found lead by UUID:', uuidLead.id);
+        
+        // Log call activity if we have call data
+        if (callData?.callSid || callData?.status) {
+          await logLeadActivity(uuidLead.id, callData);
+        }
+        
+        return new Response(JSON.stringify({
+          success: true,
+          lead: formatLeadResponse(uuidLead, callData)
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+      
       return createFallbackResponse(leadId, callData, error.message);
     }
 
@@ -95,7 +144,8 @@ Deno.serve(async (req) => {
     }
 
     // Log successful lead retrieval with full details
-    console.log('✅ Successfully retrieved lead:', {
+    console.log('✅ Successfully found lead directly in database:', lead.id);
+    console.log('📊 Lead details:', {
       id: lead.id,
       name: `${lead.first_name || ''} ${lead.last_name || ''}`,
       phone1: lead.phone1,
@@ -110,23 +160,7 @@ Deno.serve(async (req) => {
     // Return formatted lead data
     return new Response(JSON.stringify({
       success: true,
-      lead: {
-        id: lead.id,
-        first_name: lead.first_name || 'Unknown',
-        last_name: lead.last_name || 'Contact',
-        phone1: lead.phone1 || callData?.phoneNumber || '---',
-        phone2: lead.phone2 || '---',
-        email: lead.email || '---',
-        property_address: lead.property_address || '---',
-        mailing_address: lead.mailing_address || '---',
-        disposition: lead.disposition || 'Not Contacted',
-        tags: lead.tags || [],
-        created_at: lead.created_at,
-        updated_at: lead.updated_at,
-        is_mortgage_lead: lead.is_mortgage_lead || false,
-        mortgage_data: lead.mortgage_data || null,
-        avatar: lead.avatar || null
-      }
+      lead: formatLeadResponse(lead, callData)
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -136,6 +170,27 @@ Deno.serve(async (req) => {
     return createFallbackResponse(null, null, error.message);
   }
 });
+
+// Format the lead data for consistent response
+function formatLeadResponse(lead, callData = null) {
+  return {
+    id: lead.id,
+    first_name: lead.first_name || 'Unknown',
+    last_name: lead.last_name || 'Contact',
+    phone1: lead.phone1 || callData?.phoneNumber || '---',
+    phone2: lead.phone2 || '---',
+    email: lead.email || '---',
+    property_address: lead.property_address || '---',
+    mailing_address: lead.mailing_address || '---',
+    disposition: lead.disposition || 'Not Contacted',
+    tags: lead.tags || [],
+    created_at: lead.created_at,
+    updated_at: lead.updated_at,
+    is_mortgage_lead: lead.is_mortgage_lead || false,
+    mortgage_data: lead.mortgage_data || null,
+    avatar: lead.avatar || null
+  };
+}
 
 function createFallbackResponse(leadId = null, callData = null, errorMessage = null) {
   const phoneNumber = callData?.phoneNumber || '---';
