@@ -35,8 +35,9 @@ Deno.serve(async (req) => {
     
     if (effectiveLeadId) {
       try {
-        // Call the retrieve-leads function with the original lead ID
-        const { data: leadResponse, error: retrieveError } = await supabase.functions.invoke(
+        // Check if the originalLeadId exists - if so, it's likely a numeric ID
+        // Use the service role key for direct access without requiring authentication
+        const { data: leadResponse, error: retrieveError } = await adminSupabase.functions.invoke(
           'retrieve-leads',
           {
             body: {
@@ -44,6 +45,11 @@ Deno.serve(async (req) => {
               leadId: effectiveLeadId,
               exactMatch: true,
               pageSize: 1
+            },
+            // Use the service role to ensure we have proper authentication
+            headers: {
+              Authorization: `Bearer ${supabaseServiceKey}`,
+              'x-client-info': 'lead-connected-function'
             }
           }
         );
