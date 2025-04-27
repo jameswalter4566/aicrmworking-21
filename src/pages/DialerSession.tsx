@@ -42,11 +42,24 @@ const DialerSession = () => {
   const fetchSessionData = async (id: string) => {
     try {
       setIsLoadingSession(true);
+
+      // Ensure we have an auth token for the request
+      const authToken = await twilioState.getAuthToken();
+      
+      if (!authToken) {
+        console.error('No auth token available');
+        toast.error('Authentication error. Please try logging in again.');
+        return;
+      }
+      
       const { data, error } = await supabase.functions.invoke('get-dialing-session', {
         body: { sessionId: id }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching session data:', error);
+        throw error;
+      }
       
       setSessionData(data);
       console.log('Session data:', data);
@@ -64,6 +77,17 @@ const DialerSession = () => {
     try {
       setIsCallingNext(true);
       setIsDialing(true);
+      
+      // Ensure we have a valid auth token
+      const authToken = await twilioState.getAuthToken();
+      
+      if (!authToken) {
+        console.error('No auth token available');
+        toast.error('Authentication error. Please try logging in again.');
+        setIsCallingNext(false);
+        setIsDialing(false);
+        return;
+      }
       
       const { data, error } = await supabase.functions.invoke('get-next-lead', {
         body: { sessionId }
@@ -109,6 +133,15 @@ const DialerSession = () => {
   const fetchLeadData = async (leadId: string) => {
     try {
       console.log('Directly fetching lead data for:', leadId);
+      
+      // Ensure we have a valid auth token
+      const authToken = await twilioState.getAuthToken();
+      
+      if (!authToken) {
+        console.error('No auth token available');
+        toast.error('Authentication error. Please try logging in again.');
+        return;
+      }
       
       const { data, error } = await supabase.functions.invoke('lead-connected', {
         body: { 

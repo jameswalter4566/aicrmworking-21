@@ -39,8 +39,23 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
   }, [leadData]);
 
   const fetchLatestLead = async () => {
+    if (onRefresh && typeof onRefresh === 'function') {
+      onRefresh();
+      return;
+    }
+    
     try {
       setIsLoading(true);
+      
+      // Get auth token for authentication
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      
+      if (!token) {
+        console.error('No auth token available');
+        toast.error('Authentication error. Please try logging in again.');
+        return;
+      }
       
       const { data: response, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { 

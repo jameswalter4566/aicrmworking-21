@@ -1,7 +1,7 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { twilioService } from '@/services/twilio';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/services/supabase';
 
 export interface ActiveCall {
   callSid: string;
@@ -13,14 +13,14 @@ export interface ActiveCall {
   usingBrowser?: boolean;
   audioActive?: boolean;
   audioStreaming?: boolean;
-  conferenceName?: string; // Added to track conference calls
+  conferenceName?: string;
 }
 
 interface AudioChunk {
   track: string;
   timestamp: number;
   payload: string;
-  conferenceName?: string; // Added to support conference calls
+  conferenceName?: string;
 }
 
 export const useTwilio = () => {
@@ -34,7 +34,7 @@ export const useTwilio = () => {
   const [currentAudioDevice, setCurrentAudioDevice] = useState<string>('');
   const statusCheckIntervals = useRef<Record<string, number>>({});
   const audioCheckInterval = useRef<number | null>(null);
-  
+
   const webSocketRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioProcessorRef = useRef<ScriptProcessorNode | null>(null);
@@ -82,7 +82,6 @@ export const useTwilio = () => {
         try {
           const data = JSON.parse(event.data);
           
-          // Only log non-audio events to avoid console spam
           if (data.event !== 'audio') {
             console.log("WebSocket received message type:", data.event);
           }
@@ -106,7 +105,6 @@ export const useTwilio = () => {
               }, 500);
             }
             
-            // If this is part of an active call, update the call with conference info
             if (data.conferenceName) {
               setActiveCalls(prev => {
                 const updated = {...prev};
@@ -126,7 +124,6 @@ export const useTwilio = () => {
             stopCapturingMicrophone();
           }
           else if (data.event === 'audio') {
-            // Audio data received - handle silently
             if (data.conferenceName && !activeConferenceNameRef.current) {
               activeConferenceNameRef.current = data.conferenceName;
             }
@@ -168,7 +165,6 @@ export const useTwilio = () => {
         
         stopCapturingMicrophone();
         
-        // Attempt to reconnect after a short delay
         setTimeout(() => {
           if (Object.keys(activeCalls).length > 0) {
             console.log("Active calls exist, attempting to reconnect WebSocket...");
@@ -197,7 +193,6 @@ export const useTwilio = () => {
       activeConferenceNameRef.current = conferenceName;
       console.log(`Requested to join conference: ${conferenceName}`);
       
-      // Start capturing microphone audio for the conference
       startCapturingMicrophone();
       
       return true;
@@ -245,7 +240,7 @@ export const useTwilio = () => {
           }
           const rms = Math.sqrt(sum / inputData.length);
           
-          if (rms > 0.005) {  // Only send audio when there's sound above this threshold
+          if (rms > 0.005) {
             const buffer = new ArrayBuffer(inputData.length * 2);
             const view = new DataView(buffer);
             
@@ -306,7 +301,6 @@ export const useTwilio = () => {
     console.log("Microphone audio capture stopped");
   }, []);
 
-  // Define endCall before it's used
   const endCall = useCallback(async (leadId: string | number) => {
     const leadIdStr = String(leadId);
     
@@ -341,7 +335,6 @@ export const useTwilio = () => {
     return false;
   }, [activeCalls, stopCapturingMicrophone]);
 
-  // Define endAllCalls here, before it's used
   const endAllCalls = useCallback(async () => {
     Object.values(statusCheckIntervals.current).forEach(intervalId => {
       clearInterval(intervalId);
@@ -364,117 +357,6 @@ export const useTwilio = () => {
     return true;
   }, [stopCapturingMicrophone]);
 
-  useEffect(() => {
-    const initializeTwilio = async () => {
-      setIsLoading(true);
-      try {
-        console.log("Initializing Twilio service...");
-        
-        await checkPermissions();
-        
-        const micAccess = await twilioService.initializeAudioContext();
-        if (!micAccess) {
-          toast({
-            title: "Microphone Access Denied",
-            description: "Please allow microphone access to use the dialer. Check your browser settings and try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-        
-        setMicrophoneActive(true);
-        
-        const devices = await twilioService.getAudioOutputDevices();
-        setAudioOutputDevices(devices);
-        
-        const currentDevice = twilioService.getCurrentAudioDevice();
-        setCurrentAudioDevice(currentDevice);
-        
-        const audioTest = await twilioService.testAudioOutput(currentDevice);
-        setAudioTested(audioTest);
-        
-        if (!audioTest) {
-          toast({
-            title: "Audio Output Issue",
-            description: "Unable to test your speakers. Please check your audio output settings.",
-            variant: "default",
-          });
-        } else {
-          console.log("Audio test successful");
-        }
-
-        console.log("Initializing Twilio device...");
-        const deviceInitialized = await twilioService.initializeTwilioDevice();
-        setInitialized(deviceInitialized);
-        
-        if (!deviceInitialized) {
-          toast({
-            title: "Phone System Warning",
-            description: "Phone system initialized with limited features. Calls will still work but audio quality may be affected.",
-            variant: "default",
-          });
-        } else {
-          toast({
-            title: "Success",
-            description: "Phone system initialized successfully. Audio inputs and outputs are ready.",
-          });
-        }
-        
-        setupWebSocket();
-      } catch (error) {
-        console.error('Error initializing Twilio:', error);
-        toast({
-          title: "Error",
-          description: "Failed to set up phone system. Please check console for details.",
-          variant: "destructive",
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeTwilio();
-
-    audioCheckInterval.current = window.setInterval(() => {
-      const isActive = twilioService.isMicrophoneActive();
-      setMicrophoneActive(isActive);
-      
-      const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && 
-                         (activeStreamSidRef.current !== null || activeConferenceNameRef.current !== null);
-      setAudioStreaming(isStreaming);
-      
-      if (Object.keys(activeCalls).length > 0) {
-        setActiveCalls(prev => {
-          const updated = {...prev};
-          Object.keys(updated).forEach(leadId => {
-            updated[leadId].audioStreaming = isStreaming;
-            updated[leadId].audioActive = isActive;
-          });
-          return updated;
-        });
-      }
-    }, 2000);
-
-    return () => {
-      if (audioCheckInterval.current) {
-        clearInterval(audioCheckInterval.current);
-      }
-      
-      Object.values(statusCheckIntervals.current).forEach(intervalId => {
-        clearInterval(intervalId);
-      });
-      
-      if (webSocketRef.current) {
-        webSocketRef.current.close();
-        webSocketRef.current = null;
-      }
-      
-      stopCapturingMicrophone();
-      
-      twilioService.cleanup();
-    };
-  }, [checkPermissions, setupWebSocket, stopCapturingMicrophone]);
-
   const monitorCallStatus = useCallback((leadId: string | number, callSid: string, usingBrowser: boolean = true, conferenceName?: string) => {
     const leadIdStr = String(leadId);
     
@@ -484,7 +366,6 @@ export const useTwilio = () => {
     
     console.log(`Setting up call monitoring for ${usingBrowser ? 'browser' : 'REST API'} call: ${callSid}`);
     
-    // If this is a conference call, store the conference name ref
     if (conferenceName) {
       activeConferenceNameRef.current = conferenceName;
     }
@@ -657,7 +538,6 @@ export const useTwilio = () => {
 
     console.log(`Placing call to ${phoneNumber}`);
     
-    // Format the phone number properly if needed
     let formattedPhoneNumber = phoneNumber;
     if (!phoneNumber.startsWith('+') && !phoneNumber.includes('client:')) {
       formattedPhoneNumber = '+' + phoneNumber.replace(/\D/g, '');
@@ -665,13 +545,11 @@ export const useTwilio = () => {
     
     setupWebSocket();
     
-    // Always include the leadId when making calls
     const result = await twilioService.makeCall(formattedPhoneNumber, String(leadId));
     
     if (result.success && (result.callSid || result.browserCallSid)) {
       const leadIdStr = String(leadId);
       
-      // Use the result data to determine if this is a conference call
       const isConferenceCall = result.conferenceName && result.phoneCallSid && result.browserCallSid;
       const callSidToUse = result.callSid || result.browserCallSid || 'browser-call';
       
@@ -696,7 +574,6 @@ export const useTwilio = () => {
         description: `Calling ${formattedPhoneNumber}... Audio will stream through your browser when connected.`,
       });
       
-      // If this is a conference call, join the conference
       if (isConferenceCall && result.conferenceName) {
         joinConference(result.conferenceName);
       }
@@ -828,6 +705,127 @@ export const useTwilio = () => {
     }
   }, [currentAudioDevice, setAudioOutputDevice]);
 
+  const getAuthToken = async (): Promise<string | null> => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      return data?.session?.access_token || null;
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    const initializeTwilio = async () => {
+      setIsLoading(true);
+      try {
+        console.log("Initializing Twilio service...");
+        
+        await checkPermissions();
+        
+        const micAccess = await twilioService.initializeAudioContext();
+        if (!micAccess) {
+          toast({
+            title: "Microphone Access Denied",
+            description: "Please allow microphone access to use the dialer. Check your browser settings and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+        
+        setMicrophoneActive(true);
+        
+        const devices = await twilioService.getAudioOutputDevices();
+        setAudioOutputDevices(devices);
+        
+        const currentDevice = twilioService.getCurrentAudioDevice();
+        setCurrentAudioDevice(currentDevice);
+        
+        const audioTest = await twilioService.testAudioOutput(currentDevice);
+        setAudioTested(audioTest);
+        
+        if (!audioTest) {
+          toast({
+            title: "Audio Output Issue",
+            description: "Unable to test your speakers. Please check your audio output settings.",
+            variant: "default",
+          });
+        } else {
+          console.log("Audio test successful");
+        }
+
+        console.log("Initializing Twilio device...");
+        const deviceInitialized = await twilioService.initializeTwilioDevice();
+        setInitialized(deviceInitialized);
+        
+        if (!deviceInitialized) {
+          toast({
+            title: "Phone System Warning",
+            description: "Phone system initialized with limited features. Calls will still work but audio quality may be affected.",
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "Success",
+            description: "Phone system initialized successfully. Audio inputs and outputs are ready.",
+          });
+        }
+        
+        setupWebSocket();
+      } catch (error) {
+        console.error('Error initializing Twilio:', error);
+        toast({
+          title: "Error",
+          description: "Failed to set up phone system. Please check console for details.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeTwilio();
+
+    audioCheckInterval.current = window.setInterval(() => {
+      const isActive = twilioService.isMicrophoneActive();
+      setMicrophoneActive(isActive);
+      
+      const isStreaming = webSocketRef.current?.readyState === WebSocket.OPEN && 
+                         (activeStreamSidRef.current !== null || activeConferenceNameRef.current !== null);
+      setAudioStreaming(isStreaming);
+      
+      if (Object.keys(activeCalls).length > 0) {
+        setActiveCalls(prev => {
+          const updated = {...prev};
+          Object.keys(updated).forEach(leadId => {
+            updated[leadId].audioStreaming = isStreaming;
+            updated[leadId].audioActive = isActive;
+          });
+          return updated;
+        });
+      }
+    }, 2000);
+
+    return () => {
+      if (audioCheckInterval.current) {
+        clearInterval(audioCheckInterval.current);
+      }
+      
+      Object.values(statusCheckIntervals.current).forEach(intervalId => {
+        clearInterval(intervalId);
+      });
+      
+      if (webSocketRef.current) {
+        webSocketRef.current.close();
+        webSocketRef.current = null;
+      }
+      
+      stopCapturingMicrophone();
+      
+      twilioService.cleanup();
+    };
+  }, [checkPermissions, setupWebSocket, stopCapturingMicrophone]);
+
   useEffect(() => {
     try {
       const savedDevice = localStorage.getItem('preferredAudioDevice');
@@ -862,6 +860,7 @@ export const useTwilio = () => {
     setAudioOutputDevice,
     refreshAudioDevices,
     joinConference,
-    testAudio: (deviceId: string) => twilioService.testAudioOutput(deviceId)
+    testAudio: (deviceId: string) => twilioService.testAudioOutput(deviceId),
+    getAuthToken
   };
 };

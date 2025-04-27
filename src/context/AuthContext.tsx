@@ -91,10 +91,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Helper function to get the authentication token
   const getAuthToken = async (): Promise<string | null> => {
-    const { data } = await supabase.auth.getSession();
-    const token = data?.session?.access_token || null;
-    console.log("Getting auth token:", token ? "Token exists" : "No token");
-    return token;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token || null;
+      console.log("Getting auth token:", token ? "Token exists" : "No token");
+      return token;
+    } catch (error) {
+      console.error("Error getting auth token:", error);
+      return null;
+    }
   };
 
   return (

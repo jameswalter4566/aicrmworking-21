@@ -102,6 +102,7 @@ export default function PowerDialer() {
   const [currentCall, setCurrentCall] = useState<any>(null);
   const [isDialing, setIsDialing] = useState(false);
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
@@ -235,25 +236,39 @@ export default function PowerDialer() {
   const refreshLatestLead = async () => {
     try {
       console.log('Fetching latest lead...');
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      
+      const authToken = await twilioState.getAuthToken();
+      
+      if (!authToken) {
+        console.error('No auth token available');
+        toast.error('Authentication error. Please try logging in again.');
+        return;
+      }
+      
+      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
+        body: { 
+          source: 'all',
+          pageSize: 1,
+          page: 0
+        }
+      });
 
       if (error) {
-        console.error('Error fetching latest lead:', error);
+        console.error('ConnectedLeadPanel: Error fetching latest lead:', error);
         toast.error('Failed to fetch latest lead');
         return;
       }
 
-      console.log('Latest lead data:', data);
-      setConnectedLeadData(data);
-      toast.success('Latest lead retrieved');
+      if (data?.data?.[0]) {
+        console.log('ConnectedLeadPanel: Latest lead data fetched:', data.data[0]);
+        setConnectedLeadData(data.data[0]);
+        toast.success('Latest lead loaded');
+      }
     } catch (err) {
-      console.error('Error in refreshLatestLead:', err);
+      console.error('ConnectedLeadPanel: Error in fetchLatestLead:', err);
       toast.error('Failed to retrieve latest lead');
+    } finally {
+      setIsLoading(false);
     }
   };
 
