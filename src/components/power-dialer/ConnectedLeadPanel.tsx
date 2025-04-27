@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -22,19 +23,18 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
   
   useEffect(() => {
     console.log("[ConnectedLeadPanel] Raw lead data from props:", leadData);
-    console.log("[ConnectedLeadPanel] Local lead data state:", localLeadData);
     
     // Log specific fields of interest
     if (leadData) {
       console.log("[ConnectedLeadPanel] Lead Details:", {
+        id: leadData.id,
         name: `${leadData.first_name || ''} ${leadData.last_name || ''}`,
         phone1: leadData.phone1,
         email: leadData.email,
         property_address: leadData.property_address,
-        mailing_address: leadData.mailing_address
       });
     }
-  }, [leadData, localLeadData]);
+  }, [leadData]);
 
   useEffect(() => {
     if (leadData) {
@@ -47,6 +47,7 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     try {
       setIsLoading(true);
       
+      // This is a direct call to retrieve-leads for testing purposes
       const { data: response, error } = await supabase.functions.invoke('retrieve-leads', {
         body: { 
           source: 'all',
@@ -198,9 +199,14 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     <Card className="mt-4 border-2 border-green-500 relative">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex justify-between items-center">
-          {displayData?.id ? 
-            `Lead Details - ID: ${displayData.id}` : 
-            'Lead Details - No Lead ID Available'}
+          {displayData?.id ? (
+            <div className="flex flex-1 justify-between items-center">
+              <span>Lead Details</span>
+              <Badge variant="outline" className="ml-2">ID: {displayData.id}</Badge>
+            </div>
+          ) : ( 
+            'Lead Details - No Lead ID Available'
+          )}
           <Button 
             onClick={handleRefresh}
             variant="outline"
