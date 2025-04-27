@@ -119,6 +119,23 @@ export default function PowerDialer() {
     }
   }, [isScriptLoaded]);
 
+  useEffect(() => {
+    const activeCall = Object.values(twilioState.activeCalls)[0];
+    console.log('[PowerDialer] Active call updated:', {
+      callStatus: activeCall?.status,
+      leadId: activeCall?.leadId,
+      hasLeadData: !!connectedLeadData
+    });
+    
+    if (activeCall?.leadId) {
+      console.log('[PowerDialer] Setting connected lead data...');
+      setConnectedLeadData(prevData => ({
+        ...prevData,
+        id: activeCall.leadId
+      }));
+    }
+  }, [twilioState.activeCalls]);
+
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads
       .filter((lead) =>

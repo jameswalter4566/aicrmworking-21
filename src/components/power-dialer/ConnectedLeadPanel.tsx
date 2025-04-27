@@ -1,12 +1,10 @@
-
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
+import { useLeadPolling } from '@/hooks/use-lead-polling';
 
 interface ConnectedLeadPanelProps {
   leadData?: {
@@ -15,28 +13,23 @@ interface ConnectedLeadPanelProps {
   onRefresh?: () => void;
 }
 
-export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelProps) => {
+export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: ConnectedLeadPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const currentLeadId = initialLeadData?.id || null;
   
-  // IMPORTANT: We're not automatically loading data on mount anymore
-  // We only rely on the leadData passed from props
+  // Add polling hook
+  const { leadData: polledLeadData, isPolling } = useLeadPolling(currentLeadId);
   
-  const displayData = leadData;
+  // Use polled data if available, otherwise use initial data
+  const displayData = polledLeadData || initialLeadData;
   
   useEffect(() => {
-    console.log("[ConnectedLeadPanel] Raw lead data from props:", leadData);
-    
-    // Log specific fields of interest
-    if (leadData) {
-      console.log("[ConnectedLeadPanel] Lead Details:", {
-        id: leadData.id,
-        name: `${leadData.first_name || ''} ${leadData.last_name || ''}`,
-        phone1: leadData.phone1,
-        email: leadData.email,
-        property_address: leadData.property_address,
-      });
-    }
-  }, [leadData]);
+    console.log('[ConnectedLeadPanel] Current lead data:', {
+      initial: initialLeadData,
+      polled: polledLeadData,
+      display: displayData
+    });
+  }, [initialLeadData, polledLeadData, displayData]);
 
   const handleRefresh = () => {
     if (onRefresh) {
