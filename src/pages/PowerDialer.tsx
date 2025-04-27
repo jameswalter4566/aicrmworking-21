@@ -242,12 +242,10 @@ export default function PowerDialer() {
   const activeCall = Object.values(twilioState.activeCalls)[0];
   const activeLeadId = activeCall?.leadId || null;
   
-  // Replace lead polling with realtime updates
   const { user } = useAuth(); // Get current user
   const { leadData: realtimeLeadData, isLoading: isLeadDataLoading, refresh: refreshLeadData } = 
     useLeadRealtime(activeLeadId, user?.id);
 
-  // Use realtime data for connected lead
   useEffect(() => {
     if (realtimeLeadData) {
       setConnectedLeadData(realtimeLeadData);
@@ -265,7 +263,7 @@ export default function PowerDialer() {
     }
   };
 
-  const fetchLeadData = async (leadId) => {
+  const fetchLeadData = async (leadId: string) => {
     try {
       console.log(`[PowerDialer] Fetching lead data for ID: ${leadId}`);
       setIsDialing(true);
@@ -335,7 +333,7 @@ export default function PowerDialer() {
     
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.leadId) {
-      fetchLeadData(activeCall.leadId);
+      fetchLeadData(String(activeCall.leadId)); // Convert to string to ensure type safety
     }
   }, [twilioState.activeCalls]);
 
