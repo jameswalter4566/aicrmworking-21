@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,6 +24,17 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
   useEffect(() => {
     console.log("[ConnectedLeadPanel] Raw lead data from props:", leadData);
     console.log("[ConnectedLeadPanel] Local lead data state:", localLeadData);
+    
+    // Log specific fields of interest
+    if (leadData) {
+      console.log("[ConnectedLeadPanel] Lead Details:", {
+        name: `${leadData.first_name || ''} ${leadData.last_name || ''}`,
+        phone1: leadData.phone1,
+        email: leadData.email,
+        property_address: leadData.property_address,
+        mailing_address: leadData.mailing_address
+      });
+    }
   }, [leadData, localLeadData]);
 
   useEffect(() => {
@@ -55,7 +67,24 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
 
       if (response?.data?.[0]) {
         console.log('ConnectedLeadPanel: Latest lead data fetched:', response.data[0]);
-        setLocalLeadData(response.data[0]);
+        
+        // Convert API response format to match our expected format
+        const formattedLeadData = {
+          id: response.data[0].id,
+          first_name: response.data[0].firstName || '',
+          last_name: response.data[0].lastName || '',
+          email: response.data[0].email || '',
+          phone1: response.data[0].phone1 || '',
+          phone2: response.data[0].phone2 || '',
+          property_address: response.data[0].propertyAddress || '',
+          mailing_address: response.data[0].mailingAddress || '',
+          disposition: response.data[0].disposition || 'Not Contacted',
+          tags: response.data[0].tags || [],
+          created_at: response.data[0].createdAt,
+          updated_at: response.data[0].updatedAt
+        };
+        
+        setLocalLeadData(formattedLeadData);
         toast.success('Latest lead loaded');
       }
     } catch (err) {

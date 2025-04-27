@@ -107,11 +107,11 @@ export default function PowerDialer() {
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
 
   useEffect(() => {
-    console.log('[PowerDialer] connectedLeadData state:', connectedLeadData);
+    console.log('[PowerDialer] connected lead data state:', connectedLeadData);
   }, [connectedLeadData]);
 
   useEffect(() => {
-    console.log('[PowerDialer] connectedLeadData updated:', connectedLeadData);
+    console.log('[PowerDialer] connected lead data updated:', connectedLeadData);
     
     if (connectedLeadData) {
       console.log('[PowerDialer] Lead details available:',
@@ -257,47 +257,77 @@ export default function PowerDialer() {
     }
   };
 
+  const fetchLeadData = async (leadId) => {
+    try {
+      console.log(`[PowerDialer] Fetching lead data for ID: ${leadId}`);
+      setIsDialing(true);
+      
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
+        body: { 
+          leadId: leadId,
+          callData: {
+            callSid: Object.values(twilioState.activeCalls)[0]?.callSid || null,
+            status: Object.values(twilioState.activeCalls)[0]?.status || 'unknown',
+            phoneNumber: Object.values(twilioState.activeCalls)[0]?.phoneNumber || null,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('[PowerDialer] Error from lead-connected:', error);
+        throw error;
+      }
+      
+      console.log('[PowerDialer] Response from lead-connected:', data);
+      
+      if (data?.lead) {
+        console.log('[PowerDialer] Setting lead data from API response:', data.lead);
+        setConnectedLeadData(data.lead);
+      } else {
+        console.log('[PowerDialer] No lead data in response, creating fallback data');
+        const fallbackData = {
+          first_name: 'Unknown',
+          last_name: 'Contact',
+          phone1: Object.values(twilioState.activeCalls)[0]?.phoneNumber || '---',
+          phone2: '---',
+          email: '---',
+          property_address: '---',
+          mailing_address: '---',
+          disposition: 'Not Contacted',
+          tags: []
+        };
+        setConnectedLeadData(fallbackData);
+      }
+      
+      setIsDialing(false);
+    } catch (err) {
+      console.error('[PowerDialer] Error fetching lead data:', err);
+      toast.error('Failed to load lead details');
+      setIsDialing(false);
+      
+      const errorFallbackData = {
+        first_name: 'Error',
+        last_name: 'Loading Lead',
+        phone1: Object.values(twilioState.activeCalls)[0]?.phoneNumber || '---',
+        phone2: '---',
+        email: '---',
+        property_address: '---',
+        mailing_address: '---',
+        disposition: 'Not Contacted',
+        tags: []
+      };
+      setConnectedLeadData(errorFallbackData);
+    }
+  };
+
   useEffect(() => {
     console.log('[PowerDialer] Active call status changed:', Object.values(twilioState.activeCalls)[0]?.status);
     console.log('[PowerDialer] Active call leadId:', Object.values(twilioState.activeCalls)[0]?.leadId);
     
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.leadId) {
-      const fetchLeadData = async () => {
-        try {
-          console.log('[PowerDialer] Fetching lead data for:', activeCall.leadId);
-          setIsDialing(true);
-          
-          const { data: rawData, error } = await supabase.functions.invoke('lead-connected', {
-            body: { 
-              leadId: activeCall.leadId,
-              callData: {
-                callSid: activeCall.callSid,
-                status: activeCall.status || 'unknown',
-                timestamp: new Date().toISOString()
-              }
-            }
-          });
-
-          if (error) {
-            console.error('[PowerDialer] Error from lead-connected:', error);
-            throw error;
-          }
-          
-          if (rawData?.lead) {
-            console.log('[PowerDialer] Setting lead data:', rawData.lead);
-            setConnectedLeadData(rawData.lead);
-          }
-          
-          setIsDialing(false);
-        } catch (err) {
-          console.error('[PowerDialer] Error fetching lead data:', err);
-          toast.error('Failed to load lead details');
-          setIsDialing(false);
-        }
-      };
-
-      fetchLeadData();
+      fetchLeadData(activeCall.leadId);
     }
   }, [twilioState.activeCalls]);
 
@@ -323,6 +353,23 @@ export default function PowerDialer() {
         phone1: connectedLeadData.phone1
       } : null
     });
+  }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
+
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('PowerDialer Debug Info:', {
+        hasData: !!connectedLeadData,
+        isDialing,
+        hasActiveCall,
+        callStatus: Object.values(twilioState.activeCalls)[0]?.status,
+        leadData: connectedLeadData ? {
+          id: connectedLeadData.id,
+          first_name: connectedLeadData.first_name,
+          last_name: connectedLeadData.last_name,
+          phone1: connectedLeadData.phone1
+        } : null
+      });
+    }
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
 
   return (
@@ -602,7 +649,7 @@ export default function PowerDialer() {
           </TabsContent>
         </Tabs>
         
-        {connectedLeadData && process.env.NODE_ENV === 'development' && (
+        {process.env.NODE_ENV === 'development' && connectedLeadData && (
           <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border border-green-500 z-50 max-w-md">
             <h3 className="font-bold flex justify-between">
               <span>Debug: Lead Data Present</span>
