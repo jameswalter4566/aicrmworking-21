@@ -233,45 +233,6 @@ export default function PowerDialer() {
     handleEndCall(currentCall.parameters.leadId);
   };
 
-  const refreshLatestLead = async () => {
-    try {
-      console.log('Fetching latest lead...');
-      
-      const authToken = await twilioState.getAuthToken();
-      
-      if (!authToken) {
-        console.error('No auth token available');
-        toast.error('Authentication error. Please try logging in again.');
-        return;
-      }
-      
-      const { data, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { 
-          source: 'all',
-          pageSize: 1,
-          page: 0
-        }
-      });
-
-      if (error) {
-        console.error('ConnectedLeadPanel: Error fetching latest lead:', error);
-        toast.error('Failed to fetch latest lead');
-        return;
-      }
-
-      if (data?.data?.[0]) {
-        console.log('ConnectedLeadPanel: Latest lead data fetched:', data.data[0]);
-        setConnectedLeadData(data.data[0]);
-        toast.success('Latest lead loaded');
-      }
-    } catch (err) {
-      console.error('ConnectedLeadPanel: Error in fetchLatestLead:', err);
-      toast.error('Failed to retrieve latest lead');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     console.log('[PowerDialer] Active call status changed:', Object.values(twilioState.activeCalls)[0]?.status);
     console.log('[PowerDialer] Active call leadId:', Object.values(twilioState.activeCalls)[0]?.leadId);
@@ -515,7 +476,6 @@ export default function PowerDialer() {
 
               <ConnectedLeadPanel 
                 leadData={connectedLeadData}
-                onRefresh={refreshLatestLead}
               />
 
               <Card className="h-full overflow-hidden flex flex-col">
