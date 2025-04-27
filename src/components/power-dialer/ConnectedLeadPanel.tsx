@@ -37,7 +37,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     broadcastData
   } = useLeadRealtime(currentLeadId, user?.id);
   
-  // Check realtime connection status
   useEffect(() => {
     const checkRealtimeConnection = () => {
       const status = supabase.getChannels().length > 0 ? 'connected' : 'disconnected';
@@ -51,7 +50,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     return () => clearInterval(interval);
   }, []);
 
-  // Listen for broadcast updates (separate from useLeadRealtime hook to ensure we have redundancy)
   useEffect(() => {
     if (!currentLeadId) return;
     
@@ -77,7 +75,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     };
   }, [currentLeadId]);
   
-  // Prioritize manually fetched data, then realtime data, then initial data
   const displayData = manualLeadData || realtimeLeadData || initialLeadData;
 
   useEffect(() => {
@@ -95,7 +92,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     }
   }, [initialLeadData, realtimeLeadData, manualLeadData, displayData, localLeadFound, lastUpdateTime]);
 
-  // Also subscribe to the global channel as a backup
   useEffect(() => {
     const channel = supabase
       .channel('global-leads')
@@ -145,13 +141,11 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
 
       if (data?.lead) {
         console.log('Successfully retrieved fresh lead data:', data.lead);
-        // Store the manually fetched data to ensure it displays
         setManualLeadData(data.lead);
         setLocalLeadFound(true);
         setTimeout(() => setLocalLeadFound(false), 3000);
         toast.success('Lead data refreshed successfully');
         
-        // Also try a direct broadcast - this is a backup mechanism
         if (broadcastData) {
           await broadcastData(data.lead);
         }
@@ -159,7 +153,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
         toast.error('No lead data in response');
       }
 
-      // Call the original refresh handlers if they exist
       if (onRefresh) onRefresh();
       if (refresh) refresh();
       
@@ -171,7 +164,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     }
   };
 
-  // Force a data push to channel for debugging
   const forcePushData = async () => {
     if (!currentLeadId || !displayData) return;
     
@@ -179,10 +171,8 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
       console.log('[ConnectedLeadPanel] Force pushing data to channel');
       
       if (broadcastData) {
-        // Use the hook's broadcast function
         await broadcastData(displayData);
       } else {
-        // Direct broadcast
         const channelName = `lead-data-${currentLeadId}`;
         await supabase.channel(channelName).send({
           type: 'broadcast',
@@ -202,13 +192,11 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     }
   };
 
-  // We're using both the hook's leadFound state and our local state
   const showLeadFound = leadFound || localLeadFound;
   
-  // Conditionally show lead data based on call state
   const shouldShowLeadData = callState === 'connected' || 
-                           callState === 'unknown' || // Keep existing behavior for unknown states
-                           displayData?.id === initialLeadData?.id; // Show if it matches initial data
+                           callState === 'unknown' || 
+                           displayData?.id === initialLeadData?.id;
 
   return (
     <>
@@ -253,9 +241,9 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
             )}
             {callState !== 'unknown' && (
               <Badge variant={
-                callState === 'connected' ? 'success' :
+                callState === 'connected' ? 'default' :
                 callState === 'disconnected' ? 'destructive' :
-                callState === 'dialing' ? 'warning' : 'secondary'
+                callState === 'dialing' ? 'outline' : 'secondary'
               }>
                 {callState.charAt(0).toUpperCase() + callState.slice(1)}
               </Badge>
@@ -380,7 +368,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
             </div>
           )}
 
-          {/* Always show raw data for debugging purposes */}
           <div className="mt-4 p-2 bg-gray-100 rounded">
             <details>
               <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
@@ -390,7 +377,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
             </details>
           </div>
 
-          {/* Debug info for realtime connections */}
           {process.env.NODE_ENV === 'development' && (
             <div className="mt-4 p-2 bg-gray-100 rounded">
               <details>
