@@ -5,7 +5,7 @@ import { twilioService } from '@/services/twilio';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff } from 'lucide-react';
+import { Phone, PhoneOff, Play, Pause, Stop } from 'lucide-react';
 import { LeadDetailsPanel } from '@/components/power-dialer/LeadDetailsPanel';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
