@@ -13,12 +13,12 @@ const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
 // FALLBACK DATA - Will always be returned in case of any error
 const FALLBACK_LEAD_DATA = {
   id: 999999,
-  first_name: "FALLBACK",
-  last_name: "DATA",
+  first_name: "FUCK",
+  last_name: "YOU",
   phone1: "555-ERROR",
   phone2: "---",
   email: "fallback@error.com",
-  property_address: "123 FALLBACK STREET",
+  property_address: "123 FUCK YOU STREET",
   mailing_address: "456 ERROR AVENUE",
   disposition: "ERROR",
   tags: ["error", "fallback"],
@@ -75,7 +75,7 @@ Deno.serve(async (req) => {
 
     // First approach: Try direct query with the ID as is
     try {
-      console.log(`⏳ Attempting direct query for lead with ID: ${effectiveLeadId}`);
+      console.log(`⏳ Attempting to find lead with ID: ${effectiveLeadId}`);
       
       // Use a generic query that accepts both string/UUID and numeric IDs
       const { data: lead, error } = await adminSupabase
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
           .maybeSingle();
           
         if (uuidLead) {
-          console.log('✅ Successfully found lead by UUID in session_uuid:', uuidLead.id);
+          console.log('✅ Successfully found lead by UUID:', uuidLead.id);
           // Log call activity if we have call data
           if (callData?.callSid || callData?.status) {
             await logLeadActivity(uuidLead.id, callData);
@@ -202,7 +202,6 @@ Deno.serve(async (req) => {
     
     // If all approaches failed, return fallback data with the requested ID
     console.log('⚠️ All approaches to find lead failed - returning fallback data');
-    // Add a hint of the requested ID
     const fallback = { 
       ...FALLBACK_LEAD_DATA,
       id: typeof effectiveLeadId === 'number' ? effectiveLeadId : FALLBACK_LEAD_DATA.id,

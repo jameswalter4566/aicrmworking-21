@@ -111,20 +111,6 @@ export default function PowerDialer() {
   }, [connectedLeadData]);
 
   useEffect(() => {
-    console.log('[PowerDialer] connected lead data updated:', connectedLeadData);
-    
-    if (connectedLeadData) {
-      console.log('[PowerDialer] Lead details available:',
-        'Name:', connectedLeadData.first_name, connectedLeadData.last_name,
-        'Phone:', connectedLeadData.phone1,
-        'Email:', connectedLeadData.email
-      );
-    } else {
-      console.log('[PowerDialer] No lead data available yet');
-    }
-  }, [connectedLeadData]);
-
-  useEffect(() => {
     if (window.Twilio && window.Twilio.Device) {
       console.log("Twilio device available:", window.Twilio.Device);
       setTwilioReady(true);
@@ -192,6 +178,7 @@ export default function PowerDialer() {
         });
         setCallInProgress(false);
         setIsDialing(false);
+        setConnectedLeadData(null);
       } else {
         toast("Call Initiated", {
           description: `Calling ${lead.name}...`
@@ -202,6 +189,7 @@ export default function PowerDialer() {
       setTokenError(error.message);
       setCallInProgress(false);
       setIsDialing(false);
+      setConnectedLeadData(null);
       
       toast("Call Error", {
         description: error.message || "Error placing call."
@@ -234,13 +222,17 @@ export default function PowerDialer() {
 
   const refreshLatestLead = async () => {
     try {
-      console.log('Fetching latest lead...');
-      const { data, error } = await supabase
-        .from('leads')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+      console.log('Manually fetching latest lead via lead-connected function...');
+      
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
+        body: { 
+          leadId: "latest",
+          callData: {
+            status: 'manual_refresh',
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
 
       if (error) {
         console.error('Error fetching latest lead:', error);
@@ -248,9 +240,15 @@ export default function PowerDialer() {
         return;
       }
 
-      console.log('Latest lead data:', data);
-      setConnectedLeadData(data);
-      toast.success('Latest lead retrieved');
+      console.log('Lead-connected response for manual refresh:', data);
+      
+      if (data?.lead) {
+        console.log('Setting lead data from manual refresh:', data.lead);
+        setConnectedLeadData(data.lead);
+        toast.success('Latest lead retrieved');
+      } else {
+        toast.error('No lead data returned');
+      }
     } catch (err) {
       console.error('Error in refreshLatestLead:', err);
       toast.error('Failed to retrieve latest lead');
@@ -439,6 +437,7 @@ export default function PowerDialer() {
                         onClick={async () => {
                           const success = await twilioState.endAllCalls();
                           if (success) {
+                            setConnectedLeadData(null);
                             toast("System Reset", {
                               description: "All active calls have been terminated. The system has been reset."
                             });
@@ -473,7 +472,10 @@ export default function PowerDialer() {
               <PreviewDialerWindow 
                 currentCall={Object.values(twilioState.activeCalls)[0]}
                 onDisposition={handleDisposition}
-                onEndCall={() => Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id))}
+                onEndCall={() => {
+                  Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
+                  setConnectedLeadData(null);
+                }}
               />
 
               {Object.keys(twilioState.activeCalls).length > 0 && (
@@ -484,9 +486,10 @@ export default function PowerDialer() {
                       <Button
                         variant="destructive"
                         size="sm"
-                        onClick={() => 
-                          twilioState.endAllCalls()
-                        }
+                        onClick={() => {
+                          twilioState.endAllCalls();
+                          setConnectedLeadData(null);
+                        }}
                       >
                         End All Calls
                       </Button>
@@ -519,7 +522,10 @@ export default function PowerDialer() {
                               phoneNumber={call.phoneNumber}
                               activeCall={call}
                               onCall={(phone, id) => {}}
-                              onHangup={() => handleEndCall(leadId)}
+                              onHangup={() => {
+                                handleEndCall(leadId);
+                                setConnectedLeadData(null);
+                              }}
                               onToggleMute={(id) => twilioState.toggleMute(id)}
                               onToggleSpeaker={(id) => twilioState.toggleSpeaker(id)}
                               audioOutputDevices={twilioState.audioOutputDevices}
@@ -667,10 +673,6 @@ export default function PowerDialer() {
       </div>
     </MainLayout>
   );
-}
-
-function DialerTab() {
-  return null;
 }
 
 function SettingsTab() {

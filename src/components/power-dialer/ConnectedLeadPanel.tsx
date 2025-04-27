@@ -17,9 +17,11 @@ interface ConnectedLeadPanelProps {
 
 export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [localLeadData, setLocalLeadData] = useState<any>(null);
-
-  const displayData = localLeadData || leadData;
+  
+  // IMPORTANT: We're not automatically loading data on mount anymore
+  // We only rely on the leadData passed from props
+  
+  const displayData = leadData;
   
   useEffect(() => {
     console.log("[ConnectedLeadPanel] Raw lead data from props:", leadData);
@@ -36,67 +38,11 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     }
   }, [leadData]);
 
-  useEffect(() => {
-    if (leadData) {
-      setLocalLeadData(leadData);
-      console.log("[ConnectedLeadPanel] Updated local lead data from props:", leadData);
-    }
-  }, [leadData]);
-
-  const fetchLatestLead = async () => {
-    try {
-      setIsLoading(true);
-      
-      // This is a direct call to retrieve-leads for testing purposes
-      const { data: response, error } = await supabase.functions.invoke('retrieve-leads', {
-        body: { 
-          source: 'all',
-          pageSize: 1,
-          page: 0
-        }
-      });
-
-      if (error) {
-        console.error('[ConnectedLeadPanel] Error fetching latest lead:', error);
-        toast.error('Failed to fetch latest lead');
-        return;
-      }
-
-      if (response?.data?.[0]) {
-        console.log('[ConnectedLeadPanel] Latest lead data fetched:', response.data[0]);
-        
-        // Convert API response format to match our expected format
-        const formattedLeadData = {
-          id: response.data[0].id,
-          first_name: response.data[0].firstName || '',
-          last_name: response.data[0].lastName || '',
-          email: response.data[0].email || '',
-          phone1: response.data[0].phone1 || '',
-          phone2: response.data[0].phone2 || '',
-          property_address: response.data[0].propertyAddress || '',
-          mailing_address: response.data[0].mailingAddress || '',
-          disposition: response.data[0].disposition || 'Not Contacted',
-          tags: response.data[0].tags || [],
-          created_at: response.data[0].createdAt,
-          updated_at: response.data[0].updatedAt
-        };
-        
-        setLocalLeadData(formattedLeadData);
-        toast.success('Latest lead loaded');
-      }
-    } catch (err) {
-      console.error('[ConnectedLeadPanel] Error in fetchLatestLead:', err);
-      toast.error('Failed to retrieve latest lead');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleRefresh = () => {
     if (onRefresh) {
+      setIsLoading(true);
       onRefresh();
-    } else {
-      fetchLatestLead();
+      setTimeout(() => setIsLoading(false), 1000);
     }
   };
 
@@ -202,7 +148,7 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
           {displayData?.id ? (
             <div className="flex flex-1 justify-between items-center">
               <span>Lead Details</span>
-              <Badge variant="outline" className="ml-2">ID: {displayData.id}</Badge>
+              <Badge variant="outline" className="ml-2 bg-blue-50">Lead ID: {displayData.id}</Badge>
             </div>
           ) : ( 
             'Lead Details - No Lead ID Available'
