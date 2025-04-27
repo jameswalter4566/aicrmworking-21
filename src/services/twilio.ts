@@ -432,7 +432,10 @@ class TwilioService {
         const call = await this.device.connect({
           params: {
             phoneNumber: formattedPhoneNumber,
-            leadId: leadId.toString()
+            leadId: leadId.toString(),
+            machineDetection: 'DetectMessageEnd',
+            machineDetectionTimeout: '30',
+            machineDetectionUrl: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-machine-detection?callId=${leadId}`
           }
         });
         
