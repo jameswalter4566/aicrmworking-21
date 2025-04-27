@@ -39,6 +39,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
 import { useAuth } from '@/hooks/use-auth';
 import { useLeadRealtime } from '@/hooks/use-lead-realtime';
+import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
 
 const SAMPLE_LEADS = [
   {
@@ -243,8 +244,8 @@ export default function PowerDialer() {
   const activeLeadId = activeCall?.leadId || null;
   
   const { user } = useAuth(); // Get current user
-  const { leadData: realtimeLeadData, isLoading: isLeadDataLoading, refresh: refreshLeadData } = 
-    useLeadRealtime(activeLeadId, user?.id);
+  const { leadData: realtimeLeadData, isLoading: isLeadDataLoading, leadFound, refresh: refreshLeadData } = 
+    useLeadRealtime(activeLeadId ? String(activeLeadId) : null, user?.id);
 
   useEffect(() => {
     if (realtimeLeadData) {
@@ -263,14 +264,15 @@ export default function PowerDialer() {
     }
   };
 
-  const fetchLeadData = async (leadId: string) => {
+  const fetchLeadData = async (leadId: string | number) => {
     try {
       console.log(`[PowerDialer] Fetching lead data for ID: ${leadId}`);
       setIsDialing(true);
       
       const { data, error } = await supabase.functions.invoke('lead-connected', {
         body: { 
-          leadId: leadId,
+          leadId: String(leadId),
+          userId: user?.id,
           callData: {
             callSid: Object.values(twilioState.activeCalls)[0]?.callSid || null,
             status: Object.values(twilioState.activeCalls)[0]?.status || 'unknown',
@@ -380,6 +382,7 @@ export default function PowerDialer() {
 
   return (
     <MainLayout>
+      <LeadFoundIndicator isVisible={leadFound} />
       <TwilioScript
         onLoad={() => setIsScriptLoaded(true)}
         onError={(err) => console.error("TwilioScript error:", err)}

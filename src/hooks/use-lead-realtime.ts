@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export function useLeadRealtime(leadId: string | null, userId?: string | null) {
+export function useLeadRealtime(leadId: string | number | null, userId?: string | null) {
   const [leadData, setLeadData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [leadFound, setLeadFound] = useState(false);
 
   // Initial fetch to get lead data
   const fetchLeadData = async () => {
@@ -14,8 +14,8 @@ export function useLeadRealtime(leadId: string | null, userId?: string | null) {
     try {
       const { data, error } = await supabase.functions.invoke('lead-connected', {
         body: { 
-          leadId,
-          userId, // Include userId to track which user the data belongs to
+          leadId: String(leadId),
+          userId,
           callData: {
             status: 'initial_fetch',
             timestamp: new Date().toISOString()
@@ -31,6 +31,8 @@ export function useLeadRealtime(leadId: string | null, userId?: string | null) {
       if (data?.lead) {
         console.log('[useLeadRealtime] Received lead data:', data.lead);
         setLeadData(data.lead);
+        setLeadFound(true);
+        setTimeout(() => setLeadFound(false), 3000);
       }
     } catch (err) {
       console.error('Error in lead realtime fetch:', err);
@@ -43,6 +45,7 @@ export function useLeadRealtime(leadId: string | null, userId?: string | null) {
   useEffect(() => {
     if (!leadId) {
       setLeadData(null);
+      setLeadFound(false);
       return;
     }
 
@@ -55,7 +58,7 @@ export function useLeadRealtime(leadId: string | null, userId?: string | null) {
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+          event: '*',
           schema: 'public',
           table: 'leads',
           filter: `id=eq.${leadId}`
@@ -64,36 +67,36 @@ export function useLeadRealtime(leadId: string | null, userId?: string | null) {
           console.log('[useLeadRealtime] Realtime update received:', payload);
           if (payload.new) {
             setLeadData(payload.new);
+            setLeadFound(true);
+            setTimeout(() => setLeadFound(false), 3000);
           }
         }
       )
       .subscribe();
-    
+
     // Also subscribe to lead_activities for this lead
     const activitiesChannel = supabase
       .channel(`lead-activities-${leadId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT', 
+          event: 'INSERT',
           schema: 'public',
           table: 'lead_activities',
           filter: `lead_id=eq.${leadId}`
         },
         async (payload) => {
           console.log('[useLeadRealtime] New lead activity:', payload);
-          // Refresh lead data when new activity is recorded
           await fetchLeadData();
         }
       )
       .subscribe();
 
-    // Cleanup subscription
     return () => {
       supabase.removeChannel(channel);
       supabase.removeChannel(activitiesChannel);
     };
   }, [leadId, userId]);
 
-  return { leadData, isLoading, refresh: fetchLeadData };
+  return { leadData, isLoading, leadFound, refresh: fetchLeadData };
 }
