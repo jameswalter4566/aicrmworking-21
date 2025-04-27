@@ -222,102 +222,17 @@ const DialerSession = () => {
 
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0]; 
-    console.log('Active call status changed:', firstActiveCall?.status);
-    console.log('Active call leadId:', firstActiveCall?.leadId);
-    
-    if (firstActiveCall?.status === 'in-progress' && firstActiveCall.leadId) {
-      const fetchLeadData = async () => {
-        try {
-          console.log('Fetching lead data for:', firstActiveCall.leadId);
-          
-          const { data, error } = await supabase.functions.invoke('lead-connected', {
-            body: { 
-              leadId: firstActiveCall.leadId,
-              callData: {
-                callSid: firstActiveCall.callSid,
-                status: firstActiveCall.status,
-                timestamp: new Date().toISOString()
-              }
-            }
-          });
-
-          if (error) {
-            console.error('Error from lead-connected:', error);
-            throw error;
-          }
-          
-          console.log('Response from lead-connected:', data);
-          
-          if (data?.lead) {
-            console.log('Setting connected lead data from API response:', data.lead);
-            setConnectedLeadData({
-              id: data.lead.id,
-              first_name: data.lead.first_name || 'Unknown',
-              last_name: data.lead.last_name || 'Contact',
-              phone1: data.lead.phone1 || firstActiveCall.phoneNumber || '---',
-              phone2: data.lead.phone2 || '---',
-              email: data.lead.email || '---',
-              property_address: data.lead.property_address || '---', 
-              mailing_address: data.lead.mailing_address || '---',
-              disposition: data.lead.disposition || 'Not Contacted',
-              tags: data.lead.tags || [],
-              created_at: data.lead.created_at,
-              updated_at: data.lead.updated_at
-            });
-          } else {
-            console.log('No lead data in response, creating fallback data');
-            const fallbackData = {
-              first_name: 'Unknown',
-              last_name: 'Contact',
-              phone1: firstActiveCall.phoneNumber || '---',
-              phone2: '---',
-              email: '---',
-              property_address: '---',
-              mailing_address: '---',
-              disposition: 'Not Contacted',
-              tags: []
-            };
-            setConnectedLeadData(fallbackData);
-          }
-          setIsDialing(false);
-        } catch (err) {
-          console.error('Error fetching lead data:', err);
-          const errorFallbackData = {
-            first_name: 'Error',
-            last_name: 'Loading Lead',
-            phone1: firstActiveCall.phoneNumber || '---',
-            phone2: '---',
-            email: '---',
-            property_address: '---',
-            mailing_address: '---',
-            disposition: 'Not Contacted',
-            tags: []
-          };
-          setConnectedLeadData(errorFallbackData);
-          toast.error('Failed to load lead details');
-          setIsDialing(false);
-        }
-      };
-
-      fetchLeadData();
-    } else if (!hasActiveCall && !isCallingNext) {
-      setIsDialing(false);
-    }
-  }, [twilioState.activeCalls, hasActiveCall, isCallingNext]);
-
-  useEffect(() => {
-    const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
     const callStatus = firstActiveCall?.status;
     
     const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
     const inProgressStatuses = ['connecting', 'in-progress', 'ringing'];
     
-    if (completedStatuses.includes(callStatus)) {
+    if (completedStatuses.includes(callStatus || '')) {
       handleCallCompletion();
     } else if (callStatus === 'connecting' || callStatus === 'ringing') {
       startNoAnswerTimeout();
-    } else if (inProgressStatuses.includes(callStatus)) {
+    } else if (inProgressStatuses.includes(callStatus || '')) {
       clearTimeoutTimer();
     }
   }, [

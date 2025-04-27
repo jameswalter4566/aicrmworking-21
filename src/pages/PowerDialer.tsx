@@ -34,7 +34,8 @@ import TwilioScript from "@/components/TwilioScript";
 import { AudioDebugModal } from "@/components/AudioDebugModal";
 import { AudioInitializer } from "@/components/AudioInitializer";
 import { toast } from "sonner";
-import { PreviewDialerWindow } from "@/components/power-dialer/PreviewDialerWindow";
+// Import with both default and named export support
+import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
 import { ConnectedLeadPanel } from "@/components/power-dialer/ConnectedLeadPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
