@@ -9,6 +9,7 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
+const anonSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') || '');
 
 // FALLBACK DATA - Will always be returned in case of any error
 const FALLBACK_LEAD_DATA = {
@@ -30,6 +31,7 @@ const FALLBACK_LEAD_DATA = {
 };
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -125,6 +127,12 @@ Deno.serve(async (req) => {
         if (callData?.callSid || callData?.status) {
           await logLeadActivity(lead.id, callData, userId);
         }
+        
+        // Also broadcast lead found event to broadcast channel if userId is present
+        if (userId) {
+          await broadcastLeadFound(lead);
+        }
+        
         return createSuccessResponse(formatLeadResponse(lead, callData));
       }
     } catch (directError) {
@@ -133,12 +141,12 @@ Deno.serve(async (req) => {
 
     // Second approach: Try by session UUID if that field exists
     try {
-      if (typeof leadId === 'string') {
+      if (typeof effectiveLeadId === 'string') {
         console.log('🔄 Trying to find lead by UUID in session_uuid field');
         const { data: uuidLead, error } = await adminSupabase
           .from('leads')
           .select('*')
-          .eq('session_uuid', leadId)
+          .eq('session_uuid', effectiveLeadId)
           .maybeSingle();
           
         if (uuidLead) {
@@ -147,6 +155,12 @@ Deno.serve(async (req) => {
           if (callData?.callSid || callData?.status) {
             await logLeadActivity(uuidLead.id, callData, userId);
           }
+          
+          // Also broadcast lead found event to broadcast channel if userId is present
+          if (userId) {
+            await broadcastLeadFound(uuidLead);
+          }
+          
           return createSuccessResponse(formatLeadResponse(uuidLead, callData));
         }
       }
@@ -180,6 +194,12 @@ Deno.serve(async (req) => {
             if (callData?.callSid || callData?.status) {
               await logLeadActivity(fullLeadData.id, callData, userId);
             }
+            
+            // Also broadcast lead found event to broadcast channel if userId is present
+            if (userId) {
+              await broadcastLeadFound(fullLeadData);
+            }
+            
             return createSuccessResponse(formatLeadResponse(fullLeadData, callData));
           }
         }
@@ -229,6 +249,9 @@ Deno.serve(async (req) => {
           await logLeadActivity(formattedLead.id, callData, userId);
         }
         
+        // Also broadcast lead found event to broadcast channel
+        await broadcastLeadFound(formattedLead);
+        
         return createSuccessResponse(formattedLead);
       }
     } catch (retrieveLeadsError) {
@@ -237,15 +260,25 @@ Deno.serve(async (req) => {
     
     // If all approaches failed, return fallback data with the requested ID
     console.log('⚠️ All approaches to find lead failed - returning fallback data');
+    
+    // Try to build a more useful fallback with any available information
     const fallback = { 
       ...FALLBACK_LEAD_DATA,
-      id: typeof effectiveLeadId === 'number' ? effectiveLeadId : FALLBACK_LEAD_DATA.id,
+      id: typeof effectiveLeadId === 'number' || /^\d+$/.test(effectiveLeadId) ? parseInt(String(effectiveLeadId)) : FALLBACK_LEAD_DATA.id,
       phone1: callData?.phoneNumber || FALLBACK_LEAD_DATA.phone1
     };
+    
+    // Broadcast fallback data too so the UI shows something
+    await broadcastLeadFound(fallback);
+    
     return createSuccessResponse(fallback);
     
   } catch (error) {
     console.error('❌ Error in lead-connected function:', error);
+    
+    // Try to broadcast fallback data in case of error
+    await broadcastLeadFound(FALLBACK_LEAD_DATA);
+    
     return createSuccessResponse(FALLBACK_LEAD_DATA);
   }
 });
@@ -283,6 +316,7 @@ function formatLeadResponse(lead, callData = null) {
   };
 }
 
+// Helper function to log lead activity
 async function logLeadActivity(leadId, callData, userId = null) {
   if (!callData) return;
   
@@ -323,5 +357,32 @@ async function logLeadActivity(leadId, callData, userId = null) {
     });
   } catch (error) {
     console.error('❌ Failed to log activity:', error);
+  }
+}
+
+// Helper function to broadcast lead data to channel
+async function broadcastLeadFound(lead) {
+  if (!lead?.id) return;
+  
+  try {
+    // Create a channel specific to this lead ID for broadcasting updates
+    const channelName = `lead-data-${lead.id}`;
+    
+    // Send a broadcast message with the lead data
+    await anonSupabase
+      .channel(channelName)
+      .send({
+        type: 'broadcast',
+        event: 'lead_data_update',
+        payload: {
+          lead,
+          timestamp: new Date().toISOString(),
+          source: 'lead_connected'
+        }
+      });
+      
+    console.log(`📢 Broadcast lead data to channel: ${channelName}`);
+  } catch (error) {
+    console.error('❌ Failed to broadcast lead data:', error);
   }
 }

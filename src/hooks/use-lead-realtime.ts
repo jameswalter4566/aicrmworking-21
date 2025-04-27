@@ -7,6 +7,12 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
   const [leadData, setLeadData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [leadFound, setLeadFound] = useState(false);
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+
+  // Create a channel name that's consistent for this lead ID
+  const getChannelName = (id: string | number | null) => {
+    return id ? `lead-data-${id}` : 'no-lead';
+  };
 
   // Initial fetch to get lead data
   const fetchLeadData = async () => {
@@ -25,7 +31,8 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           userId,
           callData: {
             status: 'initial_fetch',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            requestId: crypto.randomUUID() // Add unique request ID for tracking
           }
         }
       });
@@ -42,7 +49,10 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         console.log('[useLeadRealtime] Successfully retrieved lead data:', data.lead);
         setLeadData(data.lead);
         setLeadFound(true);
-        toast.success('Lead data loaded successfully');
+        setLastUpdateTime(new Date());
+        
+        // Broadcast retrieved data to the lead's channel for other components to use
+        await broadcastLeadData(data.lead);
         
         // Reset the lead found indicator after 3 seconds
         setTimeout(() => setLeadFound(false), 3000);
@@ -61,6 +71,27 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     }
   };
 
+  // Broadcast lead data to the channel
+  const broadcastLeadData = async (data: any) => {
+    if (!leadId) return;
+    
+    try {
+      // Send data to the channel for this lead
+      await supabase.channel(getChannelName(leadId)).send({
+        type: 'broadcast',
+        event: 'lead_data_update',
+        payload: {
+          lead: data,
+          timestamp: new Date().toISOString(),
+          source: 'useLeadRealtime'
+        }
+      });
+      console.log('[useLeadRealtime] Broadcast lead data to channel:', getChannelName(leadId));
+    } catch (err) {
+      console.error('[useLeadRealtime] Error broadcasting lead data:', err);
+    }
+  };
+
   // Setup realtime subscription
   useEffect(() => {
     if (!leadId) {
@@ -75,8 +106,24 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     // Initial fetch
     fetchLeadData();
     
+    // Setup channel subscription for lead data updates
+    const dataChannel = supabase
+      .channel(getChannelName(leadId))
+      .on('broadcast', { event: 'lead_data_update' }, (payload) => {
+        console.log('[useLeadRealtime] Received broadcast data update:', payload);
+        
+        if (payload.payload?.lead) {
+          console.log('[useLeadRealtime] Setting lead data from broadcast:', payload.payload.lead);
+          setLeadData(payload.payload.lead);
+          setLeadFound(true);
+          setLastUpdateTime(new Date());
+          setTimeout(() => setLeadFound(false), 3000);
+        }
+      })
+      .subscribe();
+    
     // Setup realtime subscription to leads table changes
-    const channel = supabase
+    const leadChannel = supabase
       .channel(`lead-updates-${leadId}`)
       .on(
         'postgres_changes',
@@ -92,6 +139,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
             console.log('[useLeadRealtime] Setting lead data from realtime update:', payload.new);
             setLeadData(payload.new);
             setLeadFound(true);
+            setLastUpdateTime(new Date());
             setTimeout(() => setLeadFound(false), 3000);
           }
         }
@@ -121,10 +169,17 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
 
     return () => {
       console.log(`[useLeadRealtime] Cleaning up subscriptions for leadId: ${leadId}`);
-      supabase.removeChannel(channel);
+      supabase.removeChannel(dataChannel);
+      supabase.removeChannel(leadChannel);
       supabase.removeChannel(activitiesChannel);
     };
   }, [leadId, userId]);
 
-  return { leadData, isLoading, leadFound, refresh: fetchLeadData };
+  // Force refetch when explicitly told to by the user
+  const refresh = async () => {
+    setLastUpdateTime(new Date());
+    return await fetchLeadData();
+  };
+
+  return { leadData, isLoading, leadFound, refresh, lastUpdateTime };
 }

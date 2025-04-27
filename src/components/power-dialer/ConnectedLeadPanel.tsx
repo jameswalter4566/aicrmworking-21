@@ -25,8 +25,32 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
   const { user } = useAuth();
   const currentLeadId = initialLeadData?.id || null;
   
-  const { leadData: realtimeLeadData, isLoading: isRealtimeLoading, leadFound, refresh } = 
+  const { leadData: realtimeLeadData, isLoading: isRealtimeLoading, leadFound, refresh, lastUpdateTime } = 
     useLeadRealtime(currentLeadId, user?.id);
+  
+  // Listen for broadcast updates from lead-connected
+  useEffect(() => {
+    if (!currentLeadId) return;
+    
+    const channelName = `lead-data-${currentLeadId}`;
+    console.log(`[ConnectedLeadPanel] Setting up broadcast listener on channel: ${channelName}`);
+    
+    const channel = supabase
+      .channel(channelName)
+      .on('broadcast', { event: 'lead_data_update' }, (payload) => {
+        console.log('[ConnectedLeadPanel] Received broadcast lead data:', payload);
+        if (payload.payload?.lead) {
+          setManualLeadData(payload.payload.lead);
+          setLocalLeadFound(true);
+          setTimeout(() => setLocalLeadFound(false), 3000);
+        }
+      })
+      .subscribe();
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentLeadId]);
   
   // Prioritize manually fetched data, then realtime data, then initial data
   const displayData = manualLeadData || realtimeLeadData || initialLeadData;
@@ -36,14 +60,15 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
       initial: initialLeadData,
       realtime: realtimeLeadData,
       manual: manualLeadData,
-      display: displayData
+      display: displayData,
+      lastUpdate: lastUpdateTime
     });
     
     if (displayData && (realtimeLeadData || localLeadFound === false)) {
       setLocalLeadFound(true);
       setTimeout(() => setLocalLeadFound(false), 3000);
     }
-  }, [initialLeadData, realtimeLeadData, manualLeadData, displayData, localLeadFound]);
+  }, [initialLeadData, realtimeLeadData, manualLeadData, displayData, localLeadFound, lastUpdateTime]);
 
   const handleRefresh = async () => {
     setIsLoading(true);
@@ -56,7 +81,8 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
           userId: user?.id,
           callData: {
             status: 'manual_refresh',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            requestId: crypto.randomUUID() // Add unique request ID
           }
         }
       });
@@ -76,6 +102,22 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
         setLocalLeadFound(true);
         setTimeout(() => setLocalLeadFound(false), 3000);
         toast.success('Lead data refreshed successfully');
+        
+        // Broadcast data to channel for other components
+        try {
+          await supabase.channel(`lead-data-${currentLeadId}`).send({
+            type: 'broadcast',
+            event: 'lead_data_update',
+            payload: {
+              lead: data.lead,
+              timestamp: new Date().toISOString(),
+              source: 'manual_refresh'
+            }
+          });
+          console.log('Successfully broadcast lead data update');
+        } catch (broadcastErr) {
+          console.error('Error broadcasting lead data:', broadcastErr);
+        }
       } else {
         toast.error('No lead data in response');
       }
@@ -106,6 +148,11 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
               <div className="flex flex-1 justify-between items-center">
                 <span>Lead Details</span>
                 <Badge variant="outline" className="ml-2 bg-blue-50">Lead ID: {displayData.id}</Badge>
+                {lastUpdateTime && (
+                  <Badge variant="outline" className="ml-2 bg-gray-50 text-xs">
+                    Updated: {lastUpdateTime.toLocaleTimeString()}
+                  </Badge>
+                )}
               </div>
             ) : ( 
               'Lead Details - No Lead ID Available'
@@ -123,7 +170,10 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
                   Loading...
                 </>
               ) : (
-                'Refresh'
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </>
               )}
             </Button>
           </CardTitle>
@@ -225,10 +275,11 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
             </div>
           )}
 
+          {/* Always show raw data for debugging purposes */}
           <div className="mt-4 p-2 bg-gray-100 rounded">
-            <details open>
+            <details>
               <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
-              <pre className="mt-2 text-xs overflow-auto">
+              <pre className="mt-2 text-xs overflow-auto max-h-[300px]">
                 {displayData ? JSON.stringify(displayData, null, 2) : "No data available"}
               </pre>
             </details>

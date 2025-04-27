@@ -1,46 +1,56 @@
 
-# Project config
 project_id = "imrmboyczebjlbnkgjns"
 
-# Auth Server
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://localhost"
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
 [auth]
 enabled = true
+site_url = "http://localhost:3000"
 
-[auth.user_management]
-enabled = true
+[analytics]
+enabled = false
 
-[functions]
-node_version = 18
+[experimental]
+minimal_apis = false
 
-# Make these functions public so they don't require authentication
-[functions.twilio-token]
+[functions.lead-connected]
+verify_jwt = false
+no_verify_jwt = true
+
+[functions.predictive-dialer-webhook]
+verify_jwt = false
+
+[functions.dialer-webhook]
 verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.lead-connected]
+[functions.twilio-token]
 verify_jwt = false
 
-[functions.get-calling-lists]
+[functions.sms-webhook-receiver]
 verify_jwt = false
 
-[functions.get-calling-list]
+[functions.ai-sms-agent]
 verify_jwt = false
-
-[functions.get-calling-list-leads]
-verify_jwt = false
-
-# Enable realtime
-[realtime]
-enabled = true
-
-[realtime.leads]
-enabled = true
-
-[realtime.lead_activities]
-enabled = true
-
-[realtime.dialing_session_leads]
-enabled = true
-

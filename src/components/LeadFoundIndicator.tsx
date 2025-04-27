@@ -8,10 +8,12 @@ interface LeadFoundIndicatorProps {
 
 export const LeadFoundIndicator = ({ isVisible }: LeadFoundIndicatorProps) => {
   const [isShowing, setIsShowing] = useState(false);
+  const [showCount, setShowCount] = useState(0);
   
   useEffect(() => {
     if (isVisible) {
       setIsShowing(true);
+      setShowCount(prev => prev + 1);
       const timer = setTimeout(() => setIsShowing(false), 4000);
       return () => clearTimeout(timer);
     }
@@ -22,7 +24,12 @@ export const LeadFoundIndicator = ({ isVisible }: LeadFoundIndicatorProps) => {
   return (
     <div className="fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg animate-bounce z-50 flex items-center gap-2">
       <CheckCircle2 className="h-5 w-5" />
-      <span className="font-medium">Lead Successfully Found!</span>
+      <div>
+        <span className="font-medium">Lead Successfully Found!</span>
+        {showCount > 1 && (
+          <span className="text-xs ml-1">({showCount})</span>
+        )}
+      </div>
     </div>
   );
 };
