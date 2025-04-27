@@ -5,7 +5,7 @@ import { twilioService } from '@/services/twilio';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, PhoneOff } from 'lucide-react';
+import { Phone, PhoneOff, RefreshCw } from 'lucide-react';
 import { LeadDetailsPanel } from '@/components/power-dialer/LeadDetailsPanel';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
@@ -220,104 +220,38 @@ const DialerSession = () => {
     }
   };
 
-  useEffect(() => {
-    const firstActiveCall = Object.values(twilioState.activeCalls)[0]; 
-    console.log('Active call status changed:', firstActiveCall?.status);
-    console.log('Active call leadId:', firstActiveCall?.leadId);
-    
-    if (firstActiveCall?.status === 'in-progress' && firstActiveCall.leadId) {
-      const fetchLeadData = async () => {
-        try {
-          console.log('Fetching lead data for:', firstActiveCall.leadId);
-          
-          const { data, error } = await supabase.functions.invoke('lead-connected', {
-            body: { 
-              leadId: firstActiveCall.leadId,
-              callData: {
-                callSid: firstActiveCall.callSid,
-                status: firstActiveCall.status,
-                timestamp: new Date().toISOString()
-              }
-            }
-          });
-
-          if (error) {
-            console.error('Error from lead-connected:', error);
-            throw error;
-          }
-          
-          console.log('Response from lead-connected:', data);
-          
-          if (data?.lead) {
-            console.log('Setting connected lead data from API response:', data.lead);
-            setConnectedLeadData({
-              id: data.lead.id,
-              first_name: data.lead.first_name || 'Unknown',
-              last_name: data.lead.last_name || 'Contact',
-              phone1: data.lead.phone1 || firstActiveCall.phoneNumber || '---',
-              phone2: data.lead.phone2 || '---',
-              email: data.lead.email || '---',
-              property_address: data.lead.property_address || '---', 
-              mailing_address: data.lead.mailing_address || '---',
-              disposition: data.lead.disposition || 'Not Contacted',
-              tags: data.lead.tags || [],
-              created_at: data.lead.created_at,
-              updated_at: data.lead.updated_at
-            });
-          } else {
-            console.log('No lead data in response, creating fallback data');
-            const fallbackData = {
-              first_name: 'Unknown',
-              last_name: 'Contact',
-              phone1: firstActiveCall.phoneNumber || '---',
-              phone2: '---',
-              email: '---',
-              property_address: '---',
-              mailing_address: '---',
-              disposition: 'Not Contacted',
-              tags: []
-            };
-            setConnectedLeadData(fallbackData);
-          }
-          setIsDialing(false);
-        } catch (err) {
-          console.error('Error fetching lead data:', err);
-          const errorFallbackData = {
-            first_name: 'Error',
-            last_name: 'Loading Lead',
-            phone1: firstActiveCall.phoneNumber || '---',
-            phone2: '---',
-            email: '---',
-            property_address: '---',
-            mailing_address: '---',
-            disposition: 'Not Contacted',
-            tags: []
-          };
-          setConnectedLeadData(errorFallbackData);
-          toast.error('Failed to load lead details');
-          setIsDialing(false);
-        }
-      };
-
-      fetchLeadData();
-    } else if (!hasActiveCall && !isCallingNext) {
-      setIsDialing(false);
+  const handleNextLead = async () => {
+    if (hasActiveCall) {
+      try {
+        await handleEndCall();
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        await callNextLead();
+      } catch (err) {
+        console.error('Error transitioning to next lead:', err);
+        toast.error('Failed to transition to next lead');
+      }
+    } else {
+      await callNextLead();
     }
-  }, [twilioState.activeCalls, hasActiveCall, isCallingNext]);
+  };
 
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
     const callStatus = firstActiveCall?.status;
+    const statuses = {
+      completed: ['completed', 'failed', 'busy', 'no-answer', 'canceled'],
+      inProgress: ['connecting', 'in-progress'],
+      ringing: ['ringing']
+    };
     
-    const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
-    const inProgressStatuses = ['connecting', 'in-progress'];
-    
-    if (completedStatuses.includes(callStatus)) {
+    if (callStatus && statuses.completed.includes(callStatus)) {
       handleCallCompletion();
-    } else if (callStatus === 'ringing') {
+    } else if (callStatus && statuses.ringing.includes(callStatus)) {
       startNoAnswerTimeout();
-    } else if (inProgressStatuses.includes(callStatus)) {
+    } else if (callStatus && statuses.inProgress.includes(callStatus)) {
       clearTimeoutTimer();
     }
   }, [
@@ -400,7 +334,7 @@ const DialerSession = () => {
                     <div className="flex flex-col items-center py-8">
                       <p className="text-muted-foreground mb-4">No active call in progress</p>
                       <Button 
-                        onClick={callNextLead} 
+                        onClick={handleNextLead} 
                         disabled={isCallingNext}
                         className="bg-green-500 hover:bg-green-600 text-white"
                       >
