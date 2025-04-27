@@ -1,18 +1,45 @@
+
 import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ConnectedLeadPanelProps {
   leadData?: {
-    [key: string]: any; // Accept any raw JSON data
+    first_name?: string;
+    last_name?: string;
+    phone1?: string;
+    email?: string;
+    property_address?: string;
+    mailing_address?: string;
   };
 }
 
 export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
   // Debug logging to track data flow
   useEffect(() => {
-    console.log("[ConnectedLeadPanel] Raw lead data:", leadData);
+    console.log("[ConnectedLeadPanel] Received lead data:", leadData);
+    
+    if (leadData) {
+      console.log("[ConnectedLeadPanel] Lead details available:", {
+        name: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim() || 'Unknown',
+        phone: leadData.phone1 || '---',
+        email: leadData.email || '---',
+        property_address: leadData.property_address || '---',
+        mailing_address: leadData.mailing_address || '---'
+      });
+    } else {
+      console.log("[ConnectedLeadPanel] No lead data available");
+    }
   }, [leadData]);
+
+  // Format the lead name consistently
+  const getFormattedName = () => {
+    if (!leadData) return 'Unknown Contact';
+    const firstName = leadData.first_name || '';
+    const lastName = leadData.last_name || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    return fullName || 'Unknown Contact';
+  };
 
   // Display skeleton loader when no data is available
   if (!leadData) {
@@ -61,12 +88,12 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
     );
   }
 
-  // When data is available, map raw data to display fields
+  // When data is available, display it
   return (
     <Card className="mt-4 border-2 border-green-500">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg">
-          Lead Details - {`${leadData?.first_name || ''} ${leadData?.last_name || ''}`}
+          Lead Details - {getFormattedName()}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -76,23 +103,17 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-gray-500">Name</label>
-                <div className="text-sm mt-1 font-medium">
-                  {`${leadData?.first_name || ''} ${leadData?.last_name || ''}`}
-                </div>
+                <div className="text-sm mt-1 font-medium">{getFormattedName()}</div>
               </div>
               
               <div>
                 <label className="text-sm text-gray-500">Phone</label>
-                <div className="text-sm mt-1 font-medium">
-                  {leadData?.phone1 || "---"}
-                </div>
+                <div className="text-sm mt-1 font-medium">{leadData.phone1 || "---"}</div>
               </div>
               
               <div>
                 <label className="text-sm text-gray-500">Email</label>
-                <div className="text-sm mt-1 font-medium">
-                  {leadData?.email || "---"}
-                </div>
+                <div className="text-sm mt-1 font-medium">{leadData.email || "---"}</div>
               </div>
             </div>
           </div>
@@ -102,32 +123,16 @@ export const ConnectedLeadPanel = ({ leadData }: ConnectedLeadPanelProps) => {
             <div className="space-y-4">
               <div>
                 <label className="text-sm text-gray-500">Property Address</label>
-                <div className="text-sm mt-1 font-medium">
-                  {leadData?.property_address || "---"}
-                </div>
+                <div className="text-sm mt-1 font-medium">{leadData.property_address || "---"}</div>
               </div>
               
               <div>
                 <label className="text-sm text-gray-500">Mailing Address</label>
-                <div className="text-sm mt-1 font-medium">
-                  {leadData?.mailing_address || "---"}
-                </div>
+                <div className="text-sm mt-1 font-medium">{leadData.mailing_address || "---"}</div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* Debug data display */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mt-4 p-2 bg-gray-100 rounded">
-            <details>
-              <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
-              <pre className="mt-2 text-xs overflow-auto">
-                {JSON.stringify(leadData, null, 2)}
-              </pre>
-            </details>
-          </div>
-        )}
       </CardContent>
     </Card>
   );

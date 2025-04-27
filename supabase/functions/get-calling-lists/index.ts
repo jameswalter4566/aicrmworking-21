@@ -14,7 +14,6 @@ serve(async (req) => {
   }
   
   try {
-    // Create a client for user-based requests
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -25,57 +24,34 @@ serve(async (req) => {
       }
     );
     
-    // Create an admin client that uses the service role
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      serviceRoleKey
-    );
-    
-    // Try to get the user, fall back to admin access if needed
-    let user = null;
-    
-    try {
-      const { data: userData, error } = await supabaseClient.auth.getUser();
-      if (!error && userData) {
-        user = userData.user;
-      }
-    } catch (authError) {
-      console.log('Auth error in get-calling-lists:', authError);
-      // Continue with admin client
-    }
+    const { data: { user } } = await supabaseClient.auth.getUser();
     
     if (!user) {
-      console.log('Using admin access as fallback');
-      // For security, we could return an error here if we want to enforce authentication
-      // But for now, we'll continue with admin access for debugging purposes
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
-    // Use userId if available, otherwise null (admin will see all)
-    const userId = user?.id;
-    const client = userId ? supabaseClient : supabaseAdmin;
-    
-    // Get calling lists, filter by user if we have one
-    let query = client.from('calling_lists').select('id, name, created_at');
-    
-    if (userId) {
-      query = query.eq('created_by', userId);
-    }
-    
-    const { data: lists, error } = await query.order('created_at', { ascending: false });
+    // Get calling lists created by the current user
+    const { data: lists, error } = await supabaseClient
+      .from('calling_lists')
+      .select('id, name, created_at')
+      .eq('created_by', user.id)
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching calling lists:', error);
       return new Response(
-        JSON.stringify({ error: 'Failed to fetch calling lists', details: error }),
+        JSON.stringify({ error: 'Failed to fetch calling lists' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    // Get lead count for each list using admin client for reliable access
+    // Get lead count for each list
     const listsWithCounts = await Promise.all(
       lists.map(async (list) => {
-        const { count, error: countError } = await supabaseAdmin
+        const { count, error: countError } = await supabaseClient
           .from('calling_list_leads')
           .select('*', { count: 'exact', head: true })
           .eq('list_id', list.id);
@@ -94,9 +70,9 @@ serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Unexpected error in get-calling-lists:', error);
+    console.error('Unexpected error:', error);
     return new Response(
-      JSON.stringify({ error: 'Internal Server Error', details: String(error) }),
+      JSON.stringify({ error: 'Internal Server Error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

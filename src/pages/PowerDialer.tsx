@@ -106,6 +106,7 @@ export default function PowerDialer() {
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
 
+  // Enhanced debug logging for lead data
   useEffect(() => {
     console.log('[PowerDialer] connectedLeadData state:', connectedLeadData);
   }, [connectedLeadData]);
@@ -243,7 +244,8 @@ export default function PowerDialer() {
           console.log('[PowerDialer] Fetching lead data for:', activeCall.leadId);
           setIsDialing(true);
           
-          const { data: rawData, error } = await supabase.functions.invoke('lead-connected', {
+          console.log('[PowerDialer] Making API request to lead-connected function');
+          const { data, error } = await supabase.functions.invoke('lead-connected', {
             body: { 
               leadId: activeCall.leadId,
               callData: {
@@ -259,34 +261,56 @@ export default function PowerDialer() {
             throw error;
           }
           
-          console.log('[PowerDialer] Raw response from lead-connected:', rawData);
+          console.log('[PowerDialer] Full response from lead-connected:', data);
           
-          if (rawData?.lead) {
-            console.log('[PowerDialer] Setting raw lead data:', rawData.lead);
-            setConnectedLeadData(rawData.lead);
+          if (data?.lead) {
+            console.log('[PowerDialer] Setting connected lead data from response:', data.lead);
+            
+            // Ensure all required fields are present
+            const leadInfo = {
+              first_name: data.lead.first_name || 'Unknown',
+              last_name: data.lead.last_name || 'Contact',
+              phone1: data.lead.phone1 || activeCall.phoneNumber || '---',
+              email: data.lead.email || '---',
+              property_address: data.lead.property_address || '---',
+              mailing_address: data.lead.mailing_address || '---'
+            };
+            
+            console.log('[PowerDialer] Processed lead data:', leadInfo);
+            
+            // Force a state update with lead data
+            setConnectedLeadData(null); // Clear first to force re-render
+            setTimeout(() => {
+              setConnectedLeadData(leadInfo);
+              console.log('[PowerDialer] Set connected lead data:', leadInfo);
+            }, 50);
           } else {
-            console.log('[PowerDialer] No lead data in response, using fallback');
-            setConnectedLeadData({
+            console.log('[PowerDialer] No lead data in response, creating fallback data');
+            const fallbackData = {
               first_name: 'Unknown',
               last_name: 'Contact',
               phone1: activeCall.phoneNumber || '---',
               email: '---',
               property_address: '---',
               mailing_address: '---'
-            });
+            };
+            setConnectedLeadData(fallbackData);
           }
           
-          setIsDialing(false);
+          setTimeout(() => {
+            setIsDialing(false);
+          }, 500);
         } catch (err) {
           console.error('[PowerDialer] Error fetching lead data:', err);
-          setConnectedLeadData({
+          const errorFallbackData = {
             first_name: 'Error',
             last_name: 'Loading Lead',
             phone1: activeCall.phoneNumber || '---',
             email: '---',
             property_address: '---',
             mailing_address: '---'
-          });
+          };
+          setConnectedLeadData(errorFallbackData);
           toast.error('Failed to load lead details');
           setIsDialing(false);
         }
@@ -677,6 +701,7 @@ export default function PowerDialer() {
     </div>
   );
 
+  // Add debug overlay for lead data state
   return (
     <MainLayout>
       <TwilioScript
@@ -741,7 +766,8 @@ export default function PowerDialer() {
           </TabsContent>
         </Tabs>
         
-        {connectedLeadData && process.env.NODE_ENV === 'development' && (
+        {/* Debug overlay to show lead data state */}
+        {connectedLeadData && (
           <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border border-green-500 z-50 max-w-md">
             <h3 className="font-bold flex justify-between">
               <span>Debug: Lead Data Present</span>
@@ -749,9 +775,7 @@ export default function PowerDialer() {
                 Log Data
               </button>
             </h3>
-            <pre className="text-xs overflow-auto max-h-40">
-              {JSON.stringify(connectedLeadData, null, 2)}
-            </pre>
+            <pre className="text-xs overflow-auto max-h-40">{JSON.stringify(connectedLeadData, null, 2)}</pre>
           </div>
         )}
         

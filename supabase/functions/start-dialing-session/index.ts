@@ -12,14 +12,6 @@ Deno.serve(async (req) => {
   }
   
   try {
-    // Create client with service role for admin operations
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      serviceRoleKey
-    );
-    
-    // Also create a client with the user's auth token if available
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -30,19 +22,14 @@ Deno.serve(async (req) => {
       }
     );
     
-    // Try to get the user from the auth token, fallback to admin access if needed
-    let userId;
-    try {
-      const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
-      userId = user?.id;
-      
-      if (authError) {
-        console.log('Auth error:', authError.message);
-        // Continue with admin client
-      }
-    } catch (authErr) {
-      console.log('Auth attempt failed, continuing with admin access');
-      // Continue with admin client
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser();
+    
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized', details: authError }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     
     const requestData = await req.json();
@@ -55,13 +42,13 @@ Deno.serve(async (req) => {
       );
     }
     
-    console.log(`Processing request for listId: ${listId}, sessionName: ${sessionName}, userId: ${userId}`);
+    console.log(`Processing request for listId: ${listId}, sessionName: ${sessionName}, userId: ${user.id}`);
     
-    // Use admin client for all database operations
-    const { data: listAccess, error: listAccessError } = await supabaseAdmin
+    const { data: listAccess, error: listAccessError } = await supabaseClient
       .from('calling_lists')
       .select('id')
       .eq('id', listId)
+      .eq('created_by', user.id)
       .maybeSingle();
     
     if (listAccessError) {
@@ -79,7 +66,7 @@ Deno.serve(async (req) => {
       );
     }
     
-    const { data: listLeads, error: leadsError } = await supabaseAdmin
+    const { data: listLeads, error: leadsError } = await supabaseClient
       .from('calling_list_leads')
       .select('lead_id')
       .eq('list_id', listId);
@@ -102,11 +89,11 @@ Deno.serve(async (req) => {
     console.log(`Found ${listLeads.length} leads for list ${listId}`);
     
     const finalSessionName = sessionName || `Dialing Session - ${new Date().toLocaleString()}`;
-    const { data: sessionData, error: sessionError } = await supabaseAdmin
+    const { data: sessionData, error: sessionError } = await supabaseClient
       .from('dialing_sessions')
       .insert({
         name: finalSessionName,
-        created_by: userId || null,
+        created_by: user.id,
         calling_list_id: listId,
         status: 'active',
         total_leads: listLeads.length,
@@ -131,7 +118,7 @@ Deno.serve(async (req) => {
       const leadIds = listLeads.map(item => item.lead_id);
       console.log(`Processing ${leadIds.length} leads to add to session`);
       
-      const { data: actualLeads, error: leadsQueryError } = await supabaseAdmin
+      const { data: actualLeads, error: leadsQueryError } = await supabaseClient
         .from('leads')
         .select('*')
         .in('id', leadIds);
@@ -163,7 +150,7 @@ Deno.serve(async (req) => {
         const leadUuid = crypto.randomUUID();
         
         // Update lead with session UUID - AWAIT THIS OPERATION
-        const { error: updateError } = await supabaseAdmin
+        const { error: updateError } = await supabaseClient
           .from('leads')
           .update({ session_uuid: leadUuid })
           .eq('id', lead.id);
@@ -197,7 +184,7 @@ Deno.serve(async (req) => {
       
       for (let i = 0; i < sessionLeads.length; i += BATCH_SIZE) {
         const batch = sessionLeads.slice(i, i + BATCH_SIZE);
-        const { data: insertData, error: insertError } = await supabaseAdmin
+        const { data: insertData, error: insertError } = await supabaseClient
           .from('dialing_session_leads')
           .insert(batch)
           .select();
@@ -212,7 +199,7 @@ Deno.serve(async (req) => {
           for (const lead of batch) {
             try {
               // Send notification with both leadId and originalLeadId
-              await supabaseAdmin.functions.invoke('lead-connected', {
+              await supabaseClient.functions.invoke('lead-connected', {
                 body: { 
                   leadId: lead.lead_id,
                   callData: {
@@ -231,7 +218,7 @@ Deno.serve(async (req) => {
         }
       }
       
-      const { data: queuedLeads, error: queueCheckError } = await supabaseAdmin
+      const { data: queuedLeads, error: queueCheckError } = await supabaseClient
         .from('dialing_session_leads')
         .select('id, status, lead_id, notes')
         .eq('session_id', sessionData.id)
@@ -247,13 +234,13 @@ Deno.serve(async (req) => {
       }
       
       if (insertedCount > 0) {
-        await supabaseAdmin
+        await supabaseClient
           .from('dialing_sessions')
           .update({ total_leads: insertedCount })
           .eq('id', sessionData.id);
       }
       
-      const { data: refreshStats, error: refreshError } = await supabaseAdmin
+      const { data: refreshStats, error: refreshError } = await supabaseClient
         .rpc('get_next_session_lead', { p_session_id: sessionData.id })
         .limit(0);
         

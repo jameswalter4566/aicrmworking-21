@@ -113,18 +113,3 @@ verify_jwt = false
 
 [functions.predictive-dialer-webhook]
 verify_jwt = false
-
-[functions.get-calling-lists]
-verify_jwt = false
-
-[functions.start-dialing-session]
-verify_jwt = false
-
-[functions.get-dialing-session]
-verify_jwt = false
-
-[functions.get-next-lead]
-verify_jwt = false
-
-[functions.retrieve-leads]
-verify_jwt = false
