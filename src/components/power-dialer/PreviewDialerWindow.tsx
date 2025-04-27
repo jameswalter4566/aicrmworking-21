@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ interface PreviewDialerWindowProps {
   currentCall: any;
   onDisposition: (type: string) => void;
   onEndCall: () => void;
-  onCallNextLead?: () => void; // Add new prop
+  onCallNextLead?: () => void; // Added prop for next lead functionality
 }
 
 const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
@@ -79,10 +80,12 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       
       // Then trigger next lead call
       if (onCallNextLead) {
+        toast.info('Calling next lead...');
         onCallNextLead();
       }
     } catch (err) {
       console.error('Error calling next lead:', err);
+      toast.error('Error calling next lead');
     }
   }, [onEndCall, onCallNextLead]);
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -16,6 +17,7 @@ import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { useAuth } from '@/hooks/use-auth';
 import { useAutoDialer } from '@/hooks/use-auto-dialer';
 import { AutoDialerControls } from '@/components/power-dialer/AutoDialerControls';
+import PreviewDialerWindow from '@/components/power-dialer/PreviewDialerWindow';
 
 const DialerSession = () => {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
@@ -311,7 +313,7 @@ const DialerSession = () => {
     const callStatus = firstActiveCall?.status;
     
     const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
-    const inProgressStatuses = ['connecting', 'in-progress'];
+    const inProgressStatuses = ['connecting', 'in-progress', 'ringing']; // Fixed to include 'ringing' in the array
     
     if (completedStatuses.includes(callStatus)) {
       handleCallCompletion();
@@ -412,6 +414,13 @@ const DialerSession = () => {
                 </div>
               </CardContent>
             </Card>
+            
+            <PreviewDialerWindow 
+              currentCall={Object.values(twilioState.activeCalls)[0]}
+              onDisposition={handleDisposition}
+              onEndCall={handleEndCall}
+              onCallNextLead={callNextLead} // Pass the callNextLead function to PreviewDialerWindow
+            />
             
             <AutoDialerControls
               config={autoDialerConfig}
