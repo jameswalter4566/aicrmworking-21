@@ -130,7 +130,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
             setLeadData(payload.new);
             setLeadFound(true);
             setLastUpdateTime(new Date());
-            setTimeout(() => setLeadFound(false), 3000);
+            setTimeout(() => setLocalLeadFound(false), 3000);
           }
         }
       )

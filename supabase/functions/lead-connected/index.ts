@@ -38,7 +38,21 @@ Deno.serve(async (req) => {
 
   try {
     console.log('🔍 Lead connected function called');
-    const requestBody = await req.json();
+    let requestBody;
+    
+    try {
+      requestBody = await req.json();
+    } catch (e) {
+      console.error('❌ Failed to parse request body:', e);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Failed to parse request body'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+    
     console.log('📌 Request body:', JSON.stringify(requestBody, null, 2));
     
     const { leadId, userId, callData } = requestBody;

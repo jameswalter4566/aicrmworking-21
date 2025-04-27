@@ -95,6 +95,30 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     }
   }, [initialLeadData, realtimeLeadData, manualLeadData, displayData, localLeadFound, lastUpdateTime]);
 
+  // Also subscribe to the global channel as a backup
+  useEffect(() => {
+    console.log('[ConnectedLeadPanel] Setting up global channel subscription');
+    
+    const channel = supabase
+      .channel('global-leads')
+      .on('broadcast', { event: 'lead_data_update' }, (payload) => {
+        console.log('[ConnectedLeadPanel] Received global broadcast lead data:', payload);
+        if (payload.payload?.lead && 
+            (!currentLeadId || payload.payload.lead.id === currentLeadId)) {
+          setManualLeadData(payload.payload.lead);
+          setLocalLeadFound(true);
+          setTimeout(() => setLocalLeadFound(false), 3000);
+        }
+      })
+      .subscribe((status) => {
+        console.log('[ConnectedLeadPanel] Global channel subscription status:', status);
+      });
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentLeadId]);
+
   const handleRefresh = async () => {
     setIsLoading(true);
     try {
@@ -187,7 +211,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
       <LeadFoundIndicator isVisible={showLeadFound} />
       
       {connectionStatus !== 'connected' && (
-        <Alert variant="warning" className="mb-4">
+        <Alert variant="destructive" className="mb-4">
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Realtime Connection Issue</AlertTitle>
           <AlertDescription>
