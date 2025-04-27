@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -10,12 +9,10 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [lastError, setLastError] = useState<string | null>(null);
 
-  // Create a channel name that's consistent for this lead ID
   const getChannelName = useCallback((id: string | number | null) => {
     return id ? `lead-data-${id}` : 'no-lead';
   }, []);
 
-  // Initial fetch to get lead data
   const fetchLeadData = useCallback(async () => {
     if (!leadId) {
       console.log('[useLeadRealtime] No leadId provided, skipping fetch');
@@ -55,7 +52,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         setLeadFound(true);
         setLastUpdateTime(new Date());
         
-        // Reset the lead found indicator after 3 seconds
         setTimeout(() => setLeadFound(false), 3000);
         return data.lead;
       } else {
@@ -75,7 +71,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     }
   }, [leadId, userId]);
 
-  // Setup realtime subscription
   useEffect(() => {
     if (!leadId) {
       console.log('[useLeadRealtime] No leadId provided, clearing data');
@@ -86,10 +81,8 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
 
     console.log(`[useLeadRealtime] Setting up with leadId: ${leadId}, userId: ${userId || 'none'}`);
 
-    // Initial fetch
     fetchLeadData();
     
-    // Setup channel subscription for lead data updates
     const channelName = getChannelName(leadId);
     console.log(`[useLeadRealtime] Setting up broadcast listener on channel: ${channelName}`);
 
@@ -112,7 +105,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         console.log(`[useLeadRealtime] Subscription status for channel ${channelName}:`, status);
       });
     
-    // Setup realtime subscription to leads table changes
     const leadChannel = supabase
       .channel(`lead-updates-${leadId}`)
       .on(
@@ -130,7 +122,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
             setLeadData(payload.new);
             setLeadFound(true);
             setLastUpdateTime(new Date());
-            setTimeout(() => setLocalLeadFound(false), 3000);
+            setTimeout(() => setLeadFound(false), 3000);
           }
         }
       )
@@ -138,7 +130,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         console.log(`[useLeadRealtime] Lead table subscription status:`, status);
       });
 
-    // Also subscribe to lead_activities for this lead
     const activitiesChannel = supabase
       .channel(`lead-activities-${leadId}`)
       .on(
@@ -169,13 +160,11 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     };
   }, [leadId, userId, fetchLeadData, getChannelName]);
 
-  // Force refetch when explicitly told to by the user
   const refresh = useCallback(async () => {
     setLastUpdateTime(new Date());
     return await fetchLeadData();
   }, [fetchLeadData]);
 
-  // Manually send a broadcast to the channel - useful for debugging
   const broadcastData = useCallback(async (data: any) => {
     if (!leadId) return;
     
@@ -206,6 +195,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     refresh, 
     lastUpdateTime, 
     lastError,
-    broadcastData // Exposing broadcast function for debugging
+    broadcastData
   };
 }
