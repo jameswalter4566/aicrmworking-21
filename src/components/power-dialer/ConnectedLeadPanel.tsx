@@ -26,8 +26,29 @@ export const ConnectedLeadPanel: React.FC<ConnectedLeadPanelProps> = ({
            leadData.last_name === "DATA");
   }, [leadData]);
 
+  // Always render at least a placeholder even when leadData is null
+  // This ensures UI consistency and maintains layout
   if (!leadData) {
-    return null;
+    return (
+      <Card className="mb-6">
+        <CardHeader className="pb-2">
+          <div className="flex justify-between items-center">
+            <CardTitle className="text-lg">Lead Information</CardTitle>
+            {onRefresh && (
+              <Button variant="outline" size="sm" onClick={onRefresh}>
+                <RefreshCcw className="h-4 w-4 mr-1" />
+                Refresh
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="p-8 flex justify-center items-center text-muted-foreground">
+            No lead data available
+          </div>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -44,7 +65,7 @@ export const ConnectedLeadPanel: React.FC<ConnectedLeadPanelProps> = ({
         </div>
       </CardHeader>
       <CardContent>
-        {isError || isFallbackData ? (
+        {(isError || isFallbackData) && (
           <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
@@ -53,7 +74,7 @@ export const ConnectedLeadPanel: React.FC<ConnectedLeadPanelProps> = ({
                 : 'Could not retrieve complete lead details. Showing fallback data.'}
             </AlertDescription>
           </Alert>
-        ) : null}
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -71,26 +92,26 @@ export const ConnectedLeadPanel: React.FC<ConnectedLeadPanelProps> = ({
           
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-1">Email</h3>
-            <p className="font-medium">{leadData.email}</p>
+            <p className="font-medium">{leadData.email || 'Not available'}</p>
           </div>
           
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-1">Disposition</h3>
             <p className="font-medium">
               <Badge variant={isFallbackData ? "outline" : "default"}>
-                {leadData.disposition}
+                {leadData.disposition || 'Not Set'}
               </Badge>
             </p>
           </div>
           
           <div className="md:col-span-2">
             <h3 className="text-sm font-medium text-muted-foreground mb-1">Property Address</h3>
-            <p className="font-medium">{leadData.property_address}</p>
+            <p className="font-medium">{leadData.property_address || 'Not available'}</p>
           </div>
           
           <div className="md:col-span-2">
             <h3 className="text-sm font-medium text-muted-foreground mb-1">Mailing Address</h3>
-            <p className="font-medium">{leadData.mailing_address}</p>
+            <p className="font-medium">{leadData.mailing_address || 'Not available'}</p>
           </div>
           
           {leadData.tags && leadData.tags.length > 0 && (

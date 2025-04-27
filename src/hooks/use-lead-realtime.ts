@@ -82,14 +82,12 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       } else {
         console.warn('[useLeadRealtime] No lead data in response');
         setLastError('No lead data found in response');
-        toast.warning('No lead data found');
         return null;
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error('[useLeadRealtime] Error in lead realtime fetch:', err);
       setLastError(errorMsg);
-      toast.error('Error fetching lead data');
       return null;
     } finally {
       setIsLoading(false);
@@ -172,7 +170,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       // This might be a UUID - check if there's an originalLeadId to subscribe to as well
       console.log('[useLeadRealtime] UUID detected, checking for numeric original lead ID');
       // We'll get the numeric ID from the data after the initial fetch
-      // Or we could make an additional call to check if there's an originalLeadId...
     }
 
     // Set up database realtime subscription for lead changes
