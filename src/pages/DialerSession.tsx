@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -30,6 +31,19 @@ const DialerSession = () => {
   const { user } = useAuth();
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
+  
+  // Move the useAutoDialer hook up here before we use its return values
+  const {
+    config: autoDialerConfig,
+    setConfig: setAutoDialerConfig,
+    remainingTimeout,
+    startNoAnswerTimeout,
+    handleCallCompletion,
+    clearTimeoutTimer
+  } = useAutoDialer(async () => {
+    if (!sessionId) return;
+    await callNextLead();
+  });
   
   const { leadData: realtimeLeadData, isLoading: isLeadLoading, refresh: refreshLeadData } = 
     useLeadRealtime(currentLeadId, user?.id);
@@ -295,6 +309,8 @@ const DialerSession = () => {
 
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
+    
+    // Fix the TypeScript errors by using string literal comparisons instead of type comparisons
     if (firstActiveCall?.status === 'completed' || 
         firstActiveCall?.status === 'failed' || 
         firstActiveCall?.status === 'busy' || 
@@ -307,18 +323,6 @@ const DialerSession = () => {
       clearTimeoutTimer();
     }
   }, [twilioState.activeCalls, handleCallCompletion, startNoAnswerTimeout, clearTimeoutTimer]);
-
-  const {
-    config: autoDialerConfig,
-    setConfig: setAutoDialerConfig,
-    remainingTimeout,
-    startNoAnswerTimeout,
-    handleCallCompletion,
-    clearTimeoutTimer
-  } = useAutoDialer(async () => {
-    if (!sessionId) return;
-    await callNextLead();
-  });
 
   return (
     <MainLayout>
