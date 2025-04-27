@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -8,20 +8,23 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
   const [isLoading, setIsLoading] = useState(false);
   const [leadFound, setLeadFound] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
+  const [lastError, setLastError] = useState<string | null>(null);
 
   // Create a channel name that's consistent for this lead ID
-  const getChannelName = (id: string | number | null) => {
+  const getChannelName = useCallback((id: string | number | null) => {
     return id ? `lead-data-${id}` : 'no-lead';
-  };
+  }, []);
 
   // Initial fetch to get lead data
-  const fetchLeadData = async () => {
+  const fetchLeadData = useCallback(async () => {
     if (!leadId) {
       console.log('[useLeadRealtime] No leadId provided, skipping fetch');
       return null;
     }
     
     setIsLoading(true);
+    setLastError(null);
+    
     try {
       console.log(`[useLeadRealtime] Fetching data for lead ID: ${leadId}`);
       
@@ -39,6 +42,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
 
       if (error) {
         console.error('[useLeadRealtime] Error fetching lead data:', error);
+        setLastError(error.message);
         toast.error('Failed to fetch lead data');
         return null;
       }
@@ -51,46 +55,25 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         setLeadFound(true);
         setLastUpdateTime(new Date());
         
-        // Broadcast retrieved data to the lead's channel for other components to use
-        await broadcastLeadData(data.lead);
-        
         // Reset the lead found indicator after 3 seconds
         setTimeout(() => setLeadFound(false), 3000);
         return data.lead;
       } else {
         console.warn('[useLeadRealtime] No lead data in response');
+        setLastError('No lead data found in response');
         toast.warning('No lead data found');
         return null;
       }
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
       console.error('[useLeadRealtime] Error in lead realtime fetch:', err);
+      setLastError(errorMsg);
       toast.error('Error fetching lead data');
       return null;
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Broadcast lead data to the channel
-  const broadcastLeadData = async (data: any) => {
-    if (!leadId) return;
-    
-    try {
-      // Send data to the channel for this lead
-      await supabase.channel(getChannelName(leadId)).send({
-        type: 'broadcast',
-        event: 'lead_data_update',
-        payload: {
-          lead: data,
-          timestamp: new Date().toISOString(),
-          source: 'useLeadRealtime'
-        }
-      });
-      console.log('[useLeadRealtime] Broadcast lead data to channel:', getChannelName(leadId));
-    } catch (err) {
-      console.error('[useLeadRealtime] Error broadcasting lead data:', err);
-    }
-  };
+  }, [leadId, userId]);
 
   // Setup realtime subscription
   useEffect(() => {
@@ -107,8 +90,11 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     fetchLeadData();
     
     // Setup channel subscription for lead data updates
+    const channelName = getChannelName(leadId);
+    console.log(`[useLeadRealtime] Setting up broadcast listener on channel: ${channelName}`);
+
     const dataChannel = supabase
-      .channel(getChannelName(leadId))
+      .channel(channelName)
       .on('broadcast', { event: 'lead_data_update' }, (payload) => {
         console.log('[useLeadRealtime] Received broadcast data update:', payload);
         
@@ -118,9 +104,13 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           setLeadFound(true);
           setLastUpdateTime(new Date());
           setTimeout(() => setLeadFound(false), 3000);
+        } else {
+          console.warn('[useLeadRealtime] Broadcast received but no lead data in payload');
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[useLeadRealtime] Subscription status for channel ${channelName}:`, status);
+      });
     
     // Setup realtime subscription to leads table changes
     const leadChannel = supabase
@@ -144,7 +134,9 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[useLeadRealtime] Lead table subscription status:`, status);
+      });
 
     // Also subscribe to lead_activities for this lead
     const activitiesChannel = supabase
@@ -165,7 +157,9 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log(`[useLeadRealtime] Activities subscription status:`, status);
+      });
 
     return () => {
       console.log(`[useLeadRealtime] Cleaning up subscriptions for leadId: ${leadId}`);
@@ -173,13 +167,45 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       supabase.removeChannel(leadChannel);
       supabase.removeChannel(activitiesChannel);
     };
-  }, [leadId, userId]);
+  }, [leadId, userId, fetchLeadData, getChannelName]);
 
   // Force refetch when explicitly told to by the user
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     setLastUpdateTime(new Date());
     return await fetchLeadData();
-  };
+  }, [fetchLeadData]);
 
-  return { leadData, isLoading, leadFound, refresh, lastUpdateTime };
+  // Manually send a broadcast to the channel - useful for debugging
+  const broadcastData = useCallback(async (data: any) => {
+    if (!leadId) return;
+    
+    try {
+      const channelName = getChannelName(leadId);
+      console.log(`[useLeadRealtime] Manually broadcasting to channel: ${channelName}`, data);
+      
+      await supabase.channel(channelName).send({
+        type: 'broadcast',
+        event: 'lead_data_update',
+        payload: {
+          lead: data,
+          timestamp: new Date().toISOString(),
+          source: 'manual_broadcast'
+        }
+      });
+      
+      console.log('[useLeadRealtime] Manual broadcast sent');
+    } catch (err) {
+      console.error('[useLeadRealtime] Error sending manual broadcast:', err);
+    }
+  }, [leadId, getChannelName]);
+
+  return { 
+    leadData, 
+    isLoading, 
+    leadFound, 
+    refresh, 
+    lastUpdateTime, 
+    lastError,
+    broadcastData // Exposing broadcast function for debugging
+  };
 }

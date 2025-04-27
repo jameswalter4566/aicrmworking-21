@@ -128,10 +128,8 @@ Deno.serve(async (req) => {
           await logLeadActivity(lead.id, callData, userId);
         }
         
-        // Also broadcast lead found event to broadcast channel if userId is present
-        if (userId) {
-          await broadcastLeadFound(lead);
-        }
+        // Also broadcast lead found event to broadcast channel
+        await broadcastLeadFound(lead);
         
         return createSuccessResponse(formatLeadResponse(lead, callData));
       }
@@ -156,10 +154,8 @@ Deno.serve(async (req) => {
             await logLeadActivity(uuidLead.id, callData, userId);
           }
           
-          // Also broadcast lead found event to broadcast channel if userId is present
-          if (userId) {
-            await broadcastLeadFound(uuidLead);
-          }
+          // Also broadcast lead found event to broadcast channel
+          await broadcastLeadFound(uuidLead);
           
           return createSuccessResponse(formatLeadResponse(uuidLead, callData));
         }
@@ -195,10 +191,8 @@ Deno.serve(async (req) => {
               await logLeadActivity(fullLeadData.id, callData, userId);
             }
             
-            // Also broadcast lead found event to broadcast channel if userId is present
-            if (userId) {
-              await broadcastLeadFound(fullLeadData);
-            }
+            // Also broadcast lead found event to broadcast channel
+            await broadcastLeadFound(fullLeadData);
             
             return createSuccessResponse(formatLeadResponse(fullLeadData, callData));
           }
@@ -362,14 +356,20 @@ async function logLeadActivity(leadId, callData, userId = null) {
 
 // Helper function to broadcast lead data to channel
 async function broadcastLeadFound(lead) {
-  if (!lead?.id) return;
+  if (!lead?.id) {
+    console.warn('⚠️ Cannot broadcast: lead or lead.id is missing');
+    return;
+  }
   
   try {
     // Create a channel specific to this lead ID for broadcasting updates
     const channelName = `lead-data-${lead.id}`;
     
+    // Log before sending the broadcast
+    console.log(`📢 Broadcasting lead data to channel: ${channelName}`);
+    
     // Send a broadcast message with the lead data
-    await anonSupabase
+    const result = await anonSupabase
       .channel(channelName)
       .send({
         type: 'broadcast',
@@ -381,7 +381,26 @@ async function broadcastLeadFound(lead) {
         }
       });
       
-    console.log(`📢 Broadcast lead data to channel: ${channelName}`);
+    // Check if broadcast was successful
+    if (result.error) {
+      console.error('❌ Broadcast failed:', result.error);
+    } else {
+      console.log('✅ Broadcast successful!');
+    }
+    
+    // Also try sending to a global channel as backup
+    await anonSupabase
+      .channel('global-leads')
+      .send({
+        type: 'broadcast',
+        event: 'lead_data_update',
+        payload: {
+          lead,
+          timestamp: new Date().toISOString(),
+          source: 'lead_connected_global'
+        }
+      });
+      
   } catch (error) {
     console.error('❌ Failed to broadcast lead data:', error);
   }
