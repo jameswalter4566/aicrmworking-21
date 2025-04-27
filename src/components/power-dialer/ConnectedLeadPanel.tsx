@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -202,7 +201,9 @@ export const ConnectedLeadPanel = ({ leadData, onRefresh }: ConnectedLeadPanelPr
     <Card className="mt-4 border-2 border-green-500 relative">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg flex justify-between items-center">
-          Lead Details - {`${displayData?.first_name || ''} ${displayData?.last_name || ''}`}
+          {displayData?.id ? 
+            `Lead Details - ID: ${displayData.id}` : 
+            'Lead Details - No Lead ID Available'}
           <Button 
             onClick={handleRefresh}
             variant="outline"
