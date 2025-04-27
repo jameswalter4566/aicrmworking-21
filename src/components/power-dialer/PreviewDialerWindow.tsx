@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { 
   Phone, 
@@ -28,6 +28,10 @@ import { LeadDetailsPanel } from './LeadDetailsPanel';
 import DispositionSelector from '@/components/DispositionSelector';
 import { leadProfileService } from '@/services/leadProfile';
 import { ConnectedLeadPanel } from './ConnectedLeadPanel';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { List, Loader2, Mail, MapPin, Trash2 } from 'lucide-react';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
