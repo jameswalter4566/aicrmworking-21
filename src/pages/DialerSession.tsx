@@ -14,6 +14,8 @@ import { AudioInitializer } from '@/components/AudioInitializer';
 import { ConnectedLeadPanel } from '@/components/power-dialer/ConnectedLeadPanel';
 import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { useAuth } from '@/hooks/use-auth';
+import { useAutoDialer } from '@/hooks/use-auto-dialer';
+import { AutoDialerControls } from '@/components/power-dialer/AutoDialerControls';
 
 const DialerSession = () => {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
@@ -298,6 +300,32 @@ const DialerSession = () => {
     }
   }, [twilioState.activeCalls]);
 
+  const {
+    config: autoDialerConfig,
+    setConfig: setAutoDialerConfig,
+    remainingTimeout,
+    startNoAnswerTimeout,
+    handleCallCompletion,
+    clearTimeoutTimer
+  } = useAutoDialer(async () => {
+    if (!sessionId) return;
+    await callNextLead();
+  });
+
+  useEffect(() => {
+    const firstActiveCall = Object.values(twilioState.activeCalls)[0];
+    
+    if (firstActiveCall?.status === 'completed' || 
+        firstActiveCall?.status === 'failed' || 
+        firstActiveCall?.status === 'canceled') {
+      handleCallCompletion();
+    } else if (firstActiveCall?.status === 'ringing') {
+      startNoAnswerTimeout();
+    } else if (firstActiveCall?.status === 'in-progress') {
+      clearTimeoutTimer();
+    }
+  }, [twilioState.activeCalls, handleCallCompletion, startNoAnswerTimeout, clearTimeoutTimer]);
+
   return (
     <MainLayout>
       <TwilioScript
@@ -383,6 +411,12 @@ const DialerSession = () => {
                 </div>
               </CardContent>
             </Card>
+            
+            <AutoDialerControls
+              config={autoDialerConfig}
+              onConfigChange={setAutoDialerConfig}
+              remainingTimeout={remainingTimeout}
+            />
             
             <ConnectedLeadPanel 
               leadData={connectedLeadData}

@@ -11,6 +11,7 @@ export interface TwilioCallResult {
   error?: string;
   twilioErrorCode?: number;
   leadId?: string | number;
+  noAnswerTimeout?: boolean;
 }
 
 export interface CallStatusListener {
