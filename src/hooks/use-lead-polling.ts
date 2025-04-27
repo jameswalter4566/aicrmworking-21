@@ -1,8 +1,14 @@
 
+// This hook has been replaced by use-lead-realtime.ts
+// It's kept here for reference but should be removed once the realtime implementation is confirmed working
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
+// DEPRECATED: Use useLeadRealtime instead
 export function useLeadPolling(leadId: string | null) {
+  console.warn('useLeadPolling is deprecated, please use useLeadRealtime instead');
+  
   const [leadData, setLeadData] = useState<any>(null);
   const [isPolling, setIsPolling] = useState(false);
 

@@ -19,6 +19,9 @@ verify_jwt = false
 [functions.twilio-voice]
 verify_jwt = false
 
+[functions.lead-connected]
+verify_jwt = false
+
 [functions.get-calling-lists]
 verify_jwt = false
 
@@ -27,3 +30,17 @@ verify_jwt = false
 
 [functions.get-calling-list-leads]
 verify_jwt = false
+
+# Enable realtime
+[realtime]
+enabled = true
+
+[realtime.leads]
+enabled = true
+
+[realtime.lead_activities]
+enabled = true
+
+[realtime.dialing_session_leads]
+enabled = true
+

@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
@@ -39,7 +38,7 @@ Deno.serve(async (req) => {
     const requestBody = await req.json();
     console.log('📌 Request body:', JSON.stringify(requestBody, null, 2));
     
-    const { leadId, callData } = requestBody;
+    const { leadId, userId, callData } = requestBody;
     
     if (!leadId) {
       console.log('❌ No lead ID provided - returning fallback data');
@@ -73,6 +72,27 @@ Deno.serve(async (req) => {
       console.log(`📌 Using provided leadId: ${leadId}`);
     }
 
+    // Store the user's association with this lead for realtime filtering
+    if (userId && effectiveLeadId) {
+      try {
+        // Track which user is accessing which lead - we store this temporarily
+        // This could be in a dedicated table or in a cache for production use
+        const { error } = await adminSupabase
+          .from('lead_activities')
+          .insert({
+            lead_id: typeof effectiveLeadId === 'number' ? effectiveLeadId : parseInt(effectiveLeadId),
+            type: 'lead_access',
+            description: `User ${userId} accessed lead data`,
+          });
+          
+        if (error) {
+          console.warn('⚠️ Could not log lead access:', error.message);
+        }
+      } catch (trackError) {
+        console.warn('⚠️ Error tracking user-lead association:', trackError.message);
+      }
+    }
+
     // First approach: Try direct query with the ID as is
     try {
       console.log(`⏳ Attempting to find lead with ID: ${effectiveLeadId}`);
@@ -88,7 +108,7 @@ Deno.serve(async (req) => {
         console.log('✅ Successfully found lead via direct query:', lead.id);
         // Log call activity if we have call data
         if (callData?.callSid || callData?.status) {
-          await logLeadActivity(lead.id, callData);
+          await logLeadActivity(lead.id, callData, userId);
         }
         return createSuccessResponse(formatLeadResponse(lead, callData));
       }
@@ -110,7 +130,7 @@ Deno.serve(async (req) => {
           console.log('✅ Successfully found lead by UUID:', uuidLead.id);
           // Log call activity if we have call data
           if (callData?.callSid || callData?.status) {
-            await logLeadActivity(uuidLead.id, callData);
+            await logLeadActivity(uuidLead.id, callData, userId);
           }
           return createSuccessResponse(formatLeadResponse(uuidLead, callData));
         }
@@ -143,7 +163,7 @@ Deno.serve(async (req) => {
             console.log('✅ Successfully retrieved full lead data:', fullLeadData.id);
             // Log call activity if we have call data
             if (callData?.callSid || callData?.status) {
-              await logLeadActivity(fullLeadData.id, callData);
+              await logLeadActivity(fullLeadData.id, callData, userId);
             }
             return createSuccessResponse(formatLeadResponse(fullLeadData, callData));
           }
@@ -191,7 +211,7 @@ Deno.serve(async (req) => {
         
         // Log call activity if we have call data
         if (callData?.callSid || callData?.status) {
-          await logLeadActivity(formattedLead.id, callData);
+          await logLeadActivity(formattedLead.id, callData, userId);
         }
         
         return createSuccessResponse(formattedLead);
@@ -248,7 +268,7 @@ function formatLeadResponse(lead, callData = null) {
   };
 }
 
-async function logLeadActivity(leadId, callData) {
+async function logLeadActivity(leadId, callData, userId = null) {
   if (!callData) return;
   
   const activityType = callData.status === 'in-progress' ? 'call_connected' : 
@@ -265,14 +285,15 @@ async function logLeadActivity(leadId, callData) {
       .insert({
         lead_id: leadId,
         type: activityType,
-        description: description,
+        description: description + (userId ? ` by user ${userId}` : ''),
         timestamp: callData.timestamp || new Date().toISOString()
       });
     
     console.log('📝 Logged lead activity:', {
       leadId,
       type: activityType,
-      description
+      description,
+      userId
     });
   } catch (error) {
     console.error('❌ Failed to log activity:', error);

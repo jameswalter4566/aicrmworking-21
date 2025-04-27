@@ -37,6 +37,8 @@ import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
 import { ConnectedLeadPanel } from "@/components/power-dialer/ConnectedLeadPanel";
 import { supabase } from "@/integrations/supabase/client";
 import { Label } from "@/components/ui/label";
+import { useAuth } from '@/hooks/use-auth';
+import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 
 const SAMPLE_LEADS = [
   {
@@ -237,38 +239,29 @@ export default function PowerDialer() {
     handleEndCall(currentCall.parameters.leadId);
   };
 
+  const activeCall = Object.values(twilioState.activeCalls)[0];
+  const activeLeadId = activeCall?.leadId || null;
+  
+  // Replace lead polling with realtime updates
+  const { user } = useAuth(); // Get current user
+  const { leadData: realtimeLeadData, isLoading: isLeadDataLoading, refresh: refreshLeadData } = 
+    useLeadRealtime(activeLeadId, user?.id);
+
+  // Use realtime data for connected lead
+  useEffect(() => {
+    if (realtimeLeadData) {
+      setConnectedLeadData(realtimeLeadData);
+    }
+  }, [realtimeLeadData]);
+
   const refreshLatestLead = async () => {
     try {
-      console.log('Manually fetching latest lead via lead-connected function...');
-      
-      const { data, error } = await supabase.functions.invoke('lead-connected', {
-        body: { 
-          leadId: "latest",
-          callData: {
-            status: 'manual_refresh',
-            timestamp: new Date().toISOString()
-          }
-        }
-      });
-
-      if (error) {
-        console.error('Error fetching latest lead:', error);
-        toast.error('Failed to fetch latest lead');
-        return;
-      }
-
-      console.log('Lead-connected response for manual refresh:', data);
-      
-      if (data?.lead) {
-        console.log('Setting lead data from manual refresh:', data.lead);
-        setConnectedLeadData(data.lead);
-        toast.success('Latest lead retrieved');
-      } else {
-        toast.error('No lead data returned');
-      }
+      console.log('Manually fetching latest lead...');
+      refreshLeadData();
+      toast.success('Lead data refreshed');
     } catch (err) {
       console.error('Error in refreshLatestLead:', err);
-      toast.error('Failed to retrieve latest lead');
+      toast.error('Failed to refresh lead data');
     }
   };
 

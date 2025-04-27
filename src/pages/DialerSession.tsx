@@ -12,6 +12,8 @@ import { supabase } from '@/integrations/supabase/client';
 import TwilioScript from '@/components/TwilioScript';
 import { AudioInitializer } from '@/components/AudioInitializer';
 import { ConnectedLeadPanel } from '@/components/power-dialer/ConnectedLeadPanel';
+import { useLeadRealtime } from '@/hooks/use-lead-realtime';
+import { useAuth } from '@/hooks/use-auth';
 
 const DialerSession = () => {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
@@ -23,9 +25,13 @@ const DialerSession = () => {
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
   const [isDialing, setIsDialing] = useState(false);
 
+  const { user } = useAuth();
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
   
+  const { leadData: realtimeLeadData, isLoading: isLeadLoading, refresh: refreshLeadData } = 
+    useLeadRealtime(currentLeadId, user?.id);
+    
   useEffect(() => {
     console.log('Connected lead data updated:', connectedLeadData);
   }, [connectedLeadData]);
@@ -109,54 +115,12 @@ const DialerSession = () => {
   const fetchLeadData = async (leadId: string) => {
     try {
       console.log('Directly fetching lead data for:', leadId);
+      setIsDialing(true);
       
-      const { data, error } = await supabase.functions.invoke('lead-connected', {
-        body: { 
-          leadId: leadId,
-          callData: {
-            status: 'preparing',
-            timestamp: new Date().toISOString()
-          }
-        }
-      });
-
-      if (error) {
-        console.error('Error from lead-connected:', error);
-        throw error;
-      }
+      setCurrentLeadId(leadId);
       
-      console.log('Response from lead-connected:', data);
+      refreshLeadData();
       
-      if (data?.lead) {
-        console.log('Setting connected lead data from direct fetch:', data.lead);
-        setConnectedLeadData({
-          id: data.lead.id,
-          first_name: data.lead.first_name || 'Unknown',
-          last_name: data.lead.last_name || 'Contact',
-          phone1: data.lead.phone1 || '---',
-          phone2: data.lead.phone2 || '---',
-          email: data.lead.email || '---',
-          property_address: data.lead.property_address || '---', 
-          mailing_address: data.lead.mailing_address || '---',
-          disposition: data.lead.disposition || 'Not Contacted',
-          tags: data.lead.tags || [],
-          created_at: data.lead.created_at,
-          updated_at: data.lead.updated_at
-        });
-      } else {
-        console.log('No lead data in direct fetch, creating fallback data');
-        const fallbackData = {
-          first_name: 'Unknown',
-          last_name: 'Contact',
-          phone1: '---',
-          email: '---',
-          property_address: '---',
-          mailing_address: '---',
-          disposition: 'Not Contacted',
-          tags: []
-        };
-        setConnectedLeadData(fallbackData);
-      }
     } catch (err) {
       console.error('Error directly fetching lead data:', err);
       const errorFallbackData = {

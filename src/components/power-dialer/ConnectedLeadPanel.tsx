@@ -1,11 +1,11 @@
-
-import React, { useState, useEffect } from 'react'; // Add useState and useEffect imports
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw } from "lucide-react";
-import { useLeadPolling } from '@/hooks/use-lead-polling';
+import { useLeadRealtime } from '@/hooks/use-lead-realtime';
+import { useAuth } from '@/hooks/use-auth';
 
 interface ConnectedLeadPanelProps {
   leadData?: {
@@ -16,26 +16,32 @@ interface ConnectedLeadPanelProps {
 
 export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: ConnectedLeadPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
   const currentLeadId = initialLeadData?.id || null;
   
-  // Add polling hook
-  const { leadData: polledLeadData, isPolling } = useLeadPolling(currentLeadId);
+  const { leadData: realtimeLeadData, isLoading: isRealtimeLoading, refresh } = useLeadRealtime(
+    currentLeadId, 
+    user?.id
+  );
   
-  // Use polled data if available, otherwise use initial data
-  const displayData = polledLeadData || initialLeadData;
+  const displayData = realtimeLeadData || initialLeadData;
   
   useEffect(() => {
     console.log('[ConnectedLeadPanel] Current lead data:', {
       initial: initialLeadData,
-      polled: polledLeadData,
+      realtime: realtimeLeadData,
       display: displayData
     });
-  }, [initialLeadData, polledLeadData, displayData]);
+  }, [initialLeadData, realtimeLeadData, displayData]);
 
   const handleRefresh = () => {
     if (onRefresh) {
       setIsLoading(true);
       onRefresh();
+      setTimeout(() => setIsLoading(false), 1000);
+    } else if (refresh) {
+      setIsLoading(true);
+      refresh();
       setTimeout(() => setIsLoading(false), 1000);
     }
   };
@@ -73,7 +79,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     );
   }
 
-  if (isLoading) {
+  if (isLoading || isRealtimeLoading) {
     return (
       <Card className="mt-4 relative">
         <CardHeader className="pb-2">
@@ -160,7 +166,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
                 Loading...
               </>
             ) : (
-              'Retrieve Latest Lead'
+              'Refresh'
             )}
           </Button>
         </CardTitle>
