@@ -1,6 +1,5 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import twilio from 'https://esm.sh/twilio@4.18.1';
 
 // Define CORS headers for browser requests
 const corsHeaders = {
@@ -13,10 +12,19 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Initialize Twilio client
-const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
-const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
-const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+// Initialize Twilio separately only when needed to avoid JWT dependency issues
+const initTwilio = async () => {
+  try {
+    // Dynamically import Twilio to avoid issues with JWT handling during initialization
+    const twilioModule = await import('https://esm.sh/twilio@4.18.1');
+    const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
+    const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
+    return twilioModule.default(twilioAccountSid, twilioAuthToken);
+  } catch (error) {
+    console.error('Error initializing Twilio client:', error);
+    throw new Error('Failed to initialize Twilio client');
+  }
+};
 
 // Track active calls by user and session
 interface ActiveCall {
@@ -46,7 +54,10 @@ const sessionStore: Record<string, SessionTracking> = {};
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 204 
+    });
   }
 
   try {
@@ -54,7 +65,20 @@ Deno.serve(async (req) => {
     console.log(`[${requestId}] Processing disposition panel request`);
     
     // Parse the request
-    const requestData = await req.json();
+    let requestData;
+    try {
+      requestData = await req.json();
+    } catch (e) {
+      console.error(`[${requestId}] Error parsing request JSON:`, e);
+      return new Response(JSON.stringify({
+        success: false,
+        error: "Invalid JSON in request body"
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
     const { action, callSid, leadId, userId, sessionId = 'default-session' } = requestData;
     
     console.log(`[${requestId}] Action: ${action}, CallSID: ${callSid}, LeadID: ${leadId}, UserID: ${userId}, SessionID: ${sessionId}`);
@@ -135,9 +159,19 @@ async function handleHangup(callSid: string, leadId: string | number, userId: st
     validateCallAccess(callSid, userId, sessionId);
     
     // Attempt to hang up the call via Twilio API
-    await twilioClient.calls(callSid).update({ status: 'completed' });
-    
-    console.log(`[${requestId}] Successfully hung up call ${callSid}`);
+    try {
+      const twilioClient = await initTwilio();
+      await twilioClient.calls(callSid).update({ status: 'completed' });
+      console.log(`[${requestId}] Successfully hung up call ${callSid}`);
+    } catch (twilioError) {
+      console.error(`[${requestId}] Twilio API error:`, twilioError);
+      // Continue processing even if Twilio API fails - we'll clean up our tracking anyway
+      if (twilioError.code === 20404) {
+        console.log(`[${requestId}] Call ${callSid} not found in Twilio, may already be completed`);
+      } else {
+        console.error(`[${requestId}] Error hanging up call via Twilio: ${twilioError.message || twilioError}`);
+      }
+    }
     
     // Update our tracking
     if (leadId && sessionStore[sessionId]) {
@@ -211,14 +245,27 @@ async function handleHangupAll(userId: string, sessionId: string, requestId: str
   const results = [];
   let successCount = 0;
   
-  for (const callSid of callsToHangup) {
+  if (callsToHangup.length > 0) {
     try {
-      await twilioClient.calls(callSid).update({ status: 'completed' });
-      results.push({ callSid, success: true });
-      successCount++;
-    } catch (error) {
-      console.error(`[${requestId}] Error hanging up call ${callSid}: ${error}`);
-      results.push({ callSid, success: false, error: error.message });
+      const twilioClient = await initTwilio();
+      
+      for (const callSid of callsToHangup) {
+        try {
+          await twilioClient.calls(callSid).update({ status: 'completed' });
+          results.push({ callSid, success: true });
+          successCount++;
+        } catch (error) {
+          console.error(`[${requestId}] Error hanging up call ${callSid}: ${error}`);
+          results.push({ callSid, success: false, error: error.message });
+        }
+      }
+    } catch (twilioInitError) {
+      console.error(`[${requestId}] Failed to initialize Twilio: ${twilioInitError}`);
+      // We'll still clear session data but report the error
+      results.push({ 
+        success: false, 
+        error: "Failed to initialize Twilio client. Session data cleared but calls may still be active."
+      });
     }
   }
   
