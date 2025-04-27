@@ -1,8 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Phone, 
   UserX, 
@@ -14,12 +11,7 @@ import {
   RotateCcw,
   Pause,
   StopCircle,
-  Play,
-  Trash2,
-  List,
-  Loader2,
-  Mail,
-  MapPin
+  Play
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
@@ -776,6 +768,14 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 >
                   <StopCircle className="mr-2 h-4 w-4 text-red-400" />
                   Stop
+                </Button>
+
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-center bg-green-900/50 hover:bg-green-900 text-white border-green-900"
+                >
+                  <Phone className="mr-2 h-4 w-4 text-green-400" />
+                  Call Next Lead
                 </Button>
               </div>
             </ScrollArea>
