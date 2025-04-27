@@ -1,4 +1,3 @@
-
 project_id = "imrmboyczebjlbnkgjns"
 
 [api]
@@ -45,11 +44,9 @@ verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
-no_verify_jwt = true
 
 [functions.twilio-token]
 verify_jwt = false
-no_verify_jwt = true
 
 [functions.sms-webhook-receiver]
 verify_jwt = false

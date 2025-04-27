@@ -1,142 +1,412 @@
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, RefreshCcw } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RefreshCw, Bug, AlertCircle } from "lucide-react";
+import { useLeadRealtime } from '@/hooks/use-lead-realtime';
+import { useAuth } from '@/hooks/use-auth';
+import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ConnectedLeadPanelProps {
-  leadData: any | null;
+  leadData?: {
+    [key: string]: any;
+  };
   onRefresh?: () => void;
-  isError?: boolean;
-  errorMessage?: string;
 }
 
-export const ConnectedLeadPanel: React.FC<ConnectedLeadPanelProps> = ({ 
-  leadData, 
-  onRefresh,
-  isError = false,
-  errorMessage = ''
-}) => {
-  const isFallbackData = React.useMemo(() => {
-    if (!leadData) return false;
-    return leadData.id === 999999 || 
-          (leadData.first_name === "FALLBACK" && 
-           leadData.last_name === "DATA");
-  }, [leadData]);
+export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: ConnectedLeadPanelProps) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [localLeadFound, setLocalLeadFound] = useState(false);
+  const [manualLeadData, setManualLeadData] = useState<any>(null);
+  const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
+  const { user } = useAuth();
+  const currentLeadId = initialLeadData?.id || null;
+  const [callState, setCallState] = useState<string>('unknown');
+  
+  const { 
+    leadData: realtimeLeadData, 
+    isLoading: isRealtimeLoading, 
+    leadFound, 
+    refresh, 
+    lastUpdateTime, 
+    lastError,
+    broadcastData
+  } = useLeadRealtime(currentLeadId, user?.id);
+  
+  useEffect(() => {
+    const checkRealtimeConnection = () => {
+      const status = supabase.getChannels().length > 0 ? 'connected' : 'disconnected';
+      setConnectionStatus(status);
+      console.log(`[ConnectedLeadPanel] Realtime connection status: ${status}`);
+    };
+    
+    checkRealtimeConnection();
+    
+    const interval = setInterval(checkRealtimeConnection, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-  // Always render at least a placeholder even when leadData is null
-  // This ensures UI consistency and maintains layout
-  if (!leadData) {
-    return (
-      <Card className="mb-6">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-center">
-            <CardTitle className="text-lg">Lead Information</CardTitle>
-            {onRefresh && (
-              <Button variant="outline" size="sm" onClick={onRefresh}>
-                <RefreshCcw className="h-4 w-4 mr-1" />
-                Refresh
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="p-8 flex justify-center items-center text-muted-foreground">
-            No lead data available
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  useEffect(() => {
+    if (!currentLeadId) return;
+    
+    const channelName = `lead-data-${currentLeadId}`;
+    console.log(`[ConnectedLeadPanel] Setting up additional broadcast listener on channel: ${channelName}`);
+    
+    const channel = supabase
+      .channel(channelName)
+      .on('broadcast', { event: 'lead_data_update' }, (payload) => {
+        console.log('[ConnectedLeadPanel] Received broadcast lead data:', payload);
+        if (payload.payload?.lead) {
+          setManualLeadData(payload.payload.lead);
+          setLocalLeadFound(true);
+          setTimeout(() => setLocalLeadFound(false), 3000);
+        }
+      })
+      .subscribe((status) => {
+        console.log(`[ConnectedLeadPanel] Additional channel subscription status:`, status);
+      });
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentLeadId]);
+  
+  const displayData = manualLeadData || realtimeLeadData || initialLeadData;
+
+  useEffect(() => {
+    console.log('[ConnectedLeadPanel] Current lead data:', {
+      initial: initialLeadData,
+      realtime: realtimeLeadData,
+      manual: manualLeadData,
+      display: displayData,
+      lastUpdate: lastUpdateTime?.toISOString()
+    });
+    
+    if (displayData && (realtimeLeadData || manualLeadData) && localLeadFound === false) {
+      setLocalLeadFound(true);
+      setTimeout(() => setLocalLeadFound(false), 3000);
+    }
+  }, [initialLeadData, realtimeLeadData, manualLeadData, displayData, localLeadFound, lastUpdateTime]);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('global-leads')
+      .on('broadcast', { event: 'lead_data_update' }, (payload) => {
+        console.log('[ConnectedLeadPanel] Received global broadcast lead data:', payload);
+        if (payload.payload?.lead && 
+            (!currentLeadId || payload.payload.lead.id === currentLeadId)) {
+          setManualLeadData(payload.payload.lead);
+          setCallState(payload.payload.callState || 'unknown');
+          setLocalLeadFound(true);
+          setTimeout(() => setLocalLeadFound(false), 3000);
+        }
+      })
+      .subscribe((status) => {
+        console.log('[ConnectedLeadPanel] Global channel subscription status:', status);
+      });
+      
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentLeadId]);
+
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Manually refreshing lead data for ID:', currentLeadId);
+      
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
+        body: { 
+          leadId: String(currentLeadId),
+          userId: user?.id,
+          callData: {
+            status: 'manual_refresh',
+            timestamp: new Date().toISOString(),
+            requestId: crypto.randomUUID()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Error refreshing lead data:', error);
+        toast.error('Failed to refresh lead data');
+        return;
+      }
+
+      console.log("Response from lead-connected:", data);
+
+      if (data?.lead) {
+        console.log('Successfully retrieved fresh lead data:', data.lead);
+        setManualLeadData(data.lead);
+        setLocalLeadFound(true);
+        setTimeout(() => setLocalLeadFound(false), 3000);
+        toast.success('Lead data refreshed successfully');
+        
+        if (broadcastData) {
+          await broadcastData(data.lead);
+        }
+      } else {
+        toast.error('No lead data in response');
+      }
+
+      if (onRefresh) onRefresh();
+      if (refresh) refresh();
+      
+    } catch (err) {
+      console.error('Error in manual refresh:', err);
+      toast.error('Error refreshing lead data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const forcePushData = async () => {
+    if (!currentLeadId || !displayData) return;
+    
+    try {
+      console.log('[ConnectedLeadPanel] Force pushing data to channel');
+      
+      if (broadcastData) {
+        await broadcastData(displayData);
+      } else {
+        const channelName = `lead-data-${currentLeadId}`;
+        await supabase.channel(channelName).send({
+          type: 'broadcast',
+          event: 'lead_data_update',
+          payload: {
+            lead: displayData,
+            timestamp: new Date().toISOString(),
+            source: 'force_push'
+          }
+        });
+      }
+      
+      toast.success('Forced data broadcast to channel');
+    } catch (err) {
+      console.error('[ConnectedLeadPanel] Error force pushing data:', err);
+      toast.error('Failed to push data to channel');
+    }
+  };
+
+  const showLeadFound = leadFound || localLeadFound;
+  
+  const shouldShowLeadData = callState === 'connected' || 
+                           callState === 'unknown' || 
+                           displayData?.id === initialLeadData?.id;
 
   return (
-    <Card className="mb-6">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-lg">Connected Lead</CardTitle>
-          {onRefresh && (
-            <Button variant="outline" size="sm" onClick={onRefresh}>
-              <RefreshCcw className="h-4 w-4 mr-1" />
-              Refresh
+    <>
+      <LeadFoundIndicator isVisible={showLeadFound} />
+      
+      {connectionStatus !== 'connected' && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Realtime Connection Issue</AlertTitle>
+          <AlertDescription>
+            The realtime connection appears to be {connectionStatus}. This may affect data updates.
+            <Button variant="outline" size="sm" className="ml-2" onClick={() => window.location.reload()}>
+              Reconnect
             </Button>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent>
-        {(isError || isFallbackData) && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              {isError 
-                ? errorMessage || 'An error occurred loading the lead data'
-                : 'Could not retrieve complete lead details. Showing fallback data.'}
-            </AlertDescription>
-          </Alert>
-        )}
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Name</h3>
-            <p className="font-medium">{leadData.first_name} {leadData.last_name}</p>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Phone</h3>
-            <p className="font-medium">{leadData.phone1}</p>
-            {leadData.phone2 && leadData.phone2 !== '---' && (
-              <p className="text-sm text-muted-foreground">{leadData.phone2}</p>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {lastError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error Loading Lead Data</AlertTitle>
+          <AlertDescription>{lastError}</AlertDescription>
+        </Alert>
+      )}
+      
+      <Card className={`mt-4 ${showLeadFound ? 'border-2 border-green-500 transition-all duration-500' : ''} relative`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg flex justify-between items-center">
+            {displayData?.id ? (
+              <div className="flex flex-1 justify-between items-center">
+                <span>Lead Details</span>
+                <Badge variant="outline" className="ml-2 bg-blue-50">Lead ID: {displayData.id}</Badge>
+                {lastUpdateTime && (
+                  <Badge variant="outline" className="ml-2 bg-gray-50 text-xs">
+                    Updated: {lastUpdateTime.toLocaleTimeString()}
+                  </Badge>
+                )}
+              </div>
+            ) : ( 
+              'Lead Details - No Lead ID Available'
             )}
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Email</h3>
-            <p className="font-medium">{leadData.email || 'Not available'}</p>
-          </div>
-          
-          <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Disposition</h3>
-            <p className="font-medium">
-              <Badge variant={isFallbackData ? "outline" : "default"}>
-                {leadData.disposition || 'Not Set'}
+            {callState !== 'unknown' && (
+              <Badge variant={
+                callState === 'connected' ? 'default' :
+                callState === 'disconnected' ? 'destructive' :
+                callState === 'dialing' ? 'outline' : 'secondary'
+              }>
+                {callState.charAt(0).toUpperCase() + callState.slice(1)}
               </Badge>
-            </p>
-          </div>
-          
-          <div className="md:col-span-2">
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Property Address</h3>
-            <p className="font-medium">{leadData.property_address || 'Not available'}</p>
-          </div>
-          
-          <div className="md:col-span-2">
-            <h3 className="text-sm font-medium text-muted-foreground mb-1">Mailing Address</h3>
-            <p className="font-medium">{leadData.mailing_address || 'Not available'}</p>
-          </div>
-          
-          {leadData.tags && leadData.tags.length > 0 && (
-            <div className="md:col-span-2">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Tags</h3>
-              <div className="flex flex-wrap gap-2">
-                {leadData.tags.map((tag: string, index: number) => (
-                  <Badge key={index} variant="outline">{tag}</Badge>
-                ))}
+            )}
+            <div className="absolute top-2 right-2 flex space-x-2">
+              {process.env.NODE_ENV === 'development' && (
+                <Button 
+                  onClick={forcePushData}
+                  variant="ghost"
+                  size="sm"
+                  title="Force Push Data (Debug)"
+                  disabled={!displayData || isLoading}
+                >
+                  <Bug className="h-4 w-4" />
+                </Button>
+              )}
+              <Button 
+                onClick={handleRefresh}
+                variant="outline"
+                size="sm"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {shouldShowLeadData ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <h3 className="font-medium mb-2">Contact Information</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-gray-500">Name</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {`${displayData?.first_name || ''} ${displayData?.last_name || ''}`}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm text-gray-500">Primary Phone</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.phone1 || "---"}
+                    </div>
+                  </div>
+
+                  {displayData?.phone2 && displayData.phone2 !== "---" && (
+                    <div>
+                      <label className="text-sm text-gray-500">Secondary Phone</label>
+                      <div className="text-sm mt-1 font-medium">
+                        {displayData?.phone2}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div>
+                    <label className="text-sm text-gray-500">Email</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.email || "---"}
+                    </div>
+                  </div>
+
+                  {displayData?.disposition && (
+                    <div>
+                      <label className="text-sm text-gray-500">Disposition</label>
+                      <div className="text-sm mt-1 font-medium">
+                        {displayData?.disposition}
+                      </div>
+                    </div>
+                  )}
+
+                  {displayData?.tags && displayData.tags.length > 0 && (
+                    <div>
+                      <label className="text-sm text-gray-500">Tags</label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {displayData.tags.map((tag: string, index: number) => (
+                          <Badge key={`${tag}-${index}`} variant="outline">{tag}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div>
+                <h3 className="font-medium mb-2">Address Information</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm text-gray-500">Property Address</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.property_address || "---"}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="text-sm text-gray-500">Mailing Address</label>
+                    <div className="text-sm mt-1 font-medium">
+                      {displayData?.mailing_address || "---"}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
-          
-          {leadData.id && !isFallbackData && (
-            <div className="md:col-span-2 mt-2 pt-2 border-t">
-              <p className="text-xs text-muted-foreground">
-                Lead ID: {leadData.id}
-                {leadData.created_at && (
-                  <> • Created: {new Date(leadData.created_at).toLocaleDateString()}</>
-                )}
+          ) : (
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground">
+                {callState === 'dialing' ? 'Dialing...' :
+                 callState === 'disconnected' ? 'Call ended' :
+                 'Waiting for call to connect...'}
               </p>
             </div>
           )}
-        </div>
-      </CardContent>
-    </Card>
+
+          <div className="mt-4 p-2 bg-gray-100 rounded">
+            <details>
+              <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
+              <pre className="mt-2 text-xs overflow-auto max-h-[300px]">
+                {displayData ? JSON.stringify(displayData, null, 2) : "No data available"}
+              </pre>
+            </details>
+          </div>
+
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-2 bg-gray-100 rounded">
+              <details>
+                <summary className="cursor-pointer text-sm text-gray-600">Realtime Debug Info</summary>
+                <div className="mt-2 text-xs">
+                  <div><strong>Connection Status:</strong> {connectionStatus}</div>
+                  <div><strong>Active Channels:</strong> {supabase.getChannels().length}</div>
+                  <div><strong>Lead ID:</strong> {currentLeadId}</div>
+                  <div><strong>Last Update:</strong> {lastUpdateTime?.toISOString()}</div>
+                  <div><strong>Has Data Sources:</strong> {JSON.stringify({
+                    initialData: !!initialLeadData,
+                    realtimeData: !!realtimeLeadData, 
+                    manualData: !!manualLeadData
+                  })}</div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2" 
+                    onClick={forcePushData}
+                    disabled={!displayData}
+                  >
+                    Force Push Data
+                  </Button>
+                </div>
+              </details>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </>
   );
 };

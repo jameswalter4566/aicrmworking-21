@@ -101,4 +101,4 @@ export const LineDisplay = ({ lineNumber, currentCall }: LineDisplayProps) => {
       </CardContent>
     </Card>
   );
-}
+};
