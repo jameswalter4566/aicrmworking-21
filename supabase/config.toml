@@ -5,8 +5,6 @@ project_id = "imrmboyczebjlbnkgjns"
 enabled = true
 port = 54321
 schemas = ["public", "storage"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
 
 [db]
 port = 54322
@@ -16,36 +14,43 @@ major_version = 15
 [studio]
 enabled = true
 port = 54323
+api_url = "http://localhost"
 
 [inbucket]
 enabled = true
 port = 54324
 
-[auth]
-enabled = true
-port = 54325
-
 [storage]
 enabled = true
-port = 54326
 
-[realtime]
+[auth]
 enabled = true
-port = 54327
+site_url = "http://localhost:3000"
 
 [analytics]
 enabled = false
-port = 54328
 
-[vector]
-enabled = false
-port = 54329
+[experimental]
+minimal_apis = false
 
-[functions.twilio-token]
+[functions.lead-connected]
+verify_jwt = false
+no_verify_jwt = true
+
+[functions.predictive-dialer-webhook]
+verify_jwt = false
+
+[functions.dialer-webhook]
 verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.disposition-panel]
+[functions.twilio-token]
+verify_jwt = false
+
+[functions.sms-webhook-receiver]
+verify_jwt = false
+
+[functions.ai-sms-agent]
 verify_jwt = false

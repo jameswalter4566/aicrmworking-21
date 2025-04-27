@@ -582,31 +582,14 @@ class TwilioService {
         if (call) {
           const params = call.customParameters || new Map();
           const callLeadId = params.get('leadId');
-          const callSid = call.sid;
           
-          try {
-            console.log(`Using disposition panel to end call ${callSid} for lead ${leadId}`);
-            const response = await supabase.functions.invoke('disposition-panel', {
-              body: {
-                action: 'hangup',
-                callSid,
-                leadId: callLeadId,
-                userId: null
-              }
-            });
-            
-            if (response.error) {
-              console.error("Error from disposition panel:", response.error);
-              call.disconnect();
-            }
-            
-            console.log(`Ended call for lead ID ${leadId} via disposition panel`);
-            return true;
-          } catch (err) {
-            console.error("Error calling disposition panel:", err);
-            call.disconnect();
-            return true;
+          if (callLeadId) {
+            this.notifyLeadConnected(callLeadId, call.sid, 'completed');
           }
+          
+          call.disconnect();
+          console.log(`Ended call for lead ID ${leadId}`);
+          return true;
         } else {
           console.warn(`No active call found for lead ID ${leadId}`);
           return false;
@@ -629,15 +612,6 @@ class TwilioService {
         return false;
       }
       
-      const firstActiveCall = this.activeCalls[0];
-      const callSid = firstActiveCall?.sid;
-      let leadId = null;
-      
-      if (firstActiveCall) {
-        const params = firstActiveCall.customParameters || new Map();
-        leadId = params.get('leadId');
-      }
-      
       try {
         this.device.disconnectAll();
       } catch (e) {
@@ -645,22 +619,22 @@ class TwilioService {
       }
 
       try {
-        const response = await supabase.functions.invoke('disposition-panel', {
-          body: { 
-            action: 'hangup',
-            callSid,
-            leadId,
-            userId: null
-          }
+        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/twilio-voice', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'hangupAll' })
         });
         
-        if (response.error) {
-          console.warn(`Error from disposition panel:`, response.error);
+        if (!response.ok) {
+          console.warn(`Server responded with ${response.status} when trying to hang up all calls`);
         } else {
-          console.log(`Hung up calls via disposition panel:`, response.data);
+          const data = await response.json();
+          console.log(`Hung up ${data.hungUpCount || 0} calls via API`);
         }
       } catch (e) {
-        console.warn("Error calling disposition panel:", e);
+        console.warn("Error calling hangup API:", e);
       }
       
       this.activeCalls = [];

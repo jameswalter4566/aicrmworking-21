@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -164,65 +165,32 @@ const DialerSession = () => {
       
       console.log("Attempting to end calls:", activeCallIds);
       
-      const firstActiveCall = Object.values(twilioState.activeCalls)[0];
+      // Direct use of twilioService for more reliable call termination
+      const result = await twilioService.hangupAllCalls();
       
-      if (firstActiveCall) {
-        try {
-          const { data, error } = await supabase.functions.invoke('disposition-panel', {
-            body: {
-              action: 'hangup',
-              callSid: firstActiveCall.callSid,
-              leadId: firstActiveCall.leadId || currentLeadId,
-              userId: user?.id
-            }
-          });
-          
-          if (error) {
-            console.error("Error from disposition panel:", error);
-            throw error;
-          }
-          
-          console.log("Disposition panel response:", data);
-          
-          const result = await twilioService.hangupAllCalls();
-          
-          if (result || data?.success) {
-            toast.success("Call ended", {
-              description: "The call has been disconnected"
+      if (result) {
+        toast.success("Call ended", {
+          description: "The call has been disconnected"
+        });
+        
+        if (currentLeadId) {
+          try {
+            await supabase.from('lead_activities').insert({
+              lead_id: parseInt(currentLeadId),
+              type: "call_completed",
+              description: "Call ended by agent"
             });
-            
-            if (currentLeadId) {
-              try {
-                await supabase.from('lead_activities').insert({
-                  lead_id: parseInt(currentLeadId),
-                  type: "call_completed",
-                  description: "Call ended by agent"
-                });
-              } catch (error) {
-                console.error("Could not log call activity:", error);
-              }
-            }
-            
-            setConnectedLeadData(null);
-            setIsDialing(false);
-          } else {
-            toast.error("Failed to end call", {
-              description: "Please try again or reload the page"
-            });
-          }
-        } catch (dispErr) {
-          console.error("Error using disposition panel:", dispErr);
-          const result = await twilioService.hangupAllCalls();
-          if (result) {
-            toast.success("Call ended (fallback method)", {
-              description: "The call has been disconnected"
-            });
-            setConnectedLeadData(null);
-            setIsDialing(false);
-          } else {
-            throw dispErr;
+          } catch (error) {
+            console.error("Could not log call activity:", error);
           }
         }
+        
+        setConnectedLeadData(null);
+        setIsDialing(false);
+      } else {
+        toast.error("Failed to end call", {
+          description: "Please try again or reload the page"
+        });
       }
     } catch (err) {
       console.error('Error ending call:', err);
