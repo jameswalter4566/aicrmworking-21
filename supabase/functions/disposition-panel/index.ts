@@ -1,12 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import twilio from 'https://esm.sh/twilio@4.18.1';
-
-// Define CORS headers for browser requests
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from '../_shared/cors.ts';
 
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
