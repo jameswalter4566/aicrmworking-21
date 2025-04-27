@@ -30,39 +30,47 @@ Deno.serve(async (req) => {
     console.log(`Lead connected function called for leadId: ${leadId}`);
     console.log('Call data:', callData);
     
-    // If we have a leadId, fetch it from the leads table
-    if (leadId) {
+    // Get the original lead ID from callData if available
+    const effectiveLeadId = callData?.originalLeadId || leadId;
+    
+    if (effectiveLeadId) {
       try {
-        // Use the admin client to query the database directly instead of calling another function
-        const { data: leadData, error: leadError } = await adminSupabase
-          .from('leads')
-          .select('*')
-          .eq('id', leadId)
-          .maybeSingle();
-
-        if (leadError) {
-          console.error('Error fetching lead data:', leadError);
-          throw leadError;
+        // Call the retrieve-leads function with the original lead ID
+        const { data: leadResponse, error: retrieveError } = await supabase.functions.invoke(
+          'retrieve-leads',
+          {
+            body: {
+              source: 'all',
+              leadId: effectiveLeadId,
+              exactMatch: true,
+              pageSize: 1
+            }
+          }
+        );
+        
+        if (retrieveError) {
+          console.error('Error retrieving lead data:', retrieveError);
+          throw retrieveError;
         }
 
-        if (leadData) {
+        if (leadResponse && leadResponse.length > 0) {
+          console.log('Retrieved lead data:', leadResponse[0]);
+          
           // Log activity if we have call data
           if (callData?.callSid) {
-            await logLeadActivity(leadData.id, callData);
+            await logLeadActivity(effectiveLeadId, callData);
           }
-
-          console.log('Retrieved lead data:', leadData);
           
           return new Response(JSON.stringify({ 
             success: true,
-            lead: leadData
+            lead: leadResponse[0]
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
           });
         }
       } catch (error) {
-        console.error('Error retrieving lead:', error);
+        console.error('Error fetching lead data:', error);
       }
     }
     
