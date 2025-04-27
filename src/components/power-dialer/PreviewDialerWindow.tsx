@@ -317,11 +317,13 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     try {
       setIsHangingUp(true);
       
+      console.log("Current call state when hanging up:", currentCall);
+      
       const { data, error } = await supabase.functions.invoke('disposition-panel', {
         body: { 
           action: 'hangup',
-          callSid: currentCall?.callSid || null,
-          leadId: currentCall?.leadId || null,
+          callSid: currentCall?.callSid || currentCall?.parameters?.CallSid || null,
+          leadId: currentCall?.leadId || currentCall?.parameters?.leadId || null,
           userId: user?.id || 'anonymous',
           sessionId: 'default-session'
         }
@@ -794,7 +796,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   variant="outline" 
                   className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                   onClick={handleHangUpCall}
-                  disabled={isHangingUp || !currentCall}
+                  disabled={isHangingUp}
                 >
                   <PhoneOff className="mr-2 h-4 w-4" />
                   {isHangingUp ? 'Hanging Up...' : 'Hang Up'}
