@@ -10,7 +10,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
 
   // Initial fetch to get lead data
   const fetchLeadData = async () => {
-    if (!leadId) return;
+    if (!leadId) return null;
     
     setIsLoading(true);
     try {
@@ -30,7 +30,7 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       if (error) {
         console.error('[useLeadRealtime] Error fetching lead data:', error);
         toast.error('Failed to fetch lead data');
-        return;
+        return null;
       }
 
       console.log('[useLeadRealtime] Response from lead-connected:', data);
@@ -43,13 +43,16 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         
         // Reset the lead found indicator after 3 seconds
         setTimeout(() => setLeadFound(false), 3000);
+        return data.lead;
       } else {
         console.warn('[useLeadRealtime] No lead data in response');
         toast.warning('No lead data found');
+        return null;
       }
     } catch (err) {
       console.error('[useLeadRealtime] Error in lead realtime fetch:', err);
       toast.error('Error fetching lead data');
+      return null;
     } finally {
       setIsLoading(false);
     }
@@ -104,7 +107,10 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         },
         async (payload) => {
           console.log('[useLeadRealtime] New lead activity:', payload);
-          await fetchLeadData();
+          const updatedLeadData = await fetchLeadData();
+          if (updatedLeadData) {
+            console.log('[useLeadRealtime] Updated lead data after activity:', updatedLeadData);
+          }
         }
       )
       .subscribe();

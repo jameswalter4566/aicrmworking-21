@@ -21,18 +21,21 @@ interface ConnectedLeadPanelProps {
 export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: ConnectedLeadPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [localLeadFound, setLocalLeadFound] = useState(false);
+  const [manualLeadData, setManualLeadData] = useState<any>(null);
   const { user } = useAuth();
   const currentLeadId = initialLeadData?.id || null;
   
   const { leadData: realtimeLeadData, isLoading: isRealtimeLoading, leadFound, refresh } = 
     useLeadRealtime(currentLeadId, user?.id);
   
-  const displayData = realtimeLeadData || initialLeadData;
+  // Prioritize manually fetched data, then realtime data, then initial data
+  const displayData = manualLeadData || realtimeLeadData || initialLeadData;
 
   useEffect(() => {
     console.log('[ConnectedLeadPanel] Current lead data:', {
       initial: initialLeadData,
       realtime: realtimeLeadData,
+      manual: manualLeadData,
       display: displayData
     });
     
@@ -40,7 +43,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
       setLocalLeadFound(true);
       setTimeout(() => setLocalLeadFound(false), 3000);
     }
-  }, [initialLeadData, realtimeLeadData, displayData]);
+  }, [initialLeadData, realtimeLeadData, manualLeadData, displayData, localLeadFound]);
 
   const handleRefresh = async () => {
     setIsLoading(true);
@@ -64,11 +67,17 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
         return;
       }
 
+      console.log("Response from lead-connected:", data);
+
       if (data?.lead) {
         console.log('Successfully retrieved fresh lead data:', data.lead);
+        // Store the manually fetched data to ensure it displays
+        setManualLeadData(data.lead);
         setLocalLeadFound(true);
         setTimeout(() => setLocalLeadFound(false), 3000);
         toast.success('Lead data refreshed successfully');
+      } else {
+        toast.error('No lead data in response');
       }
 
       // Call the original refresh handlers if they exist
@@ -120,7 +129,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isRealtimeLoading ? (
+          {isLoading || isRealtimeLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-4 w-[200px]" />
               <Skeleton className="h-4 w-[160px]" />
@@ -145,7 +154,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
                     </div>
                   </div>
 
-                  {displayData?.phone2 && (
+                  {displayData?.phone2 && displayData.phone2 !== "---" && (
                     <div>
                       <label className="text-sm text-gray-500">Secondary Phone</label>
                       <div className="text-sm mt-1 font-medium">
@@ -174,8 +183,8 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
                     <div>
                       <label className="text-sm text-gray-500">Tags</label>
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {displayData.tags.map((tag: string) => (
-                          <Badge key={tag} variant="outline">{tag}</Badge>
+                        {displayData.tags.map((tag: string, index: number) => (
+                          <Badge key={`${tag}-${index}`} variant="outline">{tag}</Badge>
                         ))}
                       </div>
                     </div>
@@ -216,16 +225,14 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
             </div>
           )}
 
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 p-2 bg-gray-100 rounded">
-              <details>
-                <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
-                <pre className="mt-2 text-xs overflow-auto">
-                  {displayData ? JSON.stringify(displayData, null, 2) : "No data available"}
-                </pre>
-              </details>
-            </div>
-          )}
+          <div className="mt-4 p-2 bg-gray-100 rounded">
+            <details>
+              <summary className="cursor-pointer text-sm text-gray-600">Raw Lead Data</summary>
+              <pre className="mt-2 text-xs overflow-auto">
+                {displayData ? JSON.stringify(displayData, null, 2) : "No data available"}
+              </pre>
+            </details>
+          </div>
         </CardContent>
       </Card>
     </>
