@@ -23,7 +23,10 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
           callSid,
           status,
           timestamp: new Date().toISOString(),
-          originalLeadId: originalLeadId || leadId
+          originalLeadId: originalLeadId || leadId,
+          callState: status === 'in-progress' ? 'connected' : 
+                    status === 'completed' ? 'disconnected' :
+                    status === 'ringing' ? 'dialing' : 'unknown'
         }
       }
     });

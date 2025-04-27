@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -23,7 +22,10 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
         callData: {
           callSid,
           status,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          callState: status === 'in-progress' ? 'connected' : 
+                    status === 'completed' ? 'disconnected' :
+                    status === 'ringing' ? 'dialing' : 'unknown'
         }
       }
     });

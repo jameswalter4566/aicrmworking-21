@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -26,6 +25,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'connecting'>('connecting');
   const { user } = useAuth();
   const currentLeadId = initialLeadData?.id || null;
+  const [callState, setCallState] = useState<string>('unknown');
   
   const { 
     leadData: realtimeLeadData, 
@@ -97,8 +97,6 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
 
   // Also subscribe to the global channel as a backup
   useEffect(() => {
-    console.log('[ConnectedLeadPanel] Setting up global channel subscription');
-    
     const channel = supabase
       .channel('global-leads')
       .on('broadcast', { event: 'lead_data_update' }, (payload) => {
@@ -106,6 +104,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
         if (payload.payload?.lead && 
             (!currentLeadId || payload.payload.lead.id === currentLeadId)) {
           setManualLeadData(payload.payload.lead);
+          setCallState(payload.payload.callState || 'unknown');
           setLocalLeadFound(true);
           setTimeout(() => setLocalLeadFound(false), 3000);
         }
@@ -205,6 +204,11 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
 
   // We're using both the hook's leadFound state and our local state
   const showLeadFound = leadFound || localLeadFound;
+  
+  // Conditionally show lead data based on call state
+  const shouldShowLeadData = callState === 'connected' || 
+                           callState === 'unknown' || // Keep existing behavior for unknown states
+                           displayData?.id === initialLeadData?.id; // Show if it matches initial data
 
   return (
     <>
@@ -247,6 +251,15 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
             ) : ( 
               'Lead Details - No Lead ID Available'
             )}
+            {callState !== 'unknown' && (
+              <Badge variant={
+                callState === 'connected' ? 'success' :
+                callState === 'disconnected' ? 'destructive' :
+                callState === 'dialing' ? 'warning' : 'secondary'
+              }>
+                {callState.charAt(0).toUpperCase() + callState.slice(1)}
+              </Badge>
+            )}
             <div className="absolute top-2 right-2 flex space-x-2">
               {process.env.NODE_ENV === 'development' && (
                 <Button 
@@ -281,13 +294,7 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading || isRealtimeLoading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-[200px]" />
-              <Skeleton className="h-4 w-[160px]" />
-              <Skeleton className="h-4 w-[180px]" />
-            </div>
-          ) : displayData ? (
+          {shouldShowLeadData ? (
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h3 className="font-medium mb-2">Contact Information</h3>
@@ -365,15 +372,11 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
             </div>
           ) : (
             <div className="py-8 text-center">
-              <p className="text-muted-foreground">No lead data available</p>
-              <Button 
-                onClick={handleRefresh}
-                variant="outline" 
-                size="sm"
-                className="mt-2"
-              >
-                Refresh Data
-              </Button>
+              <p className="text-muted-foreground">
+                {callState === 'dialing' ? 'Dialing...' :
+                 callState === 'disconnected' ? 'Call ended' :
+                 'Waiting for call to connect...'}
+              </p>
             </div>
           )}
 
