@@ -14,8 +14,6 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // Create a Supabase client with the service role key for admin access
 const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
-// Create a regular client for non-admin operations
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -26,17 +24,39 @@ Deno.serve(async (req) => {
   try {
     const requestBody = await req.json();
     const { leadId, callData } = requestBody;
-
+    
     console.log(`Lead connected function called for leadId: ${leadId}`);
     console.log('Call data:', callData);
     
-    // Get the original lead ID from callData if available
-    const effectiveLeadId = callData?.originalLeadId || leadId;
+    // Get the numeric ID from callData if available, otherwise try to use the leadId
+    let effectiveLeadId = null;
     
+    // First try to get originalLeadId from callData
+    if (callData?.originalLeadId) {
+      effectiveLeadId = callData.originalLeadId;
+      console.log(`Using originalLeadId from callData: ${effectiveLeadId}`);
+    } 
+    // If originalLeadId is in notes (some legacy data structure), try to parse it
+    else if (callData?.notes) {
+      try {
+        const notesData = JSON.parse(callData.notes);
+        if (notesData.originalLeadId) {
+          effectiveLeadId = notesData.originalLeadId;
+          console.log(`Using originalLeadId from notes: ${effectiveLeadId}`);
+        }
+      } catch (e) {
+        console.warn('Could not parse notes JSON:', e);
+      }
+    }
+    
+    if (!effectiveLeadId) {
+      console.log('No numeric leadId found, attempting to use provided leadId:', leadId);
+      effectiveLeadId = leadId;
+    }
+
     if (effectiveLeadId) {
       try {
-        // Check if the originalLeadId exists - if so, it's likely a numeric ID
-        // Use the service role key for direct access without requiring authentication
+        // Call retrieve-leads with proper authentication and the effectiveLeadId
         const { data: leadResponse, error: retrieveError } = await adminSupabase.functions.invoke(
           'retrieve-leads',
           {
@@ -46,7 +66,6 @@ Deno.serve(async (req) => {
               exactMatch: true,
               pageSize: 1
             },
-            // Use the service role to ensure we have proper authentication
             headers: {
               Authorization: `Bearer ${supabaseServiceKey}`,
               'x-client-info': 'lead-connected-function'
@@ -60,7 +79,7 @@ Deno.serve(async (req) => {
         }
 
         if (leadResponse && leadResponse.length > 0) {
-          console.log('Retrieved lead data:', leadResponse[0]);
+          console.log('Successfully retrieved lead data:', leadResponse[0]);
           
           // Log activity if we have call data
           if (callData?.callSid) {
@@ -74,6 +93,8 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
           });
+        } else {
+          console.log(`No lead found for ID: ${effectiveLeadId}`);
         }
       } catch (error) {
         console.error('Error fetching lead data:', error);
@@ -84,7 +105,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true,
       lead: {
-        id: leadId || 'unknown',
+        id: effectiveLeadId || 'unknown',
         first_name: "Unknown",
         last_name: "Contact",
         phone1: callData?.phoneNumber || "",
