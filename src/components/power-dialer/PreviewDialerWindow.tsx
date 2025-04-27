@@ -19,7 +19,8 @@ import {
   List,
   Loader2,
   Mail,
-  MapPin
+  MapPin,
+  PhoneIncoming
 } from 'lucide-react';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import LeadSelectionPanel from './LeadSelectionPanel';
@@ -41,12 +42,14 @@ interface PreviewDialerWindowProps {
   currentCall: any;
   onDisposition: (type: string) => void;
   onEndCall: () => void;
+  onCallNextLead: () => void;
 }
 
 const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   currentCall,
   onDisposition,
-  onEndCall
+  onEndCall,
+  onCallNextLead
 }) => {
   const [isDialingStarted, setIsDialingStarted] = useState(false);
   const [callingLists, setCallingLists] = useState<any[]>([]);
@@ -681,7 +684,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
               <div className="space-y-2">
                 <Button 
                   variant="outline" 
-                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
+                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                   onClick={() => onDisposition('contact')}
                 >
                   <Phone className="mr-2 h-4 w-4 text-green-400" />
@@ -749,6 +752,15 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 >
                   <RotateCcw className="mr-2 h-4 w-4 text-indigo-400" />
                   Redial
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
+                  onClick={onCallNextLead}
+                >
+                  <PhoneIncoming className="mr-2 h-4 w-4 text-green-400" />
+                  Call Next Lead
                 </Button>
               </div>
               

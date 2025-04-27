@@ -1,98 +1,10 @@
-import React, { useState, useEffect } from "react";
-import MainLayout from "@/components/layouts/MainLayout";
-import { Button } from "@/components/ui/button";
-import { useTwilio } from "@/hooks/use-twilio";
-import { twilioService } from "@/services/twilio";
-import { GlobalAudioSettings } from "@/components/GlobalAudioSettings";
-import { CallControls } from "@/components/CallControls";
-import TwilioAudioPlayer from "@/components/TwilioAudioPlayer";
-import AudioDeviceSelector from "@/components/AudioDeviceSelector";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { InfoCircledIcon, Cross2Icon } from "@radix-ui/react-icons";
-import { Phone } from "lucide-react";
-import TwilioScript from "@/components/TwilioScript";
-import { AudioDebugModal } from "@/components/AudioDebugModal";
-import { AudioInitializer } from "@/components/AudioInitializer";
-import { toast } from "sonner";
-import PreviewDialerWindow from "@/components/power-dialer/PreviewDialerWindow";
-import { ConnectedLeadPanel } from "@/components/power-dialer/ConnectedLeadPanel";
-import { supabase } from "@/integrations/supabase/client";
-import { Label } from "@/components/ui/label";
-import { useAuth } from '@/hooks/use-auth';
-import { useLeadRealtime } from '@/hooks/use-lead-realtime';
-import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
+import React, { useState, useEffect } from 'react';
+import PreviewDialerWindow from '@/components/power-dialer/PreviewDialerWindow';
+import { twilioService } from '@/services/twilio';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
-const SAMPLE_LEADS = [
-  {
-    id: "1",
-    name: "John Smith",
-    company: "Acme Inc",
-    phone: "+18884659876",
-    status: "New",
-    priority: "High",
-  },
-  {
-    id: "2",
-    name: "James Walter",
-    company: "Golden Pathway Financial",
-    phone: "+17142449021", 
-    status: "New",
-    priority: "High",
-  },
-  {
-    id: "3",
-    name: "Michael Brown",
-    company: "XYZ Solutions",
-    phone: "+18007779999",
-    status: "New",
-    priority: "Low",
-  },
-  {
-    id: "4",
-    name: "Jennifer Davis",
-    company: "Global Tech",
-    phone: "+918320354644",
-    status: "New",
-    priority: "High",
-  },
-  {
-    id: "5",
-    name: "Robert Wilson",
-    company: "InnoTech",
-    phone: "+14155551234",
-    status: "Contacted",
-    priority: "Medium",
-  },
-  {
-    id: "6",
-    name: "Lisa Martinez",
-    company: "ABC Consulting",
-    phone: "+12125557890",
-    status: "New",
-    priority: "High",
-  },
-];
-
-export default function PowerDialer() {
+const PowerDialer = () => {
   const [currentTab, setCurrentTab] = useState("dialer");
   const [leads, setLeads] = useState(SAMPLE_LEADS);
   const [sortBy, setSortBy] = useState("priority");
@@ -105,6 +17,7 @@ export default function PowerDialer() {
   const [currentCall, setCurrentCall] = useState<any>(null);
   const [isDialing, setIsDialing] = useState(false);
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
+  const [isProcessingCall, setIsProcessingCall] = useState(false);
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
@@ -380,6 +293,47 @@ export default function PowerDialer() {
     }
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
 
+  const handleCallNextLead = async () => {
+    try {
+      if (currentCall && currentCall.status !== 'completed') {
+        await twilioService.endCall(currentCall.parameters.callSid);
+      }
+
+      setIsProcessingCall(true);
+      
+      const { data, error } = await supabase.functions.invoke('get-next-lead', {
+        body: { sessionId }  // Assuming sessionId is available in the component
+      });
+      
+      if (error) throw error;
+      
+      if (!data || !data.leadId) {
+        toast("No more leads", {
+          description: "There are no more leads to call in this session."
+        });
+        return;
+      }
+      
+      await twilioService.initializeTwilioDevice();
+      const callResult = await twilioService.makeCall(data.phoneNumber, data.leadId);
+      
+      if (!callResult.success) {
+        toast.error("Call failed", {
+          description: callResult.error || "Unable to place call"
+        });
+      } else {
+        toast("Calling", {
+          description: `Calling ${data.name || data.phoneNumber}...`
+        });
+      }
+    } catch (err) {
+      console.error('Error getting next lead:', err);
+      toast.error('Failed to get next lead');
+    } finally {
+      setIsProcessingCall(false);
+    }
+  };
+
   return (
     <MainLayout>
       <LeadFoundIndicator isVisible={leadFound} />
@@ -487,6 +441,7 @@ export default function PowerDialer() {
                   Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
                   setConnectedLeadData(null);
                 }}
+                onCallNextLead={handleCallNextLead}
               />
 
               {Object.keys(twilioState.activeCalls).length > 0 && (
@@ -684,7 +639,7 @@ export default function PowerDialer() {
       </div>
     </MainLayout>
   );
-}
+};
 
 function SettingsTab() {
   return null;
@@ -693,3 +648,5 @@ function SettingsTab() {
 function ScriptsTab() {
   return null;
 }
+
+export default PowerDialer;
