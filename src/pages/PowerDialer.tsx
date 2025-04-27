@@ -251,7 +251,6 @@ const PowerDialer: React.FC = () => {
       if (activeCall) {
         await twilioService.endCall(activeCall.leadId?.toString());
         toast.success("Call ended successfully");
-        setActiveCall(null);
       }
     } catch (error) {
       console.error("Error hanging up call:", error);

@@ -58,6 +58,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [isDialing, setIsDialing] = useState(false);
   const [forceSkeleton, setForceSkeleton] = useState(true);
   const [sessionActive, setSessionActive] = useState(false);
+  const [isHangingUp, setIsHangingUp] = useState(false);
   const { user } = useAuth();
   const { callStatuses } = useCallStatus();
 
@@ -309,6 +310,38 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
     } catch (err) {
       console.error('Error saving call notes:', err);
       toast.error('Failed to save call notes');
+    }
+  };
+
+  const handleHangUpCall = async () => {
+    try {
+      setIsHangingUp(true);
+      
+      const { data, error } = await supabase.functions.invoke('disposition-panel', {
+        body: { 
+          action: 'hangup',
+          callSid: currentCall?.callSid || null,
+          leadId: currentCall?.leadId || null,
+          userId: user?.id || 'anonymous',
+          sessionId: 'default-session'
+        }
+      });
+      
+      if (error) {
+        console.error('Error hanging up call:', error);
+        toast.error('Failed to hang up call');
+      } else {
+        console.log('Hangup response:', data);
+        toast.success('Call ended successfully');
+        if (onEndCall) {
+          onEndCall();
+        }
+      }
+    } catch (error) {
+      console.error('Error hanging up call:', error);
+      toast.error('Failed to hang up call');
+    } finally {
+      setIsHangingUp(false);
     }
   };
 
@@ -760,10 +793,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 <Button 
                   variant="outline" 
                   className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={onEndCall}
+                  onClick={handleHangUpCall}
+                  disabled={isHangingUp || !currentCall}
                 >
                   <PhoneOff className="mr-2 h-4 w-4" />
-                  Hang Up
+                  {isHangingUp ? 'Hanging Up...' : 'Hang Up'}
                 </Button>
                 
                 <Button 
@@ -778,7 +812,6 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   variant="outline" 
                   className="w-full justify-center bg-green-900/50 hover:bg-green-900 text-white border-green-900"
                   onClick={() => {
-                    // Trigger call end and progression
                     onEndCall && onEndCall();
                   }}
                 >

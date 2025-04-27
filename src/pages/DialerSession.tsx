@@ -321,7 +321,7 @@ const DialerSession = () => {
     
     if (completedStatuses.includes(callStatus)) {
       handleCallCompletion();
-    } else if (callStatus === 'ringing') {
+    } else if (callStatus === 'ringing' || callStatus === 'connecting') {
       startNoAnswerTimeout();
     } else if (inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();
