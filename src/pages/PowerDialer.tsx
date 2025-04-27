@@ -240,31 +240,6 @@ export default function PowerDialer() {
     handleEndCall(currentCall.parameters.leadId);
   };
 
-  const handleCallNextLead = async () => {
-    try {
-      // End current call if any
-      if (Object.keys(twilioState.activeCalls).length > 0) {
-        await twilioState.endAllCalls();
-        setCallInProgress(false);
-        setConnectedLeadData(null);
-      }
-      
-      const nextLead = filteredAndSortedLeads.find(lead => lead.status === "New");
-      
-      if (!nextLead) {
-        toast("No More Leads", {
-          description: "There are no more leads available to call."
-        });
-        return;
-      }
-      
-      await handleCallLead(nextLead);
-    } catch (error) {
-      console.error('Error in handleCallNextLead:', error);
-      toast.error("Failed to call next lead");
-    }
-  };
-
   const activeCall = Object.values(twilioState.activeCalls)[0];
   const activeLeadId = activeCall?.leadId || null;
   
@@ -508,10 +483,9 @@ export default function PowerDialer() {
               <PreviewDialerWindow 
                 currentCall={Object.values(twilioState.activeCalls)[0]}
                 onDisposition={handleDisposition}
-                onEndCall={async () => {
-                  await twilioState.endAllCalls();
+                onEndCall={() => {
+                  Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
                   setConnectedLeadData(null);
-                  handleCallNextLead(); // Automatically call next lead after disconnect
                 }}
               />
 
