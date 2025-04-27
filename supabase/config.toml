@@ -57,4 +57,3 @@ verify_jwt = false
 
 [functions.disposition-panel]
 verify_jwt = false
-no_verify_jwt = true

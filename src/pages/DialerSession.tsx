@@ -318,11 +318,10 @@ const DialerSession = () => {
     
     const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
     const inProgressStatuses = ['connecting', 'in-progress'];
-    const ringingStatuses = ['ringing', 'connecting'];
     
     if (completedStatuses.includes(callStatus)) {
       handleCallCompletion();
-    } else if (ringingStatuses.includes(callStatus)) {
+    } else if (callStatus === 'ringing' || callStatus === 'connecting') {
       startNoAnswerTimeout();
     } else if (inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();
