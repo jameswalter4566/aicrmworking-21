@@ -398,40 +398,6 @@ class TwilioService {
     }
   }
 
-  private async registerCallWithDispositionPanel(
-    callSid: string, 
-    leadId: string, 
-    phoneNumber: string, 
-    status: string
-  ): Promise<void> {
-    try {
-      const userId = 'browser-client';  // We could use a real user ID if authenticated
-      
-      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/disposition-panel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'registerCall',
-          callSid,
-          leadId,
-          userId,
-          phoneNumber,
-          status,
-        })
-      });
-
-      if (!response.ok) {
-        console.warn(`Failed to register call with disposition panel: ${response.status} ${response.statusText}`);
-      } else {
-        console.log('Call registered with disposition panel service');
-      }
-    } catch (err) {
-      console.error('Error registering call with disposition panel:', err);
-    }
-  }
-
   async makeCall(phoneNumber: string, leadId: string): Promise<TwilioCallResult> {
     try {
       if (!this.device) {
@@ -487,10 +453,6 @@ class TwilioService {
         
         this.notifyLeadConnected(leadId, call.sid || 'browser-call', 'ringing');
         
-        if (call.sid) {
-          this.registerCallWithDispositionPanel(call.sid, leadId.toString(), formattedPhoneNumber, 'connecting');
-        }
-        
         call.on('error', (error: any) => {
           console.error('Call error:', error);
           
@@ -531,11 +493,7 @@ class TwilioService {
             startTime: new Date()
           });
           
-          this.notifyLeadConnected(call.sid, call.sid, 'in-progress');
-          
-          if (call.sid) {
-            this.registerCallWithDispositionPanel(call.sid, leadId.toString(), formattedPhoneNumber, 'in-progress');
-          }
+          this.notifyLeadConnected(leadId, call.sid, 'in-progress');
           
           toast({
             title: "Call Connected",
@@ -616,31 +574,6 @@ class TwilioService {
       }
       
       if (leadId) {
-        try {
-          const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/disposition-panel', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              action: 'hangup',
-              leadId: leadId.toString(),
-              userId: 'browser-client'
-            })
-          });
-          
-          const data = await response.json();
-          
-          if (data.success) {
-            console.log(`Call for lead ID ${leadId} was ended via disposition panel`);
-            return true;
-          }
-          
-          console.warn('Disposition panel service could not end call, falling back to direct method');
-        } catch (err) {
-          console.warn('Error using disposition panel service, falling back to direct method:', err);
-        }
-        
         const call = this.activeCalls.find((c: any) => {
           const params = c.customParameters || new Map();
           return params.get('leadId') === leadId;
@@ -673,31 +606,6 @@ class TwilioService {
   async hangupAllCalls(): Promise<boolean> {
     try {
       console.log("Attempting to hang up all active calls");
-      
-      try {
-        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/disposition-panel', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            action: 'hangupAll',
-            userId: 'browser-client'
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          console.log(`Hung up ${data.hungUpCount || 0} calls via disposition panel service`);
-          this.activeCalls = [];
-          return true;
-        }
-        
-        console.warn('Disposition panel service could not end calls, falling back to direct methods');
-      } catch (err) {
-        console.warn('Error using disposition panel service, falling back:', err);
-      }
       
       if (!this.device) {
         console.warn("Twilio device not initialized.");

@@ -92,7 +92,7 @@ const SAMPLE_LEADS = [
   },
 ];
 
-const PowerDialer: React.FC = () => {
+export default function PowerDialer() {
   const [currentTab, setCurrentTab] = useState("dialer");
   const [leads, setLeads] = useState(SAMPLE_LEADS);
   const [sortBy, setSortBy] = useState("priority");
@@ -105,7 +105,6 @@ const PowerDialer: React.FC = () => {
   const [currentCall, setCurrentCall] = useState<any>(null);
   const [isDialing, setIsDialing] = useState(false);
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
-  const [isHangingUp, setIsHangingUp] = useState(false);
 
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
@@ -239,25 +238,6 @@ const PowerDialer: React.FC = () => {
     });
     
     handleEndCall(currentCall.parameters.leadId);
-  };
-
-  const handleSendMessage = async () => {
-    // Implement your message sending logic here
-  };
-
-  const handleHangUpCall = async (): Promise<void> => {
-    setIsHangingUp(true);
-    try {
-      if (activeCall) {
-        await twilioService.endCall(activeCall.leadId?.toString());
-        toast.success("Call ended successfully");
-      }
-    } catch (error) {
-      console.error("Error hanging up call:", error);
-      toast.error("Failed to hang up call");
-    } finally {
-      setIsHangingUp(false);
-    }
   };
 
   const activeCall = Object.values(twilioState.activeCalls)[0];
@@ -713,5 +693,3 @@ function SettingsTab() {
 function ScriptsTab() {
   return null;
 }
-
-export default PowerDialer;
