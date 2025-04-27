@@ -8,6 +8,8 @@ import { RefreshCw } from "lucide-react";
 import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { useAuth } from '@/hooks/use-auth';
 import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface ConnectedLeadPanelProps {
   leadData?: {
@@ -40,15 +42,44 @@ export const ConnectedLeadPanel = ({ leadData: initialLeadData, onRefresh }: Con
     }
   }, [initialLeadData, realtimeLeadData, displayData]);
 
-  const handleRefresh = () => {
-    if (onRefresh) {
-      setIsLoading(true);
-      onRefresh();
-      setTimeout(() => setIsLoading(false), 1000);
-    } else if (refresh) {
-      setIsLoading(true);
-      refresh();
-      setTimeout(() => setIsLoading(false), 1000);
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    try {
+      console.log('Manually refreshing lead data for ID:', currentLeadId);
+      
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
+        body: { 
+          leadId: String(currentLeadId),
+          userId: user?.id,
+          callData: {
+            status: 'manual_refresh',
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+
+      if (error) {
+        console.error('Error refreshing lead data:', error);
+        toast.error('Failed to refresh lead data');
+        return;
+      }
+
+      if (data?.lead) {
+        console.log('Successfully retrieved fresh lead data:', data.lead);
+        setLocalLeadFound(true);
+        setTimeout(() => setLocalLeadFound(false), 3000);
+        toast.success('Lead data refreshed successfully');
+      }
+
+      // Call the original refresh handlers if they exist
+      if (onRefresh) onRefresh();
+      if (refresh) refresh();
+      
+    } catch (err) {
+      console.error('Error in manual refresh:', err);
+      toast.error('Error refreshing lead data');
+    } finally {
+      setIsLoading(false);
     }
   };
 
