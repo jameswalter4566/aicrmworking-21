@@ -56,9 +56,6 @@ Deno.serve(async (req) => {
 
     if (effectiveLeadId) {
       try {
-        // Here's the enhanced approach to call retrieve-leads that's more aligned with traditional usage
-        console.log(`Attempting to fetch lead with ID: ${effectiveLeadId} using enhanced approach`);
-        
         // Convert to number if it's a numeric string to ensure proper type handling
         let numericLeadId = effectiveLeadId;
         if (/^\d+$/.test(String(effectiveLeadId))) {
@@ -66,106 +63,62 @@ Deno.serve(async (req) => {
           console.log(`Converted lead ID to numeric format: ${numericLeadId}`);
         }
         
-        // Use a direct database query when possible to avoid interference with auth flows
-        try {
-          const { data: directLead, error: directError } = await adminSupabase
+        // SIMPLIFICATION: Use a direct database query with the admin client
+        console.log(`Attempting direct database query for lead with ID: ${numericLeadId}`);
+        
+        const { data: directLead, error: directError } = await adminSupabase
+          .from('leads')
+          .select('*')
+          .eq('id', numericLeadId)
+          .single();
+          
+        if (directLead && !directError) {
+          console.log(`Successfully found lead directly in database: ${directLead.id}`);
+          
+          // Log activity if we have call data
+          if (callData?.callSid || callData?.status) {
+            await logLeadActivity(directLead.id, callData);
+          }
+          
+          return new Response(JSON.stringify({ 
+            success: true,
+            lead: directLead
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          });
+        } else {
+          console.log(`Direct database query failed: ${directError?.message || 'No lead found'}`);
+          console.log('Attempting to search by string ID as fallback');
+          
+          // Try searching by string ID
+          const { data: stringSearchLead, error: stringSearchError } = await adminSupabase
             .from('leads')
             .select('*')
-            .eq('id', numericLeadId)
+            .eq('id', String(effectiveLeadId))
             .single();
             
-          if (directLead && !directError) {
-            console.log(`Successfully found lead directly in database: ${directLead.id}`);
-            
-            // Format the lead data to match expected structure
-            const formattedLead = {
-              id: directLead.id,
-              firstName: directLead.first_name,
-              lastName: directLead.last_name,
-              email: directLead.email,
-              phone1: directLead.phone1,
-              phone2: directLead.phone2,
-              mailingAddress: directLead.mailing_address,
-              propertyAddress: directLead.property_address,
-              disposition: directLead.disposition,
-              createdAt: directLead.created_at
-            };
+          if (stringSearchLead && !stringSearchError) {
+            console.log(`Found lead using string ID: ${stringSearchLead.id}`);
             
             // Log activity if we have call data
             if (callData?.callSid || callData?.status) {
-              await logLeadActivity(directLead.id, callData);
+              await logLeadActivity(stringSearchLead.id, callData);
             }
             
             return new Response(JSON.stringify({ 
               success: true,
-              lead: directLead
+              lead: stringSearchLead
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               status: 200,
             });
           } else {
-            console.log(`Direct database query failed, falling back to retrieve-leads: ${directError?.message || 'No lead found'}`);
+            console.log(`String ID search also failed: ${stringSearchError?.message || 'No lead found'}`);
           }
-        } catch (directQueryError) {
-          console.warn(`Error in direct database query, falling back to retrieve-leads: ${directQueryError.message}`);
-        }
-        
-        // Fall back to the retrieve-leads function with enhanced configuration
-        const { data: leadResponse, error: retrieveError } = await adminSupabase.functions.invoke(
-          'retrieve-leads',
-          {
-            body: {
-              source: 'all',
-              leadId: numericLeadId,
-              exactMatch: true,
-              pageSize: 1,
-              // Adding additional commonly used parameters
-              includeNotes: true,
-              includeActivities: true
-            },
-            headers: {
-              Authorization: `Bearer ${supabaseServiceKey}`,
-              'x-client-info': 'lead-connected-function'
-            }
-          }
-        );
-        
-        if (retrieveError) {
-          console.error('Error retrieving lead data:', retrieveError);
-          throw retrieveError;
-        }
-
-        if (leadResponse?.data && leadResponse.data.length > 0) {
-          console.log('Successfully retrieved lead data from retrieve-leads:', leadResponse.data[0].id);
-          
-          // Log activity if we have call data
-          if (callData?.callSid || callData?.status) {
-            await logLeadActivity(leadResponse.data[0].id, callData);
-          }
-          
-          return new Response(JSON.stringify({ 
-            success: true,
-            lead: {
-              id: leadResponse.data[0].id,
-              first_name: leadResponse.data[0].firstName,
-              last_name: leadResponse.data[0].lastName,
-              phone1: leadResponse.data[0].phone1,
-              email: leadResponse.data[0].email,
-              property_address: leadResponse.data[0].propertyAddress,
-              mailing_address: leadResponse.data[0].mailingAddress
-            }
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 200,
-          });
-        } else if (leadResponse?.data) {
-          console.log(`No lead found for ID: ${effectiveLeadId} in retrieve-leads response`);
-          console.log('Full retrieve-leads response:', JSON.stringify(leadResponse));
-        } else {
-          console.log(`Unexpected response format from retrieve-leads:`, leadResponse);
         }
       } catch (error) {
-        console.error('Error fetching lead data:', error);
+        console.error('Error in direct database query:', error);
       }
     }
     
