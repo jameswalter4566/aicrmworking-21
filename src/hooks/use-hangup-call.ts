@@ -30,6 +30,9 @@ export function useHangupCall() {
       // Direct fetch to the edge function for better debugging
       const url = 'https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call';
       
+      console.log('HANGUP HOOK - Direct fetch URL:', url);
+      console.log('HANGUP HOOK - Authentication token:', supabase.auth.session()?.access_token ? 'Present' : 'Missing');
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {

@@ -232,7 +232,7 @@ const DialerSession = () => {
     
     if (callStatus && completedStatuses.includes(callStatus)) {
       handleCallCompletion();
-    } else if (callStatus === 'ringing') {
+    } else if (callStatus === 'ringing' as CallStatus) {
       startNoAnswerTimeout();
     } else if (callStatus && inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();

@@ -2,6 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { PhoneOff } from 'lucide-react';
 import { useHangupCall } from '@/hooks/use-hangup-call';
+import { useEffect } from 'react';
 
 interface HangupButtonProps {
   callSid?: string;
@@ -11,6 +12,11 @@ interface HangupButtonProps {
 
 export function HangupButton({ callSid, onSuccess, className = '' }: HangupButtonProps) {
   const { hangupCall, isHangingUp } = useHangupCall();
+  
+  // Log whenever the callSid changes
+  useEffect(() => {
+    console.log("HANGUP BUTTON - CallSID prop changed:", callSid);
+  }, [callSid]);
 
   const handleHangup = async () => {
     if (!callSid) {
@@ -20,11 +26,17 @@ export function HangupButton({ callSid, onSuccess, className = '' }: HangupButto
     
     console.log("HANGUP BUTTON - Attempting to hang up call with SID:", callSid);
     
-    const success = await hangupCall(callSid);
-    
-    if (success && onSuccess) {
-      console.log("HANGUP BUTTON - Call ended successfully, invoking onSuccess callback");
-      onSuccess();
+    try {
+      const success = await hangupCall(callSid);
+      
+      console.log("HANGUP BUTTON - hangupCall result:", success);
+      
+      if (success && onSuccess) {
+        console.log("HANGUP BUTTON - Call ended successfully, invoking onSuccess callback");
+        onSuccess();
+      }
+    } catch (error) {
+      console.error("HANGUP BUTTON - Error in handleHangup:", error);
     }
   };
 

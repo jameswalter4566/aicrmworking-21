@@ -15,7 +15,6 @@ Deno.serve(async (req) => {
     console.log("REQUEST URL:", req.url);
     console.log("REQUEST METHOD:", req.method);
     console.log("REQUEST HEADERS:", JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2));
-    console.log("==================================================");
     
     // Handle CORS
     if (req.method === 'OPTIONS') {
@@ -55,59 +54,73 @@ Deno.serve(async (req) => {
       const auth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
 
       console.log(`HANGUP FUNCTION - Making request to Twilio endpoint: ${twilioEndpoint}`);
-      const twilioResponse = await fetch(twilioEndpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: 'Status=completed'
-      });
-
-      const responseStatus = twilioResponse.status;
-      console.log(`HANGUP FUNCTION - Twilio API response status: ${responseStatus}`);
+      console.log(`HANGUP FUNCTION - Using Twilio account SID: ${twilioAccountSid.substring(0, 5)}...`);
+      console.log(`HANGUP FUNCTION - Auth token present: ${twilioAuthToken ? 'Yes' : 'No'}`);
       
-      const responseText = await twilioResponse.text();
-      console.log(`HANGUP FUNCTION - Twilio API response: ${responseText}`);
+      try {
+        const twilioResponse = await fetch(twilioEndpoint, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${auth}`,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: 'Status=completed'
+        });
 
-      if (!twilioResponse.ok) {
-        console.error(`HANGUP FUNCTION - Twilio API error: ${responseStatus} - ${responseText}`);
-        throw new Error(`Failed to end call: ${responseText}`);
-      }
-
-      // Log the hang-up action
-      if (userId) {
-        console.log(`HANGUP FUNCTION - Logging hang-up action for call ${callSid} by user ${userId}`);
+        const responseStatus = twilioResponse.status;
+        console.log(`HANGUP FUNCTION - Twilio API response status: ${responseStatus}`);
         
+        let responseText;
         try {
-          const { data, error } = await supabase.from('call_logs').insert({
-            call_sid: callSid,
-            user_id: userId,
-            action: 'hangup',
-            timestamp: new Date().toISOString()
-          });
-          
-          if (error) {
-            console.error('HANGUP FUNCTION - Error logging call action to database:', error);
-          } else {
-            console.log('HANGUP FUNCTION - Successfully logged call action to database');
-          }
-        } catch (dbError) {
-          console.error('HANGUP FUNCTION - Error in database operation:', dbError);
+          responseText = await twilioResponse.text();
+          console.log(`HANGUP FUNCTION - Twilio API response: ${responseText}`);
+        } catch (textError) {
+          console.error("HANGUP FUNCTION - Error reading Twilio response text:", textError);
+          responseText = "Error reading response";
         }
-      }
 
-      console.log("HANGUP FUNCTION - Successfully ended call");
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: "Call ended successfully" 
-        }), 
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
+        if (!twilioResponse.ok) {
+          console.error(`HANGUP FUNCTION - Twilio API error: ${responseStatus} - ${responseText}`);
+          throw new Error(`Failed to end call: ${responseText}`);
         }
-      );
+
+        // Log the hang-up action
+        if (userId) {
+          console.log(`HANGUP FUNCTION - Logging hang-up action for call ${callSid} by user ${userId}`);
+          
+          try {
+            const { data, error } = await supabase.from('call_logs').insert({
+              call_sid: callSid,
+              user_id: userId,
+              action: 'hangup',
+              timestamp: new Date().toISOString()
+            });
+            
+            if (error) {
+              console.error('HANGUP FUNCTION - Error logging call action to database:', error);
+            } else {
+              console.log('HANGUP FUNCTION - Successfully logged call action to database');
+            }
+          } catch (dbError) {
+            console.error('HANGUP FUNCTION - Error in database operation:', dbError);
+          }
+        }
+
+        console.log("HANGUP FUNCTION - Successfully ended call");
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: "Call ended successfully" 
+          }), 
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200
+          }
+        );
+      } catch (twilioError) {
+        console.error("HANGUP FUNCTION - Error calling Twilio API:", twilioError);
+        throw new Error(`Twilio API error: ${twilioError.message}`);
+      }
 
     } catch (error) {
       console.error('HANGUP FUNCTION - Error ending call:', error);
