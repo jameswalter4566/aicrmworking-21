@@ -1,22 +1,35 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import twilio from 'https://esm.sh/twilio@4.18.1';
-import { corsHeaders } from '../_shared/cors.ts';
 
-// Initialize Twilio client with proper credentials
-const twilioClient = twilio(
-  Deno.env.get('TWILIO_ACCOUNT_SID'),
-  Deno.env.get('TWILIO_AUTH_TOKEN')
-);
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import { corsHeaders } from '../_shared/cors.ts';
 
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// We'll initialize Twilio client using dynamic import inside the serve function
+// This prevents the "Object prototype may only be an Object or null" error
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Initialize Twilio client with proper dynamic import pattern
+  // Using the same version and import pattern as twilio-token function
+  let twilioClient;
+  try {
+    const twilioModule = await import('npm:twilio@4.10.0');
+    const twilio = twilioModule.default;
+    
+    // Initialize Twilio client with proper credentials
+    twilioClient = twilio(
+      Deno.env.get('TWILIO_ACCOUNT_SID'),
+      Deno.env.get('TWILIO_AUTH_TOKEN')
+    );
+  } catch (twilioError) {
+    console.error(`[call-disposition] Error initializing Twilio client:`, twilioError);
   }
 
   try {
@@ -106,13 +119,13 @@ Deno.serve(async (req) => {
         if (!callSid) {
           throw new Error('Call SID is required for ending a call');
         }
-        return await handleEndCall(callSid, leadId);
+        return await handleEndCall(callSid, leadId, twilioClient);
         
       case 'disposition':
         if (!leadId || !disposition) {
           throw new Error('Lead ID and disposition are required');
         }
-        return await handleDisposition(leadId, disposition, callSid);
+        return await handleDisposition(leadId, disposition, callSid, twilioClient);
         
       case 'next':
         if (!sessionId) {
@@ -132,14 +145,18 @@ Deno.serve(async (req) => {
   }
 });
 
-async function handleEndCall(callSid: string, leadId?: string | number) {
+async function handleEndCall(callSid: string, leadId?: string | number, twilioClient?: any) {
   console.log(`📞 Ending call ${callSid}`);
   
   try {
     // End the call via Twilio API
     try {
-      await twilioClient.calls(callSid).update({ status: 'completed' });
-      console.log(`✅ Successfully ended call ${callSid} via Twilio API`);
+      if (twilioClient) {
+        await twilioClient.calls(callSid).update({ status: 'completed' });
+        console.log(`✅ Successfully ended call ${callSid} via Twilio API`);
+      } else {
+        console.warn('⚠️ Twilio client not initialized, cannot end call via API');
+      }
     } catch (twilioError) {
       console.error(`⚠️ Twilio API error: ${twilioError.message}`);
       
@@ -190,7 +207,7 @@ async function handleEndCall(callSid: string, leadId?: string | number) {
   }
 }
 
-async function handleDisposition(leadId: string | number, disposition: string, callSid?: string) {
+async function handleDisposition(leadId: string | number, disposition: string, callSid?: string, twilioClient?: any) {
   console.log(`📝 Setting disposition for lead ${leadId} to ${disposition}`);
   
   try {
@@ -222,7 +239,7 @@ async function handleDisposition(leadId: string | number, disposition: string, c
     }
     
     // If call SID is provided, end the call as well
-    if (callSid) {
+    if (callSid && twilioClient) {
       try {
         await twilioClient.calls(callSid).update({ status: 'completed' });
         console.log(`✅ Ended call ${callSid} after disposition`);
