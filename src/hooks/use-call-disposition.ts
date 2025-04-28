@@ -16,24 +16,19 @@ export function useCallDisposition() {
         body: {
           action: 'endCall',
           callSid,
-          leadId,
-          callData: {
-            status: 'completed',
-            timestamp: new Date().toISOString(),
-            callState: 'disconnected'
-          }
+          leadId
         }
       });
 
       if (error) throw error;
 
-      toast.success('Call ended successfully');
+      toast.success('Call ended');
       return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       setError(errorMsg);
       console.error('[useCallDisposition] Error ending call:', err);
-      toast.error('Failed to end call. Please try again.');
+      toast.error('Failed to end call');
       return false;
     } finally {
       setIsLoading(false);
