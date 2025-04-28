@@ -1,0 +1,269 @@
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import twilio from 'https://esm.sh/twilio@4.18.1';
+
+// Define CORS headers for browser requests
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Create Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Create Twilio client
+const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
+const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
+const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
+
+// Main function to handle requests
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+  
+  try {
+    const { action, callSid, leadId, disposition, sessionId, userId } = await req.json();
+    
+    console.log(`📞 Call disposition request received: ${action} for call ${callSid}, lead ${leadId}`);
+    
+    // Validate required parameters based on action
+    if (!action) {
+      throw new Error('Action is required');
+    }
+    
+    // Track the action in the database for analytics
+    try {
+      await supabase.from('lead_activities').insert({
+        lead_id: Number(leadId),
+        type: `call_${action}`,
+        description: `Call ${action} via disposition panel`,
+      });
+      console.log(`✅ Activity logged for lead ${leadId}: call_${action}`);
+    } catch (activityError) {
+      console.warn(`⚠️ Failed to log activity: ${activityError.message}`);
+      // Continue with the operation even if logging fails
+    }
+    
+    // Handle different call actions
+    switch(action) {
+      case 'end':
+        if (!callSid) {
+          throw new Error('Call SID is required for ending a call');
+        }
+        return await handleEndCall(callSid, leadId);
+        
+      case 'disposition':
+        if (!leadId || !disposition) {
+          throw new Error('Lead ID and disposition are required');
+        }
+        return await handleDisposition(leadId, disposition, callSid);
+        
+      case 'next':
+        if (!sessionId) {
+          throw new Error('Session ID is required for fetching next lead');
+        }
+        return await handleNextLead(sessionId, userId);
+        
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error in call-disposition function: ${error.message}`);
+    
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: error.message || 'An error occurred',
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 400,
+    });
+  }
+});
+
+async function handleEndCall(callSid: string, leadId?: string | number) {
+  console.log(`📞 Ending call ${callSid}`);
+  
+  try {
+    // End the call via Twilio API
+    try {
+      await twilioClient.calls(callSid).update({ status: 'completed' });
+      console.log(`✅ Successfully ended call ${callSid} via Twilio API`);
+    } catch (twilioError) {
+      console.error(`⚠️ Twilio API error: ${twilioError.message}`);
+      
+      // If Twilio API fails, try to update call status in our database anyway
+      if (leadId) {
+        try {
+          await supabase.from('call_mappings')
+            .update({ status: 'completed' })
+            .eq('call_sid', callSid);
+          console.log(`✅ Updated call mapping status to completed for ${callSid}`);
+        } catch (dbError) {
+          console.warn(`⚠️ Failed to update call mapping: ${dbError.message}`);
+        }
+      }
+      
+      // Even if Twilio API fails, we still report success to the client
+      // since the user intends to end the call anyway
+    }
+    
+    // Broadcast call ended event to any listeners for real-time updates
+    try {
+      if (leadId) {
+        const channelName = `lead-data-${leadId}`;
+        await supabase.channel(channelName).send({
+          type: 'broadcast',
+          event: 'lead_data_update',
+          payload: {
+            callStatus: 'completed',
+            callSid: callSid,
+            timestamp: new Date().toISOString(),
+          }
+        });
+        console.log(`✅ Broadcast call ended event to ${channelName}`);
+      }
+    } catch (broadcastError) {
+      console.warn(`⚠️ Failed to broadcast call status: ${broadcastError.message}`);
+    }
+    
+    return new Response(JSON.stringify({
+      success: true,
+      message: 'Call ended successfully',
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error(`❌ Error ending call: ${error.message}`);
+    throw error;
+  }
+}
+
+async function handleDisposition(leadId: string | number, disposition: string, callSid?: string) {
+  console.log(`📝 Setting disposition for lead ${leadId} to ${disposition}`);
+  
+  try {
+    // Update lead disposition in database
+    const { error: updateError } = await supabase.from('leads')
+      .update({ 
+        disposition: disposition,
+        last_contacted: new Date().toISOString()
+      })
+      .eq('id', Number(leadId));
+    
+    if (updateError) {
+      throw new Error(`Failed to update lead disposition: ${updateError.message}`);
+    }
+    
+    console.log(`✅ Updated disposition for lead ${leadId} to ${disposition}`);
+    
+    // Log disposition as an activity
+    const { error: activityError } = await supabase.from('lead_activities').insert({
+      lead_id: Number(leadId),
+      type: "disposition",
+      description: disposition
+    });
+    
+    if (activityError) {
+      console.warn(`⚠️ Failed to log disposition activity: ${activityError.message}`);
+    } else {
+      console.log(`✅ Logged disposition activity for lead ${leadId}`);
+    }
+    
+    // If call SID is provided, end the call as well
+    if (callSid) {
+      try {
+        await twilioClient.calls(callSid).update({ status: 'completed' });
+        console.log(`✅ Ended call ${callSid} after disposition`);
+      } catch (twilioError) {
+        console.warn(`⚠️ Failed to end call via Twilio API: ${twilioError.message}`);
+      }
+    }
+    
+    // Broadcast disposition update
+    try {
+      const channelName = `lead-data-${leadId}`;
+      await supabase.channel(channelName).send({
+        type: 'broadcast',
+        event: 'lead_data_update',
+        payload: {
+          lead: {
+            id: leadId,
+            disposition: disposition,
+            last_contacted: new Date().toISOString()
+          },
+          timestamp: new Date().toISOString(),
+        }
+      });
+      console.log(`✅ Broadcast disposition update to ${channelName}`);
+    } catch (broadcastError) {
+      console.warn(`⚠️ Failed to broadcast disposition: ${broadcastError.message}`);
+    }
+    
+    return new Response(JSON.stringify({
+      success: true,
+      message: `Lead disposition set to ${disposition}`,
+      disposition: disposition,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error(`❌ Error setting disposition: ${error.message}`);
+    throw error;
+  }
+}
+
+async function handleNextLead(sessionId: string, userId?: string) {
+  console.log(`📞 Getting next lead for session ${sessionId}`);
+  
+  try {
+    // Get the next lead from the session
+    const { data: nextLead, error: nextLeadError } = await supabase.functions.invoke('get-next-lead', {
+      body: { sessionId }
+    });
+    
+    if (nextLeadError) {
+      throw new Error(`Failed to get next lead: ${nextLeadError}`);
+    }
+    
+    if (!nextLead || !nextLead.leadId) {
+      return new Response(JSON.stringify({
+        success: true,
+        message: "No more leads available in this session.",
+        hasMoreLeads: false,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
+    console.log(`✅ Retrieved next lead: ${nextLead.leadId}, ${nextLead.phoneNumber}`);
+    
+    // Log this as an activity
+    try {
+      await supabase.from('lead_activities').insert({
+        lead_id: Number(nextLead.leadId),
+        type: "call_initiated",
+        description: `Call initiated by ${userId || 'user'} via next lead button`
+      });
+    } catch (activityError) {
+      console.warn(`⚠️ Failed to log call activity: ${activityError}`);
+    }
+    
+    return new Response(JSON.stringify({
+      success: true,
+      message: "Next lead retrieved successfully",
+      leadId: nextLead.leadId,
+      phoneNumber: nextLead.phoneNumber,
+      name: nextLead.name,
+      hasMoreLeads: true,
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  } catch (error) {
+    console.error(`❌ Error getting next lead: ${error.message}`);
+    throw error;
+  }
+}

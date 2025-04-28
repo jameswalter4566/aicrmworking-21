@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.ai-sms-agent]
 verify_jwt = false
+
+[functions.call-disposition]
+verify_jwt = false
