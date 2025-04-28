@@ -49,6 +49,14 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Determine request type early by checking content type
+  const contentType = req.headers.get('content-type') || '';
+  const isTwilioWebhook = contentType.includes('application/x-www-form-urlencoded');
+  const isApiRequest = contentType.includes('application/json');
+
+  console.log(`[call-disposition] Request type: ${isTwilioWebhook ? 'Twilio webhook' : isApiRequest ? 'API request' : 'Unknown'}`);
+  console.log(`[call-disposition] Content-Type: ${contentType}`);
+
   // Ensure Twilio client is initialized before processing requests
   if (!twilioClient) {
     try {
@@ -83,24 +91,44 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Check the content type to determine if this is a Twilio webhook or API request
-    const contentType = req.headers.get('content-type');
-    
-    // Handle Twilio webhook (form data)
-    if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
+    // Route based on content type
+    if (isTwilioWebhook) {
+      // Process as Twilio webhook (form data)
       console.log('[call-disposition] Processing Twilio webhook (form data)');
       return await handleTwilioWebhook(req);
+    } else if (isApiRequest) {
+      // Process as API request (JSON)
+      console.log('[call-disposition] Processing API request (JSON)');
+      return await handleApiRequest(req, twilioClient);
+    } else {
+      // Unknown content type
+      console.warn(`[call-disposition] Unsupported content type: ${contentType}`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: `Unsupported content type: ${contentType}` 
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
-    
-    // Handle API request (JSON)
-    console.log('[call-disposition] Processing API request (JSON)');
-    return await handleApiRequest(req, twilioClient);
   } catch (error) {
     console.error(`[call-disposition] Unhandled error:`, error);
-    return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    
+    // Return appropriate format based on request type
+    if (isTwilioWebhook) {
+      return new Response(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 
+        { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({ success: false, error: error.message }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
   }
 });
 
@@ -114,7 +142,7 @@ async function handleTwilioWebhook(req: Request) {
       twilioData[key] = value.toString();
     }
     
-    console.log('[call-disposition] Received Twilio webhook:', JSON.stringify(twilioData, null, 2));
+    console.log('[call-disposition] Received Twilio webhook data:', JSON.stringify(twilioData, null, 2));
     
     // Log and store call status information if available
     if (twilioData.CallSid && twilioData.CallStatus) {
@@ -175,7 +203,9 @@ async function handleTwilioWebhook(req: Request) {
 async function handleApiRequest(req: Request, twilioClient: any) {
   try {
     // Parse JSON from API request
-    const { action, callSid, leadId, disposition, sessionId, userId } = await req.json();
+    const requestData = await req.json();
+    const { action, callSid, leadId, disposition, sessionId, userId } = requestData;
+    
     console.log(`[call-disposition] Received API action: ${action} for call ${callSid}`);
 
     // Validate required parameters based on action

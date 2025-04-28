@@ -311,7 +311,7 @@ const DialerSession = () => {
     const callStatus = firstActiveCall?.status;
     
     const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
-    const inProgressStatuses = ['connecting', 'in-progress'];
+    const inProgressStatuses = ['connecting', 'ringing', 'in-progress'];
     
     if (completedStatuses.includes(callStatus)) {
       handleCallCompletion();
@@ -381,6 +381,7 @@ const DialerSession = () => {
                         </p>
                         <Badge className="mt-2" variant={Object.values(twilioState.activeCalls)[0]?.status === 'in-progress' ? "default" : "outline"}>
                           {Object.values(twilioState.activeCalls)[0]?.status === 'connecting' ? 'Ringing' : 
+                           Object.values(twilioState.activeCalls)[0]?.status === 'ringing' ? 'Ringing' :
                            Object.values(twilioState.activeCalls)[0]?.status === 'in-progress' ? 'Connected' :
                            Object.values(twilioState.activeCalls)[0]?.status === 'completed' ? 'Ended' : 
                            Object.values(twilioState.activeCalls)[0]?.status}
