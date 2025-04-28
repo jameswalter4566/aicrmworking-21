@@ -403,8 +403,8 @@ export default function PowerDialer() {
       
       <AudioDebugModal />
       
-      <div className="container py-4 px-4 md:px-6">
-        <div className="flex flex-col space-y-2 mb-4">
+      <div className="container py-2 px-4 md:px-6">
+        <div className="flex flex-col space-y-2 mb-2">
           <h1 className="text-2xl font-bold tracking-tight">Power Dialer</h1>
           <p className="text-muted-foreground">
             Make outbound calls to your leads in queue
@@ -434,7 +434,7 @@ export default function PowerDialer() {
           defaultValue="dialer"
           value={currentTab}
           onValueChange={setCurrentTab}
-          className="space-y-4"
+          className="space-y-2"
         >
           <TabsList>
             <TabsTrigger value="dialer" onClick={() => setCurrentTab("dialer")}>
@@ -448,225 +448,288 @@ export default function PowerDialer() {
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="dialer" className="space-y-4">
-            <div className="flex flex-col space-y-4">
-              <Card className="bg-muted/50">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-lg flex justify-between items-center">
-                    System Controls
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async () => {
-                          const success = await twilioState.endAllCalls();
-                          if (success) {
-                            setConnectedLeadData(null);
-                            toast("System Reset", {
-                              description: "All active calls have been terminated. The system has been reset."
-                            });
-                          }
-                        }}
-                      >
-                        Reset All Calls
-                      </Button>
-                      
-                      <Button
-                        variant="default" 
-                        size="sm"
-                        onClick={async () => {
-                          const initialized = await twilioService.initializeTwilioDevice();
-                          if (initialized) {
-                            toast("System Reinitialized", {
-                              description: "The phone system has been reinitialized with a new token."
-                            });
-                          }
-                        }}
-                      >
-                        Reinitialize System
-                      </Button>
-                    </div>
-                  </CardTitle>
-                  <CardDescription>
-                    Reset your system and terminate all active calls if you encounter any issues
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-
-              <PreviewDialerWindow 
-                currentCall={Object.values(twilioState.activeCalls)[0]}
-                onDisposition={handleDisposition}
-                onEndCall={() => {
-                  Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
-                  setConnectedLeadData(null);
-                }}
-              />
-
-              {Object.keys(twilioState.activeCalls).length > 0 && (
+          <TabsContent value="dialer" className="space-y-0">
+            <div className="bg-gray-50 rounded-lg p-2 border shadow-sm">
+              <div className="flex flex-col space-y-2">
                 <Card className="bg-muted/50">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex justify-between items-center">
-                      Active Call
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => {
-                          twilioState.endAllCalls();
-                          setConnectedLeadData(null);
-                        }}
-                      >
-                        End All Calls
-                      </Button>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pb-2">
-                    {Object.entries(twilioState.activeCalls).map(([leadId, call]) => (
-                      <div key={leadId} className="mb-4">
-                        {leads.find(l => l.id === leadId) && (
-                          <div className="flex flex-col space-y-2">
-                            <div className="flex justify-between items-center">
-                              <div>
-                                <p className="font-medium">
-                                  {leads.find(l => l.id === leadId)?.name}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {call.phoneNumber}
-                                </p>
-                              </div>
-                              <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
-                                {call.status === 'connecting' ? 'Ringing' : 
-                                 call.status === 'in-progress' ? 'Connected' :
-                                 call.status === 'completed' ? 'Ended' : 
-                                 call.status}
-                              </Badge>
-                            </div>
-                            
-                            <CallControls
-                              leadId={leadId}
-                              phoneNumber={call.phoneNumber}
-                              activeCall={call}
-                              onCall={(phone, id) => {}}
-                              onHangup={() => {
-                                handleEndCall(leadId);
-                                setConnectedLeadData(null);
-                              }}
-                              onToggleMute={(id) => twilioState.toggleMute(id)}
-                              onToggleSpeaker={(id) => twilioState.toggleSpeaker(id)}
-                              audioOutputDevices={twilioState.audioOutputDevices}
-                              currentAudioDevice={twilioState.currentAudioDevice}
-                              onChangeAudioDevice={(deviceId) => twilioState.setAudioOutputDevice(deviceId)}
-                              onRefreshDevices={() => twilioState.refreshAudioDevices()}
-                              onTestAudio={(deviceId) => twilioState.testAudio(deviceId || '')}
-                            />
-                            
-                            {!call.audioActive && call.status === 'in-progress' && (
-                              <Alert variant="destructive" className="mt-2">
-                                <AlertTitle>Audio Warning</AlertTitle>
-                                <AlertDescription>
-                                  Microphone appears to be inactive. Check your browser permissions.
-                                </AlertDescription>
-                              </Alert>
-                            )}
-                          </div>
-                        )}
+                      System Controls
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const success = await twilioState.endAllCalls();
+                            if (success) {
+                              setConnectedLeadData(null);
+                              toast("System Reset", {
+                                description: "All active calls have been terminated. The system has been reset."
+                              });
+                            }
+                          }}
+                        >
+                          Reset All Calls
+                        </Button>
+                        
+                        <Button
+                          variant="default" 
+                          size="sm"
+                          onClick={async () => {
+                            const initialized = await twilioService.initializeTwilioDevice();
+                            if (initialized) {
+                              toast("System Reinitialized", {
+                                description: "The phone system has been reinitialized with a new token."
+                              });
+                            }
+                          }}
+                        >
+                          Reinitialize System
+                        </Button>
                       </div>
-                    ))}
-                  </CardContent>
+                    </CardTitle>
+                    <CardDescription>
+                      Reset your system and terminate all active calls if you encounter any issues
+                    </CardDescription>
+                  </CardHeader>
                 </Card>
-              )}
 
-              <ConnectedLeadPanel 
-                leadData={connectedLeadData}
-                onRefresh={refreshLatestLead}
-              />
+                <PreviewDialerWindow 
+                  currentCall={Object.values(twilioState.activeCalls)[0]}
+                  onDisposition={handleDisposition}
+                  onEndCall={() => {
+                    Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
+                    setConnectedLeadData(null);
+                  }}
+                />
 
-              <Card className="h-full overflow-hidden flex flex-col">
-                <CardHeader className="pb-2">
-                  <div className="flex justify-between items-center">
-                    <CardTitle>Dialing Queue</CardTitle>
-                    <div className="flex space-x-2">
-                      <Select value={filterStatus} onValueChange={setFilterStatus}>
-                        <SelectTrigger className="w-[130px] h-8 text-xs">
-                          <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Status</SelectItem>
-                          <SelectItem value="New">New</SelectItem>
-                          <SelectItem value="Attempted">Attempted</SelectItem>
-                          <SelectItem value="Contacted">Contacted</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={sortBy} onValueChange={setSortBy}>
-                        <SelectTrigger className="w-[130px] h-8 text-xs">
-                          <SelectValue placeholder="Sort by" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="priority">Priority</SelectItem>
-                          <SelectItem value="name">Name</SelectItem>
-                          <SelectItem value="company">Company</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <CardDescription>
-                    {filteredAndSortedLeads.length} leads ready to call
-                  </CardDescription>
-                </CardHeader>
-                <ScrollArea className="flex-1 h-[calc(100vh-450px)]">
-                  <CardContent>
-                    <div className="space-y-3">
-                      {filteredAndSortedLeads.map((lead) => (
-                        <Card key={lead.id} className="p-3 hover:bg-accent/50">
-                          <div className="flex justify-between items-start">
-                            <div className="space-y-1">
-                              <div className="font-medium">{lead.name}</div>
-                              <div className="text-sm text-muted-foreground">
-                                {lead.company}
+                {Object.keys(twilioState.activeCalls).length > 0 && (
+                  <Card className="bg-muted/50 mb-0">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg flex justify-between items-center">
+                        Active Call
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => {
+                            twilioState.endAllCalls();
+                            setConnectedLeadData(null);
+                          }}
+                        >
+                          End All Calls
+                        </Button>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pb-2">
+                      {Object.entries(twilioState.activeCalls).map(([leadId, call]) => (
+                        <div key={leadId} className="mb-2">
+                          {leads.find(l => l.id === leadId) && (
+                            <div className="flex flex-col space-y-2">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <p className="font-medium">
+                                    {leads.find(l => l.id === leadId)?.name}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {call.phoneNumber}
+                                  </p>
+                                </div>
+                                <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
+                                  {call.status === 'connecting' ? 'Ringing' : 
+                                   call.status === 'ringing' ? 'Ringing' :
+                                   call.status === 'in-progress' ? 'Connected' :
+                                   call.status === 'completed' ? 'Ended' : 
+                                   call.status}
+                                </Badge>
                               </div>
-                              <div className="text-sm">{lead.phone}</div>
+                              
+                              <CallControls
+                                leadId={leadId}
+                                phoneNumber={call.phoneNumber}
+                                activeCall={call}
+                                onCall={(phone, id) => {}}
+                                onHangup={() => {
+                                  handleEndCall(leadId);
+                                  setConnectedLeadData(null);
+                                }}
+                                onToggleMute={(id) => twilioState.toggleMute(id)}
+                                onToggleSpeaker={(id) => twilioState.toggleSpeaker(id)}
+                                audioOutputDevices={twilioState.audioOutputDevices}
+                                currentAudioDevice={twilioState.currentAudioDevice}
+                                onChangeAudioDevice={(deviceId) => twilioState.setAudioOutputDevice(deviceId)}
+                                onRefreshDevices={() => twilioState.refreshAudioDevices()}
+                                onTestAudio={(deviceId) => twilioState.testAudio(deviceId || '')}
+                              />
+                              
+                              {!call.audioActive && call.status === 'in-progress' && (
+                                <Alert variant="destructive" className="mt-2">
+                                  <AlertTitle>Audio Warning</AlertTitle>
+                                  <AlertDescription>
+                                    Microphone appears to be inactive. Check your browser permissions.
+                                  </AlertDescription>
+                                </Alert>
+                              )}
                             </div>
-                            <div className="flex flex-col items-end">
-                              <Badge
-                                variant={
-                                  lead.status === "New"
-                                    ? "default"
-                                    : lead.status === "Attempted"
-                                    ? "secondary"
-                                    : "outline"
-                                }
-                                className="mb-2"
-                              >
-                                {lead.status}
-                              </Badge>
-                              <Badge
-                                variant={
-                                  lead.priority === "High"
-                                    ? "destructive"
-                                    : lead.priority === "Medium"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                className="mb-2"
-                              >
-                                {lead.priority}
-                              </Badge>
-                              <Button
-                                size="sm"
-                                variant="default"
-                                onClick={() => handleCallLead(lead)}
-                                disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0}
-                                className="w-16 h-8"
-                              >
-                                <Phone className="mr-1 h-3 w-3" /> Call
-                              </Button>
-                            </div>
-                          </div>
-                        </Card>
+                          )}
+                        </div>
                       ))}
-                    </div>
-                  </CardContent>
-                </ScrollArea>
-              </Card>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <ConnectedLeadPanel 
+                  leadData={connectedLeadData}
+                  onRefresh={refreshLatestLead}
+                />
+
+                <div className="grid grid-cols-4 gap-2">
+                  <div className="col-span-3">
+                    <Card className="h-full overflow-hidden flex flex-col">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-center">
+                          <CardTitle>Dialing Queue</CardTitle>
+                          <div className="flex space-x-2">
+                            <Select value={filterStatus} onValueChange={setFilterStatus}>
+                              <SelectTrigger className="w-[130px] h-8 text-xs">
+                                <SelectValue placeholder="Status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="New">New</SelectItem>
+                                <SelectItem value="Attempted">Attempted</SelectItem>
+                                <SelectItem value="Contacted">Contacted</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Select value={sortBy} onValueChange={setSortBy}>
+                              <SelectTrigger className="w-[130px] h-8 text-xs">
+                                <SelectValue placeholder="Sort by" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="priority">Priority</SelectItem>
+                                <SelectItem value="name">Name</SelectItem>
+                                <SelectItem value="company">Company</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <CardDescription>
+                          {filteredAndSortedLeads.length} leads ready to call
+                        </CardDescription>
+                      </CardHeader>
+                      <ScrollArea className="flex-1 h-[calc(100vh-520px)]">
+                        <CardContent>
+                          <div className="space-y-2">
+                            {filteredAndSortedLeads.map((lead) => (
+                              <Card key={lead.id} className="p-3 hover:bg-accent/50">
+                                <div className="flex justify-between items-start">
+                                  <div className="space-y-1">
+                                    <div className="font-medium">{lead.name}</div>
+                                    <div className="text-sm text-muted-foreground">
+                                      {lead.company}
+                                    </div>
+                                    <div className="text-sm">{lead.phone}</div>
+                                  </div>
+                                  <div className="flex flex-col items-end">
+                                    <Badge
+                                      variant={
+                                        lead.status === "New"
+                                          ? "default"
+                                          : lead.status === "Attempted"
+                                          ? "secondary"
+                                          : "outline"
+                                      }
+                                      className="mb-2"
+                                    >
+                                      {lead.status}
+                                    </Badge>
+                                    <Badge
+                                      variant={
+                                        lead.priority === "High"
+                                          ? "destructive"
+                                          : lead.priority === "Medium"
+                                          ? "default"
+                                          : "outline"
+                                      }
+                                      className="mb-2"
+                                    >
+                                      {lead.priority}
+                                    </Badge>
+                                    <Button
+                                      size="sm"
+                                      variant="default"
+                                      onClick={() => handleCallLead(lead)}
+                                      disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0}
+                                      className="w-16 h-8"
+                                    >
+                                      <Phone className="mr-1 h-3 w-3" /> Call
+                                    </Button>
+                                  </div>
+                                </div>
+                              </Card>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </ScrollArea>
+                    </Card>
+                  </div>
+
+                  <Card className="bg-gray-800 text-white h-full">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg font-medium text-white">Disposition</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ScrollArea className="h-[calc(100vh-520px)]">
+                        <div className="space-y-2">
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
+                            onClick={() => onDisposition('contact')}
+                          >
+                            <Phone className="mr-2 h-4 w-4 text-green-400" />
+                            Contact
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
+                            onClick={() => onDisposition('attempt')}
+                          >
+                            <Phone className="mr-2 h-4 w-4 text-yellow-400" />
+                            Attempt
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
+                            onClick={() => onDisposition('no-answer')}
+                          >
+                            <Phone className="mr-2 h-4 w-4 text-red-400" />
+                            No Answer
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
+                            onClick={() => onDisposition('busy')}
+                          >
+                            <Phone className="mr-2 h-4 w-4 text-orange-400" />
+                            Busy
+                          </Button>
+                          
+                          <Button 
+                            variant="outline" 
+                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
+                            onClick={() => onDisposition('failed')}
+                          >
+                            <Phone className="mr-2 h-4 w-4 text-gray-400" />
+                            Failed
+                          </Button>
+                        </div>
+                      </ScrollArea>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </div>
           </TabsContent>
           

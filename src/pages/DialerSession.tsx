@@ -226,14 +226,13 @@ const DialerSession = () => {
     const callStatus = firstActiveCall?.status;
     
     if (callStatus) {
-      if (callStatus === 'completed' || 
-          callStatus === 'failed' || 
-          callStatus === 'busy' || 
-          callStatus === 'no-answer' || 
-          callStatus === 'canceled') {
+      const completionStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
+      const connectingStatuses = ['connecting', 'ringing'];
+      
+      if (completionStatuses.includes(callStatus)) {
         handleCallCompletion();
       } 
-      else if (callStatus === 'connecting' || callStatus === 'ringing') {
+      else if (connectingStatuses.includes(callStatus)) {
         startNoAnswerTimeout();
       } 
       else if (callStatus === 'in-progress') {
@@ -304,11 +303,14 @@ const DialerSession = () => {
                             ? "default" 
                             : "outline"
                         }>
-                          {Object.values(twilioState.activeCalls)[0]?.status === 'connecting' ? 'Ringing' : 
-                           Object.values(twilioState.activeCalls)[0]?.status === 'ringing' ? 'Ringing' :
-                           Object.values(twilioState.activeCalls)[0]?.status === 'in-progress' ? 'Connected' :
-                           Object.values(twilioState.activeCalls)[0]?.status === 'completed' ? 'Ended' : 
-                           Object.values(twilioState.activeCalls)[0]?.status}
+                          {(() => {
+                            const status = Object.values(twilioState.activeCalls)[0]?.status;
+                            if (status === 'connecting') return 'Ringing';
+                            if (status === 'ringing') return 'Ringing';
+                            if (status === 'in-progress') return 'Connected';
+                            if (status === 'completed') return 'Ended';
+                            return status;
+                          })()}
                         </Badge>
                       </div>
                       
