@@ -83,67 +83,100 @@ Deno.serve(async (req) => {
   }
 
   try {
-    let eventData;
-    let twilioData;
-    
-    // Check if this is a Twilio webhook request
+    // Check the content type to determine if this is a Twilio webhook or API request
     const contentType = req.headers.get('content-type');
+    
+    // Handle Twilio webhook (form data)
     if (contentType && contentType.includes('application/x-www-form-urlencoded')) {
-      // This is a Twilio webhook
-      const formData = await req.formData();
-      twilioData = {};
-      for (const [key, value] of formData.entries()) {
-        twilioData[key] = value;
-      }
-      console.log('[call-disposition] Received Twilio webhook:', JSON.stringify(twilioData, null, 2));
-      
-      // Log and store call status information
-      if (twilioData.CallSid && twilioData.CallStatus) {
-        console.log(`[call-disposition] Call ${twilioData.CallSid} status: ${twilioData.CallStatus}`);
-        console.log(`[call-disposition] From: ${twilioData.From} To: ${twilioData.To}`);
-        console.log(`[call-disposition] Duration: ${twilioData.CallDuration || 0}s`);
-        
-        // Store call status update in Supabase
-        const { error: dbError } = await supabase
-          .from('call_status_updates')
-          .insert({
-            call_sid: twilioData.CallSid,
-            status: twilioData.CallStatus,
-            data: twilioData,
-          });
-        
-        if (dbError) {
-          console.error('[call-disposition] Error storing call status:', dbError);
-        }
-        
-        // Broadcast status update for real-time UI updates
-        try {
-          const channelName = `call-${twilioData.CallSid}`;
-          await supabase.channel(channelName).send({
-            type: 'broadcast',
-            event: 'call_status_update',
-            payload: {
-              callSid: twilioData.CallSid,
-              status: twilioData.CallStatus,
-              duration: twilioData.CallDuration,
-              timestamp: new Date().toISOString(),
-            }
-          });
-        } catch (broadcastError) {
-          console.error('[call-disposition] Broadcast error:', broadcastError);
-        }
-      }
-      
-      // Return TwiML response for Twilio
-      return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 
-        { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
-      );
+      console.log('[call-disposition] Processing Twilio webhook (form data)');
+      return await handleTwilioWebhook(req);
     }
+    
+    // Handle API request (JSON)
+    console.log('[call-disposition] Processing API request (JSON)');
+    return await handleApiRequest(req, twilioClient);
+  } catch (error) {
+    console.error(`[call-disposition] Unhandled error:`, error);
+    return new Response(
+      JSON.stringify({ success: false, error: error.message }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+    );
+  }
+});
 
-    // Handle API requests from our frontend
+async function handleTwilioWebhook(req: Request) {
+  try {
+    // Parse form data from Twilio webhook
+    const formData = await req.formData();
+    const twilioData: Record<string, string> = {};
+    
+    for (const [key, value] of formData.entries()) {
+      twilioData[key] = value.toString();
+    }
+    
+    console.log('[call-disposition] Received Twilio webhook:', JSON.stringify(twilioData, null, 2));
+    
+    // Log and store call status information if available
+    if (twilioData.CallSid && twilioData.CallStatus) {
+      console.log(`[call-disposition] Call ${twilioData.CallSid} status: ${twilioData.CallStatus}`);
+      console.log(`[call-disposition] From: ${twilioData.From} To: ${twilioData.To}`);
+      console.log(`[call-disposition] Duration: ${twilioData.CallDuration || 0}s`);
+      
+      // Store call status update in Supabase
+      const { error: dbError } = await supabase
+        .from('call_status_updates')
+        .insert({
+          call_sid: twilioData.CallSid,
+          status: twilioData.CallStatus,
+          data: twilioData,
+        });
+      
+      if (dbError) {
+        console.error('[call-disposition] Error storing call status:', dbError);
+      } else {
+        console.log(`[call-disposition] ✅ Stored call status for SID ${twilioData.CallSid}`);
+      }
+      
+      // Broadcast status update for real-time UI updates
+      try {
+        const channelName = `call-${twilioData.CallSid}`;
+        await supabase.channel(channelName).send({
+          type: 'broadcast',
+          event: 'call_status_update',
+          payload: {
+            callSid: twilioData.CallSid,
+            status: twilioData.CallStatus,
+            duration: twilioData.CallDuration,
+            timestamp: new Date().toISOString(),
+          }
+        });
+        console.log(`[call-disposition] ✅ Broadcast call status update for ${twilioData.CallSid}`);
+      } catch (broadcastError) {
+        console.error('[call-disposition] Broadcast error:', broadcastError);
+      }
+    }
+    
+    // Return TwiML response for Twilio - empty response is fine for status callbacks
+    return new Response(
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 
+      { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+    );
+  } catch (error) {
+    console.error('[call-disposition] Error handling Twilio webhook:', error);
+    
+    // Even on error, return a valid TwiML response to Twilio
+    return new Response(
+      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 
+      { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
+    );
+  }
+}
+
+async function handleApiRequest(req: Request, twilioClient: any) {
+  try {
+    // Parse JSON from API request
     const { action, callSid, leadId, disposition, sessionId, userId } = await req.json();
-    console.log(`[call-disposition] Received action: ${action} for call ${callSid}`);
+    console.log(`[call-disposition] Received API action: ${action} for call ${callSid}`);
 
     // Validate required parameters based on action
     if (!action) {
@@ -152,12 +185,14 @@ Deno.serve(async (req) => {
     
     // Track the action in the database for analytics
     try {
-      await supabase.from('lead_activities').insert({
-        lead_id: Number(leadId),
-        type: `call_${action}`,
-        description: `Call ${action} via disposition panel`,
-      });
-      console.log(`✅ Activity logged for lead ${leadId}: call_${action}`);
+      if (leadId) {
+        await supabase.from('lead_activities').insert({
+          lead_id: Number(leadId),
+          type: `call_${action}`,
+          description: `Call ${action} via disposition panel`,
+        });
+        console.log(`✅ Activity logged for lead ${leadId}: call_${action}`);
+      }
     } catch (activityError) {
       console.warn(`⚠️ Failed to log activity: ${activityError.message}`);
       // Continue with the operation even if logging fails
@@ -187,13 +222,13 @@ Deno.serve(async (req) => {
         throw new Error(`Unknown action: ${action}`);
     }
   } catch (error) {
-    console.error(`[call-disposition] Error:`, error);
+    console.error(`[call-disposition] API request error:`, error);
     return new Response(
       JSON.stringify({ success: false, error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
     );
   }
-});
+}
 
 async function handleEndCall(callSid: string, leadId?: string | number, twilioClient?: any) {
   console.log(`📞 Ending call ${callSid}`);
