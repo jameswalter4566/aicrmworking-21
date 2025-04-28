@@ -1,9 +1,9 @@
-project_id = "imrmboyczebjlbnkgjns"
 
+project_id = "imrmboyczebjlbnkgjns"
 [api]
 enabled = true
 port = 54321
-schemas = ["public", "storage"]
+schemas = ["public", "storage", "graphql_public"]
 
 [db]
 port = 54322
@@ -19,45 +19,26 @@ api_url = "http://localhost"
 enabled = true
 port = 54324
 
+[auth]
+enabled = true
+port = 9999
+
+[realtime]
+enabled = true
+ip_address = "0.0.0.0"
+port = 5433
+
 [storage]
 enabled = true
 
-[auth]
+[edge_functions]
 enabled = true
-site_url = "http://localhost:3000"
 
-[analytics]
-enabled = false
-
-[experimental]
-minimal_apis = false
-
-[functions.lead-connected]
-verify_jwt = false
-no_verify_jwt = true
-
-[functions.predictive-dialer-webhook]
-verify_jwt = false
-
-[functions.dialer-webhook]
+[functions.twilio-token]
 verify_jwt = false
 
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.twilio-token]
-verify_jwt = false
-
-[functions.sms-webhook-receiver]
-verify_jwt = false
-
-[functions.ai-sms-agent]
-verify_jwt = false
-
-[functions.call-disposition]
-verify_jwt = false
-no_verify_jwt = true
-
 [functions.hangup-call]
 verify_jwt = false
-no_verify_jwt = true

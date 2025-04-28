@@ -11,6 +11,8 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 Deno.serve(async (req) => {
   console.log("Hangup-call function invoked with URL:", req.url);
+  console.log("Request headers:", JSON.stringify(Object.fromEntries(req.headers.entries()), null, 2));
+  console.log("Request method:", req.method);
   
   // Handle CORS
   if (req.method === 'OPTIONS') {

@@ -224,10 +224,23 @@ export default function PowerDialer() {
   };
 
   const handleEndCall = async (leadId: string) => {
-    await twilioState.endCall(leadId);
-    updateLeadStatus(leadId, "Contacted");
-    setCallInProgress(false);
-    setConnectedLeadData(null);
+    const activeCall = Object.values(twilioState.activeCalls)[0];
+    if (!activeCall || !activeCall.callSid) {
+      console.error("No active call or callSid available to end");
+      return;
+    }
+    
+    console.log("PowerDialer - handleEndCall - Using callSid:", activeCall.callSid);
+    
+    try {
+      await twilioState.endCall(leadId);
+      updateLeadStatus(leadId, "Contacted");
+      setCallInProgress(false);
+      setConnectedLeadData(null);
+    } catch (err) {
+      console.error("PowerDialer - Failed to end call:", err);
+      toast.error("Failed to end call");
+    }
   };
 
   const handleDisposition = (type: string) => {

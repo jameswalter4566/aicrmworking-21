@@ -18,16 +18,15 @@ export function useHangupCall() {
     console.log(`Attempting to hang up call with SID: ${callSid}`, { callSid });
 
     try {
-      console.log('Sending hangup request to hangup-call function with payload:', {
+      const payload = { 
         callSid,
-        userId: user?.id
-      });
+        userId: user?.id || 'anonymous'
+      };
+      
+      console.log('Sending hangup request to hangup-call function with payload:', payload);
 
       const { data, error } = await supabase.functions.invoke('hangup-call', {
-        body: { 
-          callSid,
-          userId: user?.id
-        }
+        body: payload
       });
 
       console.log('Received response from hangup-call function:', { data, error });
