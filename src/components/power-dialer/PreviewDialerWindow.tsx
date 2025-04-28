@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { List, Loader2, Mail, MapPin, Trash2 } from 'lucide-react';
+import { HangupButton } from './HangupButton';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -757,14 +758,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                   Pause
                 </Button>
                 
-                <Button 
-                  variant="outline" 
+                <HangupButton
+                  callSid={currentCall?.callSid}
+                  onSuccess={onEndCall}
                   className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={onEndCall}
-                >
-                  <PhoneOff className="mr-2 h-4 w-4" />
-                  Hang Up
-                </Button>
+                />
                 
                 <Button 
                   variant="outline" 
