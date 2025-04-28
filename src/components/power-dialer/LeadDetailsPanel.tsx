@@ -9,6 +9,7 @@ import DispositionSelector from '@/components/DispositionSelector';
 import { leadProfileService } from '@/services/leadProfile';
 import { TranscriptionPanel } from './TranscriptionPanel';
 import { ColoredSwitch } from "@/components/ui/colored-switch";
+import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 
 interface LeadDetailsPanelProps {
   leadId?: string;
@@ -23,12 +24,23 @@ export const LeadDetailsPanel = ({ leadId, isActive, callSid }: LeadDetailsPanel
   const [isLoading, setIsLoading] = useState(false);
   const [showTranscription, setShowTranscription] = useState(true); // Default to true
 
+  // Use the enhanced hook that now provides transcription data
+  const { 
+    leadData: realtimeLeadData, 
+    isLoading: isLeadLoading, 
+    refresh: refreshLeadData,
+    transcriptions,
+    isTranscriptionLoading,
+    refreshTranscriptions
+  } = useLeadRealtime(leadId, undefined);
+
   useEffect(() => {
     if (leadId) {
       fetchLeadData();
     }
   }, [leadId]);
 
+  // Fetch lead from our standard API (for disposition data, etc.)
   const fetchLeadData = async () => {
     if (!leadId) return;
     
@@ -61,6 +73,12 @@ export const LeadDetailsPanel = ({ leadId, isActive, callSid }: LeadDetailsPanel
     }
   };
 
+  // Refresh transcriptions for the current call
+  const handleRefreshTranscriptions = async () => {
+    if (!callSid) return;
+    return refreshTranscriptions(callSid);
+  };
+
   if (!leadId || !leadData) {
     return (
       <Card className="h-full bg-gray-50">
@@ -90,8 +108,15 @@ export const LeadDetailsPanel = ({ leadId, isActive, callSid }: LeadDetailsPanel
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4">
-        {/* Always render the TranscriptionPanel but control visibility through the isVisible prop */}
-        <TranscriptionPanel leadId={leadId} callSid={callSid} isVisible={showTranscription} />
+        {/* Use the TranscriptionPanel with the transcriptions from our hook */}
+        <TranscriptionPanel 
+          leadId={leadId} 
+          callSid={callSid} 
+          isVisible={showTranscription} 
+          transcriptions={transcriptions}
+          onRefresh={handleRefreshTranscriptions}
+          isLoading={isTranscriptionLoading}
+        />
         
         <Tabs defaultValue="details">
           <TabsList className="w-full">

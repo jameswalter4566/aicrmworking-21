@@ -271,5 +271,5 @@ verify_jwt = false
 [functions.twilio-voice]
 verify_jwt = false
 
-[functions.predictive-dialer-webhook]
+[functions.dialer-webhook]
 verify_jwt = false
