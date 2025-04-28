@@ -435,7 +435,10 @@ class TwilioService {
             leadId: leadId.toString(),
             machineDetection: 'DetectMessageEnd',
             machineDetectionTimeout: '30',
-            machineDetectionUrl: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-machine-detection?callId=${leadId}`
+            machineDetectionUrl: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-machine-detection?callId=${leadId}`,
+            callDispositionUrl: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/call-disposition`,
+            sessionId: `browser-session-${Date.now()}`,
+            userId: localStorage.getItem('userId') || 'anonymous'
           }
         });
         

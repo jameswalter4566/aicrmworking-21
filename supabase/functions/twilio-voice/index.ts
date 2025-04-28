@@ -1,6 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import twilio from "npm:twilio@4.10.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 // Define CORS headers
 const corsHeaders = {
@@ -193,6 +193,53 @@ serve(async (req) => {
       }
     }
 
+    // Forward call data to call-disposition function for real-time monitoring
+    const forwardCallData = async (callData: any) => {
+      try {
+        console.log(`[${requestId}] Forwarding call data to call-disposition function:`, callData.CallSid || 'No CallSid');
+        
+        // Create a new supabase client for this request
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+        
+        if (!supabaseUrl || !supabaseAnonKey) {
+          console.error(`[${requestId}] Missing Supabase configuration. Cannot forward call data.`);
+          return;
+        }
+        
+        const supabase = createClient(supabaseUrl, supabaseAnonKey);
+        
+        // Forward the data to the call-disposition function
+        await supabase.functions.invoke('call-disposition', {
+          body: callData
+        });
+        
+        console.log(`[${requestId}] Successfully forwarded call data to call-disposition function`);
+      } catch (err) {
+        console.error(`[${requestId}] Error forwarding call data to call-disposition: ${err.message}`);
+      }
+    };
+
+    // Forward call data when we have meaningful status updates
+    if (callSid && (formData.CallStatus || dialCallStatus || errorCode)) {
+      // Extract key call information
+      const callData = {
+        CallSid: callSid,
+        CallStatus: formData.CallStatus || dialCallStatus || 'unknown',
+        From: formData.From || formData.phoneNumber,
+        To: formData.To || formData.phoneNumber,
+        Direction: formData.Direction || 'outbound-api',
+        CallDuration: formData.CallDuration,
+        ErrorCode: errorCode || null,
+        ErrorMessage: errorMessage || null,
+        SessionId: sessionId,
+        Timestamp: new Date().toISOString()
+      };
+      
+      // Don't await this to avoid slowing down the response
+      forwardCallData(callData);
+    }
+
     // Handle dial action with proper handling of error codes
     if (isDialAction) {
       console.log(`[${requestId}] Processing dial action response: Status=${dialCallStatus}, Error=${errorCode}`);
@@ -257,7 +304,6 @@ serve(async (req) => {
         console.log(logMessage);
         
         const response = new twiml.VoiceResponse();
-        // This is the key change - using the updated message that matches what we set elsewhere in the code
         response.say("The call could not be connected. The system will try again later.");
         response.hangup();
         
