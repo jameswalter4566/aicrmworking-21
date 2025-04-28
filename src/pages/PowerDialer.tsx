@@ -40,6 +40,8 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from '@/hooks/use-auth';
 import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
+import { LineDisplay } from "@/components/power-dialer/LineDisplay";
+import { CallStatusUpdate } from '@/hooks/use-call-status';
 
 const SAMPLE_LEADS = [
   {
@@ -342,6 +344,30 @@ export default function PowerDialer() {
     }
   };
 
+  const transformActiveCallsForDisplay = () => {
+    const calls = Object.values(twilioState.activeCalls);
+    const displayData: Record<number, CallStatusUpdate | undefined> = {
+      1: undefined,
+      2: undefined,
+      3: undefined,
+    };
+    
+    calls.forEach((call, index) => {
+      if (index < 3) {
+        displayData[index + 1] = {
+          status: call.status,
+          phoneNumber: call.phoneNumber,
+          startTime: call.status === 'in-progress' ? new Date() : undefined,
+          errorMessage: undefined
+        };
+      }
+    });
+    
+    return displayData;
+  };
+
+  const activeCallsForDisplay = transformActiveCallsForDisplay();
+
   useEffect(() => {
     console.log('[PowerDialer] Active call status changed:', Object.values(twilioState.activeCalls)[0]?.status);
     console.log('[PowerDialer] Active call leadId:', Object.values(twilioState.activeCalls)[0]?.leadId);
@@ -392,6 +418,16 @@ export default function PowerDialer() {
       });
     }
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
+
+  useEffect(() => {
+    const activeCall = Object.values(twilioState.activeCalls)[0];
+    if (activeCall?.status) {
+      const completionStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
+      const connectingStatuses = ['connecting', 'ringing']; // Both treated the same way
+      
+      // Add logic to handle call status changes if needed
+    }
+  }, [twilioState.activeCalls]);
 
   return (
     <MainLayout>
