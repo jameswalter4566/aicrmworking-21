@@ -2,15 +2,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import twilio from 'https://esm.sh/twilio@4.18.1';
 import { corsHeaders } from '../_shared/cors.ts';
 
+// Initialize Twilio client with proper credentials
+const twilioClient = twilio(
+  Deno.env.get('TWILIO_ACCOUNT_SID'),
+  Deno.env.get('TWILIO_AUTH_TOKEN')
+);
+
 // Create Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Create Twilio client
-const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID') || '';
-const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN') || '';
-const twilioClient = twilio(twilioAccountSid, twilioAuthToken);
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -19,7 +20,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get request data
     let eventData;
     let twilioData;
     
@@ -34,13 +34,13 @@ Deno.serve(async (req) => {
       }
       console.log('[call-disposition] Received Twilio webhook:', JSON.stringify(twilioData, null, 2));
       
-      // Log detailed call status information
+      // Log and store call status information
       if (twilioData.CallSid && twilioData.CallStatus) {
         console.log(`[call-disposition] Call ${twilioData.CallSid} status: ${twilioData.CallStatus}`);
         console.log(`[call-disposition] From: ${twilioData.From} To: ${twilioData.To}`);
         console.log(`[call-disposition] Duration: ${twilioData.CallDuration || 0}s`);
         
-        // Store call status update in Supabase for real-time tracking
+        // Store call status update in Supabase
         const { error: dbError } = await supabase
           .from('call_status_updates')
           .insert({
@@ -51,8 +51,6 @@ Deno.serve(async (req) => {
         
         if (dbError) {
           console.error('[call-disposition] Error storing call status:', dbError);
-        } else {
-          console.log('[call-disposition] Successfully stored call status update');
         }
         
         // Broadcast status update for real-time UI updates
@@ -68,7 +66,6 @@ Deno.serve(async (req) => {
               timestamp: new Date().toISOString(),
             }
           });
-          console.log(`[call-disposition] Broadcast status update to ${channelName}`);
         } catch (broadcastError) {
           console.error('[call-disposition] Broadcast error:', broadcastError);
         }
@@ -77,57 +74,54 @@ Deno.serve(async (req) => {
       // Return TwiML response for Twilio
       return new Response(
         '<?xml version="1.0" encoding="UTF-8"?><Response></Response>', 
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
-          status: 200 
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'text/xml' } }
       );
-    } else {
-      // Regular JSON request from our frontend
-      const { action, callSid, leadId, disposition, sessionId, userId } = await req.json();
-      console.log(`[call-disposition] Received action: ${action} for call ${callSid}`);
-      
-      // Validate required parameters based on action
-      if (!action) {
-        throw new Error('Action is required');
-      }
-      
-      // Track the action in the database for analytics
-      try {
-        await supabase.from('lead_activities').insert({
-          lead_id: Number(leadId),
-          type: `call_${action}`,
-          description: `Call ${action} via disposition panel`,
-        });
-        console.log(`✅ Activity logged for lead ${leadId}: call_${action}`);
-      } catch (activityError) {
-        console.warn(`⚠️ Failed to log activity: ${activityError.message}`);
-        // Continue with the operation even if logging fails
-      }
-      
-      // Handle different call actions
-      switch(action) {
-        case 'end':
-          if (!callSid) {
-            throw new Error('Call SID is required for ending a call');
-          }
-          return await handleEndCall(callSid, leadId);
-          
-        case 'disposition':
-          if (!leadId || !disposition) {
-            throw new Error('Lead ID and disposition are required');
-          }
-          return await handleDisposition(leadId, disposition, callSid);
-          
-        case 'next':
-          if (!sessionId) {
-            throw new Error('Session ID is required for fetching next lead');
-          }
-          return await handleNextLead(sessionId, userId);
-          
-        default:
-          throw new Error(`Unknown action: ${action}`);
-      }
+    }
+
+    // Handle API requests from our frontend
+    const { action, callSid, leadId, disposition, sessionId, userId } = await req.json();
+    console.log(`[call-disposition] Received action: ${action} for call ${callSid}`);
+
+    // Validate required parameters based on action
+    if (!action) {
+      throw new Error('Action is required');
+    }
+    
+    // Track the action in the database for analytics
+    try {
+      await supabase.from('lead_activities').insert({
+        lead_id: Number(leadId),
+        type: `call_${action}`,
+        description: `Call ${action} via disposition panel`,
+      });
+      console.log(`✅ Activity logged for lead ${leadId}: call_${action}`);
+    } catch (activityError) {
+      console.warn(`⚠️ Failed to log activity: ${activityError.message}`);
+      // Continue with the operation even if logging fails
+    }
+    
+    // Handle different call actions
+    switch(action) {
+      case 'end':
+        if (!callSid) {
+          throw new Error('Call SID is required for ending a call');
+        }
+        return await handleEndCall(callSid, leadId);
+        
+      case 'disposition':
+        if (!leadId || !disposition) {
+          throw new Error('Lead ID and disposition are required');
+        }
+        return await handleDisposition(leadId, disposition, callSid);
+        
+      case 'next':
+        if (!sessionId) {
+          throw new Error('Session ID is required for fetching next lead');
+        }
+        return await handleNextLead(sessionId, userId);
+        
+      default:
+        throw new Error(`Unknown action: ${action}`);
     }
   } catch (error) {
     console.error(`[call-disposition] Error:`, error);
