@@ -8,10 +8,20 @@ export interface CallDispositionOptions {
   onError?: (error: Error) => void;
 }
 
+export interface ActiveCall {
+  callSid: string;
+  phoneNumber?: string;
+  leadId?: string | number;
+  userId?: string;
+  status: string;
+  lastUpdate: number;
+}
+
 export interface CallDispositionHook {
   endCall: (callSid: string, leadId?: string | number) => Promise<boolean>;
   setDisposition: (leadId: string | number, disposition: string, callSid?: string) => Promise<boolean>;
   getNextLead: (sessionId: string, userId?: string) => Promise<any>;
+  getActiveCalls: () => Promise<ActiveCall[]>;
   isLoading: boolean;
   error: string | null;
 }
@@ -106,10 +116,27 @@ export function useCallDisposition(options?: CallDispositionOptions): CallDispos
     return result;
   };
   
+  const getActiveCalls = async (): Promise<ActiveCall[]> => {
+    interface ActiveCallsResponse {
+      success: boolean;
+      activeCalls: ActiveCall[];
+      count: number;
+    }
+    
+    const result = await handleRequest<ActiveCallsResponse>('list_active_calls', {});
+    if (!result) {
+      toast.error('Failed to get active calls');
+      return [];
+    }
+    
+    return result.activeCalls;
+  };
+  
   return {
     endCall,
     setDisposition,
     getNextLead,
+    getActiveCalls,
     isLoading,
     error,
   };

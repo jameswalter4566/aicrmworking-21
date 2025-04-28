@@ -221,7 +221,7 @@ const DialerSession = () => {
   };
 
   useEffect(() => {
-    const firstActiveCall = Object.values(twilioState.activeCalls)[0]; 
+    const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     console.log('Active call status changed:', firstActiveCall?.status);
     console.log('Active call leadId:', firstActiveCall?.leadId);
     
@@ -308,16 +308,18 @@ const DialerSession = () => {
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
-    const callStatus = firstActiveCall?.status;
+    // Ensure we properly handle all possible call status values in TypeScript
+    type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
+    const callStatus = firstActiveCall?.status as CallStatus | undefined;
     
-    const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
-    const inProgressStatuses = ['connecting', 'ringing', 'in-progress'];
+    const completedStatuses: CallStatus[] = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
+    const inProgressStatuses: CallStatus[] = ['connecting', 'ringing', 'in-progress'];
     
-    if (completedStatuses.includes(callStatus)) {
+    if (callStatus && completedStatuses.includes(callStatus)) {
       handleCallCompletion();
     } else if (callStatus === 'ringing' || callStatus === 'connecting') {
       startNoAnswerTimeout();
-    } else if (inProgressStatuses.includes(callStatus)) {
+    } else if (callStatus && inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();
     }
   }, [

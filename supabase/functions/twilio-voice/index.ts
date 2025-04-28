@@ -209,12 +209,15 @@ serve(async (req) => {
         
         const supabase = createClient(supabaseUrl, supabaseAnonKey);
         
+        // Add action parameter to help call-disposition function identify webhook data
+        callData.action = 'call_status_update';
+        
         // Forward the data to the call-disposition function
         await supabase.functions.invoke('call-disposition', {
           body: callData
         });
         
-        console.log(`[${requestId}] Successfully forwarded call data to call-disposition function`);
+        console.log(`[${requestId}] Successfully forwarded call status update to call-disposition function`);
       } catch (err) {
         console.error(`[${requestId}] Error forwarding call data to call-disposition: ${err.message}`);
       }
