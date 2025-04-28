@@ -15,7 +15,7 @@ export function useHangupCall() {
     }
 
     setIsHangingUp(true);
-    console.log(`Attempting to hang up call with SID: ${callSid}`);
+    console.log(`Attempting to hang up call with SID: ${callSid}`, { callSid });
 
     try {
       console.log('Sending hangup request to hangup-call function with payload:', {

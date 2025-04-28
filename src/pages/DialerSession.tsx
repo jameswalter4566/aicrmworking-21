@@ -232,7 +232,7 @@ const DialerSession = () => {
     
     if (callStatus && completedStatuses.includes(callStatus)) {
       handleCallCompletion();
-    } else if (callStatus && callStatus === 'ringing') {
+    } else if (callStatus && inProgressStatuses.includes('ringing')) {
       startNoAnswerTimeout();
     } else if (callStatus && inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();
@@ -306,7 +306,7 @@ const DialerSession = () => {
                       </div>
                       
                       <HangupButton 
-                        callSid={Object.keys(twilioState.activeCalls)[0] || undefined}
+                        callSid={Object.values(twilioState.activeCalls)[0]?.callSid || undefined}
                         onSuccess={handleEndCall}
                       />
                     </div>

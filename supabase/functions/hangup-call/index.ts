@@ -10,7 +10,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 Deno.serve(async (req) => {
-  console.log("Hangup-call function invoked");
+  console.log("Hangup-call function invoked with URL:", req.url);
   
   // Handle CORS
   if (req.method === 'OPTIONS') {
@@ -19,8 +19,14 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const requestBody = await req.json();
-    console.log("Received request body:", JSON.stringify(requestBody));
+    let requestBody;
+    try {
+      requestBody = await req.json();
+      console.log("Received request body:", JSON.stringify(requestBody, null, 2));
+    } catch (parseError) {
+      console.error("Error parsing request body:", parseError);
+      throw new Error('Invalid JSON request body');
+    }
     
     const { callSid, userId } = requestBody;
 
@@ -59,12 +65,23 @@ Deno.serve(async (req) => {
     // Log the hang-up action
     if (userId) {
       console.log(`Logging hang-up action for call ${callSid} by user ${userId}`);
-      await supabase.from('call_logs').insert({
-        call_sid: callSid,
-        user_id: userId,
-        action: 'hangup',
-        timestamp: new Date().toISOString()
-      });
+      
+      try {
+        const { data, error } = await supabase.from('call_logs').insert({
+          call_sid: callSid,
+          user_id: userId,
+          action: 'hangup',
+          timestamp: new Date().toISOString()
+        });
+        
+        if (error) {
+          console.error('Error logging call action to database:', error);
+        } else {
+          console.log('Successfully logged call action to database');
+        }
+      } catch (dbError) {
+        console.error('Error in database operation:', dbError);
+      }
     }
 
     console.log("Successfully ended call");

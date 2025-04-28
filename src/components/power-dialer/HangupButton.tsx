@@ -14,11 +14,16 @@ export function HangupButton({ callSid, onSuccess, className = '' }: HangupButto
 
   const handleHangup = async () => {
     if (!callSid) {
+      console.error("No callSid provided to HangupButton");
       return;
     }
-
+    
+    console.log("HangupButton - Attempting to hang up call with SID:", callSid);
+    
     const success = await hangupCall(callSid);
+    
     if (success && onSuccess) {
+      console.log("HangupButton - Call ended successfully, invoking onSuccess callback");
       onSuccess();
     }
   };
