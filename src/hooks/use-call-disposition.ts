@@ -3,75 +3,83 @@ import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export interface CallDispositionOptions {
-  onSuccess?: (data: any) => void;
-  onError?: (error: Error) => void;
-}
-
-export function useCallDisposition(options?: CallDispositionOptions) {
+export function useCallDisposition() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const handleRequest = async <T>(action: string, params: Record<string, any>): Promise<T | null> => {
+
+  const endCall = async (callSid: string, leadId?: string | number): Promise<boolean> => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const { data, error } = await supabase.functions.invoke('call-disposition', {
+      const { data, error } = await supabase.functions.invoke('lead-connected', {
         body: {
-          action,
-          ...params,
+          action: 'endCall',
+          callSid,
+          leadId
         }
       });
-      
+
       if (error) throw error;
-      
-      if (options?.onSuccess) {
-        options.onSuccess(data);
-      }
-      
-      return data as T;
+
+      toast.success('Call ended');
+      return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       setError(errorMsg);
-      console.error(`[useCallDisposition] Error in ${action} request:`, err);
-      
-      if (options?.onError) {
-        options.onError(err instanceof Error ? err : new Error(String(err)));
-      }
-      
-      return null;
+      console.error('[useCallDisposition] Error ending call:', err);
+      toast.error('Failed to end call');
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
-  
-  const endCall = async (callSid: string): Promise<boolean> => {
-    console.log(`[useCallDisposition] Ending call ${callSid}`);
-    const result = await handleRequest('end', { callSid });
-    if (result) {
-      toast.success('Call ended');
-      return true;
-    }
-    toast.error('Failed to end call');
-    return false;
-  };
-  
+
   const setDisposition = async (leadId: string | number, disposition: string, callSid?: string): Promise<boolean> => {
-    console.log(`[useCallDisposition] Setting disposition ${disposition} for lead ${leadId}${callSid ? ` and ending call ${callSid}` : ''}`);
-    const result = await handleRequest('disposition', { leadId, disposition, callSid });
-    if (result) {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // First update the disposition
+      const { error: updateError } = await supabase
+        .from('leads')
+        .update({ 
+          disposition,
+          last_contacted: new Date().toISOString()
+        })
+        .eq('id', typeof leadId === 'string' ? parseInt(leadId) : leadId);
+
+      if (updateError) throw updateError;
+
+      // Log the activity
+      await supabase.from('lead_activities').insert({
+        lead_id: typeof leadId === 'string' ? parseInt(leadId) : leadId,
+        type: 'disposition',
+        description: disposition
+      });
+
+      // If callSid provided, end the call
+      if (callSid) {
+        await endCall(callSid, leadId);
+      }
+
       toast.success(`Lead marked as ${disposition}`);
       return true;
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      setError(errorMsg);
+      console.error('[useCallDisposition] Error setting disposition:', err);
+      toast.error('Failed to update disposition');
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-    toast.error('Failed to update disposition');
-    return false;
   };
 
   return {
     endCall,
     setDisposition,
     isLoading,
-    error,
+    error
   };
 }

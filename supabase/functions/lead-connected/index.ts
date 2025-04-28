@@ -1,5 +1,5 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
+import twilio from 'twilio';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +29,11 @@ const FALLBACK_LEAD_DATA = {
   avatar: null
 };
 
+const twilioClient = twilio(
+  Deno.env.get('TWILIO_ACCOUNT_SID'),
+  Deno.env.get('TWILIO_AUTH_TOKEN')
+);
+
 async function broadcastLeadFound(lead, callState?: string) {
   if (!lead?.id) {
     console.warn('⚠️ Cannot broadcast: lead or lead.id is missing');
@@ -36,13 +41,10 @@ async function broadcastLeadFound(lead, callState?: string) {
   }
   
   try {
-    // Create a channel specific to this lead ID for broadcasting updates
     const channelName = `lead-data-${lead.id}`;
     
-    // Log before sending the broadcast
     console.log(`📢 Broadcasting lead data to channel: ${channelName}, callState: ${callState}`);
     
-    // Send a broadcast message with the lead data
     const result = await anonSupabase
       .channel(channelName)
       .send({
@@ -56,14 +58,12 @@ async function broadcastLeadFound(lead, callState?: string) {
         }
       });
       
-    // Check if broadcast was successful
     if (result.error) {
       console.error('❌ Broadcast failed:', result.error);
     } else {
       console.log('✅ Broadcast successful!');
     }
     
-    // Also try sending to a global channel as backup
     await anonSupabase
       .channel('global-leads')
       .send({
@@ -111,6 +111,64 @@ Deno.serve(async (req) => {
     const callState = callData?.callState || 'unknown';
     console.log(`📞 Call State: ${callState}`);
     
+    if (requestBody.action === 'endCall') {
+      if (!requestBody.callSid) {
+        console.error('❌ No callSid provided for endCall action');
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'CallSid is required for endCall action'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        });
+      }
+
+      try {
+        console.log(`📞 Ending call with SID: ${requestBody.callSid}`);
+        await twilioClient.calls(requestBody.callSid).update({ status: 'completed' });
+        console.log(`✅ Successfully ended call: ${requestBody.callSid}`);
+
+        if (requestBody.leadId) {
+          try {
+            let numericLeadId = requestBody.leadId;
+            if (typeof numericLeadId === 'string' && /^\d+$/.test(numericLeadId)) {
+              numericLeadId = parseInt(numericLeadId, 10);
+            }
+
+            if (typeof numericLeadId === 'number') {
+              await adminSupabase
+                .from('lead_activities')
+                .insert({
+                  lead_id: numericLeadId,
+                  type: 'call_ended',
+                  description: 'Call ended by agent',
+                  timestamp: new Date().toISOString()
+                });
+              console.log(`📝 Logged call end activity for lead ${numericLeadId}`);
+            }
+          } catch (error) {
+            console.error('❌ Failed to log call end activity:', error);
+          }
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Call ended successfully'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      } catch (error) {
+        console.error('❌ Failed to end call:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: error.message || 'Failed to end call'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        });
+      }
+    }
+
     if (!leadId) {
       console.log('❌ No lead ID provided - returning fallback data');
       const fallback = FALLBACK_LEAD_DATA;
