@@ -32,6 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { List, Loader2, Mail, MapPin, Trash2 } from 'lucide-react';
+import { useCallDisposition } from '@/hooks/use-call-disposition';
 
 interface PreviewDialerWindowProps {
   currentCall: any;
@@ -60,6 +61,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
   const [sessionActive, setSessionActive] = useState(false);
   const { user } = useAuth();
   const { callStatuses } = useCallStatus();
+  const { endCall, setDisposition, isLoading: isDispositionLoading } = useCallDisposition();
 
   const [currentLead, setCurrentLead] = useState<any>(null);
   const [leadNotes, setLeadNotes] = useState<any[]>([]);
@@ -350,6 +352,25 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
       setSessionActive(true);
     }
   }, [sessionId]);
+
+  const handleHangUpCall = async () => {
+    if (!currentCall) return;
+    
+    try {
+      console.log("Hanging up call with SID:", currentCall?.callSid);
+      
+      const success = await endCall(currentCall?.callSid, currentCall?.parameters?.leadId);
+      
+      if (success) {
+        toast.success("Call ended successfully");
+      } else {
+        toast.error("Failed to end call");
+      }
+    } catch (error) {
+      console.error("Error hanging up call:", error);
+      toast.error("Error ending call");
+    }
+  };
 
   return (
     <>
@@ -760,10 +781,11 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 <Button 
                   variant="outline" 
                   className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
-                  onClick={onEndCall}
+                  onClick={handleHangUpCall}
+                  disabled={!currentCall?.callSid || isDispositionLoading}
                 >
                   <PhoneOff className="mr-2 h-4 w-4" />
-                  Hang Up
+                  {isDispositionLoading ? "Hanging Up..." : "Hang Up"}
                 </Button>
                 
                 <Button 
