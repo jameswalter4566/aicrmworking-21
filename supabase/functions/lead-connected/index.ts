@@ -283,30 +283,20 @@ Deno.serve(async (req) => {
     
     console.log('📌 Request body:', JSON.stringify(requestBody, null, 2));
     
-    const { leadId, userId, callData, transcription, fetchTranscriptions } = requestBody;
+    const { leadId, userId, callData, transcription, fetchTranscriptions: explicitFetchRequest } = requestBody;
+    
+    const callSid = callData?.callSid;
+    console.log(`📞 Call SID from request: ${callSid || 'none'}`);
     
     const callState = callData?.callState || 'unknown';
     console.log(`📞 Call State: ${callState}`);
     
-    if (fetchTranscriptions === true && callData?.callSid && leadId) {
-      console.log(`🔍 Explicit request to fetch transcriptions for call SID ${callData.callSid}`);
-      const twilioTranscriptions = await fetchTwilioTranscriptions(callData.callSid, leadId);
-      const dbTranscriptions = await fetchRecentTranscriptions(leadId, callData.callSid);
-      
-      const allTranscriptions = [...dbTranscriptions];
-      for (const trans of twilioTranscriptions) {
-        if (!allTranscriptions.some(t => t.id === trans.id)) {
-          allTranscriptions.push(trans);
-        }
-      }
-      
-      return new Response(JSON.stringify({
-        success: true,
-        transcriptions: allTranscriptions
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      });
+    let transcriptions = [];
+    
+    if (callSid && leadId) {
+      console.log(`🎤 Detected call SID ${callSid} with lead ID ${leadId}, fetching transcriptions automatically`);
+      transcriptions = await fetchTwilioTranscriptions(callSid, leadId);
+      console.log(`Retrieved ${transcriptions.length} transcriptions for call SID ${callSid}`);
     }
     
     if (transcription && leadId) {
@@ -395,7 +385,6 @@ Deno.serve(async (req) => {
 
     const callSid = callData?.callSid;
     
-    let transcriptions = [];
     if (callSid) {
       console.log(`🎤 Call SID detected: ${callSid}, fetching transcriptions from Twilio`);
       const twilioTranscriptions = await fetchTwilioTranscriptions(callSid, effectiveLeadId);

@@ -392,6 +392,36 @@ export default function PowerDialer() {
     }
   }, [twilioState.activeCalls]);
 
+  const renderCallStatus = (status: string) => {
+    if (!status) return 'Unknown';
+    
+    if (status === 'in-progress' || status === 'answered') {
+      return (
+        <Badge variant="success" className="text-white">
+          Connected
+        </Badge>
+      );
+    } else if (status === 'ringing' || status === 'queued') {
+      return (
+        <Badge variant="warning" className="text-white">
+          Ringing
+        </Badge>
+      );
+    } else if (status === 'completed' || status === 'failed' || status === 'busy' || status === 'no-answer' || status === 'canceled') {
+      return (
+        <Badge variant="destructive" className="text-white">
+          Disconnected
+        </Badge>
+      );
+    }
+    
+    return (
+      <Badge variant="outline">
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    );
+  };
+
   return <MainLayout>
       <LeadFoundIndicator isVisible={leadFound} />
       <TwilioScript onLoad={() => setIsScriptLoaded(true)} onError={err => console.error("TwilioScript error:", err)} />
