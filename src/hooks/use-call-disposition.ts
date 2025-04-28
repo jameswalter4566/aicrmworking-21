@@ -34,6 +34,7 @@ export function useCallDisposition(options?: CallDispositionOptions) {
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       setError(errorMsg);
+      console.error(`[useCallDisposition] Error in ${action} request:`, err);
       
       if (options?.onError) {
         options.onError(err instanceof Error ? err : new Error(String(err)));
@@ -46,6 +47,7 @@ export function useCallDisposition(options?: CallDispositionOptions) {
   };
   
   const endCall = async (callSid: string): Promise<boolean> => {
+    console.log(`[useCallDisposition] Ending call ${callSid}`);
     const result = await handleRequest('end', { callSid });
     if (result) {
       toast.success('Call ended');
@@ -56,6 +58,7 @@ export function useCallDisposition(options?: CallDispositionOptions) {
   };
   
   const setDisposition = async (leadId: string | number, disposition: string, callSid?: string): Promise<boolean> => {
+    console.log(`[useCallDisposition] Setting disposition ${disposition} for lead ${leadId}${callSid ? ` and ending call ${callSid}` : ''}`);
     const result = await handleRequest('disposition', { leadId, disposition, callSid });
     if (result) {
       toast.success(`Lead marked as ${disposition}`);
