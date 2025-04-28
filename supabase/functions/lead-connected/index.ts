@@ -1,6 +1,5 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import twilio from 'https://esm.sh/twilio@4.18.1';
+import twilio from 'twilio';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

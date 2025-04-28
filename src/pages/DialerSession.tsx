@@ -17,7 +17,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { useAutoDialer } from '@/hooks/use-auto-dialer';
 import { AutoDialerControls } from '@/components/power-dialer/AutoDialerControls';
 
-// Define CallStatus type globally to ensure consistency
 type CallStatus = 
   | 'connecting' 
   | 'ringing'
@@ -234,6 +233,7 @@ const DialerSession = () => {
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
+    type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
     const callStatus = firstActiveCall?.status as CallStatus | undefined;
     
     const completedStatuses: CallStatus[] = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
