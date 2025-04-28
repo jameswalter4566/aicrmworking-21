@@ -7,8 +7,41 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// We'll initialize Twilio client using dynamic import inside the serve function
-// This prevents the "Object prototype may only be an Object or null" error
+// Initialize Twilio client at the top level
+let twilioClient: any = null;
+let twilioInitError: Error | null = null;
+let initializationPromise: Promise<void> | null = null;
+
+async function initializeTwilioClient() {
+  if (initializationPromise) {
+    return initializationPromise;
+  }
+
+  initializationPromise = (async () => {
+    try {
+      const twilioModule = await import('npm:twilio@4.10.0');
+      const twilio = twilioModule.default;
+      
+      twilioClient = twilio(
+        Deno.env.get('TWILIO_ACCOUNT_SID'),
+        Deno.env.get('TWILIO_AUTH_TOKEN')
+      );
+      
+      console.log('[call-disposition] ✅ Twilio client initialized successfully');
+    } catch (error) {
+      twilioInitError = error;
+      console.error('[call-disposition] ❌ Failed to initialize Twilio client:', error);
+      throw error;
+    }
+  })();
+
+  return initializationPromise;
+}
+
+// Initialize Twilio client immediately
+initializeTwilioClient().catch(err => {
+  console.error('[call-disposition] Initial Twilio client initialization failed:', err);
+});
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -16,20 +49,37 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Initialize Twilio client with proper dynamic import pattern
-  // Using the same version and import pattern as twilio-token function
-  let twilioClient;
-  try {
-    const twilioModule = await import('npm:twilio@4.10.0');
-    const twilio = twilioModule.default;
-    
-    // Initialize Twilio client with proper credentials
-    twilioClient = twilio(
-      Deno.env.get('TWILIO_ACCOUNT_SID'),
-      Deno.env.get('TWILIO_AUTH_TOKEN')
+  // Ensure Twilio client is initialized before processing requests
+  if (!twilioClient) {
+    try {
+      await initializeTwilioClient();
+    } catch (error) {
+      console.error('[call-disposition] Failed to initialize Twilio client during request:', error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Twilio service temporarily unavailable'
+        }), 
+        { 
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+  }
+
+  // If initialization has failed and we still don't have a client
+  if (!twilioClient) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: 'Twilio service unavailable'
+      }), 
+      { 
+        status: 503,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
-  } catch (twilioError) {
-    console.error(`[call-disposition] Error initializing Twilio client:`, twilioError);
   }
 
   try {
