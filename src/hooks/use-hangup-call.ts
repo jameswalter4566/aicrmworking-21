@@ -27,7 +27,7 @@ export function useHangupCall() {
       
       console.log('HANGUP HOOK - Sending hangup request to hangup-call function with payload:', payload);
 
-      // Get current auth token using getSession() instead of session()
+      // Get current auth token using getSession()
       const { data: sessionData } = await supabase.auth.getSession();
       const authToken = sessionData?.session?.access_token || '';
       
