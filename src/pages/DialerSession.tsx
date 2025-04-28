@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -225,16 +224,14 @@ const DialerSession = () => {
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
-    type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
-    const callStatus = firstActiveCall?.status as CallStatus | undefined;
+    const callStatus = firstActiveCall?.status;
     
-    const completedStatuses: CallStatus[] = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
-    const inProgressStatuses: CallStatus[] = ['connecting', 'ringing', 'in-progress'];
+    const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
+    const inProgressStatuses = ['connecting', 'ringing', 'in-progress'];
     
     if (callStatus && completedStatuses.includes(callStatus)) {
       handleCallCompletion();
     } else if (callStatus === 'connecting' || callStatus === 'ringing') {
-      // Use OR operator to check for both statuses explicitly
       startNoAnswerTimeout();
     } else if (callStatus && inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();

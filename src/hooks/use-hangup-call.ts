@@ -16,19 +16,51 @@ export function useHangupCall() {
     try {
       const userId = user?.id || 'anonymous';
       
+      // Let's look at active calls in the Twilio state if no callSid provided
+      if (!callSid || callSid === '') {
+        console.log('HANGUP HOOK - No callSid provided, attempting to find active call in Twilio state');
+        
+        // Try to get the callSid from the browser's localStorage where Twilio might store it
+        try {
+          const localStorageKeys = Object.keys(localStorage);
+          const twilioKey = localStorageKeys.find(key => key.startsWith('twilio-'));
+          
+          if (twilioKey) {
+            console.log('HANGUP HOOK - Found potential Twilio data in localStorage:', twilioKey);
+            // Attempt to parse and extract any call information
+            try {
+              const twilioData = JSON.parse(localStorage.getItem(twilioKey) || '{}');
+              console.log('HANGUP HOOK - Parsed Twilio data:', twilioData);
+              
+              // Look for potential call SID in the data
+              if (twilioData && twilioData.calls) {
+                const callIds = Object.keys(twilioData.calls);
+                if (callIds.length > 0) {
+                  const firstCallId = callIds[0];
+                  const firstCall = twilioData.calls[firstCallId];
+                  if (firstCall && firstCall.parameters && firstCall.parameters.CallSid) {
+                    callSid = firstCall.parameters.CallSid;
+                    console.log('HANGUP HOOK - Found call SID in localStorage:', callSid);
+                  }
+                }
+              }
+            } catch (parseError) {
+              console.error('HANGUP HOOK - Error parsing Twilio data from localStorage:', parseError);
+            }
+          }
+        } catch (localStorageError) {
+          console.error('HANGUP HOOK - Error accessing localStorage:', localStorageError);
+        }
+      }
+      
       const payload = { 
-        callSid: callSid || '',  // Send empty string if undefined
-        userId
+        callSid: callSid || '',  // Send empty string if still undefined
+        userId,
+        timestamp: new Date().toISOString()
       };
       
       console.log('HANGUP HOOK - Sending hangup request to hangup-call function with payload:', payload);
 
-      // Get current auth token using getSession()
-      const { data: sessionData } = await supabase.auth.getSession();
-      const authToken = sessionData?.session?.access_token || '';
-      
-      console.log('HANGUP HOOK - Direct fetch URL: https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call');
-      
       // First trying the direct fetch approach with better error handling
       let isDirectFetchSuccessful = false;
       try {
@@ -36,7 +68,7 @@ export function useHangupCall() {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            // Don't use auth token since the function is now public (verify_jwt = false)
+            // Function is now public (verify_jwt = false) so no auth token needed
           },
           body: JSON.stringify(payload)
         });

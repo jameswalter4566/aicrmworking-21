@@ -42,7 +42,7 @@ export function HangupButton({ callSid, onSuccess, className = '' }: HangupButto
       variant="destructive"
       size="sm"
       onClick={handleHangup}
-      disabled={isHangingUp} // Remove the callSid check to always make the button clickable
+      disabled={isHangingUp} // Always make the button clickable regardless of callSid
       className={className}
     >
       <PhoneOff className="h-4 w-4 mr-2" />

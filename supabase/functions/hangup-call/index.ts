@@ -9,6 +9,101 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Function to retrieve all active calls from Twilio as a fallback mechanism
+async function getActiveCallsFromTwilio() {
+  const twilioBaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Calls.json?Status=in-progress`;
+  const auth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
+  
+  try {
+    console.log(`HANGUP FUNCTION - Fetching active calls from Twilio API: ${twilioBaseUrl}`);
+    
+    const activeCalls = await fetch(twilioBaseUrl, {
+      headers: {
+        'Authorization': `Basic ${auth}`,
+      }
+    });
+    
+    if (!activeCalls.ok) {
+      throw new Error(`Twilio API returned ${activeCalls.status}: ${await activeCalls.text()}`);
+    }
+    
+    const callsData = await activeCalls.json();
+    console.log("HANGUP FUNCTION - Active calls in Twilio:", JSON.stringify(callsData, null, 2));
+    
+    return callsData?.calls || [];
+  } catch (error) {
+    console.error("HANGUP FUNCTION - Error fetching active calls from Twilio:", error);
+    return [];
+  }
+}
+
+// Function to find the most recent active call in database
+async function getMostRecentActiveCallFromDB() {
+  try {
+    console.log("HANGUP FUNCTION - Trying to find most recent active call in database");
+    
+    // First try predictive_dialer_calls
+    const { data: activeCall, error } = await supabase
+      .from('predictive_dialer_calls')
+      .select('twilio_call_sid, contact_id')
+      .eq('status', 'in_progress')
+      .order('start_timestamp', { ascending: false })
+      .limit(1);
+    
+    if (error) {
+      console.error("HANGUP FUNCTION - Error querying predictive_dialer_calls:", error);
+    } else if (activeCall && activeCall.length > 0) {
+      console.log(`HANGUP FUNCTION - Found active call in predictive_dialer_calls: ${activeCall[0].twilio_call_sid}`);
+      return activeCall[0];
+    }
+    
+    // If no call found, check dialing_session_leads
+    const { data: sessionLead, error: sessionError } = await supabase
+      .from('dialing_session_leads')
+      .select('id, lead_id, notes')
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (sessionError) {
+      console.error("HANGUP FUNCTION - Error querying dialing_session_leads:", sessionError);
+    } else if (sessionLead && sessionLead.length > 0) {
+      console.log(`HANGUP FUNCTION - Found most recent lead from dialing session: ${sessionLead[0].lead_id}`);
+      
+      // Try to extract call SID from notes if it exists
+      try {
+        if (sessionLead[0].notes) {
+          const notesData = JSON.parse(sessionLead[0].notes);
+          if (notesData.callSid) {
+            console.log(`HANGUP FUNCTION - Found callSid in notes: ${notesData.callSid}`);
+            return { 
+              twilio_call_sid: notesData.callSid, 
+              contact_id: notesData.originalLeadId || sessionLead[0].lead_id 
+            };
+          }
+        }
+      } catch (parseError) {
+        console.error("HANGUP FUNCTION - Error parsing notes JSON:", parseError);
+      }
+      
+      // If no call SID in notes, check Twilio API for active calls
+      const activeCalls = await getActiveCallsFromTwilio();
+      if (activeCalls && activeCalls.length > 0) {
+        const firstCall = activeCalls[0];
+        console.log(`HANGUP FUNCTION - Using first active call from Twilio API: ${firstCall.sid}`);
+        return { 
+          twilio_call_sid: firstCall.sid,
+          contact_id: sessionLead[0].lead_id 
+        };
+      }
+    }
+    
+    return null;
+  } catch (dbError) {
+    console.error("HANGUP FUNCTION - Database error while looking for active calls:", dbError);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   try {
     console.log("=============== HANGUP FUNCTION INVOKED ===============");
@@ -24,19 +119,8 @@ Deno.serve(async (req) => {
 
     // Log current active calls in the system to help debug
     try {
-      const twilioBaseUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Calls.json?Status=in-progress`;
-      const auth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
-      
-      const activeCalls = await fetch(twilioBaseUrl, {
-        headers: {
-          'Authorization': `Basic ${auth}`,
-        }
-      });
-      
-      if (activeCalls.ok) {
-        const callsData = await activeCalls.json();
-        console.log("HANGUP FUNCTION - Active calls in Twilio:", JSON.stringify(callsData, null, 2));
-      }
+      const activeCalls = await getActiveCallsFromTwilio();
+      console.log(`HANGUP FUNCTION - Found ${activeCalls.length} active calls in Twilio`);
     } catch (activeCallsError) {
       console.error("HANGUP FUNCTION - Error fetching active calls:", activeCallsError);
     }
@@ -81,67 +165,82 @@ Deno.serve(async (req) => {
         }
       }
       
-      const callSid = requestBody?.callSid || requestBody?.CallSid;
-      const userId = requestBody?.userId || 'anonymous';
+      let callSid = requestBody?.callSid || 
+                    requestBody?.CallSid || 
+                    requestBody?.callsid || 
+                    requestBody?.call_sid;
+                    
+      const userId = requestBody?.userId || 
+                    requestBody?.user_id || 
+                    requestBody?.agentId || 
+                    requestBody?.agent_id || 
+                    'anonymous';
 
       // Even if no callSid is provided, log the attempt
       console.log(`HANGUP FUNCTION - Call SID provided: ${callSid || 'NONE'}`);
       
-      // If no callSid provided but we're in a debug mode, we'll try to look up active calls
+      // If no callSid provided, try to find one
       if (!callSid) {
         console.log("HANGUP FUNCTION - No callSid provided, checking for active calls in the database");
         
-        // Try to find any active calls in the database
-        try {
-          const { data: activeCalls, error } = await supabase
-            .from('predictive_dialer_calls')
-            .select('twilio_call_sid')
-            .eq('status', 'in_progress')
-            .limit(1);
+        const activeCall = await getMostRecentActiveCallFromDB();
+        
+        if (activeCall && activeCall.twilio_call_sid) {
+          callSid = activeCall.twilio_call_sid;
+          console.log(`HANGUP FUNCTION - Using database-found callSid: ${callSid}`);
           
-          if (error) {
-            console.error("HANGUP FUNCTION - Error fetching active calls from database:", error);
-          } else if (activeCalls && activeCalls.length > 0) {
-            const firstActiveCall = activeCalls[0].twilio_call_sid;
-            console.log(`HANGUP FUNCTION - Found active call in database: ${firstActiveCall}`);
-            
-            // Log that we're using this call SID instead
-            console.log(`HANGUP FUNCTION - Using database-found callSid: ${firstActiveCall}`);
+          // Now attempt to end this call
+          await handleCallTermination(callSid, userId, activeCall.contact_id);
+          
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              message: "Call ended successfully using database-found call SID" 
+            }), 
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200
+            }
+          );
+        } else {
+          console.log("HANGUP FUNCTION - No active calls found in database, checking Twilio API directly");
+          
+          // As a last resort, check Twilio API for any active calls
+          const activeCalls = await getActiveCallsFromTwilio();
+          if (activeCalls && activeCalls.length > 0) {
+            callSid = activeCalls[0].sid;
+            console.log(`HANGUP FUNCTION - Using Twilio API-found callSid: ${callSid}`);
             
             // Now attempt to end this call
-            await handleCallTermination(firstActiveCall, userId);
+            await handleCallTermination(callSid, userId);
             
             return new Response(
               JSON.stringify({ 
                 success: true, 
-                message: "Call ended successfully using database-found call SID" 
+                message: "Call ended successfully using Twilio API-found call SID" 
               }), 
               { 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
                 status: 200
               }
             );
-          } else {
-            console.log("HANGUP FUNCTION - No active calls found in database");
           }
-        } catch (dbError) {
-          console.error("HANGUP FUNCTION - Database error while looking for active calls:", dbError);
+          
+          console.error("HANGUP FUNCTION - Error: No callSid provided and no active calls found");
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Call SID is required or no active calls found'
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            }
+          );
         }
-        
-        console.error("HANGUP FUNCTION - Error: No callSid provided and no active calls found");
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: 'Call SID is required or no active calls found'
-          }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          }
-        );
       }
 
-      // Proceed with call termination
+      // Proceed with call termination if we have a callSid
       return await handleCallTermination(callSid, userId);
 
     } catch (error) {
@@ -173,7 +272,7 @@ Deno.serve(async (req) => {
 });
 
 // Extracted function to handle call termination logic
-async function handleCallTermination(callSid: string, userId: string) {
+async function handleCallTermination(callSid: string, userId: string, contactId?: string | number) {
   console.log(`HANGUP FUNCTION - Attempting to end call ${callSid} by user ${userId || 'anonymous'}`);
 
   // Call Twilio's API to end the call
@@ -211,100 +310,72 @@ async function handleCallTermination(callSid: string, userId: string) {
       throw new Error(`Failed to end call: ${responseText}`);
     }
 
-    // Log the hang-up action
-    if (userId) {
-      console.log(`HANGUP FUNCTION - Logging hang-up action for call ${callSid} by user ${userId}`);
-      
+    // Even if we don't have a contactId, try to search for it
+    if (!contactId) {
       try {
-        const { data, error } = await supabase.from('call_logs').insert({
-          call_sid: callSid,
-          user_id: userId,
-          action: 'hangup',
-          timestamp: new Date().toISOString()
-        });
-        
-        if (error) {
-          console.error('HANGUP FUNCTION - Error logging call action to database:', error);
+        // Find the call in predictive_dialer_calls first to get the contact_id
+        const callQuery = await supabase
+          .from('predictive_dialer_calls')
+          .select('contact_id')
+          .eq('twilio_call_sid', callSid)
+          .single();
+          
+        if (callQuery.data?.contact_id) {
+          console.log(`HANGUP FUNCTION - Found contact_id: ${callQuery.data.contact_id} for call ${callSid}`);
+          contactId = callQuery.data.contact_id;
         } else {
-          console.log('HANGUP FUNCTION - Successfully logged call action to database');
-        }
-        
-        // Notify the lead-connected function about the hangup
-        try {
-          // Find the call in predictive_dialer_calls first to get the contact_id
-          const callQuery = await supabase
-            .from('predictive_dialer_calls')
-            .select('contact_id')
-            .eq('twilio_call_sid', callSid)
-            .single();
-            
-          if (callQuery.data?.contact_id) {
-            console.log(`HANGUP FUNCTION - Found contact_id: ${callQuery.data.contact_id} for call ${callSid}`);
-            
-            // Invoke lead-connected with the found contact_id
-            await supabase.functions.invoke('lead-connected', {
-              body: { 
-                leadId: callQuery.data.contact_id.toString(),
-                callData: {
-                  callSid,
-                  status: 'completed',
-                  timestamp: new Date().toISOString(),
-                  callState: 'disconnected',
-                  hangupTriggered: true
-                }
-              }
-            });
-            
-            console.log(`HANGUP FUNCTION - Notified lead-connected function about hangup for lead ${callQuery.data.contact_id}`);
-          } else {
-            console.log(`HANGUP FUNCTION - Could not find contact_id for call ${callSid}`);
-            
-            // If we couldn't find in predictive_dialer_calls, try dialing_session_leads
-            const sessionLeadQuery = await supabase
-              .from('dialing_session_leads')
-              .select('lead_id, notes')
-              .order('created_at', { ascending: false })
-              .limit(1);
-              
-            if (sessionLeadQuery.data && sessionLeadQuery.data.length > 0) {
-              const leadId = sessionLeadQuery.data[0].lead_id;
-              console.log(`HANGUP FUNCTION - Found most recent lead_id from session: ${leadId}`);
-              
-              // Try to extract original lead ID from notes JSON
-              try {
-                const notesData = JSON.parse(sessionLeadQuery.data[0].notes || '{}');
-                const originalLeadId = notesData.originalLeadId;
-                
-                if (originalLeadId) {
-                  console.log(`HANGUP FUNCTION - Found originalLeadId from notes: ${originalLeadId}`);
-                  
-                  // Notify lead-connected with this info
-                  await supabase.functions.invoke('lead-connected', {
-                    body: { 
-                      leadId: originalLeadId.toString(),
-                      callData: {
-                        callSid: callSid || 'UNKNOWN',
-                        status: 'completed',
-                        timestamp: new Date().toISOString(),
-                        callState: 'disconnected',
-                        hangupTriggered: true
-                      }
-                    }
-                  });
-                  
-                  console.log(`HANGUP FUNCTION - Notified lead-connected using originalLeadId: ${originalLeadId}`);
-                }
-              } catch (parseError) {
-                console.error('HANGUP FUNCTION - Error parsing notes JSON:', parseError);
-              }
-            }
-          }
-        } catch (notifyError) {
-          console.error('HANGUP FUNCTION - Error notifying lead-connected:', notifyError);
+          console.log(`HANGUP FUNCTION - Could not find contact_id for call ${callSid} in predictive_dialer_calls`);
         }
       } catch (dbError) {
-        console.error('HANGUP FUNCTION - Error in database operation:', dbError);
+        console.error("HANGUP FUNCTION - Error searching for contact_id:", dbError);
       }
+    }
+
+    // Log the hang-up action
+    console.log(`HANGUP FUNCTION - Logging hang-up action for call ${callSid} by user ${userId}`);
+    
+    try {
+      const { data: logData, error: logError } = await supabase.from('call_logs').insert({
+        call_sid: callSid,
+        user_id: userId,
+        action: 'hangup',
+        timestamp: new Date().toISOString()
+      });
+      
+      if (logError) {
+        console.error('HANGUP FUNCTION - Error logging call action to database:', logError);
+      } else {
+        console.log('HANGUP FUNCTION - Successfully logged call action to database');
+      }
+    } catch (logDbError) {
+      console.error('HANGUP FUNCTION - Error in database logging operation:', logDbError);
+    }
+    
+    // Notify the lead-connected function about the hangup
+    try {
+      if (contactId) {
+        console.log(`HANGUP FUNCTION - Notifying lead-connected function about hangup for lead ${contactId}`);
+        
+        // Invoke lead-connected with the found contact_id
+        await supabase.functions.invoke('lead-connected', {
+          body: { 
+            leadId: contactId.toString(),
+            callData: {
+              callSid,
+              status: 'completed',
+              timestamp: new Date().toISOString(),
+              callState: 'disconnected',
+              hangupTriggered: true
+            }
+          }
+        });
+        
+        console.log(`HANGUP FUNCTION - Notified lead-connected function about hangup for lead ${contactId}`);
+      } else {
+        console.log(`HANGUP FUNCTION - Could not find contact_id for call ${callSid}, cannot notify lead-connected`);
+      }
+    } catch (notifyError) {
+      console.error('HANGUP FUNCTION - Error notifying lead-connected:', notifyError);
     }
 
     console.log("HANGUP FUNCTION - Successfully ended call");
