@@ -61,6 +61,7 @@ async function processTranscription(formData: FormData, callId: string, leadId: 
     }
     
     console.log(`Received transcription for call ${callId}: ${transcriptionText}`);
+    console.log(`Transcription details - Status: ${transcriptionStatus}, SID: ${transcriptionSid}`);
     
     const transcription = {
       segment_text: transcriptionText,
@@ -70,6 +71,12 @@ async function processTranscription(formData: FormData, callId: string, leadId: 
       timestamp: new Date().toISOString(),
       call_sid: callSid
     };
+    
+    // Log all form data for debugging
+    console.log('All transcription form data:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`${key}: ${value}`);
+    }
     
     // Store the transcription in the database
     const { data, error } = await supabase
@@ -112,6 +119,9 @@ Deno.serve(async (req) => {
     const callId = url.searchParams.get('callId');
     const originalLeadId = url.searchParams.get('originalLeadId');
     
+    console.log(`Dialer webhook received request with URL: ${req.url}`);
+    console.log(`Parameters: callId=${callId}, originalLeadId=${originalLeadId}`);
+    
     if (!callId) {
       throw new Error('Call ID is required');
     }
@@ -130,6 +140,12 @@ Deno.serve(async (req) => {
     console.log('URL originalLeadId:', originalLeadId);
     console.log('Custom parameters:', customParams);
     
+    // Log all form data for debugging
+    console.log('All form data:');
+    for (const [key, value] of formData.entries()) {
+      console.log(`${key}: ${value}`);
+    }
+    
     // Get the call record with expanded contact and session data
     const { data: call, error: callError } = await supabase
       .from('dialing_session_leads')
@@ -143,6 +159,25 @@ Deno.serve(async (req) => {
       .single();
       
     if (callError || !call) {
+      console.log(`Call not found in dialing_session_leads. Error: ${callError?.message}`);
+      console.log('Attempting to use leadId directly from URL parameters...');
+      
+      // Process transcription directly if we have a leadId from URL params
+      if (isTranscription && callSid && (callId || originalLeadId)) {
+        await processTranscription(
+          formData,
+          callId || '',
+          originalLeadId || callId || '',
+          callSid,
+          originalLeadId
+        );
+        
+        return new Response('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', {
+          headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
+          status: 200,
+        });
+      }
+      
       throw new Error(`Call not found: ${callError?.message}`);
     }
 

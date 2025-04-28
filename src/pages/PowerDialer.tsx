@@ -503,7 +503,7 @@ export default function PowerDialer() {
                                   </p>
                                 </div>
                                 <Badge variant={call.status && ['ringing', 'connecting'].includes(call.status) ? "default" : "outline"}>
-                                  {call.status === 'connecting' ? 'Ringing' : call.status === 'ringing' ? 'Ringing' : call.status === 'in-progress' ? 'Connected' : call.status === 'completed' ? 'Ended' : call.status}
+                                  {call.status === 'connecting' ? 'Ringing' : call.status === 'in-progress' ? 'Connected' : call.status === 'completed' ? 'Ended' : call.status}
                                 </Badge>
                               </div>
                               

@@ -438,7 +438,11 @@ class TwilioService {
             machineDetectionUrl: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-machine-detection?callId=${leadId}`,
             callDispositionUrl: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/call-disposition`,
             sessionId: `browser-session-${Date.now()}`,
-            userId: localStorage.getItem('userId') || 'anonymous'
+            userId: localStorage.getItem('userId') || 'anonymous',
+            
+            record: 'true',
+            transcribe: 'true',
+            transcribeCallback: `https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/dialer-webhook?callId=${leadId}&originalLeadId=${leadId}`,
           }
         });
         
