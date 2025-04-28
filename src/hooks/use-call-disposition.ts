@@ -44,7 +44,7 @@ export function useCallDisposition(options?: CallDispositionOptions): CallDispos
         options.onSuccess(data);
       }
       
-      return data;
+      return data as T;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error(`[useCallDisposition] Error in ${action}:`, errorMsg);
@@ -81,7 +81,17 @@ export function useCallDisposition(options?: CallDispositionOptions): CallDispos
   };
   
   const getNextLead = async (sessionId: string, userId?: string): Promise<any> => {
-    const result = await handleRequest('next', { sessionId, userId });
+    // Fix: Type the result properly to include hasMoreLeads property
+    interface NextLeadResponse {
+      success: boolean;
+      message: string;
+      leadId?: string | number;
+      phoneNumber?: string;
+      name?: string;
+      hasMoreLeads: boolean;
+    }
+    
+    const result = await handleRequest<NextLeadResponse>('next', { sessionId, userId });
     if (!result) {
       toast.error('Failed to get next lead');
       return null;
