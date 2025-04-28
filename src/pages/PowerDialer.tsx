@@ -29,58 +29,49 @@ import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
 import { LineDisplay } from "@/components/power-dialer/LineDisplay";
 import { CallStatusUpdate } from '@/hooks/use-call-status';
-
-const SAMPLE_LEADS = [
-  {
-    id: "1",
-    name: "John Smith",
-    company: "Acme Inc",
-    phone: "+18884659876",
-    status: "New",
-    priority: "High"
-  },
-  {
-    id: "2",
-    name: "James Walter",
-    company: "Golden Pathway Financial",
-    phone: "+17142449021",
-    status: "New",
-    priority: "High"
-  },
-  {
-    id: "3",
-    name: "Michael Brown",
-    company: "XYZ Solutions",
-    phone: "+18007779999",
-    status: "New",
-    priority: "Low"
-  },
-  {
-    id: "4",
-    name: "Jennifer Davis",
-    company: "Global Tech",
-    phone: "+918320354644",
-    status: "New",
-    priority: "High"
-  },
-  {
-    id: "5",
-    name: "Robert Wilson",
-    company: "InnoTech",
-    phone: "+14155551234",
-    status: "Contacted",
-    priority: "Medium"
-  },
-  {
-    id: "6",
-    name: "Lisa Martinez",
-    company: "ABC Consulting",
-    phone: "+12125557890",
-    status: "New",
-    priority: "High"
-  }
-];
-
+const SAMPLE_LEADS = [{
+  id: "1",
+  name: "John Smith",
+  company: "Acme Inc",
+  phone: "+18884659876",
+  status: "New",
+  priority: "High"
+}, {
+  id: "2",
+  name: "James Walter",
+  company: "Golden Pathway Financial",
+  phone: "+17142449021",
+  status: "New",
+  priority: "High"
+}, {
+  id: "3",
+  name: "Michael Brown",
+  company: "XYZ Solutions",
+  phone: "+18007779999",
+  status: "New",
+  priority: "Low"
+}, {
+  id: "4",
+  name: "Jennifer Davis",
+  company: "Global Tech",
+  phone: "+918320354644",
+  status: "New",
+  priority: "High"
+}, {
+  id: "5",
+  name: "Robert Wilson",
+  company: "InnoTech",
+  phone: "+14155551234",
+  status: "Contacted",
+  priority: "Medium"
+}, {
+  id: "6",
+  name: "Lisa Martinez",
+  company: "ABC Consulting",
+  phone: "+12125557890",
+  status: "New",
+  priority: "High"
+}];
 export default function PowerDialer() {
   const [currentTab, setCurrentTab] = useState("dialer");
   const [leads, setLeads] = useState(SAMPLE_LEADS);
@@ -96,11 +87,9 @@ export default function PowerDialer() {
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
-
   useEffect(() => {
     console.log('[PowerDialer] connected lead data state:', connectedLeadData);
   }, [connectedLeadData]);
-
   useEffect(() => {
     if (window.Twilio && window.Twilio.Device) {
       console.log("Twilio device available:", window.Twilio.Device);
@@ -108,7 +97,6 @@ export default function PowerDialer() {
       return () => {};
     }
   }, [isScriptLoaded]);
-
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     console.log('[PowerDialer] Active call updated:', {
@@ -124,7 +112,6 @@ export default function PowerDialer() {
       }));
     }
   }, [twilioState.activeCalls]);
-
   const filteredAndSortedLeads = React.useMemo(() => {
     return leads.filter(lead => filterStatus === "all" ? true : lead.status === filterStatus).sort((a, b) => {
       if (sortBy === "priority") {
@@ -141,7 +128,6 @@ export default function PowerDialer() {
       }
     });
   }, [leads, filterStatus, sortBy]);
-
   const handleCallLead = async (lead: any) => {
     if (!twilioState.initialized && !isScriptLoaded) {
       toast("Phone System Not Ready", {
@@ -189,14 +175,12 @@ export default function PowerDialer() {
       });
     }
   };
-
   const updateLeadStatus = (leadId: string, newStatus: string) => {
     setLeads(leads.map(lead => lead.id === leadId ? {
       ...lead,
       status: newStatus
     } : lead));
   };
-
   const handleEndCall = async (leadId: string) => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (!activeCall || !activeCall.callSid) {
@@ -214,7 +198,6 @@ export default function PowerDialer() {
       toast.error("Failed to end call");
     }
   };
-
   const handleDisposition = (type: string) => {
     if (!currentCall) return;
     toast("Call Dispositioned", {
@@ -222,26 +205,22 @@ export default function PowerDialer() {
     });
     handleEndCall(currentCall.parameters.leadId);
   };
-
   const activeCall = Object.values(twilioState.activeCalls)[0];
   const activeLeadId = activeCall?.leadId || null;
   const {
     user
-  } = useAuth();
-
+  } = useAuth(); // Get current user
   const {
     leadData: realtimeLeadData,
     isLoading: isLeadDataLoading,
     leadFound,
     refresh: refreshLeadData
   } = useLeadRealtime(activeLeadId ? String(activeLeadId) : null, user?.id);
-
   useEffect(() => {
     if (realtimeLeadData) {
       setConnectedLeadData(realtimeLeadData);
     }
   }, [realtimeLeadData]);
-
   const refreshLatestLead = async () => {
     try {
       console.log('Manually fetching latest lead...');
@@ -252,7 +231,6 @@ export default function PowerDialer() {
       toast.error('Failed to refresh lead data');
     }
   };
-
   const fetchLeadData = async (leadId: string | number) => {
     try {
       console.log(`[PowerDialer] Fetching lead data for ID: ${leadId}`);
@@ -314,7 +292,6 @@ export default function PowerDialer() {
       setConnectedLeadData(errorFallbackData);
     }
   };
-
   const transformActiveCallsForDisplay = () => {
     const calls = Object.values(twilioState.activeCalls);
     const displayData: Record<number, CallStatusUpdate | undefined> = {
@@ -334,18 +311,15 @@ export default function PowerDialer() {
     });
     return displayData;
   };
-
   const activeCallsForDisplay = transformActiveCallsForDisplay();
-
   useEffect(() => {
     console.log('[PowerDialer] Active call status changed:', Object.values(twilioState.activeCalls)[0]?.status);
     console.log('[PowerDialer] Active call leadId:', Object.values(twilioState.activeCalls)[0]?.leadId);
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.leadId) {
-      fetchLeadData(String(activeCall.leadId));
+      fetchLeadData(String(activeCall.leadId)); // Convert to string to ensure type safety
     }
   }, [twilioState.activeCalls]);
-
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.status === 'completed' || activeCall?.status === 'failed') {
@@ -354,7 +328,6 @@ export default function PowerDialer() {
       console.log('[PowerDialer] Call completed/failed, cleared lead data and dialing state');
     }
   }, [twilioState.activeCalls]);
-
   useEffect(() => {
     console.log('Rendering PowerDialer with state:', {
       hasData: !!connectedLeadData,
@@ -369,7 +342,6 @@ export default function PowerDialer() {
       } : null
     });
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
-
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('PowerDialer Debug Info:', {
@@ -386,7 +358,6 @@ export default function PowerDialer() {
       });
     }
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
-
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.status) {
@@ -396,7 +367,6 @@ export default function PowerDialer() {
       // Add logic to handle call status changes if needed
     }
   }, [twilioState.activeCalls]);
-
   return <MainLayout>
       <LeadFoundIndicator isVisible={leadFound} />
       <TwilioScript onLoad={() => setIsScriptLoaded(true)} onError={err => console.error("TwilioScript error:", err)} />
@@ -479,17 +449,7 @@ export default function PowerDialer() {
                   </CardHeader>
                 </Card>
 
-                <Card className="bg-gray-800 p-4 rounded-lg mb-0">
-                  <div className="grid grid-cols-3 gap-4">
-                    {[1, 2, 3].map((line) => (
-                      <LineDisplay 
-                        key={line} 
-                        lineNumber={line}
-                        currentCall={activeCallsForDisplay[line]}
-                      />
-                    ))}
-                  </div>
-                </Card>
+                
 
                 <PreviewDialerWindow currentCall={Object.values(twilioState.activeCalls)[0]} onDisposition={handleDisposition} onEndCall={() => {
                 Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
@@ -543,7 +503,7 @@ export default function PowerDialer() {
 
                 <ConnectedLeadPanel leadData={connectedLeadData} onRefresh={refreshLatestLead} />
 
-                <div className="grid grid-cols-4 gap-0">
+                <div className="grid grid-cols-4 gap-2">
                   <div className="col-span-3">
                     <Card className="h-full overflow-hidden flex flex-col">
                       <CardHeader className="pb-2">
@@ -673,11 +633,9 @@ export default function PowerDialer() {
       </div>
     </MainLayout>;
 }
-
 function SettingsTab() {
   return null;
 }
-
 function ScriptsTab() {
   return null;
 }
