@@ -116,10 +116,12 @@ async function fetchRecentTranscriptions(leadId: string | number, callSid?: stri
   if (!leadId) return [];
   
   try {
+    console.log(`🔍 Fetching recent transcriptions for lead ${leadId}${callSid ? ` and callSid ${callSid}` : ''}`);
+    
     let query = adminSupabase
       .from('call_transcriptions')
       .select('*')
-      .eq('lead_id', leadId)
+      .eq('lead_id', String(leadId))
       .order('timestamp', { ascending: false })
       .limit(limit);
       
@@ -134,6 +136,7 @@ async function fetchRecentTranscriptions(leadId: string | number, callSid?: stri
       return [];
     }
     
+    console.log(`✅ Found ${data?.length || 0} transcriptions`);
     return data || [];
   } catch (error) {
     console.error('❌ Exception fetching transcriptions:', error);
@@ -148,6 +151,8 @@ async function storeTranscription(leadId: string | number, callSid: string, tran
   }
   
   try {
+    console.log(`💾 Storing transcription for lead ${leadId}, callSid ${callSid}`);
+    
     const { data, error } = await adminSupabase
       .from('call_transcriptions')
       .insert({
@@ -201,17 +206,22 @@ Deno.serve(async (req) => {
     
     const { leadId, userId, callData, transcription } = requestBody;
     
+    const callSid = callData?.callSid;
+    console.log(`📞 Call SID: ${callSid || 'Not provided'}`);
+    
     const callState = callData?.callState || 'unknown';
     console.log(`📞 Call State: ${callState}`);
     
     if (transcription && leadId) {
       console.log('🎤 Processing transcription update for lead:', leadId);
       
-      const callSid = callData?.callSid || transcription.callSid;
-      if (!callSid) {
+      // Use the callSid from either location
+      const effectiveCallSid = callSid || transcription.call_sid;
+      
+      if (!effectiveCallSid) {
         console.warn('⚠️ Cannot process transcription without callSid');
       } else {
-        const storedTranscription = await storeTranscription(leadId, callSid, transcription);
+        const storedTranscription = await storeTranscription(leadId, effectiveCallSid, transcription);
         if (storedTranscription) {
           await broadcastTranscription(leadId, storedTranscription);
           
@@ -288,10 +298,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    const callSid = callData?.callSid;
-    const recentTranscriptions = callSid ? 
-      await fetchRecentTranscriptions(effectiveLeadId, callSid) : 
-      await fetchRecentTranscriptions(effectiveLeadId);
+    // Check if we have a callSid to fetch transcriptions specifically for this call
+    let recentTranscriptions: any[] = [];
+    if (callSid) {
+      console.log(`🎤 Fetching transcriptions for specific callSid: ${callSid}`);
+      recentTranscriptions = await fetchRecentTranscriptions(effectiveLeadId, callSid);
+    } else {
+      // Otherwise just get recent ones for this lead
+      recentTranscriptions = await fetchRecentTranscriptions(effectiveLeadId);
+    }
 
     try {
       console.log(`⏳ Attempting to find lead with ID: ${effectiveLeadId}`);
@@ -409,7 +424,7 @@ Deno.serve(async (req) => {
         return createSuccessResponse(formattedLead);
       }
     } catch (retrieveLeadsError) {
-      console.warn('⚠️ Retrieve-leads approach failed:', retrieveLeadsError.message);
+      console.warn('��️ Retrieve-leads approach failed:', retrieveLeadsError.message);
     }
     
     console.log('⚠️ All approaches to find lead failed - returning fallback data');
@@ -481,10 +496,12 @@ async function logLeadActivity(leadId, callData, userId = null) {
 
   const activityType = callData.status === 'in-progress' ? 'call_connected' : 
                        callData.status === 'completed' ? 'call_ended' : 
+                       callData.status === 'transcription' ? 'call_transcription' :
                        'call_status_change';
   
   const description = callData.status === 'in-progress' ? 'Call connected' :
                      callData.status === 'completed' ? 'Call ended' :
+                     callData.status === 'transcription' ? 'Transcription received' :
                      `Call status changed to ${callData.status}`;
   
   try {
