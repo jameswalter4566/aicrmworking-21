@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { 
@@ -366,8 +367,8 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
         </div>
       </Card>
 
-      <div className="grid grid-cols-4 gap-4 mt-4">
-        <div className="col-span-3">
+      <div className="grid grid-cols-4 gap-0">
+        <div className="col-span-3 pr-4">
           {!isDialingStarted ? (
             <Card>
               <CardHeader className="pb-2">
