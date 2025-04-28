@@ -450,8 +450,8 @@ export default function PowerDialer() {
           
           <TabsContent value="dialer" className="space-y-0">
             <div className="bg-gray-50 rounded-lg p-2 border shadow-sm">
-              <div className="flex flex-col space-y-2">
-                <Card className="bg-muted/50">
+              <div className="flex flex-col space-y-0">
+                <Card className="bg-muted/50 mb-0">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex justify-between items-center">
                       System Controls
@@ -492,6 +492,18 @@ export default function PowerDialer() {
                       Reset your system and terminate all active calls if you encounter any issues
                     </CardDescription>
                   </CardHeader>
+                </Card>
+
+                <Card className="bg-gray-800 p-4 rounded-lg mt-0 mb-0 border-b-0 rounded-b-none">
+                  <div className="grid grid-cols-3 gap-4">
+                    {[1, 2, 3].map((line) => (
+                      <LineDisplay 
+                        key={line} 
+                        lineNumber={line}
+                        currentCall={activeCallsForDisplay[line]}
+                      />
+                    ))}
+                  </div>
                 </Card>
 
                 <PreviewDialerWindow 
@@ -683,7 +695,7 @@ export default function PowerDialer() {
                           <Button 
                             variant="outline" 
                             className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => onDisposition('contact')}
+                            onClick={() => handleDisposition('contact')}
                           >
                             <Phone className="mr-2 h-4 w-4 text-green-400" />
                             Contact
@@ -692,7 +704,7 @@ export default function PowerDialer() {
                           <Button 
                             variant="outline" 
                             className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => onDisposition('attempt')}
+                            onClick={() => handleDisposition('attempt')}
                           >
                             <Phone className="mr-2 h-4 w-4 text-yellow-400" />
                             Attempt
@@ -701,7 +713,7 @@ export default function PowerDialer() {
                           <Button 
                             variant="outline" 
                             className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => onDisposition('no-answer')}
+                            onClick={() => handleDisposition('no-answer')}
                           >
                             <Phone className="mr-2 h-4 w-4 text-red-400" />
                             No Answer
@@ -710,7 +722,7 @@ export default function PowerDialer() {
                           <Button 
                             variant="outline" 
                             className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => onDisposition('busy')}
+                            onClick={() => handleDisposition('busy')}
                           >
                             <Phone className="mr-2 h-4 w-4 text-orange-400" />
                             Busy
@@ -719,7 +731,7 @@ export default function PowerDialer() {
                           <Button 
                             variant="outline" 
                             className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => onDisposition('failed')}
+                            onClick={() => handleDisposition('failed')}
                           >
                             <Phone className="mr-2 h-4 w-4 text-gray-400" />
                             Failed

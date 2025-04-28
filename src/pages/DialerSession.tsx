@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -306,7 +307,7 @@ const DialerSession = () => {
                           {(() => {
                             const status = Object.values(twilioState.activeCalls)[0]?.status;
                             if (status === 'connecting') return 'Ringing';
-                            if (status === 'ringing') return 'Ringing';
+                            if (status && ['ringing', 'connecting'].includes(status)) return 'Ringing';
                             if (status === 'in-progress') return 'Connected';
                             if (status === 'completed') return 'Ended';
                             return status;
