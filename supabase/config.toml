@@ -1,4 +1,3 @@
-
 project_id = "imrmboyczebjlbnkgjns"
 
 [api]
@@ -56,5 +55,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.call-disposition]
+verify_jwt = false
+no_verify_jwt = true
+
+[functions.hangup-call]
 verify_jwt = false
 no_verify_jwt = true
