@@ -15,21 +15,41 @@ export function useHangupCall() {
     }
 
     setIsHangingUp(true);
-    console.log(`Attempting to hang up call with SID: ${callSid}`, { callSid });
+    console.log(`HANGUP HOOK - Attempting to hang up call with SID: ${callSid}`, { callSid });
 
     try {
+      const userId = user?.id || 'anonymous';
+      
       const payload = { 
         callSid,
-        userId: user?.id || 'anonymous'
+        userId
       };
       
-      console.log('Sending hangup request to hangup-call function with payload:', payload);
+      console.log('HANGUP HOOK - Sending hangup request to hangup-call function with payload:', payload);
 
+      // Direct fetch to the edge function for better debugging
+      const url = 'https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call';
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const result = await response.text();
+      console.log('HANGUP HOOK - Direct fetch response status:', response.status);
+      console.log('HANGUP HOOK - Direct fetch response:', result);
+      
+      // Also try the supabase.functions.invoke method as backup
+      console.log('HANGUP HOOK - Also trying supabase.functions.invoke as backup');
       const { data, error } = await supabase.functions.invoke('hangup-call', {
         body: payload
       });
 
-      console.log('Received response from hangup-call function:', { data, error });
+      console.log('HANGUP HOOK - Received response from hangup-call function via invoke:', { data, error });
 
       if (error) throw error;
 
@@ -40,9 +60,9 @@ export function useHangupCall() {
       toast.success('Call ended successfully');
       return true;
     } catch (err) {
-      const error = err instanceof Error ? err.message : 'Failed to end call';
-      console.error('Error hanging up call:', error);
-      toast.error(error);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to end call';
+      console.error('HANGUP HOOK - Error hanging up call:', errorMessage);
+      toast.error(errorMessage);
       return false;
     } finally {
       setIsHangingUp(false);
