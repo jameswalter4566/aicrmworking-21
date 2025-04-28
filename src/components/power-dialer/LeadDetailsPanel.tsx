@@ -21,7 +21,7 @@ export const LeadDetailsPanel = ({ leadId, isActive, callSid }: LeadDetailsPanel
   const [notes, setNotes] = useState<any[]>([]);
   const [currentDisposition, setCurrentDisposition] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showTranscription, setShowTranscription] = useState(false);
+  const [showTranscription, setShowTranscription] = useState(true); // Default to true
 
   useEffect(() => {
     if (leadId) {

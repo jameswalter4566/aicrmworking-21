@@ -18,7 +18,7 @@ export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: Transc
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   
-  // Fetch initial transcriptions
+  // Fetch initial transcriptions whenever leadId changes, regardless of visibility
   useEffect(() => {
     if (!leadId) return;
     
@@ -43,6 +43,7 @@ export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: Transc
         }
         
         if (data) {
+          console.log(`[TranscriptionPanel] Loaded ${data.length} initial transcriptions for lead ${leadId}`);
           setTranscriptions(data);
         }
       } catch (err) {

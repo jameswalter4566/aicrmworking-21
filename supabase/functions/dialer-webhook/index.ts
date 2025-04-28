@@ -13,7 +13,7 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Notify lead-connected function when call status changes
-async function notifyLeadConnected(leadId: string, callSid: string, status: string, originalLeadId?: string) {
+async function notifyLeadConnected(leadId: string, callSid: string, status: string, originalLeadId?: string, transcription?: any) {
   try {
     console.log(`Dialer Webhook: Notifying lead-connected for lead: ${leadId}, originalLeadId: ${originalLeadId}, status: ${status}`);
     
@@ -24,20 +24,78 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
                       status === 'canceled' ? 'disconnected' :
                       status === 'ringing' || status === 'queued' ? 'dialing' : 'unknown';
     
-    await supabase.functions.invoke('lead-connected', {
-      body: { 
-        leadId,
-        callData: {
-          callSid,
-          status,
-          timestamp: new Date().toISOString(),
-          originalLeadId: originalLeadId || leadId,
-          callState
-        }
+    const payload: any = { 
+      leadId,
+      callData: {
+        callSid,
+        status,
+        timestamp: new Date().toISOString(),
+        originalLeadId: originalLeadId || leadId,
+        callState
       }
+    };
+    
+    // Add transcription data if available
+    if (transcription) {
+      payload.transcription = transcription;
+    }
+    
+    await supabase.functions.invoke('lead-connected', {
+      body: payload
     });
   } catch (err) {
     console.error('Error notifying lead-connected from dialer webhook:', err);
+  }
+}
+
+// Process transcription data from Twilio
+async function processTranscription(formData: FormData, callId: string, leadId: string, callSid: string, originalLeadId?: string) {
+  try {
+    const transcriptionText = formData.get('TranscriptionText')?.toString();
+    const transcriptionStatus = formData.get('TranscriptionStatus')?.toString();
+    const transcriptionSid = formData.get('TranscriptionSid')?.toString();
+    
+    if (!transcriptionText) {
+      console.log('No transcription text available');
+      return;
+    }
+    
+    console.log(`Received transcription for call ${callId}: ${transcriptionText}`);
+    
+    const transcription = {
+      segment_text: transcriptionText,
+      is_final: transcriptionStatus === 'completed',
+      confidence: parseFloat(formData.get('Confidence')?.toString() || '0.8'),
+      speaker: formData.get('From')?.toString() || 'Unknown',
+      timestamp: new Date().toISOString(),
+      call_sid: callSid
+    };
+    
+    // Store the transcription in the database
+    const { data, error } = await supabase
+      .from('call_transcriptions')
+      .insert({
+        lead_id: originalLeadId || String(leadId),
+        call_sid: callSid,
+        segment_text: transcriptionText,
+        is_final: transcriptionStatus === 'completed',
+        confidence: parseFloat(formData.get('Confidence')?.toString() || '0.8'),
+        speaker: formData.get('From')?.toString() || 'Unknown',
+        timestamp: new Date().toISOString()
+      })
+      .select();
+    
+    if (error) {
+      console.error('Error storing transcription:', error);
+    } else {
+      console.log('Successfully stored transcription:', data);
+    }
+    
+    // Forward the transcription to lead-connected
+    await notifyLeadConnected(leadId, callSid, 'transcription', originalLeadId, transcription);
+    
+  } catch (error) {
+    console.error('Error processing transcription:', error);
   }
 }
 
@@ -65,7 +123,10 @@ Deno.serve(async (req) => {
     const callDuration = formData.get('CallDuration')?.toString();
     const customParams = formData.get('CustomParameters')?.toString();
     
-    console.log(`Dialer webhook received for call ${callId} with status: ${callStatus}`);
+    // Check if this is a transcription event
+    const isTranscription = formData.has('TranscriptionText') || formData.has('TranscriptionSid');
+    
+    console.log(`Dialer webhook received for call ${callId} with status: ${callStatus} ${isTranscription ? '(includes transcription)' : ''}`);
     console.log('URL originalLeadId:', originalLeadId);
     console.log('Custom parameters:', customParams);
     
@@ -96,8 +157,18 @@ Deno.serve(async (req) => {
       }
     }
     
+    // Process transcription if available
+    if (isTranscription && callSid && call.contact_id) {
+      await processTranscription(
+        formData,
+        callId,
+        call.contact_id,
+        callSid,
+        originalLeadId || originalLeadIdFromNotes
+      );
+    }
     // Pass both IDs to lead-connected function
-    if ((call.contact_id || originalLeadIdFromNotes) && callSid) {
+    else if ((call.contact_id || originalLeadIdFromNotes) && callSid) {
       await notifyLeadConnected(
         originalLeadIdFromNotes || call.contact_id, 
         callSid, 

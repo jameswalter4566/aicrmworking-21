@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -66,6 +67,26 @@ async function processTranscription(formData: FormData, callId: string, leadId: 
       timestamp: new Date().toISOString(),
       call_sid: callSid
     };
+    
+    // Store transcription in database
+    const { data, error } = await supabase
+      .from('call_transcriptions')
+      .insert({
+        lead_id: String(leadId),
+        call_sid: callSid,
+        segment_text: transcriptionText,
+        is_final: transcriptionStatus === 'completed',
+        confidence: parseFloat(formData.get('Confidence')?.toString() || '0.8'),
+        speaker: formData.get('From')?.toString() || 'Unknown',
+        timestamp: new Date().toISOString()
+      })
+      .select();
+      
+    if (error) {
+      console.error('Error storing transcription:', error);
+    } else {
+      console.log('Successfully stored transcription:', data);
+    }
     
     // Forward the transcription to lead-connected
     await notifyLeadConnected(leadId, callSid, 'transcription', transcription);

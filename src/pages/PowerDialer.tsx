@@ -502,8 +502,8 @@ export default function PowerDialer() {
                                     {call.phoneNumber}
                                   </p>
                                 </div>
-                                <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
-                                  {call.status === 'connecting' ? 'Ringing' : call.status === 'ringing' ? 'Ringing' : call.status === 'in-progress' ? 'Connected' : call.status === 'completed' ? 'Ended' : call.status}
+                                <Badge variant={callStatus && ['ringing', 'connecting'].includes(callStatus) ? "default" : "outline"}>
+                                  {callStatus === 'connecting' ? 'Ringing' : callStatus === 'ringing' ? 'Ringing' : callStatus === 'in-progress' ? 'Connected' : callStatus === 'completed' ? 'Ended' : callStatus}
                                 </Badge>
                               </div>
                               
