@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -226,20 +225,20 @@ const DialerSession = () => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     const callStatus = firstActiveCall?.status;
     
-    // Fix the TypeScript error by using type string comparison instead of literal types
-    const isCompletedStatus = callStatus === 'completed' || callStatus === 'failed' || 
-                             callStatus === 'busy' || callStatus === 'no-answer' || 
-                             callStatus === 'canceled';
-    
-    const isInProgressStatus = callStatus === 'connecting' || callStatus === 'ringing' || 
-                              callStatus === 'in-progress';
-    
-    if (callStatus && isCompletedStatus) {
-      handleCallCompletion();
-    } else if (callStatus === 'connecting' || callStatus === 'ringing') {
-      startNoAnswerTimeout();
-    } else if (callStatus && isInProgressStatus) {
-      clearTimeoutTimer();
+    if (callStatus) {
+      if (callStatus === 'completed' || 
+          callStatus === 'failed' || 
+          callStatus === 'busy' || 
+          callStatus === 'no-answer' || 
+          callStatus === 'canceled') {
+        handleCallCompletion();
+      } 
+      else if (callStatus === 'connecting' || callStatus === 'ringing') {
+        startNoAnswerTimeout();
+      } 
+      else if (callStatus === 'in-progress') {
+        clearTimeoutTimer();
+      }
     }
   }, [
     twilioState.activeCalls,
@@ -300,7 +299,11 @@ const DialerSession = () => {
                         <p className="text-sm text-muted-foreground">
                           {Object.values(twilioState.activeCalls)[0]?.phoneNumber}
                         </p>
-                        <Badge className="mt-2" variant={Object.values(twilioState.activeCalls)[0]?.status === 'in-progress' ? "default" : "outline"}>
+                        <Badge className="mt-2" variant={
+                          (Object.values(twilioState.activeCalls)[0]?.status === 'in-progress') 
+                            ? "default" 
+                            : "outline"
+                        }>
                           {Object.values(twilioState.activeCalls)[0]?.status === 'connecting' ? 'Ringing' : 
                            Object.values(twilioState.activeCalls)[0]?.status === 'ringing' ? 'Ringing' :
                            Object.values(twilioState.activeCalls)[0]?.status === 'in-progress' ? 'Connected' :
