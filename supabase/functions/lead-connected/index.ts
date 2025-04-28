@@ -106,14 +106,9 @@ Deno.serve(async (req) => {
     
     console.log('📌 Request body:', JSON.stringify(requestBody, null, 2));
     
-    const { leadId, userId, callData } = requestBody;
-    
-    const callState = callData?.callState || 'unknown';
-    console.log(`📞 Call State: ${callState}`);
-    
+    // Handle endCall action
     if (requestBody.action === 'endCall') {
       if (!requestBody.callSid) {
-        console.error('❌ No callSid provided for endCall action');
         return new Response(JSON.stringify({
           success: false,
           error: 'CallSid is required for endCall action'
@@ -136,6 +131,7 @@ Deno.serve(async (req) => {
             }
 
             if (typeof numericLeadId === 'number') {
+              // Log activity
               await adminSupabase
                 .from('lead_activities')
                 .insert({
@@ -168,6 +164,11 @@ Deno.serve(async (req) => {
         });
       }
     }
+
+    const { leadId, userId, callData } = requestBody;
+    
+    const callState = callData?.callState || 'unknown';
+    console.log(`📞 Call State: ${callState}`);
 
     if (!leadId) {
       console.log('❌ No lead ID provided - returning fallback data');
@@ -362,9 +363,13 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('❌ Error in lead-connected function:', error);
     
-    await broadcastLeadFound(FALLBACK_LEAD_DATA, 'unknown');
-    
-    return createSuccessResponse(FALLBACK_LEAD_DATA);
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Internal server error'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
+    });
   }
 });
 
