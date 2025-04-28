@@ -34,36 +34,59 @@ export function useHangupCall() {
       console.log('HANGUP HOOK - Direct fetch URL: https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call');
       console.log('HANGUP HOOK - Authentication token:', authToken ? 'Present' : 'Missing');
       
-      // Direct fetch to the edge function for better debugging
-      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      const result = await response.text();
-      console.log('HANGUP HOOK - Direct fetch response status:', response.status);
-      console.log('HANGUP HOOK - Direct fetch response:', result);
-      
-      // Also try the supabase.functions.invoke method as backup
-      console.log('HANGUP HOOK - Also trying supabase.functions.invoke as backup');
-      const { data, error } = await supabase.functions.invoke('hangup-call', {
-        body: payload
-      });
-
-      console.log('HANGUP HOOK - Received response from hangup-call function via invoke:', { data, error });
-
-      if (error) throw error;
-
-      if (!data?.success) {
-        throw new Error(data?.error || 'Failed to end call');
+      // First trying the direct fetch approach with better error handling
+      let isDirectFetchSuccessful = false;
+      try {
+        const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            // Don't use auth token since the function is now public (verify_jwt = false)
+          },
+          body: JSON.stringify(payload)
+        });
+        
+        console.log('HANGUP HOOK - Direct fetch response status:', response.status);
+        
+        if (response.ok) {
+          const result = await response.text();
+          console.log('HANGUP HOOK - Direct fetch response:', result);
+          isDirectFetchSuccessful = true;
+          
+          toast.success('Call ended successfully');
+          return true;
+        } else {
+          const errorText = await response.text();
+          console.error(`HANGUP HOOK - Direct fetch failed with status ${response.status}:`, errorText);
+          // Continue to fallback method
+        }
+      } catch (directFetchError) {
+        console.error('HANGUP HOOK - Direct fetch error:', directFetchError);
+        // Continue to fallback method
       }
+      
+      // Only try the invoke method if direct fetch failed
+      if (!isDirectFetchSuccessful) {
+        console.log('HANGUP HOOK - Direct fetch failed, trying supabase.functions.invoke as fallback');
+        const { data, error } = await supabase.functions.invoke('hangup-call', {
+          body: payload
+        });
 
-      toast.success('Call ended successfully');
-      return true;
+        console.log('HANGUP HOOK - Received response from hangup-call function via invoke:', { data, error });
+
+        if (error) {
+          throw error;
+        }
+
+        if (!data?.success) {
+          throw new Error(data?.error || 'Failed to end call');
+        }
+
+        toast.success('Call ended successfully via invoke');
+        return true;
+      }
+      
+      return isDirectFetchSuccessful;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to end call';
       console.error('HANGUP HOOK - Error hanging up call:', errorMessage);

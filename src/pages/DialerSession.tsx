@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -232,7 +233,8 @@ const DialerSession = () => {
     
     if (callStatus && completedStatuses.includes(callStatus)) {
       handleCallCompletion();
-    } else if (callStatus === 'connecting') {
+    } else if (callStatus === 'connecting' || callStatus === 'ringing') {
+      // Fixed the comparison by using OR to compare with both potential status values
       startNoAnswerTimeout();
     } else if (callStatus && inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();

@@ -27,6 +27,7 @@ export function HangupButton({ callSid, onSuccess, className = '' }: HangupButto
     console.log("HANGUP BUTTON - Attempting to hang up call with SID:", callSid);
     
     try {
+      // Make sure to pass the full SID string, not a React event
       const success = await hangupCall(callSid);
       
       console.log("HANGUP BUTTON - hangupCall result:", success);

@@ -23,24 +23,29 @@ Deno.serve(async (req) => {
     }
 
     try {
-      // Clone the request to read the body multiple times if needed
-      const clonedReq = req.clone();
-      
-      // Try to get body as text first for logging
-      const bodyText = await clonedReq.text();
+      // Try to read request body as text first
+      const bodyText = await req.text();
       console.log("HANGUP FUNCTION - Raw request body:", bodyText);
       
       let requestBody;
       try {
-        // Parse the text as JSON
+        // Parse the text as JSON if possible
         requestBody = JSON.parse(bodyText);
         console.log("HANGUP FUNCTION - Parsed request body:", JSON.stringify(requestBody, null, 2));
       } catch (parseError) {
-        console.error("HANGUP FUNCTION - Error parsing request body:", parseError);
-        throw new Error('Invalid JSON request body');
+        console.error("HANGUP FUNCTION - Error parsing request body as JSON:", parseError);
+        
+        // If parsing as JSON fails, try form data
+        const formData = await req.formData();
+        requestBody = {};
+        for (const [key, value] of formData.entries()) {
+          requestBody[key] = value;
+        }
+        console.log("HANGUP FUNCTION - Parsed request as form data:", JSON.stringify(requestBody, null, 2));
       }
       
-      const { callSid, userId } = requestBody;
+      const callSid = requestBody?.callSid || requestBody?.CallSid;
+      const userId = requestBody?.userId || 'anonymous';
 
       if (!callSid) {
         console.error("HANGUP FUNCTION - Error: No callSid provided in request");
@@ -100,6 +105,39 @@ Deno.serve(async (req) => {
               console.error('HANGUP FUNCTION - Error logging call action to database:', error);
             } else {
               console.log('HANGUP FUNCTION - Successfully logged call action to database');
+            }
+            
+            // Notify the lead-connected function about the hangup
+            try {
+              // Find the call in predictive_dialer_calls first to get the contact_id
+              const callQuery = await supabase
+                .from('predictive_dialer_calls')
+                .select('contact_id')
+                .eq('twilio_call_sid', callSid)
+                .single();
+                
+              if (callQuery.data?.contact_id) {
+                console.log(`HANGUP FUNCTION - Found contact_id: ${callQuery.data.contact_id} for call ${callSid}`);
+                
+                // Invoke lead-connected with the found contact_id
+                await supabase.functions.invoke('lead-connected', {
+                  body: { 
+                    leadId: callQuery.data.contact_id.toString(),
+                    callData: {
+                      callSid,
+                      status: 'completed',
+                      timestamp: new Date().toISOString(),
+                      callState: 'disconnected'
+                    }
+                  }
+                });
+                
+                console.log(`HANGUP FUNCTION - Notified lead-connected function about hangup for lead ${callQuery.data.contact_id}`);
+              } else {
+                console.log(`HANGUP FUNCTION - Could not find contact_id for call ${callSid}`);
+              }
+            } catch (notifyError) {
+              console.error('HANGUP FUNCTION - Error notifying lead-connected:', notifyError);
             }
           } catch (dbError) {
             console.error('HANGUP FUNCTION - Error in database operation:', dbError);
