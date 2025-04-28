@@ -27,7 +27,7 @@ export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: Transc
         let query = supabase
           .from('call_transcriptions')
           .select('*')
-          .eq('lead_id', leadId)
+          .eq('lead_id', String(leadId)) // Convert leadId to string
           .order('timestamp', { ascending: true });
           
         if (callSid) {

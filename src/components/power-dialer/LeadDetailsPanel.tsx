@@ -76,14 +76,15 @@ export const LeadDetailsPanel = ({ leadId, isActive, callSid }: LeadDetailsPanel
       <CardHeader>
         <CardTitle className="text-lg font-medium flex items-center justify-between">
           <div>Connected Lead Details</div>
-          <div className="flex items-center space-x-2">
-            <Mic className="h-4 w-4" />
+          <div className="flex items-center space-x-2 bg-gray-100 p-2 rounded-md">
+            <Mic className="h-4 w-4 text-blue-600" />
+            <span className="text-sm font-medium">Transcription:</span>
             <Switch 
               checked={showTranscription}
               onCheckedChange={setShowTranscription}
               aria-label="Toggle transcription"
             />
-            <span className="text-sm">Transcription</span>
+            <span className="text-sm">{showTranscription ? 'On' : 'Off'}</span>
           </div>
         </CardTitle>
       </CardHeader>
