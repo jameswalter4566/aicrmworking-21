@@ -759,7 +759,7 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                 </Button>
                 
                 <HangupButton
-                  callSid={currentCall?.callSid}
+                  callSid={currentCall?.callSid || currentCall?.parameters?.CallSid}
                   onSuccess={onEndCall}
                   className="w-full justify-center bg-gray-700 hover:bg-gray-600 text-white border-gray-600"
                 />
