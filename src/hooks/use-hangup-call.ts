@@ -20,6 +20,7 @@ export function useHangupCall() {
         console.log('HANGUP HOOK - No callSid provided, attempting to find active call in localStorage');
         
         try {
+          // First check local storage for any Twilio data
           const localStorageKeys = Object.keys(localStorage);
           const twilioKey = localStorageKeys.find(key => key.startsWith('twilio-'));
           
@@ -34,7 +35,22 @@ export function useHangupCall() {
                 const firstCall = twilioData.calls[firstCallId];
                 if (firstCall?.parameters?.CallSid) {
                   callSid = firstCall.parameters.CallSid;
-                  console.log('HANGUP HOOK - Found call SID:', callSid);
+                  console.log('HANGUP HOOK - Found call SID in localStorage:', callSid);
+                }
+              }
+            }
+          }
+          
+          // If still no callSid found in localStorage, check window.Twilio if available
+          if (!callSid && typeof window !== 'undefined' && (window as any).Twilio) {
+            const twilio = (window as any).Twilio;
+            if (twilio && twilio.Device) {
+              const device = twilio.Device.getInstance();
+              if (device && device._activeConnection) {
+                const activeConn = device._activeConnection;
+                if (activeConn.parameters && activeConn.parameters.CallSid) {
+                  callSid = activeConn.parameters.CallSid;
+                  console.log('HANGUP HOOK - Found call SID from Twilio.Device:', callSid);
                 }
               }
             }
@@ -44,11 +60,14 @@ export function useHangupCall() {
         }
       }
       
+      // Create a payload with as much information as possible
       const payload = { 
         callSid: callSid || '',
         userId,
         timestamp: new Date().toISOString(),
-        attemptType: 'direct-hangup'
+        attemptType: 'direct-hangup',
+        source: 'user-initiated',
+        twilioDeviceActive: typeof window !== 'undefined' && !!(window as any).Twilio
       };
       
       console.log('HANGUP HOOK - Sending hangup request with payload:', payload);
@@ -56,6 +75,7 @@ export function useHangupCall() {
       // First try direct fetch with better error handling
       let isDirectFetchSuccessful = false;
       try {
+        // Use full URL with project ID to avoid CORS issues
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call', {
           method: 'POST',
           headers: {

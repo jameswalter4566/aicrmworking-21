@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -225,17 +226,19 @@ const DialerSession = () => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     const callStatus = firstActiveCall?.status;
     
-    const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'] as const;
-    const inProgressStatuses = ['connecting', 'ringing', 'in-progress'] as const;
+    // Fix the TypeScript error by using type string comparison instead of literal types
+    const isCompletedStatus = callStatus === 'completed' || callStatus === 'failed' || 
+                             callStatus === 'busy' || callStatus === 'no-answer' || 
+                             callStatus === 'canceled';
     
-    type CompletedStatus = typeof completedStatuses[number];
-    type InProgressStatus = typeof inProgressStatuses[number];
+    const isInProgressStatus = callStatus === 'connecting' || callStatus === 'ringing' || 
+                              callStatus === 'in-progress';
     
-    if (callStatus && completedStatuses.includes(callStatus as CompletedStatus)) {
+    if (callStatus && isCompletedStatus) {
       handleCallCompletion();
     } else if (callStatus === 'connecting' || callStatus === 'ringing') {
       startNoAnswerTimeout();
-    } else if (callStatus && inProgressStatuses.includes(callStatus as InProgressStatus)) {
+    } else if (callStatus && isInProgressStatus) {
       clearTimeoutTimer();
     }
   }, [
