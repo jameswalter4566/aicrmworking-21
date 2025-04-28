@@ -3,21 +3,25 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Phone, Mail, MapPin, Clock, MessageSquare } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, MessageSquare, Mic } from 'lucide-react';
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import DispositionSelector from '@/components/DispositionSelector';
 import { leadProfileService } from '@/services/leadProfile';
+import { TranscriptionPanel } from './TranscriptionPanel';
 
 interface LeadDetailsPanelProps {
   leadId?: string;
   isActive?: boolean;
+  callSid?: string;
 }
 
-export const LeadDetailsPanel = ({ leadId, isActive }: LeadDetailsPanelProps) => {
+export const LeadDetailsPanel = ({ leadId, isActive, callSid }: LeadDetailsPanelProps) => {
   const [leadData, setLeadData] = useState<any>(null);
   const [notes, setNotes] = useState<any[]>([]);
   const [currentDisposition, setCurrentDisposition] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showTranscription, setShowTranscription] = useState(false);
 
   useEffect(() => {
     if (leadId) {
@@ -72,9 +76,22 @@ export const LeadDetailsPanel = ({ leadId, isActive }: LeadDetailsPanelProps) =>
       <CardHeader>
         <CardTitle className="text-lg font-medium flex items-center justify-between">
           <div>Connected Lead Details</div>
+          <div className="flex items-center space-x-2">
+            <Mic className="h-4 w-4" />
+            <Switch 
+              checked={showTranscription}
+              onCheckedChange={setShowTranscription}
+              aria-label="Toggle transcription"
+            />
+            <span className="text-sm">Transcription</span>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4">
+        {showTranscription && (
+          <TranscriptionPanel leadId={leadId} callSid={callSid} isVisible={showTranscription} />
+        )}
+        
         <Tabs defaultValue="details">
           <TabsList className="w-full">
             <TabsTrigger value="details" className="flex-1">Details</TabsTrigger>

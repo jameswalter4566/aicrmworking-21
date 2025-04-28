@@ -111,6 +111,42 @@ export type Database = {
         }
         Relationships: []
       }
+      call_transcriptions: {
+        Row: {
+          call_sid: string
+          confidence: number | null
+          created_at: string
+          id: string
+          is_final: boolean | null
+          lead_id: string
+          segment_text: string
+          speaker: string | null
+          timestamp: string
+        }
+        Insert: {
+          call_sid: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          is_final?: boolean | null
+          lead_id: string
+          segment_text: string
+          speaker?: string | null
+          timestamp?: string
+        }
+        Update: {
+          call_sid?: string
+          confidence?: number | null
+          created_at?: string
+          id?: string
+          is_final?: boolean | null
+          lead_id?: string
+          segment_text?: string
+          speaker?: string | null
+          timestamp?: string
+        }
+        Relationships: []
+      }
       calling_list_leads: {
         Row: {
           added_at: string

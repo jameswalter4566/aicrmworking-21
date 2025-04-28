@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import MainLayout from '@/components/layouts/MainLayout';
 import { useTwilio } from '@/hooks/use-twilio';
@@ -32,6 +31,10 @@ const DialerSession = () => {
   const { user } = useAuth();
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
+  
+  const activeCall = Object.values(twilioState.activeCalls)[0];
+  const activeCallSid = activeCall?.callSid;
+  const activeLeadId = activeCall?.leadId || null;
   
   const {
     config: autoDialerConfig,
@@ -350,6 +353,7 @@ const DialerSession = () => {
             <LeadDetailsPanel 
               leadId={currentLeadId || undefined}
               isActive={hasActiveCall}
+              callSid={activeCallSid}
             />
           </div>
           

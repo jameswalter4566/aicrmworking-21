@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 const corsHeaders = {
@@ -29,20 +28,17 @@ const FALLBACK_LEAD_DATA = {
   avatar: null
 };
 
-async function broadcastLeadFound(lead, callState?: string) {
+async function broadcastLeadFound(lead, callState?: string, transcriptions?: any[]) {
   if (!lead?.id) {
     console.warn('⚠️ Cannot broadcast: lead or lead.id is missing');
     return;
   }
   
   try {
-    // Create a channel specific to this lead ID for broadcasting updates
     const channelName = `lead-data-${lead.id}`;
     
-    // Log before sending the broadcast
     console.log(`📢 Broadcasting lead data to channel: ${channelName}, callState: ${callState}`);
     
-    // Send a broadcast message with the lead data
     const result = await anonSupabase
       .channel(channelName)
       .send({
@@ -52,18 +48,17 @@ async function broadcastLeadFound(lead, callState?: string) {
           lead,
           callState,
           timestamp: new Date().toISOString(),
+          transcriptions,
           source: 'lead_connected'
         }
       });
       
-    // Check if broadcast was successful
     if (result.error) {
       console.error('❌ Broadcast failed:', result.error);
     } else {
       console.log('✅ Broadcast successful!');
     }
     
-    // Also try sending to a global channel as backup
     await anonSupabase
       .channel('global-leads')
       .send({
@@ -73,12 +68,110 @@ async function broadcastLeadFound(lead, callState?: string) {
           lead,
           callState,
           timestamp: new Date().toISOString(),
+          transcriptions,
           source: 'lead_connected_global'
         }
       });
       
   } catch (error) {
     console.error('❌ Failed to broadcast lead data:', error);
+  }
+}
+
+async function broadcastTranscription(leadId: string | number, transcription: any) {
+  if (!leadId || !transcription) {
+    console.warn('⚠️ Cannot broadcast transcription: leadId or transcription missing');
+    return;
+  }
+  
+  try {
+    const channelName = `lead-transcription-${leadId}`;
+    
+    console.log(`📢 Broadcasting transcription to channel: ${channelName}`);
+    
+    const result = await anonSupabase
+      .channel(channelName)
+      .send({
+        type: 'broadcast',
+        event: 'transcription_update',
+        payload: {
+          leadId,
+          transcription,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
+    if (result.error) {
+      console.error('❌ Transcription broadcast failed:', result.error);
+    } else {
+      console.log('✅ Transcription broadcast successful!');
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to broadcast transcription:', error);
+  }
+}
+
+async function fetchRecentTranscriptions(leadId: string | number, callSid?: string, limit = 10) {
+  if (!leadId) return [];
+  
+  try {
+    let query = adminSupabase
+      .from('call_transcriptions')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('timestamp', { ascending: false })
+      .limit(limit);
+      
+    if (callSid) {
+      query = query.eq('call_sid', callSid);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) {
+      console.error('❌ Error fetching transcriptions:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('❌ Exception fetching transcriptions:', error);
+    return [];
+  }
+}
+
+async function storeTranscription(leadId: string | number, callSid: string, transcriptionData: any) {
+  if (!leadId || !callSid || !transcriptionData?.segment_text) {
+    console.warn('⚠️ Cannot store transcription: required data missing');
+    return null;
+  }
+  
+  try {
+    const { data, error } = await adminSupabase
+      .from('call_transcriptions')
+      .insert({
+        lead_id: String(leadId),
+        call_sid: callSid,
+        segment_text: transcriptionData.segment_text,
+        speaker: transcriptionData.speaker || null,
+        confidence: transcriptionData.confidence || null,
+        is_final: transcriptionData.is_final || false,
+        timestamp: transcriptionData.timestamp || new Date().toISOString()
+      })
+      .select()
+      .single();
+      
+    if (error) {
+      console.error('❌ Error storing transcription:', error);
+      return null;
+    }
+    
+    console.log('✅ Transcription stored successfully:', data.id);
+    return data;
+  } catch (error) {
+    console.error('❌ Exception storing transcription:', error);
+    return null;
   }
 }
 
@@ -106,10 +199,34 @@ Deno.serve(async (req) => {
     
     console.log('📌 Request body:', JSON.stringify(requestBody, null, 2));
     
-    const { leadId, userId, callData } = requestBody;
+    const { leadId, userId, callData, transcription } = requestBody;
     
     const callState = callData?.callState || 'unknown';
     console.log(`📞 Call State: ${callState}`);
+    
+    if (transcription && leadId) {
+      console.log('🎤 Processing transcription update for lead:', leadId);
+      
+      const callSid = callData?.callSid || transcription.callSid;
+      if (!callSid) {
+        console.warn('⚠️ Cannot process transcription without callSid');
+      } else {
+        const storedTranscription = await storeTranscription(leadId, callSid, transcription);
+        if (storedTranscription) {
+          await broadcastTranscription(leadId, storedTranscription);
+          
+          if (requestBody.transcriptionOnly === true) {
+            return new Response(JSON.stringify({
+              success: true,
+              transcription: storedTranscription
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 200,
+            });
+          }
+        }
+      }
+    }
     
     if (!leadId) {
       console.log('❌ No lead ID provided - returning fallback data');
@@ -171,6 +288,11 @@ Deno.serve(async (req) => {
       }
     }
 
+    const callSid = callData?.callSid;
+    const recentTranscriptions = callSid ? 
+      await fetchRecentTranscriptions(effectiveLeadId, callSid) : 
+      await fetchRecentTranscriptions(effectiveLeadId);
+
     try {
       console.log(`⏳ Attempting to find lead with ID: ${effectiveLeadId}`);
       
@@ -185,8 +307,8 @@ Deno.serve(async (req) => {
         if (callData?.callSid || callData?.status) {
           await logLeadActivity(lead.id, callData, userId);
         }
-        await broadcastLeadFound(lead, callState);
-        return createSuccessResponse(formatLeadResponse(lead, callData));
+        await broadcastLeadFound(lead, callState, recentTranscriptions);
+        return createSuccessResponse(formatLeadResponse(lead, callData, recentTranscriptions));
       }
     } catch (directError) {
       console.warn('⚠️ Direct query failed:', directError.message);
@@ -206,8 +328,8 @@ Deno.serve(async (req) => {
           if (callData?.callSid || callData?.status) {
             await logLeadActivity(uuidLead.id, callData, userId);
           }
-          await broadcastLeadFound(uuidLead, callState);
-          return createSuccessResponse(formatLeadResponse(uuidLead, callData));
+          await broadcastLeadFound(uuidLead, callState, recentTranscriptions);
+          return createSuccessResponse(formatLeadResponse(uuidLead, callData, recentTranscriptions));
         }
       }
     } catch (uuidError) {
@@ -237,8 +359,8 @@ Deno.serve(async (req) => {
             if (callData?.callSid || callData?.status) {
               await logLeadActivity(fullLeadData.id, callData, userId);
             }
-            await broadcastLeadFound(fullLeadData, callState);
-            return createSuccessResponse(formatLeadResponse(fullLeadData, callData));
+            await broadcastLeadFound(fullLeadData, callState, recentTranscriptions);
+            return createSuccessResponse(formatLeadResponse(fullLeadData, callData, recentTranscriptions));
           }
         }
       } catch (dbFunctionError) {
@@ -276,13 +398,14 @@ Deno.serve(async (req) => {
           updated_at: retrievedLead.updatedAt,
           is_mortgage_lead: retrievedLead.isMortgageLead || false,
           mortgage_data: retrievedLead.mortgageData || null,
-          avatar: retrievedLead.avatar || null
+          avatar: retrievedLead.avatar || null,
+          transcriptions: recentTranscriptions
         };
         
         if (callData?.callSid || callData?.status) {
           await logLeadActivity(formattedLead.id, callData, userId);
         }
-        await broadcastLeadFound(formattedLead, callState);
+        await broadcastLeadFound(formattedLead, callState, recentTranscriptions);
         return createSuccessResponse(formattedLead);
       }
     } catch (retrieveLeadsError) {
@@ -297,7 +420,7 @@ Deno.serve(async (req) => {
       phone1: callData?.phoneNumber || FALLBACK_LEAD_DATA.phone1
     };
     
-    await broadcastLeadFound(fallback, callState);
+    await broadcastLeadFound(fallback, callState, recentTranscriptions);
     
     return createSuccessResponse(fallback);
     
@@ -310,18 +433,19 @@ Deno.serve(async (req) => {
   }
 });
 
-function createSuccessResponse(lead) {
+function createSuccessResponse(lead, transcriptions = []) {
   console.log('📤 Returning lead data:', lead.id, lead.first_name, lead.last_name);
   return new Response(JSON.stringify({
     success: true,
-    lead: lead
+    lead: lead,
+    transcriptions: transcriptions
   }), {
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     status: 200,
   });
 }
 
-function formatLeadResponse(lead, callData = null) {
+function formatLeadResponse(lead, callData = null, transcriptions = []) {
   return {
     id: lead.id,
     first_name: lead.first_name || 'Unknown',
@@ -337,7 +461,8 @@ function formatLeadResponse(lead, callData = null) {
     updated_at: lead.updated_at,
     is_mortgage_lead: lead.is_mortgage_lead || false,
     mortgage_data: lead.mortgage_data || null,
-    avatar: lead.avatar || null
+    avatar: lead.avatar || null,
+    transcriptions: transcriptions
   };
 }
 

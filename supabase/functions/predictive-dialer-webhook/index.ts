@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
 // Define CORS headers for browser requests
@@ -13,7 +12,7 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Notify lead-connected function when call status changes
-async function notifyLeadConnected(leadId: string, callSid: string, status: string) {
+async function notifyLeadConnected(leadId: string, callSid: string, status: string, transcription?: any) {
   try {
     console.log(`Webhook: Notifying lead-connected for lead: ${leadId}, status: ${status}`);
     
@@ -24,19 +23,55 @@ async function notifyLeadConnected(leadId: string, callSid: string, status: stri
                       status === 'canceled' ? 'disconnected' :
                       status === 'ringing' || status === 'queued' ? 'dialing' : 'unknown';
     
-    await supabase.functions.invoke('lead-connected', {
-      body: { 
-        leadId,
-        callData: {
-          callSid,
-          status,
-          timestamp: new Date().toISOString(),
-          callState
-        }
+    const payload: any = { 
+      leadId,
+      callData: {
+        callSid,
+        status,
+        timestamp: new Date().toISOString(),
+        callState
       }
-    });
+    };
+    
+    // Add transcription data if available
+    if (transcription) {
+      payload.transcription = transcription;
+    }
+    
+    await supabase.functions.invoke('lead-connected', { body: payload });
   } catch (err) {
     console.error('Error notifying lead-connected from webhook:', err);
+  }
+}
+
+// Process transcription data from Twilio
+async function processTranscription(formData: FormData, callId: string, leadId: string, callSid: string) {
+  try {
+    const transcriptionText = formData.get('TranscriptionText')?.toString();
+    const transcriptionStatus = formData.get('TranscriptionStatus')?.toString();
+    const transcriptionSid = formData.get('TranscriptionSid')?.toString();
+    
+    if (!transcriptionText) {
+      console.log('No transcription text available');
+      return;
+    }
+    
+    console.log(`Received transcription for call ${callId}: ${transcriptionText}`);
+    
+    const transcription = {
+      segment_text: transcriptionText,
+      is_final: transcriptionStatus === 'completed',
+      confidence: parseFloat(formData.get('Confidence')?.toString() || '0.8'),
+      speaker: formData.get('From')?.toString() || 'Unknown',
+      timestamp: new Date().toISOString(),
+      call_sid: callSid
+    };
+    
+    // Forward the transcription to lead-connected
+    await notifyLeadConnected(leadId, callSid, 'transcription', transcription);
+    
+  } catch (error) {
+    console.error('Error processing transcription:', error);
   }
 }
 
@@ -64,7 +99,10 @@ Deno.serve(async (req) => {
     const errorCode = formData.get('ErrorCode')?.toString();
     const errorMessage = formData.get('ErrorMessage')?.toString();
     
-    console.log(`Webhook received for call ${callId} with status: ${callStatus}`);
+    // Check if this is a transcription event
+    const isTranscription = formData.has('TranscriptionText') || formData.has('TranscriptionSid');
+    
+    console.log(`Webhook received for call ${callId} with status: ${callStatus} ${isTranscription ? '(includes transcription)' : ''}`);
     if (errorCode || errorMessage) {
       console.log(`Error information: Code=${errorCode}, Message=${errorMessage}`);
     }
@@ -80,8 +118,12 @@ Deno.serve(async (req) => {
       throw new Error(`Call not found: ${callError?.message}`);
     }
     
-    // If we have a contact_id, notify the lead-connected function
-    if (call.contact_id && callSid) {
+    // If we have a contact_id and this is a transcription, process it
+    if (call.contact_id && callSid && isTranscription) {
+      await processTranscription(formData, callId, call.contact_id, callSid);
+    }
+    // Otherwise, if we have a contact_id and callSid, notify the lead-connected function
+    else if (call.contact_id && callSid) {
       await notifyLeadConnected(call.contact_id, callSid, callStatus || 'unknown');
     }
     
