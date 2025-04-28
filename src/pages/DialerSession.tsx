@@ -16,6 +16,7 @@ import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { useAuth } from '@/hooks/use-auth';
 import { useAutoDialer } from '@/hooks/use-auto-dialer';
 import { AutoDialerControls } from '@/components/power-dialer/AutoDialerControls';
+import { HangupButton } from '@/components/power-dialer/HangupButton';
 
 const DialerSession = () => {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
@@ -223,7 +224,6 @@ const DialerSession = () => {
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
-    // Ensure we properly handle all possible call status values in TypeScript
     type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
     const callStatus = firstActiveCall?.status as CallStatus | undefined;
     
@@ -305,14 +305,10 @@ const DialerSession = () => {
                         </Badge>
                       </div>
                       
-                      <Button 
-                        variant="destructive"
-                        onClick={handleEndCall}
-                        disabled={!Object.values(twilioState.activeCalls)[0] || Object.values(twilioState.activeCalls)[0].status === 'completed'}
-                      >
-                        <PhoneOff className="mr-2 h-4 w-4" />
-                        End Call
-                      </Button>
+                      <HangupButton 
+                        callSid={Object.keys(twilioState.activeCalls)[0] || undefined}
+                        onSuccess={handleEndCall}
+                      />
                     </div>
                   ) : (
                     <div className="flex flex-col items-center py-8">

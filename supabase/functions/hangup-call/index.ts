@@ -10,22 +10,32 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 Deno.serve(async (req) => {
+  console.log("Hangup-call function invoked");
+  
   // Handle CORS
   if (req.method === 'OPTIONS') {
+    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { callSid, userId } = await req.json();
+    const requestBody = await req.json();
+    console.log("Received request body:", JSON.stringify(requestBody));
+    
+    const { callSid, userId } = requestBody;
 
     if (!callSid) {
+      console.error("Error: No callSid provided in request");
       throw new Error('Call SID is required');
     }
+
+    console.log(`Attempting to end call ${callSid} by user ${userId || 'anonymous'}`);
 
     // Call Twilio's API to end the call
     const twilioEndpoint = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Calls/${callSid}.json`;
     const auth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
 
+    console.log(`Making request to Twilio endpoint: ${twilioEndpoint}`);
     const twilioResponse = await fetch(twilioEndpoint, {
       method: 'POST',
       headers: {
@@ -35,14 +45,20 @@ Deno.serve(async (req) => {
       body: 'Status=completed'
     });
 
+    const responseStatus = twilioResponse.status;
+    console.log(`Twilio API response status: ${responseStatus}`);
+    
+    const responseText = await twilioResponse.text();
+    console.log(`Twilio API response: ${responseText}`);
+
     if (!twilioResponse.ok) {
-      const twilioError = await twilioResponse.text();
-      console.error('Twilio Error:', twilioError);
-      throw new Error(`Failed to end call: ${twilioError}`);
+      console.error(`Twilio API error: ${responseStatus} - ${responseText}`);
+      throw new Error(`Failed to end call: ${responseText}`);
     }
 
     // Log the hang-up action
     if (userId) {
+      console.log(`Logging hang-up action for call ${callSid} by user ${userId}`);
       await supabase.from('call_logs').insert({
         call_sid: callSid,
         user_id: userId,
@@ -51,6 +67,7 @@ Deno.serve(async (req) => {
       });
     }
 
+    console.log("Successfully ended call");
     return new Response(
       JSON.stringify({ 
         success: true, 

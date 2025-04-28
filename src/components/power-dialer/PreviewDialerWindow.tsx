@@ -441,14 +441,10 @@ const PreviewDialerWindow: React.FC<PreviewDialerWindowProps> = ({
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <Button 
-                        variant="destructive" 
-                        size="sm"
-                        onClick={onEndCall}
-                      >
-                        <PhoneOff className="h-4 w-4 mr-2" />
-                        End Call
-                      </Button>
+                      <HangupButton 
+                        callSid={currentCall?.callSid || currentCall?.parameters?.CallSid}
+                        onSuccess={onEndCall}
+                      />
                     </div>
                   </div>
                   
