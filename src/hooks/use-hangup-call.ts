@@ -27,17 +27,19 @@ export function useHangupCall() {
       
       console.log('HANGUP HOOK - Sending hangup request to hangup-call function with payload:', payload);
 
+      // Get current auth token using getSession() instead of session()
+      const { data: sessionData } = await supabase.auth.getSession();
+      const authToken = sessionData?.session?.access_token || '';
+      
+      console.log('HANGUP HOOK - Direct fetch URL: https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call');
+      console.log('HANGUP HOOK - Authentication token:', authToken ? 'Present' : 'Missing');
+      
       // Direct fetch to the edge function for better debugging
-      const url = 'https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call';
-      
-      console.log('HANGUP HOOK - Direct fetch URL:', url);
-      console.log('HANGUP HOOK - Authentication token:', supabase.auth.session()?.access_token ? 'Present' : 'Missing');
-      
-      const response = await fetch(url, {
+      const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify(payload)
       });
