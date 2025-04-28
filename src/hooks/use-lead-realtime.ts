@@ -8,8 +8,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
   const [leadFound, setLeadFound] = useState(false);
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date());
   const [lastError, setLastError] = useState<string | null>(null);
-  const [transcriptions, setTranscriptions] = useState<any[]>([]);
-  const [isTranscriptionLoading, setIsTranscriptionLoading] = useState(false);
 
   const getChannelName = useCallback((id: string | number | null) => {
     return id ? `lead-data-${id}` : 'no-lead';
@@ -51,13 +49,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       if (data?.lead) {
         console.log('[useLeadRealtime] Successfully retrieved lead data:', data.lead);
         setLeadData(data.lead);
-        
-        // Set transcriptions if they were returned
-        if (data.transcriptions && Array.isArray(data.transcriptions)) {
-          console.log('[useLeadRealtime] Setting initial transcriptions:', data.transcriptions.length);
-          setTranscriptions(data.transcriptions);
-        }
-        
         setLeadFound(true);
         setLastUpdateTime(new Date());
         
@@ -80,57 +71,11 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     }
   }, [leadId, userId]);
 
-  const fetchTranscriptions = useCallback(async (callSid?: string) => {
-    if (!leadId) {
-      console.log('[useLeadRealtime] No leadId provided, skipping transcription fetch');
-      return [];
-    }
-    
-    setIsTranscriptionLoading(true);
-    
-    try {
-      console.log(`[useLeadRealtime] Explicitly fetching transcriptions for lead ID: ${leadId}, callSid: ${callSid || 'none'}`);
-      
-      const { data, error } = await supabase.functions.invoke('lead-connected', {
-        body: { 
-          leadId: String(leadId),
-          userId,
-          fetchTranscriptions: true,
-          callData: {
-            callSid,
-            timestamp: new Date().toISOString()
-          }
-        }
-      });
-
-      if (error) {
-        console.error('[useLeadRealtime] Error fetching transcriptions:', error);
-        return [];
-      }
-
-      console.log('[useLeadRealtime] Response from transcription fetch:', data);
-      
-      if (data?.transcriptions) {
-        console.log('[useLeadRealtime] Setting fetched transcriptions:', data.transcriptions.length);
-        setTranscriptions(data.transcriptions);
-        return data.transcriptions;
-      }
-      
-      return [];
-    } catch (err) {
-      console.error('[useLeadRealtime] Error in transcription fetch:', err);
-      return [];
-    } finally {
-      setIsTranscriptionLoading(false);
-    }
-  }, [leadId, userId]);
-
   useEffect(() => {
     if (!leadId) {
       console.log('[useLeadRealtime] No leadId provided, clearing data');
       setLeadData(null);
       setLeadFound(false);
-      setTranscriptions([]);
       return;
     }
 
@@ -152,51 +97,12 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
           setLeadFound(true);
           setLastUpdateTime(new Date());
           setTimeout(() => setLeadFound(false), 3000);
-        }
-        
-        // Also process any transcriptions in the broadcast
-        if (payload.payload?.transcriptions && Array.isArray(payload.payload.transcriptions)) {
-          console.log('[useLeadRealtime] Received transcriptions via broadcast:', payload.payload.transcriptions.length);
-          setTranscriptions(prev => {
-            const newTranscriptions = [...prev];
-            
-            // Add any new transcriptions not already in the list
-            payload.payload.transcriptions.forEach((transcription: any) => {
-              if (!newTranscriptions.some(t => t.id === transcription.id)) {
-                newTranscriptions.push(transcription);
-              }
-            });
-            
-            return newTranscriptions.sort(
-              (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-            );
-          });
+        } else {
+          console.warn('[useLeadRealtime] Broadcast received but no lead data in payload');
         }
       })
       .subscribe((status) => {
         console.log(`[useLeadRealtime] Subscription status for channel ${channelName}:`, status);
-      });
-    
-    // Set up transcription-specific channel for real-time updates
-    const transcriptionChannel = supabase
-      .channel(`lead-transcription-${leadId}`)
-      .on('broadcast', { event: 'transcription_update' }, (payload) => {
-        if (payload.payload?.transcription) {
-          console.log('[useLeadRealtime] Received transcription update:', payload.payload.transcription);
-          setTranscriptions(prev => {
-            // Check if we already have this transcription to avoid duplicates
-            const exists = prev.some(t => t.id === payload.payload.transcription.id);
-            if (!exists) {
-              return [...prev, payload.payload.transcription].sort(
-                (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-              );
-            }
-            return prev;
-          });
-        }
-      })
-      .subscribe((status) => {
-        console.log(`[useLeadRealtime] Transcription channel subscription status:`, status);
       });
     
     const leadChannel = supabase
@@ -224,36 +130,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
         console.log(`[useLeadRealtime] Lead table subscription status:`, status);
       });
 
-    // Listen for database changes to transcriptions table
-    const transcriptionsDbChannel = supabase
-      .channel(`lead-transcriptions-db-${leadId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_transcriptions',
-          filter: `lead_id=eq.${leadId}`
-        },
-        (payload) => {
-          console.log('[useLeadRealtime] New transcription from DB:', payload.new);
-          if (payload.new) {
-            setTranscriptions(prev => {
-              const exists = prev.some(t => t.id === payload.new.id);
-              if (!exists) {
-                return [...prev, payload.new].sort(
-                  (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-                );
-              }
-              return prev;
-            });
-          }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`[useLeadRealtime] Transcriptions DB subscription status:`, status);
-      });
-
     const activitiesChannel = supabase
       .channel(`lead-activities-${leadId}`)
       .on(
@@ -275,41 +151,19 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
       .subscribe((status) => {
         console.log(`[useLeadRealtime] Activities subscription status:`, status);
       });
-      
-    // Set up polling for transcriptions if we have an active call
-    let transcriptionPollingInterval: number | null = null;
-    
-    if (leadData?.activeCall?.callSid) {
-      console.log(`[useLeadRealtime] Setting up transcription polling for callSid: ${leadData.activeCall.callSid}`);
-      
-      // Poll every 5 seconds
-      transcriptionPollingInterval = window.setInterval(() => {
-        fetchTranscriptions(leadData.activeCall.callSid);
-      }, 5000);
-    }
 
     return () => {
       console.log(`[useLeadRealtime] Cleaning up subscriptions for leadId: ${leadId}`);
       supabase.removeChannel(dataChannel);
       supabase.removeChannel(leadChannel);
       supabase.removeChannel(activitiesChannel);
-      supabase.removeChannel(transcriptionChannel);
-      supabase.removeChannel(transcriptionsDbChannel);
-      
-      if (transcriptionPollingInterval !== null) {
-        clearInterval(transcriptionPollingInterval);
-      }
     };
-  }, [leadId, userId, fetchLeadData, getChannelName, fetchTranscriptions, leadData?.activeCall?.callSid]);
+  }, [leadId, userId, fetchLeadData, getChannelName]);
 
   const refresh = useCallback(async () => {
     setLastUpdateTime(new Date());
     return await fetchLeadData();
   }, [fetchLeadData]);
-
-  const refreshTranscriptions = useCallback(async (callSid?: string) => {
-    return await fetchTranscriptions(callSid);
-  }, [fetchTranscriptions]);
 
   const broadcastData = useCallback(async (data: any) => {
     if (!leadId) return;
@@ -341,9 +195,6 @@ export function useLeadRealtime(leadId: string | number | null, userId?: string 
     refresh, 
     lastUpdateTime, 
     lastError,
-    broadcastData,
-    transcriptions,
-    isTranscriptionLoading,
-    refreshTranscriptions
+    broadcastData
   };
 }

@@ -486,18 +486,17 @@ class TwilioService {
         });
         
         call.on('accept', () => {
-          const callSid = call.parameters.CallSid;
           console.log('Call accepted, audio connection established');
           
           this.notifyCallStatusListeners({
-            callSid: callSid,
+            callSid: call.sid,
             status: 'in-progress',
             leadId: leadId,
             phoneNumber: formattedPhoneNumber,
             startTime: new Date()
           });
           
-          this.notifyLeadConnected(leadId, callSid, 'in-progress');
+          this.notifyLeadConnected(leadId, call.sid, 'in-progress');
           
           toast({
             title: "Call Connected",

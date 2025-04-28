@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import { Twilio } from 'https://esm.sh/twilio@4.19.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,9 +9,6 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const adminSupabase = createClient(supabaseUrl, supabaseServiceKey);
 const anonSupabase = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') || '');
-
-const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
 
 const FALLBACK_LEAD_DATA = {
   id: 999999,
@@ -116,86 +112,6 @@ async function broadcastTranscription(leadId: string | number, transcription: an
   }
 }
 
-async function fetchTwilioTranscriptions(callSid: string, leadId: string | number) {
-  console.log(`🔍 Attempting to fetch Twilio transcriptions directly for call SID: ${callSid}`);
-  
-  if (!TWILIO_ACCOUNT_SID || !TWILIO_AUTH_TOKEN) {
-    console.error('❌ Twilio credentials not available');
-    return [];
-  }
-  
-  try {
-    const client = new Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
-    
-    const transcriptionsResponse = await fetch(
-      `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls/${callSid}/Transcriptions.json`,
-      {
-        headers: {
-          "Authorization": `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`
-        }
-      }
-    );
-    
-    if (!transcriptionsResponse.ok) {
-      console.error(`❌ Failed to fetch transcriptions from Twilio API: ${transcriptionsResponse.status}`);
-      return [];
-    }
-    
-    const transcriptionsData = await transcriptionsResponse.json();
-    console.log(`✅ Retrieved ${transcriptionsData.transcriptions?.length || 0} transcriptions from Twilio API`);
-    
-    const transcriptions = [];
-    
-    if (transcriptionsData.transcriptions && transcriptionsData.transcriptions.length > 0) {
-      for (const item of transcriptionsData.transcriptions) {
-        const transcriptionResponse = await fetch(
-          `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Transcriptions/${item.sid}.json`,
-          {
-            headers: {
-              "Authorization": `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`
-            }
-          }
-        );
-        
-        if (transcriptionResponse.ok) {
-          const transcriptionData = await transcriptionResponse.json();
-          
-          const transcription = {
-            lead_id: String(leadId),
-            call_sid: callSid,
-            segment_text: transcriptionData.transcription_text,
-            is_final: true,
-            confidence: 0.8,
-            speaker: 'Unknown',
-            timestamp: transcriptionData.date_created
-          };
-          
-          const { data, error } = await adminSupabase
-            .from('call_transcriptions')
-            .insert(transcription)
-            .select();
-            
-          if (error) {
-            console.error('❌ Error storing Twilio transcription:', error);
-          } else if (data && data.length > 0) {
-            console.log(`✅ Stored Twilio transcription: ${data[0].id}`);
-            transcriptions.push(data[0]);
-            
-            await broadcastTranscription(leadId, data[0]);
-          }
-        } else {
-          console.error(`❌ Failed to fetch transcription text for SID ${item.sid}: ${transcriptionResponse.status}`);
-        }
-      }
-    }
-    
-    return transcriptions;
-  } catch (error) {
-    console.error('❌ Error fetching Twilio transcriptions:', error);
-    return [];
-  }
-}
-
 async function fetchRecentTranscriptions(leadId: string | number, callSid?: string, limit = 10) {
   if (!leadId) return [];
   
@@ -283,21 +199,10 @@ Deno.serve(async (req) => {
     
     console.log('📌 Request body:', JSON.stringify(requestBody, null, 2));
     
-    const { leadId, userId, callData, transcription, fetchTranscriptions: explicitFetchRequest } = requestBody;
-    
-    const callSid = callData?.callSid;
-    console.log(`📞 Call SID from request: ${callSid || 'none'}`);
+    const { leadId, userId, callData, transcription } = requestBody;
     
     const callState = callData?.callState || 'unknown';
     console.log(`📞 Call State: ${callState}`);
-    
-    let transcriptions = [];
-    
-    if (callSid && leadId) {
-      console.log(`🎤 Detected call SID ${callSid} with lead ID ${leadId}, fetching transcriptions automatically`);
-      transcriptions = await fetchTwilioTranscriptions(callSid, leadId);
-      console.log(`Retrieved ${transcriptions.length} transcriptions for call SID ${callSid}`);
-    }
     
     if (transcription && leadId) {
       console.log('🎤 Processing transcription update for lead:', leadId);
@@ -384,21 +289,9 @@ Deno.serve(async (req) => {
     }
 
     const callSid = callData?.callSid;
-    
-    if (callSid) {
-      console.log(`🎤 Call SID detected: ${callSid}, fetching transcriptions from Twilio`);
-      const twilioTranscriptions = await fetchTwilioTranscriptions(callSid, effectiveLeadId);
-      const dbTranscriptions = await fetchRecentTranscriptions(effectiveLeadId, callSid);
-      
-      transcriptions = [...dbTranscriptions];
-      for (const trans of twilioTranscriptions) {
-        if (!transcriptions.some(t => t.id === trans.id)) {
-          transcriptions.push(trans);
-        }
-      }
-    } else {
-      transcriptions = await fetchRecentTranscriptions(effectiveLeadId);
-    }
+    const recentTranscriptions = callSid ? 
+      await fetchRecentTranscriptions(effectiveLeadId, callSid) : 
+      await fetchRecentTranscriptions(effectiveLeadId);
 
     try {
       console.log(`⏳ Attempting to find lead with ID: ${effectiveLeadId}`);
@@ -414,8 +307,8 @@ Deno.serve(async (req) => {
         if (callData?.callSid || callData?.status) {
           await logLeadActivity(lead.id, callData, userId);
         }
-        await broadcastLeadFound(lead, callState, transcriptions);
-        return createSuccessResponse(formatLeadResponse(lead, callData, transcriptions));
+        await broadcastLeadFound(lead, callState, recentTranscriptions);
+        return createSuccessResponse(formatLeadResponse(lead, callData, recentTranscriptions));
       }
     } catch (directError) {
       console.warn('⚠️ Direct query failed:', directError.message);
@@ -435,8 +328,8 @@ Deno.serve(async (req) => {
           if (callData?.callSid || callData?.status) {
             await logLeadActivity(uuidLead.id, callData, userId);
           }
-          await broadcastLeadFound(uuidLead, callState, transcriptions);
-          return createSuccessResponse(formatLeadResponse(uuidLead, callData, transcriptions));
+          await broadcastLeadFound(uuidLead, callState, recentTranscriptions);
+          return createSuccessResponse(formatLeadResponse(uuidLead, callData, recentTranscriptions));
         }
       }
     } catch (uuidError) {
@@ -466,8 +359,8 @@ Deno.serve(async (req) => {
             if (callData?.callSid || callData?.status) {
               await logLeadActivity(fullLeadData.id, callData, userId);
             }
-            await broadcastLeadFound(fullLeadData, callState, transcriptions);
-            return createSuccessResponse(formatLeadResponse(fullLeadData, callData, transcriptions));
+            await broadcastLeadFound(fullLeadData, callState, recentTranscriptions);
+            return createSuccessResponse(formatLeadResponse(fullLeadData, callData, recentTranscriptions));
           }
         }
       } catch (dbFunctionError) {
@@ -506,13 +399,13 @@ Deno.serve(async (req) => {
           is_mortgage_lead: retrievedLead.isMortgageLead || false,
           mortgage_data: retrievedLead.mortgageData || null,
           avatar: retrievedLead.avatar || null,
-          transcriptions: transcriptions
+          transcriptions: recentTranscriptions
         };
         
         if (callData?.callSid || callData?.status) {
           await logLeadActivity(formattedLead.id, callData, userId);
         }
-        await broadcastLeadFound(formattedLead, callState, transcriptions);
+        await broadcastLeadFound(formattedLead, callState, recentTranscriptions);
         return createSuccessResponse(formattedLead);
       }
     } catch (retrieveLeadsError) {
@@ -527,7 +420,7 @@ Deno.serve(async (req) => {
       phone1: callData?.phoneNumber || FALLBACK_LEAD_DATA.phone1
     };
     
-    await broadcastLeadFound(fallback, callState, transcriptions);
+    await broadcastLeadFound(fallback, callState, recentTranscriptions);
     
     return createSuccessResponse(fallback);
     

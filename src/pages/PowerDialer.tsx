@@ -392,36 +392,6 @@ export default function PowerDialer() {
     }
   }, [twilioState.activeCalls]);
 
-  const renderCallStatus = (status: string) => {
-    if (!status) return 'Unknown';
-    
-    if (status === 'in-progress' || status === 'answered') {
-      return (
-        <Badge className="bg-green-500 text-white">
-          Connected
-        </Badge>
-      );
-    } else if (status === 'ringing' || status === 'queued') {
-      return (
-        <Badge className="bg-yellow-500 text-white">
-          Ringing
-        </Badge>
-      );
-    } else if (status === 'completed' || status === 'failed' || status === 'busy' || status === 'no-answer' || status === 'canceled') {
-      return (
-        <Badge className="bg-red-500 text-white">
-          Disconnected
-        </Badge>
-      );
-    }
-    
-    return (
-      <Badge variant="outline">
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
-  };
-
   return <MainLayout>
       <LeadFoundIndicator isVisible={leadFound} />
       <TwilioScript onLoad={() => setIsScriptLoaded(true)} onError={err => console.error("TwilioScript error:", err)} />
@@ -532,7 +502,7 @@ export default function PowerDialer() {
                                     {call.phoneNumber}
                                   </p>
                                 </div>
-                                <Badge variant={call.status && (call.status === 'connecting' || call.status === 'ringing') ? "default" : "outline"}>
+                                <Badge variant={call.status && ['ringing', 'connecting'].includes(call.status) ? "default" : "outline"}>
                                   {call.status === 'connecting' ? 'Ringing' : call.status === 'ringing' ? 'Ringing' : call.status === 'in-progress' ? 'Connected' : call.status === 'completed' ? 'Ended' : call.status}
                                 </Badge>
                               </div>

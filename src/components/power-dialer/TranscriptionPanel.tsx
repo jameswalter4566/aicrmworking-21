@@ -1,70 +1,29 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mic, AlertCircle, RefreshCcw } from "lucide-react";
+import { Mic, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
 
 interface TranscriptionPanelProps {
   leadId?: string | number;
   callSid?: string;
   isVisible?: boolean;
-  transcriptions?: any[];
-  onRefresh?: () => Promise<any>;
-  isLoading?: boolean;
 }
 
-export const TranscriptionPanel = ({ 
-  leadId, 
-  callSid,
-  isVisible = true,
-  transcriptions: externalTranscriptions,
-  onRefresh,
-  isLoading: externalLoading
-}: TranscriptionPanelProps) => {
+export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: TranscriptionPanelProps) => {
   const [transcriptions, setTranscriptions] = useState<any[]>([]);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPolling, setIsPolling] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pollingIntervalRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (externalTranscriptions) {
-      console.log('[TranscriptionPanel] Received external transcriptions:', externalTranscriptions.length);
-      setTranscriptions(externalTranscriptions);
-    }
-  }, [externalTranscriptions]);
   
+  // Fetch initial transcriptions whenever leadId changes, regardless of visibility
   useEffect(() => {
-    if (!leadId || externalTranscriptions) return;
+    if (!leadId) return;
     
     const fetchTranscriptions = async () => {
       try {
-        setIsLoading(true);
-        
-        try {
-          console.log(`[TranscriptionPanel] Fetching transcriptions via lead-connected function for lead ${leadId}`);
-          const { data, error } = await supabase.functions.invoke('lead-connected', {
-            body: { 
-              leadId: String(leadId),
-              fetchTranscriptions: true,
-              callData: { callSid }
-            }
-          });
-          
-          if (!error && data?.transcriptions?.length > 0) {
-            console.log(`[TranscriptionPanel] Received ${data.transcriptions.length} transcriptions from lead-connected function`);
-            setTranscriptions(data.transcriptions);
-            setError(null);
-            return;
-          }
-        } catch (err) {
-          console.warn('[TranscriptionPanel] Failed to fetch from lead-connected:', err);
-        }
-        
         let query = supabase
           .from('call_transcriptions')
           .select('*')
@@ -78,7 +37,7 @@ export const TranscriptionPanel = ({
         const { data, error } = await query;
         
         if (error) {
-          console.error('[TranscriptionPanel] Error fetching transcriptions:', error);
+          console.error('Error fetching transcriptions:', error);
           setError('Failed to load transcriptions');
           return;
         }
@@ -88,16 +47,15 @@ export const TranscriptionPanel = ({
           setTranscriptions(data);
         }
       } catch (err) {
-        console.error('[TranscriptionPanel] Exception fetching transcriptions:', err);
+        console.error('Exception fetching transcriptions:', err);
         setError('An error occurred while loading transcriptions');
-      } finally {
-        setIsLoading(false);
       }
     };
     
     fetchTranscriptions();
-  }, [leadId, callSid, externalTranscriptions]);
+  }, [leadId, callSid]);
   
+  // Subscribe to real-time updates regardless of visibility
   useEffect(() => {
     if (!leadId) return;
     
@@ -111,6 +69,7 @@ export const TranscriptionPanel = ({
         
         if (payload.payload?.transcription) {
           setTranscriptions(prev => {
+            // Check if we already have this transcription to avoid duplicates
             const exists = prev.some(t => t.id === payload.payload.transcription.id);
             if (!exists) {
               return [...prev, payload.payload.transcription].sort(
@@ -126,6 +85,7 @@ export const TranscriptionPanel = ({
         setIsSubscribed(status === 'SUBSCRIBED');
       });
       
+    // Also subscribe to lead-data channel for potential transcription updates there
     const leadDataChannel = supabase
       .channel(`lead-data-${leadId}`)
       .on('broadcast', { event: 'lead_data_update' }, (payload) => {
@@ -134,6 +94,7 @@ export const TranscriptionPanel = ({
           setTranscriptions(prev => {
             const newTranscriptions = [...prev];
             
+            // Add any new transcriptions not already in the list
             payload.payload.transcriptions.forEach((transcription: any) => {
               if (!newTranscriptions.some(t => t.id === transcription.id)) {
                 newTranscriptions.push(transcription);
@@ -148,147 +109,21 @@ export const TranscriptionPanel = ({
       })
       .subscribe();
       
-    const dbChannel = supabase
-      .channel(`transcription-db-${leadId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'call_transcriptions',
-          filter: `lead_id=eq.${leadId}`
-        },
-        (payload) => {
-          console.log('[TranscriptionPanel] New transcription from DB:', payload.new);
-          if (payload.new) {
-            setTranscriptions(prev => {
-              const exists = prev.some(t => t.id === payload.new.id);
-              if (!exists) {
-                return [...prev, payload.new].sort(
-                  (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-                );
-              }
-              return prev;
-            });
-          }
-        }
-      )
-      .subscribe();
-      
     return () => {
       console.log('[TranscriptionPanel] Cleaning up subscriptions');
       supabase.removeChannel(channel);
       supabase.removeChannel(leadDataChannel);
-      supabase.removeChannel(dbChannel);
     };
   }, [leadId]);
   
-  useEffect(() => {
-    if (!leadId || !callSid || !isVisible || externalTranscriptions) {
-      if (pollingIntervalRef.current) {
-        console.log('[TranscriptionPanel] Stopping polling');
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-        setIsPolling(false);
-      }
-      return;
-    }
-    
-    console.log('[TranscriptionPanel] Starting polling for transcriptions');
-    
-    const startPolling = () => {
-      pollingIntervalRef.current = window.setInterval(async () => {
-        try {
-          console.log('[TranscriptionPanel] Polling for new transcriptions...');
-          setIsPolling(true);
-          
-          const { data, error } = await supabase.functions.invoke('lead-connected', {
-            body: { 
-              leadId: String(leadId),
-              fetchTranscriptions: true,
-              callData: { callSid }
-            }
-          });
-          
-          if (error) {
-            console.warn('[TranscriptionPanel] Polling error:', error);
-            return;
-          }
-          
-          if (data?.transcriptions?.length > 0) {
-            console.log(`[TranscriptionPanel] Poll received ${data.transcriptions.length} transcriptions`);
-            
-            setTranscriptions(prev => {
-              const newTranscriptions = [...prev];
-              
-              data.transcriptions.forEach((transcription: any) => {
-                if (!newTranscriptions.some(t => t.id === transcription.id)) {
-                  newTranscriptions.push(transcription);
-                }
-              });
-              
-              return newTranscriptions.sort(
-                (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-              );
-            });
-          } else {
-            console.log('[TranscriptionPanel] Poll found no new transcriptions');
-          }
-        } finally {
-          setIsPolling(false);
-        }
-      }, 5000);
-    };
-    
-    startPolling();
-    
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-        pollingIntervalRef.current = null;
-      }
-    };
-  }, [leadId, callSid, isVisible, externalTranscriptions]);
-  
+  // Auto-scroll to bottom when new transcriptions come in
   useEffect(() => {
     if (scrollRef.current && transcriptions.length > 0 && isVisible) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [transcriptions, isVisible]);
   
-  const handleManualRefresh = async () => {
-    if (!leadId || !isVisible) return;
-    
-    try {
-      setIsLoading(true);
-      
-      if (onRefresh) {
-        await onRefresh();
-      } else {
-        const { data, error } = await supabase.functions.invoke('lead-connected', {
-          body: { 
-            leadId: String(leadId),
-            fetchTranscriptions: true,
-            callData: { callSid }
-          }
-        });
-        
-        if (error) {
-          console.error('[TranscriptionPanel] Refresh error:', error);
-          return;
-        }
-        
-        if (data?.transcriptions?.length > 0) {
-          setTranscriptions(data.transcriptions);
-        }
-      }
-    } catch (err) {
-      console.error('[TranscriptionPanel] Error during manual refresh:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
+  // Always render the container, but conditionally render its content based on isVisible
   return (
     <Card className={`mt-4 transition-all duration-300 ${isVisible ? 'opacity-100' : 'opacity-50'}`}>
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
@@ -300,22 +135,7 @@ export const TranscriptionPanel = ({
               Live
             </Badge>
           )}
-          {isPolling && (
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 text-xs">
-              Polling
-            </Badge>
-          )}
         </CardTitle>
-        
-        <Button 
-          size="sm" 
-          variant="outline" 
-          onClick={handleManualRefresh} 
-          disabled={(isLoading || externalLoading)}
-        >
-          <RefreshCcw className={`h-4 w-4 mr-1 ${(isLoading || externalLoading) ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
       </CardHeader>
       <CardContent>
         {!isVisible ? (
@@ -326,10 +146,6 @@ export const TranscriptionPanel = ({
           <div className="flex items-center gap-2 text-red-500 p-4">
             <AlertCircle className="h-5 w-5" />
             <span>{error}</span>
-          </div>
-        ) : (isLoading || externalLoading) ? (
-          <div className="text-center text-gray-500 py-4">
-            Loading transcriptions...
           </div>
         ) : transcriptions.length === 0 ? (
           <div className="text-center text-gray-500 py-4">
