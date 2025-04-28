@@ -233,7 +233,6 @@ const DialerSession = () => {
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
     
-    type CallStatus = 'connecting' | 'ringing' | 'in-progress' | 'completed' | 'failed' | 'busy' | 'no-answer' | 'canceled';
     const callStatus = firstActiveCall?.status as CallStatus | undefined;
     
     const completedStatuses: CallStatus[] = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
