@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Phone, Mail, MapPin, Clock, MessageSquare, Mic } from 'lucide-react';
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import DispositionSelector from '@/components/DispositionSelector';
 import { leadProfileService } from '@/services/leadProfile';
 import { TranscriptionPanel } from './TranscriptionPanel';
+import { ColoredSwitch } from "@/components/ui/colored-switch";
 
 interface LeadDetailsPanelProps {
   leadId?: string;
@@ -79,19 +79,19 @@ export const LeadDetailsPanel = ({ leadId, isActive, callSid }: LeadDetailsPanel
           <div className="flex items-center space-x-2 bg-gray-100 p-2 rounded-md">
             <Mic className="h-4 w-4 text-blue-600" />
             <span className="text-sm font-medium">Transcription:</span>
-            <Switch 
+            <ColoredSwitch 
               checked={showTranscription}
               onCheckedChange={setShowTranscription}
               aria-label="Toggle transcription"
+              colorScheme="blue"
             />
             <span className="text-sm">{showTranscription ? 'On' : 'Off'}</span>
           </div>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-4">
-        {showTranscription && (
-          <TranscriptionPanel leadId={leadId} callSid={callSid} isVisible={showTranscription} />
-        )}
+        {/* Always render the TranscriptionPanel but control visibility through the isVisible prop */}
+        <TranscriptionPanel leadId={leadId} callSid={callSid} isVisible={showTranscription} />
         
         <Tabs defaultValue="details">
           <TabsList className="w-full">

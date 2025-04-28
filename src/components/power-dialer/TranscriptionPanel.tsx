@@ -20,7 +20,7 @@ export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: Transc
   
   // Fetch initial transcriptions
   useEffect(() => {
-    if (!leadId || !isVisible) return;
+    if (!leadId) return;
     
     const fetchTranscriptions = async () => {
       try {
@@ -52,11 +52,11 @@ export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: Transc
     };
     
     fetchTranscriptions();
-  }, [leadId, callSid, isVisible]);
+  }, [leadId, callSid]);
   
-  // Subscribe to real-time updates
+  // Subscribe to real-time updates regardless of visibility
   useEffect(() => {
-    if (!leadId || !isVisible) return;
+    if (!leadId) return;
     
     const channelName = `lead-transcription-${leadId}`;
     console.log(`[TranscriptionPanel] Setting up transcription listener on channel: ${channelName}`);
@@ -113,21 +113,18 @@ export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: Transc
       supabase.removeChannel(channel);
       supabase.removeChannel(leadDataChannel);
     };
-  }, [leadId, isVisible]);
+  }, [leadId]);
   
   // Auto-scroll to bottom when new transcriptions come in
   useEffect(() => {
-    if (scrollRef.current && transcriptions.length > 0) {
+    if (scrollRef.current && transcriptions.length > 0 && isVisible) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [transcriptions]);
+  }, [transcriptions, isVisible]);
   
-  if (!isVisible) {
-    return null;
-  }
-  
+  // Always render the container, but conditionally render its content based on isVisible
   return (
-    <Card className="mt-4">
+    <Card className={`mt-4 transition-all duration-300 ${isVisible ? 'opacity-100' : 'opacity-50'}`}>
       <CardHeader className="pb-2 flex flex-row items-center justify-between">
         <CardTitle className="text-lg flex items-center gap-2">
           <Mic className="h-5 w-5" />
@@ -140,7 +137,11 @@ export const TranscriptionPanel = ({ leadId, callSid, isVisible = true }: Transc
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {error ? (
+        {!isVisible ? (
+          <div className="text-center text-gray-500 py-4">
+            Transcription panel hidden. Toggle switch to view.
+          </div>
+        ) : error ? (
           <div className="flex items-center gap-2 text-red-500 p-4">
             <AlertCircle className="h-5 w-5" />
             <span>{error}</span>
