@@ -223,23 +223,25 @@ const DialerSession = () => {
 
   useEffect(() => {
     const firstActiveCall = Object.values(twilioState.activeCalls)[0];
-    
     const callStatus = firstActiveCall?.status;
     
-    const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
-    const inProgressStatuses = ['connecting', 'ringing', 'in-progress'];
+    const completedStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'] as const;
+    const inProgressStatuses = ['connecting', 'ringing', 'in-progress'] as const;
     
-    if (callStatus && completedStatuses.includes(callStatus)) {
+    type CompletedStatus = typeof completedStatuses[number];
+    type InProgressStatus = typeof inProgressStatuses[number];
+    
+    if (callStatus && completedStatuses.includes(callStatus as CompletedStatus)) {
       handleCallCompletion();
     } else if (callStatus === 'connecting' || callStatus === 'ringing') {
       startNoAnswerTimeout();
-    } else if (callStatus && inProgressStatuses.includes(callStatus)) {
+    } else if (callStatus && inProgressStatuses.includes(callStatus as InProgressStatus)) {
       clearTimeoutTimer();
     }
   }, [
-    twilioState.activeCalls, 
-    handleCallCompletion, 
-    startNoAnswerTimeout, 
+    twilioState.activeCalls,
+    handleCallCompletion,
+    startNoAnswerTimeout,
     clearTimeoutTimer
   ]);
 

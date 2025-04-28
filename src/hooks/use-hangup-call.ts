@@ -9,43 +9,34 @@ export function useHangupCall() {
   const { user } = useAuth();
 
   const hangupCall = async (callSid?: string) => {
-    // Set hangup state immediately to show UI feedback
     setIsHangingUp(true);
     console.log(`HANGUP HOOK - Attempting to hang up call with SID: ${callSid || 'UNKNOWN'}`, { callSid });
     
     try {
       const userId = user?.id || 'anonymous';
       
-      // Let's look at active calls in the Twilio state if no callSid provided
+      // Look for active calls in Twilio state if no callSid provided
       if (!callSid || callSid === '') {
-        console.log('HANGUP HOOK - No callSid provided, attempting to find active call in Twilio state');
+        console.log('HANGUP HOOK - No callSid provided, attempting to find active call in localStorage');
         
-        // Try to get the callSid from the browser's localStorage where Twilio might store it
         try {
           const localStorageKeys = Object.keys(localStorage);
           const twilioKey = localStorageKeys.find(key => key.startsWith('twilio-'));
           
           if (twilioKey) {
-            console.log('HANGUP HOOK - Found potential Twilio data in localStorage:', twilioKey);
-            // Attempt to parse and extract any call information
-            try {
-              const twilioData = JSON.parse(localStorage.getItem(twilioKey) || '{}');
-              console.log('HANGUP HOOK - Parsed Twilio data:', twilioData);
-              
-              // Look for potential call SID in the data
-              if (twilioData && twilioData.calls) {
-                const callIds = Object.keys(twilioData.calls);
-                if (callIds.length > 0) {
-                  const firstCallId = callIds[0];
-                  const firstCall = twilioData.calls[firstCallId];
-                  if (firstCall && firstCall.parameters && firstCall.parameters.CallSid) {
-                    callSid = firstCall.parameters.CallSid;
-                    console.log('HANGUP HOOK - Found call SID in localStorage:', callSid);
-                  }
+            const twilioData = JSON.parse(localStorage.getItem(twilioKey) || '{}');
+            console.log('HANGUP HOOK - Found Twilio data:', twilioData);
+            
+            if (twilioData?.calls) {
+              const callIds = Object.keys(twilioData.calls);
+              if (callIds.length > 0) {
+                const firstCallId = callIds[0];
+                const firstCall = twilioData.calls[firstCallId];
+                if (firstCall?.parameters?.CallSid) {
+                  callSid = firstCall.parameters.CallSid;
+                  console.log('HANGUP HOOK - Found call SID:', callSid);
                 }
               }
-            } catch (parseError) {
-              console.error('HANGUP HOOK - Error parsing Twilio data from localStorage:', parseError);
             }
           }
         } catch (localStorageError) {
@@ -54,21 +45,21 @@ export function useHangupCall() {
       }
       
       const payload = { 
-        callSid: callSid || '',  // Send empty string if still undefined
+        callSid: callSid || '',
         userId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        attemptType: 'direct-hangup'
       };
       
-      console.log('HANGUP HOOK - Sending hangup request to hangup-call function with payload:', payload);
+      console.log('HANGUP HOOK - Sending hangup request with payload:', payload);
 
-      // First trying the direct fetch approach with better error handling
+      // First try direct fetch with better error handling
       let isDirectFetchSuccessful = false;
       try {
         const response = await fetch('https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            // Function is now public (verify_jwt = false) so no auth token needed
           },
           body: JSON.stringify(payload)
         });
@@ -85,31 +76,25 @@ export function useHangupCall() {
         } else {
           const errorText = await response.text();
           console.error(`HANGUP HOOK - Direct fetch failed with status ${response.status}:`, errorText);
-          // Continue to fallback method
         }
       } catch (directFetchError) {
         console.error('HANGUP HOOK - Direct fetch error:', directFetchError);
-        // Continue to fallback method
       }
       
-      // Only try the invoke method if direct fetch failed
+      // Only try invoke method if direct fetch failed
       if (!isDirectFetchSuccessful) {
-        console.log('HANGUP HOOK - Direct fetch failed, trying supabase.functions.invoke as fallback');
+        console.log('HANGUP HOOK - Direct fetch failed, trying supabase.functions.invoke');
         const { data, error } = await supabase.functions.invoke('hangup-call', {
           body: payload
         });
 
-        console.log('HANGUP HOOK - Received response from hangup-call function via invoke:', { data, error });
-
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         if (!data?.success) {
           throw new Error(data?.error || 'Failed to end call');
         }
 
-        toast.success('Call ended successfully via invoke');
+        toast.success('Call ended via invoke');
         return true;
       }
       

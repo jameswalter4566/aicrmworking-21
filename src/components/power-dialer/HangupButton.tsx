@@ -13,18 +13,15 @@ interface HangupButtonProps {
 export function HangupButton({ callSid, onSuccess, className = '' }: HangupButtonProps) {
   const { hangupCall, isHangingUp } = useHangupCall();
   
-  // Log whenever the callSid changes
   useEffect(() => {
     console.log("HANGUP BUTTON - CallSID prop changed:", callSid);
   }, [callSid]);
 
   const handleHangup = async () => {
-    // Continue even if callSid is undefined - we'll handle it in the hook
     console.log("HANGUP BUTTON - Attempting to hang up call with SID:", callSid || "NO SID PROVIDED");
     
     try {
-      // Pass callSid even if it's undefined - the hook will handle this case
-      const success = await hangupCall(callSid || '');
+      const success = await hangupCall(callSid);
       
       console.log("HANGUP BUTTON - hangupCall result:", success);
       
@@ -42,7 +39,7 @@ export function HangupButton({ callSid, onSuccess, className = '' }: HangupButto
       variant="destructive"
       size="sm"
       onClick={handleHangup}
-      disabled={isHangingUp} // Always make the button clickable regardless of callSid
+      disabled={isHangingUp}
       className={className}
     >
       <PhoneOff className="h-4 w-4 mr-2" />
