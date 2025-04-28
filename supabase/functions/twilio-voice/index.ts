@@ -1,6 +1,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
-import { toXML, VoiceResponse } from 'https://esm.sh/twilio@4.19.0/lib/twiml/VoiceResponse';
+// Fix the import of VoiceResponse - the correct import is from twilio@4.19.0/twiml
+import { VoiceResponse } from 'https://esm.sh/twilio@4.19.0/twiml';
 
 // Define CORS headers
 const corsHeaders = {
@@ -118,7 +119,7 @@ Deno.serve(async (req) => {
         
         // Generate TwiML with empty response - call has ended
         const twiml = new VoiceResponse();
-        return new Response(toXML(twiml), {
+        return new Response(twiml.toString(), {
           headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
         });
       }
@@ -181,7 +182,7 @@ Deno.serve(async (req) => {
         const dial = twiml.dial(dialOptions);
         dial.number(formattedNumber);
         
-        const twimlString = toXML(twiml);
+        const twimlString = twiml.toString();
         console.log(`[${Deno.requestId}] Generated TwiML for form request: ${twimlString}`);
         
         return new Response(twimlString, {
@@ -211,7 +212,7 @@ Deno.serve(async (req) => {
         });
         dial.number('+0');
         
-        const twimlString = toXML(twiml);
+        const twimlString = twiml.toString();
         console.log(`[${Deno.requestId}] Generated TwiML for incoming call: ${twimlString}`);
         
         return new Response(twimlString, {
@@ -227,7 +228,7 @@ Deno.serve(async (req) => {
         
         // Return empty TwiML response for status callbacks
         const twiml = new VoiceResponse();
-        return new Response(toXML(twiml), {
+        return new Response(twiml.toString(), {
           headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
         });
       }
@@ -244,7 +245,7 @@ Deno.serve(async (req) => {
     // Return a TwiML response even in case of error to avoid Twilio errors
     const twiml = new VoiceResponse();
     twiml.say('An error occurred processing your request.');
-    return new Response(toXML(twiml), {
+    return new Response(twiml.toString(), {
       headers: { ...corsHeaders, 'Content-Type': 'text/xml' },
       status: 200, // Return 200 to avoid Twilio retries
     });

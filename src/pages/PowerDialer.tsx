@@ -397,19 +397,19 @@ export default function PowerDialer() {
     
     if (status === 'in-progress' || status === 'answered') {
       return (
-        <Badge variant="success" className="text-white">
+        <Badge className="bg-green-500 text-white">
           Connected
         </Badge>
       );
     } else if (status === 'ringing' || status === 'queued') {
       return (
-        <Badge variant="warning" className="text-white">
+        <Badge className="bg-yellow-500 text-white">
           Ringing
         </Badge>
       );
     } else if (status === 'completed' || status === 'failed' || status === 'busy' || status === 'no-answer' || status === 'canceled') {
       return (
-        <Badge variant="destructive" className="text-white">
+        <Badge className="bg-red-500 text-white">
           Disconnected
         </Badge>
       );
@@ -532,7 +532,7 @@ export default function PowerDialer() {
                                     {call.phoneNumber}
                                   </p>
                                 </div>
-                                <Badge variant={call.status && ['ringing', 'connecting'].includes(call.status) ? "default" : "outline"}>
+                                <Badge variant={call.status && (call.status === 'connecting' || call.status === 'ringing') ? "default" : "outline"}>
                                   {call.status === 'connecting' ? 'Ringing' : call.status === 'ringing' ? 'Ringing' : call.status === 'in-progress' ? 'Connected' : call.status === 'completed' ? 'Ended' : call.status}
                                 </Badge>
                               </div>
