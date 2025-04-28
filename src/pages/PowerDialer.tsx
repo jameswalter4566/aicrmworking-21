@@ -8,21 +8,8 @@ import { CallControls } from "@/components/CallControls";
 import TwilioAudioPlayer from "@/components/TwilioAudioPlayer";
 import AudioDeviceSelector from "@/components/AudioDeviceSelector";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
@@ -42,58 +29,49 @@ import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
 import { LineDisplay } from "@/components/power-dialer/LineDisplay";
 import { CallStatusUpdate } from '@/hooks/use-call-status';
-
-const SAMPLE_LEADS = [
-  {
-    id: "1",
-    name: "John Smith",
-    company: "Acme Inc",
-    phone: "+18884659876",
-    status: "New",
-    priority: "High",
-  },
-  {
-    id: "2",
-    name: "James Walter",
-    company: "Golden Pathway Financial",
-    phone: "+17142449021", 
-    status: "New",
-    priority: "High",
-  },
-  {
-    id: "3",
-    name: "Michael Brown",
-    company: "XYZ Solutions",
-    phone: "+18007779999",
-    status: "New",
-    priority: "Low",
-  },
-  {
-    id: "4",
-    name: "Jennifer Davis",
-    company: "Global Tech",
-    phone: "+918320354644",
-    status: "New",
-    priority: "High",
-  },
-  {
-    id: "5",
-    name: "Robert Wilson",
-    company: "InnoTech",
-    phone: "+14155551234",
-    status: "Contacted",
-    priority: "Medium",
-  },
-  {
-    id: "6",
-    name: "Lisa Martinez",
-    company: "ABC Consulting",
-    phone: "+12125557890",
-    status: "New",
-    priority: "High",
-  },
-];
-
+const SAMPLE_LEADS = [{
+  id: "1",
+  name: "John Smith",
+  company: "Acme Inc",
+  phone: "+18884659876",
+  status: "New",
+  priority: "High"
+}, {
+  id: "2",
+  name: "James Walter",
+  company: "Golden Pathway Financial",
+  phone: "+17142449021",
+  status: "New",
+  priority: "High"
+}, {
+  id: "3",
+  name: "Michael Brown",
+  company: "XYZ Solutions",
+  phone: "+18007779999",
+  status: "New",
+  priority: "Low"
+}, {
+  id: "4",
+  name: "Jennifer Davis",
+  company: "Global Tech",
+  phone: "+918320354644",
+  status: "New",
+  priority: "High"
+}, {
+  id: "5",
+  name: "Robert Wilson",
+  company: "InnoTech",
+  phone: "+14155551234",
+  status: "Contacted",
+  priority: "Medium"
+}, {
+  id: "6",
+  name: "Lisa Martinez",
+  company: "ABC Consulting",
+  phone: "+12125557890",
+  status: "New",
+  priority: "High"
+}];
 export default function PowerDialer() {
   const [currentTab, setCurrentTab] = useState("dialer");
   const [leads, setLeads] = useState(SAMPLE_LEADS);
@@ -107,23 +85,18 @@ export default function PowerDialer() {
   const [currentCall, setCurrentCall] = useState<any>(null);
   const [isDialing, setIsDialing] = useState(false);
   const [connectedLeadData, setConnectedLeadData] = useState<any>(null);
-
   const twilioState = useTwilio();
   const hasActiveCall = Object.keys(twilioState.activeCalls).length > 0;
-
   useEffect(() => {
     console.log('[PowerDialer] connected lead data state:', connectedLeadData);
   }, [connectedLeadData]);
-
   useEffect(() => {
     if (window.Twilio && window.Twilio.Device) {
       console.log("Twilio device available:", window.Twilio.Device);
       setTwilioReady(true);
-      
       return () => {};
     }
   }, [isScriptLoaded]);
-
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     console.log('[PowerDialer] Active call updated:', {
@@ -131,7 +104,6 @@ export default function PowerDialer() {
       leadId: activeCall?.leadId,
       hasLeadData: !!connectedLeadData
     });
-    
     if (activeCall?.leadId) {
       console.log('[PowerDialer] Setting connected lead data...');
       setConnectedLeadData(prevData => ({
@@ -140,28 +112,22 @@ export default function PowerDialer() {
       }));
     }
   }, [twilioState.activeCalls]);
-
   const filteredAndSortedLeads = React.useMemo(() => {
-    return leads
-      .filter((lead) =>
-        filterStatus === "all" ? true : lead.status === filterStatus
-      )
-      .sort((a, b) => {
-        if (sortBy === "priority") {
-          const priorityWeight: Record<string, number> = {
-            High: 3,
-            Medium: 2,
-            Low: 1,
-          };
-          return priorityWeight[b.priority] - priorityWeight[a.priority];
-        } else if (sortBy === "name") {
-          return a.name.localeCompare(b.name);
-        } else {
-          return a.company.localeCompare(b.company);
-        }
-      });
+    return leads.filter(lead => filterStatus === "all" ? true : lead.status === filterStatus).sort((a, b) => {
+      if (sortBy === "priority") {
+        const priorityWeight: Record<string, number> = {
+          High: 3,
+          Medium: 2,
+          Low: 1
+        };
+        return priorityWeight[b.priority] - priorityWeight[a.priority];
+      } else if (sortBy === "name") {
+        return a.name.localeCompare(b.name);
+      } else {
+        return a.company.localeCompare(b.company);
+      }
+    });
   }, [leads, filterStatus, sortBy]);
-
   const handleCallLead = async (lead: any) => {
     if (!twilioState.initialized && !isScriptLoaded) {
       toast("Phone System Not Ready", {
@@ -169,30 +135,22 @@ export default function PowerDialer() {
       });
       return;
     }
-
     if (callInProgress) {
       toast("Call Already in Progress", {
         description: "Please end the current call before starting a new one."
       });
       return;
     }
-    
     try {
       setIsDialing(true);
       setConnectedLeadData(null);
-      
       const initialized = await twilioService.initializeTwilioDevice();
       console.log("Twilio initialization:", initialized ? "successful" : "failed");
-      
       await new Promise(resolve => setTimeout(resolve, 500));
-      
       setCallInProgress(true);
-      
       const formattedPhone = lead.phone.replace(/\D/g, '');
       const callResult = await twilioService.makeCall(formattedPhone, lead.id);
-      
       console.log("Call result:", callResult);
-      
       if (!callResult.success) {
         console.error("Call failed:", JSON.stringify(callResult));
         toast("Call Failed", {
@@ -212,28 +170,24 @@ export default function PowerDialer() {
       setCallInProgress(false);
       setIsDialing(false);
       setConnectedLeadData(null);
-      
       toast("Call Error", {
         description: error.message || "Error placing call."
       });
     }
   };
-
   const updateLeadStatus = (leadId: string, newStatus: string) => {
-    setLeads(leads.map(lead => 
-      lead.id === leadId ? { ...lead, status: newStatus } : lead
-    ));
+    setLeads(leads.map(lead => lead.id === leadId ? {
+      ...lead,
+      status: newStatus
+    } : lead));
   };
-
   const handleEndCall = async (leadId: string) => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (!activeCall || !activeCall.callSid) {
       console.error("No active call or callSid available to end");
       return;
     }
-    
     console.log("PowerDialer - handleEndCall - Using callSid:", activeCall.callSid);
-    
     try {
       await twilioState.endCall(leadId);
       updateLeadStatus(leadId, "Contacted");
@@ -244,30 +198,29 @@ export default function PowerDialer() {
       toast.error("Failed to end call");
     }
   };
-
   const handleDisposition = (type: string) => {
     if (!currentCall) return;
-    
     toast("Call Dispositioned", {
       description: `Call marked as ${type}`
     });
-    
     handleEndCall(currentCall.parameters.leadId);
   };
-
   const activeCall = Object.values(twilioState.activeCalls)[0];
   const activeLeadId = activeCall?.leadId || null;
-  
-  const { user } = useAuth(); // Get current user
-  const { leadData: realtimeLeadData, isLoading: isLeadDataLoading, leadFound, refresh: refreshLeadData } = 
-    useLeadRealtime(activeLeadId ? String(activeLeadId) : null, user?.id);
-
+  const {
+    user
+  } = useAuth(); // Get current user
+  const {
+    leadData: realtimeLeadData,
+    isLoading: isLeadDataLoading,
+    leadFound,
+    refresh: refreshLeadData
+  } = useLeadRealtime(activeLeadId ? String(activeLeadId) : null, user?.id);
   useEffect(() => {
     if (realtimeLeadData) {
       setConnectedLeadData(realtimeLeadData);
     }
   }, [realtimeLeadData]);
-
   const refreshLatestLead = async () => {
     try {
       console.log('Manually fetching latest lead...');
@@ -278,14 +231,15 @@ export default function PowerDialer() {
       toast.error('Failed to refresh lead data');
     }
   };
-
   const fetchLeadData = async (leadId: string | number) => {
     try {
       console.log(`[PowerDialer] Fetching lead data for ID: ${leadId}`);
       setIsDialing(true);
-      
-      const { data, error } = await supabase.functions.invoke('lead-connected', {
-        body: { 
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('lead-connected', {
+        body: {
           leadId: String(leadId),
           userId: user?.id,
           callData: {
@@ -296,14 +250,11 @@ export default function PowerDialer() {
           }
         }
       });
-
       if (error) {
         console.error('[PowerDialer] Error from lead-connected:', error);
         throw error;
       }
-      
       console.log('[PowerDialer] Response from lead-connected:', data);
-      
       if (data?.lead) {
         console.log('[PowerDialer] Setting lead data from API response:', data.lead);
         setConnectedLeadData(data.lead);
@@ -322,13 +273,11 @@ export default function PowerDialer() {
         };
         setConnectedLeadData(fallbackData);
       }
-      
       setIsDialing(false);
     } catch (err) {
       console.error('[PowerDialer] Error fetching lead data:', err);
       toast.error('Failed to load lead details');
       setIsDialing(false);
-      
       const errorFallbackData = {
         first_name: 'Error',
         last_name: 'Loading Lead',
@@ -343,15 +292,13 @@ export default function PowerDialer() {
       setConnectedLeadData(errorFallbackData);
     }
   };
-
   const transformActiveCallsForDisplay = () => {
     const calls = Object.values(twilioState.activeCalls);
     const displayData: Record<number, CallStatusUpdate | undefined> = {
       1: undefined,
       2: undefined,
-      3: undefined,
+      3: undefined
     };
-    
     calls.forEach((call, index) => {
       if (index < 3) {
         displayData[index + 1] = {
@@ -362,22 +309,17 @@ export default function PowerDialer() {
         };
       }
     });
-    
     return displayData;
   };
-
   const activeCallsForDisplay = transformActiveCallsForDisplay();
-
   useEffect(() => {
     console.log('[PowerDialer] Active call status changed:', Object.values(twilioState.activeCalls)[0]?.status);
     console.log('[PowerDialer] Active call leadId:', Object.values(twilioState.activeCalls)[0]?.leadId);
-    
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.leadId) {
       fetchLeadData(String(activeCall.leadId)); // Convert to string to ensure type safety
     }
   }, [twilioState.activeCalls]);
-
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.status === 'completed' || activeCall?.status === 'failed') {
@@ -386,7 +328,6 @@ export default function PowerDialer() {
       console.log('[PowerDialer] Call completed/failed, cleared lead data and dialing state');
     }
   }, [twilioState.activeCalls]);
-
   useEffect(() => {
     console.log('Rendering PowerDialer with state:', {
       hasData: !!connectedLeadData,
@@ -401,7 +342,6 @@ export default function PowerDialer() {
       } : null
     });
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
-
   React.useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.log('PowerDialer Debug Info:', {
@@ -418,24 +358,18 @@ export default function PowerDialer() {
       });
     }
   }, [connectedLeadData, isDialing, hasActiveCall, twilioState.activeCalls]);
-
   useEffect(() => {
     const activeCall = Object.values(twilioState.activeCalls)[0];
     if (activeCall?.status) {
       const completionStatuses = ['completed', 'failed', 'busy', 'no-answer', 'canceled'];
       const connectingStatuses = ['connecting', 'ringing']; // Both treated the same way
-      
+
       // Add logic to handle call status changes if needed
     }
   }, [twilioState.activeCalls]);
-
-  return (
-    <MainLayout>
+  return <MainLayout>
       <LeadFoundIndicator isVisible={leadFound} />
-      <TwilioScript
-        onLoad={() => setIsScriptLoaded(true)}
-        onError={(err) => console.error("TwilioScript error:", err)}
-      />
+      <TwilioScript onLoad={() => setIsScriptLoaded(true)} onError={err => console.error("TwilioScript error:", err)} />
       
       <AudioDebugModal />
       
@@ -446,12 +380,10 @@ export default function PowerDialer() {
             Make outbound calls to your leads in queue
           </p>
 
-          {tokenError && (
-            <Alert variant="destructive">
+          {tokenError && <Alert variant="destructive">
               <AlertTitle>Token Error</AlertTitle>
               <AlertDescription>{tokenError}</AlertDescription>
-            </Alert>
-          )}
+            </Alert>}
 
           <div className="flex items-center space-x-2">
             <Badge variant={twilioState.initialized ? "default" : "outline"}>
@@ -466,12 +398,7 @@ export default function PowerDialer() {
           </div>
         </div>
 
-        <Tabs
-          defaultValue="dialer"
-          value={currentTab}
-          onValueChange={setCurrentTab}
-          className="space-y-2"
-        >
+        <Tabs defaultValue="dialer" value={currentTab} onValueChange={setCurrentTab} className="space-y-2">
           <TabsList>
             <TabsTrigger value="dialer" onClick={() => setCurrentTab("dialer")}>
               Dialer
@@ -492,34 +419,26 @@ export default function PowerDialer() {
                     <CardTitle className="text-lg flex justify-between items-center">
                       System Controls
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async () => {
-                            const success = await twilioState.endAllCalls();
-                            if (success) {
-                              setConnectedLeadData(null);
-                              toast("System Reset", {
-                                description: "All active calls have been terminated. The system has been reset."
-                              });
-                            }
-                          }}
-                        >
+                        <Button variant="outline" size="sm" onClick={async () => {
+                        const success = await twilioState.endAllCalls();
+                        if (success) {
+                          setConnectedLeadData(null);
+                          toast("System Reset", {
+                            description: "All active calls have been terminated. The system has been reset."
+                          });
+                        }
+                      }}>
                           Reset All Calls
                         </Button>
                         
-                        <Button
-                          variant="default" 
-                          size="sm"
-                          onClick={async () => {
-                            const initialized = await twilioService.initializeTwilioDevice();
-                            if (initialized) {
-                              toast("System Reinitialized", {
-                                description: "The phone system has been reinitialized with a new token."
-                              });
-                            }
-                          }}
-                        >
+                        <Button variant="default" size="sm" onClick={async () => {
+                        const initialized = await twilioService.initializeTwilioDevice();
+                        if (initialized) {
+                          toast("System Reinitialized", {
+                            description: "The phone system has been reinitialized with a new token."
+                          });
+                        }
+                      }}>
                           Reinitialize System
                         </Button>
                       </div>
@@ -530,49 +449,28 @@ export default function PowerDialer() {
                   </CardHeader>
                 </Card>
 
-                <Card className="bg-gray-800 p-4 rounded-lg mt-0 mb-0 border-b-0 rounded-b-none">
-                  <div className="grid grid-cols-3 gap-4">
-                    {[1, 2, 3].map((line) => (
-                      <LineDisplay 
-                        key={line} 
-                        lineNumber={line}
-                        currentCall={activeCallsForDisplay[line]}
-                      />
-                    ))}
-                  </div>
-                </Card>
+                
 
-                <PreviewDialerWindow 
-                  currentCall={Object.values(twilioState.activeCalls)[0]}
-                  onDisposition={handleDisposition}
-                  onEndCall={() => {
-                    Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
-                    setConnectedLeadData(null);
-                  }}
-                />
+                <PreviewDialerWindow currentCall={Object.values(twilioState.activeCalls)[0]} onDisposition={handleDisposition} onEndCall={() => {
+                Object.keys(twilioState.activeCalls).forEach(id => handleEndCall(id));
+                setConnectedLeadData(null);
+              }} />
 
-                {Object.keys(twilioState.activeCalls).length > 0 && (
-                  <Card className="bg-muted/50 mb-0">
+                {Object.keys(twilioState.activeCalls).length > 0 && <Card className="bg-muted/50 mb-0">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg flex justify-between items-center">
                         Active Call
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => {
-                            twilioState.endAllCalls();
-                            setConnectedLeadData(null);
-                          }}
-                        >
+                        <Button variant="destructive" size="sm" onClick={() => {
+                      twilioState.endAllCalls();
+                      setConnectedLeadData(null);
+                    }}>
                           End All Calls
                         </Button>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pb-2">
-                      {Object.entries(twilioState.activeCalls).map(([leadId, call]) => (
-                        <div key={leadId} className="mb-2">
-                          {leads.find(l => l.id === leadId) && (
-                            <div className="flex flex-col space-y-2">
+                      {Object.entries(twilioState.activeCalls).map(([leadId, call]) => <div key={leadId} className="mb-2">
+                          {leads.find(l => l.id === leadId) && <div className="flex flex-col space-y-2">
                               <div className="flex justify-between items-center">
                                 <div>
                                   <p className="font-medium">
@@ -583,52 +481,27 @@ export default function PowerDialer() {
                                   </p>
                                 </div>
                                 <Badge variant={call.status === 'in-progress' ? "default" : "outline"}>
-                                  {call.status === 'connecting' ? 'Ringing' : 
-                                   call.status === 'ringing' ? 'Ringing' :
-                                   call.status === 'in-progress' ? 'Connected' :
-                                   call.status === 'completed' ? 'Ended' : 
-                                   call.status}
+                                  {call.status === 'connecting' ? 'Ringing' : call.status === 'ringing' ? 'Ringing' : call.status === 'in-progress' ? 'Connected' : call.status === 'completed' ? 'Ended' : call.status}
                                 </Badge>
                               </div>
                               
-                              <CallControls
-                                leadId={leadId}
-                                phoneNumber={call.phoneNumber}
-                                activeCall={call}
-                                onCall={(phone, id) => {}}
-                                onHangup={() => {
-                                  handleEndCall(leadId);
-                                  setConnectedLeadData(null);
-                                }}
-                                onToggleMute={(id) => twilioState.toggleMute(id)}
-                                onToggleSpeaker={(id) => twilioState.toggleSpeaker(id)}
-                                audioOutputDevices={twilioState.audioOutputDevices}
-                                currentAudioDevice={twilioState.currentAudioDevice}
-                                onChangeAudioDevice={(deviceId) => twilioState.setAudioOutputDevice(deviceId)}
-                                onRefreshDevices={() => twilioState.refreshAudioDevices()}
-                                onTestAudio={(deviceId) => twilioState.testAudio(deviceId || '')}
-                              />
+                              <CallControls leadId={leadId} phoneNumber={call.phoneNumber} activeCall={call} onCall={(phone, id) => {}} onHangup={() => {
+                        handleEndCall(leadId);
+                        setConnectedLeadData(null);
+                      }} onToggleMute={id => twilioState.toggleMute(id)} onToggleSpeaker={id => twilioState.toggleSpeaker(id)} audioOutputDevices={twilioState.audioOutputDevices} currentAudioDevice={twilioState.currentAudioDevice} onChangeAudioDevice={deviceId => twilioState.setAudioOutputDevice(deviceId)} onRefreshDevices={() => twilioState.refreshAudioDevices()} onTestAudio={deviceId => twilioState.testAudio(deviceId || '')} />
                               
-                              {!call.audioActive && call.status === 'in-progress' && (
-                                <Alert variant="destructive" className="mt-2">
+                              {!call.audioActive && call.status === 'in-progress' && <Alert variant="destructive" className="mt-2">
                                   <AlertTitle>Audio Warning</AlertTitle>
                                   <AlertDescription>
                                     Microphone appears to be inactive. Check your browser permissions.
                                   </AlertDescription>
-                                </Alert>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                                </Alert>}
+                            </div>}
+                        </div>)}
                     </CardContent>
-                  </Card>
-                )}
+                  </Card>}
 
-                <ConnectedLeadPanel 
-                  leadData={connectedLeadData}
-                  onRefresh={refreshLatestLead}
-                />
+                <ConnectedLeadPanel leadData={connectedLeadData} onRefresh={refreshLatestLead} />
 
                 <div className="grid grid-cols-4 gap-2">
                   <div className="col-span-3">
@@ -667,8 +540,7 @@ export default function PowerDialer() {
                       <ScrollArea className="flex-1 h-[calc(100vh-520px)]">
                         <CardContent>
                           <div className="space-y-2">
-                            {filteredAndSortedLeads.map((lead) => (
-                              <Card key={lead.id} className="p-3 hover:bg-accent/50">
+                            {filteredAndSortedLeads.map(lead => <Card key={lead.id} className="p-3 hover:bg-accent/50">
                                 <div className="flex justify-between items-start">
                                   <div className="space-y-1">
                                     <div className="font-medium">{lead.name}</div>
@@ -678,43 +550,18 @@ export default function PowerDialer() {
                                     <div className="text-sm">{lead.phone}</div>
                                   </div>
                                   <div className="flex flex-col items-end">
-                                    <Badge
-                                      variant={
-                                        lead.status === "New"
-                                          ? "default"
-                                          : lead.status === "Attempted"
-                                          ? "secondary"
-                                          : "outline"
-                                      }
-                                      className="mb-2"
-                                    >
+                                    <Badge variant={lead.status === "New" ? "default" : lead.status === "Attempted" ? "secondary" : "outline"} className="mb-2">
                                       {lead.status}
                                     </Badge>
-                                    <Badge
-                                      variant={
-                                        lead.priority === "High"
-                                          ? "destructive"
-                                          : lead.priority === "Medium"
-                                          ? "default"
-                                          : "outline"
-                                      }
-                                      className="mb-2"
-                                    >
+                                    <Badge variant={lead.priority === "High" ? "destructive" : lead.priority === "Medium" ? "default" : "outline"} className="mb-2">
                                       {lead.priority}
                                     </Badge>
-                                    <Button
-                                      size="sm"
-                                      variant="default"
-                                      onClick={() => handleCallLead(lead)}
-                                      disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0}
-                                      className="w-16 h-8"
-                                    >
+                                    <Button size="sm" variant="default" onClick={() => handleCallLead(lead)} disabled={callInProgress || Object.keys(twilioState.activeCalls).length > 0} className="w-16 h-8">
                                       <Phone className="mr-1 h-3 w-3" /> Call
                                     </Button>
                                   </div>
                                 </div>
-                              </Card>
-                            ))}
+                              </Card>)}
                           </div>
                         </CardContent>
                       </ScrollArea>
@@ -728,47 +575,27 @@ export default function PowerDialer() {
                     <CardContent>
                       <ScrollArea className="h-[calc(100vh-520px)]">
                         <div className="space-y-2">
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => handleDisposition('contact')}
-                          >
+                          <Button variant="outline" className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" onClick={() => handleDisposition('contact')}>
                             <Phone className="mr-2 h-4 w-4 text-green-400" />
                             Contact
                           </Button>
                           
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => handleDisposition('attempt')}
-                          >
+                          <Button variant="outline" className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" onClick={() => handleDisposition('attempt')}>
                             <Phone className="mr-2 h-4 w-4 text-yellow-400" />
                             Attempt
                           </Button>
                           
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => handleDisposition('no-answer')}
-                          >
+                          <Button variant="outline" className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" onClick={() => handleDisposition('no-answer')}>
                             <Phone className="mr-2 h-4 w-4 text-red-400" />
                             No Answer
                           </Button>
                           
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => handleDisposition('busy')}
-                          >
+                          <Button variant="outline" className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" onClick={() => handleDisposition('busy')}>
                             <Phone className="mr-2 h-4 w-4 text-orange-400" />
                             Busy
                           </Button>
                           
-                          <Button 
-                            variant="outline" 
-                            className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" 
-                            onClick={() => handleDisposition('failed')}
-                          >
+                          <Button variant="outline" className="w-full justify-start bg-gray-700 hover:bg-gray-600 text-white border-gray-600" onClick={() => handleDisposition('failed')}>
                             <Phone className="mr-2 h-4 w-4 text-gray-400" />
                             Failed
                           </Button>
@@ -790,8 +617,7 @@ export default function PowerDialer() {
           </TabsContent>
         </Tabs>
         
-        {process.env.NODE_ENV === 'development' && connectedLeadData && (
-          <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border border-green-500 z-50 max-w-md">
+        {process.env.NODE_ENV === 'development' && connectedLeadData && <div className="fixed bottom-5 right-5 bg-white p-4 rounded shadow-lg border border-green-500 z-50 max-w-md">
             <h3 className="font-bold flex justify-between">
               <span>Debug: Lead Data Present</span>
               <button onClick={() => console.log('Current lead data:', connectedLeadData)}>
@@ -801,19 +627,15 @@ export default function PowerDialer() {
             <pre className="text-xs overflow-auto max-h-40">
               {JSON.stringify(connectedLeadData, null, 2)}
             </pre>
-          </div>
-        )}
+          </div>}
         
         <TwilioAudioPlayer sound="/sounds/test-tone.mp3" />
       </div>
-    </MainLayout>
-  );
+    </MainLayout>;
 }
-
 function SettingsTab() {
   return null;
 }
-
 function ScriptsTab() {
   return null;
 }
