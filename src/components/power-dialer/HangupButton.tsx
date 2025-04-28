@@ -19,16 +19,12 @@ export function HangupButton({ callSid, onSuccess, className = '' }: HangupButto
   }, [callSid]);
 
   const handleHangup = async () => {
-    if (!callSid) {
-      console.error("HANGUP BUTTON - No callSid provided to HangupButton");
-      return;
-    }
-    
-    console.log("HANGUP BUTTON - Attempting to hang up call with SID:", callSid);
+    // Continue even if callSid is undefined - we'll handle it in the hook
+    console.log("HANGUP BUTTON - Attempting to hang up call with SID:", callSid || "NO SID PROVIDED");
     
     try {
-      // Make sure to pass the full SID string, not a React event
-      const success = await hangupCall(callSid);
+      // Pass callSid even if it's undefined - the hook will handle this case
+      const success = await hangupCall(callSid || '');
       
       console.log("HANGUP BUTTON - hangupCall result:", success);
       
@@ -46,7 +42,7 @@ export function HangupButton({ callSid, onSuccess, className = '' }: HangupButto
       variant="destructive"
       size="sm"
       onClick={handleHangup}
-      disabled={!callSid || isHangingUp}
+      disabled={isHangingUp} // Remove the callSid check to always make the button clickable
       className={className}
     >
       <PhoneOff className="h-4 w-4 mr-2" />

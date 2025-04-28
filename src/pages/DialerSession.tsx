@@ -234,7 +234,7 @@ const DialerSession = () => {
     if (callStatus && completedStatuses.includes(callStatus)) {
       handleCallCompletion();
     } else if (callStatus === 'connecting' || callStatus === 'ringing') {
-      // Fixed the comparison by using OR to compare with both potential status values
+      // Use OR operator to check for both statuses explicitly
       startNoAnswerTimeout();
     } else if (callStatus && inProgressStatuses.includes(callStatus)) {
       clearTimeoutTimer();

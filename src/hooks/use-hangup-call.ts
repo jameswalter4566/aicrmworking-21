@@ -8,20 +8,16 @@ export function useHangupCall() {
   const [isHangingUp, setIsHangingUp] = useState(false);
   const { user } = useAuth();
 
-  const hangupCall = async (callSid: string) => {
-    if (!callSid) {
-      toast.error('No call identified');
-      return false;
-    }
-
+  const hangupCall = async (callSid?: string) => {
+    // Set hangup state immediately to show UI feedback
     setIsHangingUp(true);
-    console.log(`HANGUP HOOK - Attempting to hang up call with SID: ${callSid}`, { callSid });
-
+    console.log(`HANGUP HOOK - Attempting to hang up call with SID: ${callSid || 'UNKNOWN'}`, { callSid });
+    
     try {
       const userId = user?.id || 'anonymous';
       
       const payload = { 
-        callSid,
+        callSid: callSid || '',  // Send empty string if undefined
         userId
       };
       
@@ -32,7 +28,6 @@ export function useHangupCall() {
       const authToken = sessionData?.session?.access_token || '';
       
       console.log('HANGUP HOOK - Direct fetch URL: https://imrmboyczebjlbnkgjns.supabase.co/functions/v1/hangup-call');
-      console.log('HANGUP HOOK - Authentication token:', authToken ? 'Present' : 'Missing');
       
       // First trying the direct fetch approach with better error handling
       let isDirectFetchSuccessful = false;
