@@ -40,6 +40,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from '@/hooks/use-auth';
 import { useLeadRealtime } from '@/hooks/use-lead-realtime';
 import { LeadFoundIndicator } from '@/components/LeadFoundIndicator';
+import { useCallDisposition } from '@/hooks/use-call-disposition';
 
 const SAMPLE_LEADS = [
   {
@@ -224,10 +225,30 @@ export default function PowerDialer() {
   };
 
   const handleEndCall = async (leadId: string) => {
-    await twilioState.endCall(leadId);
-    updateLeadStatus(leadId, "Contacted");
-    setCallInProgress(false);
-    setConnectedLeadData(null);
+    const activeCalls = twilioState.activeCalls;
+    const callSid = activeCalls[leadId]?.callSid;
+    
+    if (!callSid) {
+      console.error("No call SID found for lead ID:", leadId);
+      toast.error("Could not find active call to end");
+      return;
+    }
+    
+    console.log("Ending call with SID:", callSid, "for lead:", leadId);
+    
+    try {
+      const { endCall } = useCallDisposition();
+      const success = await endCall(callSid, leadId);
+      
+      if (success) {
+        updateLeadStatus(leadId, "Contacted");
+        setCallInProgress(false);
+        setConnectedLeadData(null);
+      }
+    } catch (error) {
+      console.error("Error ending call:", error);
+      toast.error("Failed to end call");
+    }
   };
 
   const handleDisposition = (type: string) => {

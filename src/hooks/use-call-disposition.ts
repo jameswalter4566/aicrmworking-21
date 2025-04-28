@@ -8,6 +8,13 @@ export function useCallDisposition() {
   const [error, setError] = useState<string | null>(null);
 
   const endCall = async (callSid: string, leadId?: string | number): Promise<boolean> => {
+    if (!callSid) {
+      console.error("No callSid provided to endCall function");
+      toast.error('Cannot end call: missing call identifier');
+      return false;
+    }
+    
+    console.log(`Ending call with SID: ${callSid}, leadId: ${leadId || 'none'}`);
     setIsLoading(true);
     setError(null);
     
@@ -16,19 +23,33 @@ export function useCallDisposition() {
         body: {
           action: 'endCall',
           callSid,
-          leadId
+          leadId,
+          callData: {
+            status: 'completed',
+            timestamp: new Date().toISOString(),
+            callState: 'disconnected'
+          }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error from lead-connected function:", error);
+        throw error;
+      }
+      
+      console.log("End call response:", data);
 
-      toast.success('Call ended');
+      if (!data?.success) {
+        throw new Error(data?.error || "Unknown error ending call");
+      }
+
+      toast.success('Call ended successfully');
       return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       setError(errorMsg);
       console.error('[useCallDisposition] Error ending call:', err);
-      toast.error('Failed to end call');
+      toast.error('Failed to end call. Please try again.');
       return false;
     } finally {
       setIsLoading(false);
