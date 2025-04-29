@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -79,7 +78,7 @@ const LandingPage = () => {
           <FeatureCard title="Integrated Dialer" value="Make Calls" icon={<Phone size={20} className="text-blue-400" />} />
         </div>,
     initialX: -450,
-    initialY: -380,
+    initialY: -280,
     floatRadius: 20,
     floatSpeed: 0.002,
     delay: 0,
@@ -90,7 +89,7 @@ const LandingPage = () => {
           <FeatureCard title="AI Assistance" value="Smart Support" icon={<Bot size={20} className="text-purple-400" />} />
         </div>,
     initialX: 450,
-    initialY: -220,
+    initialY: -120,
     floatRadius: 25,
     floatSpeed: 0.0015,
     delay: 200,
@@ -101,7 +100,7 @@ const LandingPage = () => {
           <FeatureCard title="Sales Analytics" value="Data Insights" icon={<LineChart size={20} className="text-green-400" />} className="w-48" />
         </div>,
     initialX: 450,
-    initialY: -20,
+    initialY: 80,
     floatRadius: 30,
     floatSpeed: 0.0025,
     delay: 400,
@@ -112,7 +111,7 @@ const LandingPage = () => {
           <FeatureCard title="SMS Campaigns" value="Bulk Messaging" icon={<MessageSquare size={20} className="text-orange-400" />} />
         </div>,
     initialX: -450,
-    initialY: -180,
+    initialY: -80,
     floatRadius: 22,
     floatSpeed: 0.002,
     delay: 300,
@@ -123,7 +122,7 @@ const LandingPage = () => {
           <FeatureCard title="Power Dialer" value="10-to-1 Calling" icon={<Zap size={20} className="text-yellow-400" />} />
         </div>,
     initialX: 450,
-    initialY: -380,
+    initialY: -280,
     floatRadius: 25,
     floatSpeed: 0.002,
     delay: 250,
@@ -134,7 +133,7 @@ const LandingPage = () => {
           <FeatureCard title="Lead Manager" value="Organize Contacts" icon={<Inbox size={20} className="text-purple-500" />} />
         </div>,
     initialX: -450,
-    initialY: -20,
+    initialY: 80,
     floatRadius: 22,
     floatSpeed: 0.0018,
     delay: 200,
@@ -260,12 +259,13 @@ const LandingPage = () => {
               <div className="absolute top-0 left-0 right-0 h-40 bg-gradient-to-b from-slate-900 to-transparent z-10"></div>
             </div>
             
-            <div className="absolute inset-0 z-10 pointer-events-none">
+            {/* Floating items positioned higher to avoid overlap */}
+            <div className="absolute inset-0 z-10 pointer-events-none select-none">
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Adding the new video container here */}
-            <div className="w-full max-w-4xl mx-auto mb-8 relative z-20 mt-24">
+            {/* Video container positioned at the top of the content area */}
+            <div className="w-full max-w-4xl mx-auto pt-20 relative z-20">
               <div className="aspect-video bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
                 {/* Video will be placed here later */}
                 <div className="w-full h-full flex items-center justify-center">
@@ -274,7 +274,8 @@ const LandingPage = () => {
               </div>
             </div>
             
-            <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 flex flex-col items-center justify-center">
+            {/* Main content section with increased top margin to avoid overlap */}
+            <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-12 flex flex-col items-center justify-center">
               <div className="flex justify-center mb-6">
                 <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl flex-shrink-0">
                   <span className="font-bold text-2xl">CRM</span>
@@ -414,4 +415,3 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
-
