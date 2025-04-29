@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -263,7 +264,17 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-20 flex flex-col items-center justify-center">
+            {/* Adding the new video container here */}
+            <div className="w-full max-w-4xl mx-auto mb-8 relative z-20 mt-24">
+              <div className="aspect-video bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
+                {/* Video will be placed here later */}
+                <div className="w-full h-full flex items-center justify-center">
+                  <p className="text-gray-400 text-lg">Video Content</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 flex flex-col items-center justify-center">
               <div className="flex justify-center mb-6">
                 <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl flex-shrink-0">
                   <span className="font-bold text-2xl">CRM</span>
@@ -403,3 +414,4 @@ const LandingPage = () => {
 };
 
 export default LandingPage;
+

@@ -22,6 +22,7 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [noLeadsError, setNoLeadsError] = useState<string | null>(null);
   const [attemptCount, setAttemptCount] = useState(0);
+  
   const fetchQueueStats = async () => {
     if (!sessionId) return;
     setIsLoading(true);
@@ -105,6 +106,7 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({
       setIsLoading(false);
     }
   };
+  
   useEffect(() => {
     if (sessionId) {
       fetchQueueStats();
@@ -138,12 +140,15 @@ const DialerQueueMonitor: React.FC<DialerQueueMonitorProps> = ({
       return () => clearTimeout(timer);
     }
   }, [sessionId, attemptCount]);
+  
   if (!sessionId) return null;
+  
   const handleRefresh = () => {
     setAttemptCount(0);
     fetchQueueStats();
     toast.info("Refreshing queue data...");
   };
+  
   return <Card className="mb-4">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-medium flex items-center justify-between">
