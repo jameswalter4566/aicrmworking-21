@@ -6,7 +6,11 @@ import { AutoDialerController } from "@/components/power-dialer/AutoDialerContro
 const PowerDialer = () => {
   return (
     <MainLayout>
-      <AutoDialerController />
+      <AutoDialerController 
+        sessionId="default-session" 
+        isActive={true}
+        onCallComplete={() => {}}
+      />
     </MainLayout>
   );
 };
