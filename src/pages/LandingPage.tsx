@@ -252,9 +252,11 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Video container with expanded size - approximately 2x larger */}
+            {/* Video container with expanded vertical size */}
             <div className="w-full max-w-[80vw] md:max-w-[70vw] mx-auto pt-40 relative z-20">
-              <div className="aspect-video bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative">
+              <div className="aspect-video bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative" style={{
+                height: "65vh" /* Increased height to expand vertically */
+              }}>
                 <video
                   className="w-full h-full object-cover"
                   muted
