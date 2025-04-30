@@ -254,7 +254,7 @@ const LandingPage = () => {
             
             {/* Video container with 9:16 aspect ratio - Centered and Expanded */}
             <div className="w-full flex justify-center items-center pt-40 relative z-20">
-              <div className="w-full max-w-[500px] mx-auto flex justify-center">
+              <div className="w-full max-w-[500px] mx-auto">
                 <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative" style={{
                   aspectRatio: "9/16", /* 9:16 aspect ratio */
                   maxHeight: "65vh"
@@ -286,7 +286,7 @@ const LandingPage = () => {
                   </div>
                 </div>
                 
-                {/* Access Portal button - Position maintained exactly as before */}
+                {/* Access Portal button - Maintain position */}
                 <div className="pt-6 flex justify-center">
                   <div className="relative mx-auto w-[300px]">
                     <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
