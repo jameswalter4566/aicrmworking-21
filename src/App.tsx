@@ -253,18 +253,18 @@ function App() {
                 <Route path="/reset-password" element={<ResetPassword />} />
                 
                 {/* Add AudioInitializer only to protected routes and specific pages where it's needed */}
-                <Route path="/" element={<ProtectedRoute><AudioInitializer /><Index /></ProtectedRoute>} />
-                <Route path="/people" element={<ProtectedRoute><AudioInitializer /><People /></ProtectedRoute>} />
-                <Route path="/lead/:id" element={<ProtectedRoute><AudioInitializer /><LeadProfile /></ProtectedRoute>} />
-                <Route path="/deals" element={<ProtectedRoute><AudioInitializer /><Deals /></ProtectedRoute>} />
-                <Route path="/pipeline" element={<ProtectedRoute><AudioInitializer /><Pipeline /></ProtectedRoute>} />
-                <Route path="/power-dialer" element={<AudioInitializer /><PowerDialer />} />
-                <Route path="/predictive-dialer" element={<AudioInitializer /><PredictiveDialer />} />
-                <Route path="/ai-dialer" element={<AudioInitializer /><AIDialer />} />
-                <Route path="/ai-realtor" element={<ProtectedRoute><AudioInitializer /><AIRealtor /></ProtectedRoute>} />
-                <Route path="/listing-presentation" element={<ProtectedRoute><AudioInitializer /><ListingPresentation /></ProtectedRoute>} />
+                <Route path="/" element={<ProtectedRoute><><AudioInitializer /><Index /></></ProtectedRoute>} />
+                <Route path="/people" element={<ProtectedRoute><><AudioInitializer /><People /></></ProtectedRoute>} />
+                <Route path="/lead/:id" element={<ProtectedRoute><><AudioInitializer /><LeadProfile /></></ProtectedRoute>} />
+                <Route path="/deals" element={<ProtectedRoute><><AudioInitializer /><Deals /></></ProtectedRoute>} />
+                <Route path="/pipeline" element={<ProtectedRoute><><AudioInitializer /><Pipeline /></></ProtectedRoute>} />
+                <Route path="/power-dialer" element={<><AudioInitializer /><PowerDialer /></>} />
+                <Route path="/predictive-dialer" element={<><AudioInitializer /><PredictiveDialer /></>} />
+                <Route path="/ai-dialer" element={<><AudioInitializer /><AIDialer /></>} />
+                <Route path="/ai-realtor" element={<ProtectedRoute><><AudioInitializer /><AIRealtor /></></ProtectedRoute>} />
+                <Route path="/listing-presentation" element={<ProtectedRoute><><AudioInitializer /><ListingPresentation /></></ProtectedRoute>} />
                 <Route path="/sms-campaign" element={<SMSCampaign />} />
-                <Route path="/settings" element={<ProtectedRoute><AudioInitializer /><Settings /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><><AudioInitializer /><Settings /></></ProtectedRoute>} />
                 
                 {/* Rest of the routes without AudioInitializer */}
                 <Route path="/amortization" element={<ProtectedRoute><AmortizationCalculator /></ProtectedRoute>} />
