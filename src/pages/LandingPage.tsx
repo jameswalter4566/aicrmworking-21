@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -271,6 +270,16 @@ const LandingPage = () => {
                 {/* Video will be placed here later */}
                 <div className="w-full h-full flex items-center justify-center">
                   <p className="text-gray-400 text-lg">Video Content</p>
+                </div>
+              </div>
+              
+              {/* Copy of the Start Calling button placed underneath the video container */}
+              <div className="pt-6 flex justify-center">
+                <div className="relative mx-auto w-[300px]">
+                  <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
+                  <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)]">
+                    Start Calling
+                  </Button>
                 </div>
               </div>
             </div>
