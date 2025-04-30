@@ -1,12 +1,23 @@
+
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { toast } from './ui/use-toast';
+import { useLocation } from 'react-router-dom';
 
 export function AudioInitializer() {
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [showInitModal, setShowInitModal] = useState(false);
+  const location = useLocation();
+  
+  // Skip audio initialization on landing page
+  const isLandingPage = location.pathname === '/' || location.pathname === '/index';
   
   const checkAudioInitialization = async () => {
+    // Skip on landing page
+    if (isLandingPage) {
+      return false;
+    }
+    
     try {
       // Check if we've already initialized
       const initialized = localStorage.getItem('audio-initialized');
@@ -131,12 +142,18 @@ export function AudioInitializer() {
   };
   
   useEffect(() => {
+    // Skip on landing page
+    if (isLandingPage) {
+      console.log("Skipping audio initialization on landing page");
+      return;
+    }
+    
     // Check if already initialized on mount
     checkAudioInitialization();
     
     // Listen for user interaction on the document to initialize audio if needed
     const handleInteraction = () => {
-      if (!audioInitialized) {
+      if (!audioInitialized && !isLandingPage) {
         initializeAudio();
       }
     };
@@ -147,10 +164,10 @@ export function AudioInitializer() {
     return () => {
       document.removeEventListener('click', handleInteraction);
     };
-  }, [audioInitialized]);
+  }, [audioInitialized, isLandingPage]);
   
-  // Only render the modal if not initialized and we need to show it
-  if (!audioInitialized && showInitModal) {
+  // Only render the modal if not initialized, we need to show it, and we're not on the landing page
+  if (!audioInitialized && showInitModal && !isLandingPage) {
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md text-center">
