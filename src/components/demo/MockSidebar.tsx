@@ -88,7 +88,7 @@ export const MockSidebar = ({ industry }: MockSidebarProps) => {
   const backgroundColor = getIndustryColor(industry);
   
   return (
-    <div className={`w-64 ${backgroundColor} h-full flex-shrink-0 rounded-tl-xl`}>
+    <div className={`w-full sm:w-64 ${backgroundColor} sm:h-full rounded-t-xl sm:rounded-tr-none sm:rounded-l-xl`}>
       <div className="flex items-center h-16 px-6 border-b border-white/20">
         <div className="h-8 w-8 bg-white rounded flex items-center justify-center">
           <span className="text-black text-sm font-bold">CRM</span>
@@ -99,7 +99,7 @@ export const MockSidebar = ({ industry }: MockSidebarProps) => {
           {industry === 'debtSettlement' && "Debt SalesPro"}
         </span>
       </div>
-      <nav className="p-4 space-y-1 flex flex-col">
+      <nav className="p-4 space-y-1 flex flex-col max-h-56 sm:max-h-none overflow-y-auto">
         {menuItems.map((item) => (
           <div
             key={item.label}

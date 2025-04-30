@@ -198,10 +198,10 @@ const LandingPage = () => {
   const trailSegments = 20;
   
   const section2Content = <div className="
-        w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
-        min-h-[50vh] relative z-40 border border-gray-100 transition-shadow
+        w-[95vw] sm:w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
+        min-h-[50vh] relative z-40 border border-gray-100 transition-shadow overflow-hidden
       ">
-      <div className="w-full px-6 py-6 flex flex-col items-center justify-center h-full">
+      <div className="w-full px-3 sm:px-4 md:px-6 py-4 sm:py-6 flex flex-col items-center justify-center h-full overflow-hidden">
         <MockCRMInterface industry={selectedIndustry} />
       </div>
     </div>;
@@ -391,7 +391,7 @@ const LandingPage = () => {
             {section2Content}
           </div>
           
-          <div className="w-[90vw] max-w-6xl mx-auto mt-[375px] flex flex-col md:flex-row gap-4 relative z-30">
+          <div className="w-[95vw] sm:w-[90vw] max-w-6xl mx-auto mt-[300px] sm:mt-[325px] md:mt-[375px] flex flex-col md:flex-row gap-4 relative z-30">
             <div className="flex-1 h-[72px]">
               <div className="flex items-center justify-between p-3 bg-opacity-20 bg-white backdrop-blur-sm rounded-lg h-full">
                 <div className="flex-1">
