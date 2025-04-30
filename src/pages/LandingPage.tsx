@@ -10,6 +10,7 @@ import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuL
 import { MockCRMInterface } from "@/components/demo/MockCRMInterface";
 import { Switch } from "@/components/ui/switch";
 import { useIsMobile } from "@/hooks/use-mobile";
+
 const CategoryCard = ({
   bgColor,
   title
@@ -23,6 +24,7 @@ const CategoryCard = ({
       <div className="font-semibold text-lg">{title}</div>
     </div>
   </div>;
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const [featuresVisible, setFeaturesVisible] = useState(false);
@@ -250,11 +252,28 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Video container positioned with more space */}
+            {/* Video container with actual video */}
             <div className="w-full max-w-4xl mx-auto pt-40 relative z-20">
               <div className="aspect-video bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative">
-                {/* Play button replacing video content text */}
-                <div className="w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" onClick={navigateToAuth}>
+                <video
+                  className="w-full h-full object-cover"
+                  muted
+                  controls
+                  poster="/placeholder.svg"
+                >
+                  <source src="/0429.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+                
+                {/* Play button overlay */}
+                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" onClick={(e) => {
+                  e.preventDefault();
+                  const video = e.currentTarget.previousElementSibling as HTMLVideoElement;
+                  if (video.paused) {
+                    video.play();
+                    e.currentTarget.style.display = 'none';
+                  }
+                }}>
                   <div className="relative group">
                     
                     <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
@@ -411,4 +430,5 @@ const LandingPage = () => {
       </div>
     </div>;
 };
+
 export default LandingPage;
