@@ -1,23 +1,25 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { toast } from './ui/use-toast';
 import { useLocation } from 'react-router-dom';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function AudioInitializer() {
   const [audioInitialized, setAudioInitialized] = useState(false);
   const [showInitModal, setShowInitModal] = useState(false);
   const location = useLocation();
+  const isMobile = useIsMobile();
   
-  // Skip audio initialization on landing page
-  const isLandingPage = location.pathname === '/' || location.pathname === '/index';
+  // Skip audio initialization on landing page or index
+  const isLandingPage = location.pathname === '/' || location.pathname === '/index' || location.pathname.includes('landing');
+  
+  // Completely skip rendering and initialization on landing pages
+  if (isLandingPage) {
+    console.log("AudioInitializer: Skipping entirely on landing page");
+    return null;
+  }
   
   const checkAudioInitialization = async () => {
-    // Skip on landing page
-    if (isLandingPage) {
-      return false;
-    }
-    
     try {
       // Check if we've already initialized
       const initialized = localStorage.getItem('audio-initialized');
@@ -64,6 +66,12 @@ export function AudioInitializer() {
   };
   
   const initializeAudio = async (skipUserPrompt = false) => {
+    // Double-check we're not on a landing page
+    if (isLandingPage) {
+      console.log("🔊 Prevented audio initialization on landing page");
+      return false;
+    }
+    
     try {
       // If we need user interaction and we're not skipping the prompt
       if (!skipUserPrompt && showInitModal) {
@@ -142,7 +150,7 @@ export function AudioInitializer() {
   };
   
   useEffect(() => {
-    // Skip on landing page
+    // Double check that we're not on landing page
     if (isLandingPage) {
       console.log("Skipping audio initialization on landing page");
       return;
@@ -167,7 +175,7 @@ export function AudioInitializer() {
   }, [audioInitialized, isLandingPage]);
   
   // Only render the modal if not initialized, we need to show it, and we're not on the landing page
-  if (!audioInitialized && showInitModal && !isLandingPage) {
+  if (!audioInitialized && showInitModal) {
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg max-w-md text-center">
