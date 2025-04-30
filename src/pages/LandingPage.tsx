@@ -33,6 +33,14 @@ const LandingPage = () => {
   const [selectedIndustry, setSelectedIndustry] = useState<'mortgage' | 'realEstate' | 'debtSettlement'>('mortgage');
   const isMobile = useIsMobile();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [videoLoaded, setVideoLoaded] = useState(false);
+  const [videoPlaying, setVideoPlaying] = useState(false);
+  
+  // Function to check if device is iOS
+  const isIOS = () => {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  };
   
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -40,25 +48,61 @@ const LandingPage = () => {
     }, 300);
     setIsActive(true);
     
-    // Autoplay video with sound when the component mounts
+    // Handle video playback differently for iOS/Safari
     if (videoRef.current) {
-      videoRef.current.muted = false;
-      videoRef.current.play().catch(error => {
-        console.log("Autoplay prevented:", error);
-        // If autoplay with sound is prevented (common due to browser policies),
-        // try to play muted first, then unmute after user interaction
-        if (videoRef.current) {
-          videoRef.current.muted = true;
-          videoRef.current.play().catch(e => console.log("Muted autoplay also failed:", e));
-        }
-      });
+      // Set up oncanplay event to track when video data is available
+      videoRef.current.oncanplay = () => {
+        setVideoLoaded(true);
+        console.log("🎥 Video can now play");
+      };
+      
+      // Set up onplay event
+      videoRef.current.onplay = () => {
+        setVideoPlaying(true);
+        console.log("🎥 Video is now playing");
+      };
+      
+      // Set up onpause event
+      videoRef.current.onpause = () => {
+        setVideoPlaying(false);
+        console.log("🎥 Video is now paused");
+      };
+      
+      // Prevent autoplay with sound on mobile devices
+      const mobileAutoplay = isIOS() || isMobile;
+      if (mobileAutoplay) {
+        videoRef.current.muted = true;
+        console.log("🎥 Mobile device detected, using muted autoplay strategy");
+      }
+      
+      // Don't attempt autoplay with sound on mobile - it will fail
+      // Instead use muted autoplay which has higher success rate
+      if (!mobileAutoplay) {
+        videoRef.current.play().catch(error => {
+          console.log("🎥 Autoplay prevented:", error);
+          // If autoplay with sound is prevented, try muted
+          if (videoRef.current) {
+            videoRef.current.muted = true;
+            videoRef.current.play().catch(e => {
+              console.log("���� Muted autoplay also failed:", e);
+            });
+          }
+        });
+      } else {
+        // For iOS devices, try muted autoplay immediately
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true; // This is crucial for iOS
+        videoRef.current.play().catch(e => {
+          console.log("🎥 Mobile muted autoplay failed:", e);
+        });
+      }
     }
     
     return () => {
       clearTimeout(timer);
       setIsActive(false);
     };
-  }, []);
+  }, [isMobile]);
   
   useEffect(() => {
     if (!isActive) return;
@@ -279,7 +323,7 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Video container with 9:16 aspect ratio - Properly centered */}
+            {/* Improved video container with mobile compatibility */}
             <div className="w-full flex justify-center items-center pt-40 relative z-20">
               <div className="w-full max-w-[500px] mx-auto flex justify-center">
                 <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative" style={{
@@ -290,39 +334,58 @@ const LandingPage = () => {
                   <video
                     ref={videoRef}
                     className="w-full h-full object-cover"
-                    muted={false}
-                    autoPlay
-                    controls
+                    muted={isIOS() || isMobile}
+                    autoPlay={false}  // We handle this programmatically instead
+                    controls={videoLoaded}
+                    playsInline // Critical for iOS
+                    preload="auto"
                     poster="/placeholder.svg"
+                    onLoadedMetadata={() => console.log("🎥 Video metadata loaded")}
                   >
                     <source src="/0429.mp4" type="video/mp4" />
                     Your browser does not support the video tag.
                   </video>
                   
-                  {/* Play button overlay - Now automatically hides when video plays */}
-                  <div 
-                    className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" 
-                    style={{ display: videoRef.current?.paused ? 'flex' : 'none' }}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (videoRef.current) {
-                        videoRef.current.muted = false;
-                        videoRef.current.play()
-                          .then(() => {
-                            e.currentTarget.style.display = 'none';
-                          })
-                          .catch(error => {
-                            console.log("Play failed:", error);
-                          });
-                      }
-                    }}
-                  >
-                    <div className="relative group">
-                      <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
-                        <Play size={40} className="text-white ml-2" fill="white" />
+                  {/* Play button overlay - Shows when video is loaded but not playing */}
+                  {videoLoaded && !videoPlaying && (
+                    <div 
+                      className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/50 cursor-pointer"
+                      onClick={() => {
+                        if (videoRef.current) {
+                          // On iOS/mobile, we might need to keep it muted for autoplay
+                          if (!isIOS() && !isMobile) {
+                            videoRef.current.muted = false;
+                          }
+                          videoRef.current.play()
+                            .then(() => setVideoPlaying(true))
+                            .catch(error => {
+                              console.log("🎥 Play failed:", error);
+                              // If unmuted play fails, try muted
+                              if (videoRef.current) {
+                                videoRef.current.muted = true;
+                                videoRef.current.play()
+                                  .then(() => setVideoPlaying(true))
+                                  .catch(e => console.log("🎥 Muted play also failed:", e));
+                              }
+                            });
+                        }
+                      }}
+                    >
+                      <div className="relative group">
+                        <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
+                          <Play size={40} className="text-white ml-2" fill="white" />
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Loading indicator - when video is loading but not ready */}
+                  {!videoLoaded && (
+                    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-black/70">
+                      <div className="w-12 h-12 rounded-full border-4 border-blue-500 border-t-transparent animate-spin mb-4"></div>
+                      <p className="text-white text-sm">Loading video...</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

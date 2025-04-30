@@ -1,7 +1,7 @@
-
 import { useEffect, useState } from "react";
 import { preloadAudioAssets } from "@/utils/audioPreloader";
 import { toast } from "./ui/use-toast";
+import { useLocation } from "react-router-dom";
 
 interface TwilioScriptProps {
   onLoad?: () => void;
@@ -19,9 +19,27 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [loadedUrl, setLoadedUrl] = useState<string>('');
+  const location = useLocation();
+  
+  // Check if current route is a public route where we should skip Twilio initialization
+  const isPublicRoute = () => {
+    const path = location.pathname;
+    return path === '/' || 
+           path === '/landing' || 
+           path.includes('/client-portal') || 
+           path === '/auth' ||
+           path.includes('/pitch-deck/view') || 
+           path.includes('/yourhomesolution');
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    
+    // Skip on public routes to prevent microphone permission requests
+    if (isPublicRoute()) {
+      console.log("📵 Skipping Twilio initialization on public page", location.pathname);
+      return;
+    }
     
     // Skip audio preload to avoid decoding errors
     // We'll load sounds dynamically when needed instead
@@ -140,7 +158,7 @@ const TwilioScript: React.FC<TwilioScriptProps> = ({ onLoad, onError }) => {
         variant: "destructive",
       });
     });
-  }, [onLoad, onError]);
+  }, [onLoad, onError, location.pathname]);
 
   return null;
 };

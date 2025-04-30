@@ -1,8 +1,9 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import TwilioScript from "./components/TwilioScript";
 import { useEffect, useState } from "react";
 import { audioProcessing } from "./services/audioProcessing";
@@ -68,6 +69,25 @@ interface AudioDiagnostics {
   availableDevices?: number;
   twilioAudioAvailable?: boolean;
 }
+
+// Conditional wrapper to only show audio diagnostics on protected pages
+const ConditionalAudioDiagnosticLogger = () => {
+  const location = useLocation();
+  const path = location.pathname;
+  
+  // Skip on public routes or landing pages
+  if (path === '/' || 
+      path === '/landing' || 
+      path.includes('/client-portal') || 
+      path === '/auth' || 
+      path.includes('/pitch-deck/view') || 
+      path.includes('/yourhomesolution')) {
+    console.log("📵 Audio diagnostics disabled on public route:", path);
+    return null;
+  }
+  
+  return <AudioDiagnosticLogger />;
+};
 
 const AudioDiagnosticLogger = () => {
   const [audioContextState, setAudioContextState] = useState<string>("unknown");
@@ -208,6 +228,25 @@ const AudioDiagnosticLogger = () => {
   return null;
 };
 
+// Also create a conditional wrapper for TwilioScript to prevent it from loading on public pages
+const ConditionalTwilioScript = ({ onLoad, onError }) => {
+  const location = useLocation();
+  const path = location.pathname;
+  
+  // Skip on public routes or landing pages
+  if (path === '/' || 
+      path === '/landing' || 
+      path.includes('/client-portal') || 
+      path === '/auth' ||
+      path.includes('/pitch-deck/view') || 
+      path.includes('/yourhomesolution')) {
+    console.log("📵 Twilio script loading disabled on public route:", path);
+    return null;
+  }
+  
+  return <TwilioScript onLoad={onLoad} onError={onError} />;
+};
+
 function App() {
   const [twilioLoaded, setTwilioLoaded] = useState(false);
 
@@ -218,33 +257,6 @@ function App() {
           <IndustryProvider>
             <Toaster />
             <Sonner />
-            <TwilioScript 
-              onLoad={() => {
-                console.log("🎉 Twilio SDK loaded and ready!");
-                setTwilioLoaded(true);
-                if (window.Twilio?.Device) {
-                  twilioService.initializeTwilioDevice().then(success => {
-                    if (success && window.Twilio.Device.audio) {
-                      console.log("🎤 Twilio Device audio is available");
-                    }
-                  });
-                }
-                audioProcessing.connect({
-                  onConnectionStatus: (connected) => {
-                    console.log(`🔌 Audio WebSocket connection status: ${connected ? 'connected' : 'disconnected'}`);
-                  }
-                }).then(success => {
-                  console.log(`🎤 WebSocket initialization ${success ? 'successful' : 'failed'}`);
-                }).catch(err => {
-                  console.error('🎤 WebSocket initialization error:', err);
-                });
-              }}
-              onError={(error) => console.error("❌ Error loading Twilio SDK:", error)}
-            />
-            <AudioDiagnosticLogger />
-            <div className="fixed top-16 right-4 z-50">
-              <GlobalAudioSettings />
-            </div>
             <BrowserRouter>
               <Routes>
                 <Route path="/landing" element={<PublicRoute><LandingPage /></PublicRoute>} />
@@ -304,6 +316,35 @@ function App() {
                 
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              
+              {/* Use our conditional components after routes are defined so they can access route data */}
+              <ConditionalTwilioScript 
+                onLoad={() => {
+                  console.log("🎉 Twilio SDK loaded and ready!");
+                  setTwilioLoaded(true);
+                  if (window.Twilio?.Device) {
+                    twilioService.initializeTwilioDevice().then(success => {
+                      if (success && window.Twilio.Device.audio) {
+                        console.log("🎤 Twilio Device audio is available");
+                      }
+                    });
+                  }
+                  audioProcessing.connect({
+                    onConnectionStatus: (connected) => {
+                      console.log(`🔌 Audio WebSocket connection status: ${connected ? 'connected' : 'disconnected'}`);
+                    }
+                  }).then(success => {
+                    console.log(`🎤 WebSocket initialization ${success ? 'successful' : 'failed'}`);
+                  }).catch(err => {
+                    console.error('🎤 WebSocket initialization error:', err);
+                  });
+                }}
+                onError={(error) => console.error("❌ Error loading Twilio SDK:", error)}
+              />
+              <ConditionalAudioDiagnosticLogger />
+              <div className="fixed top-16 right-4 z-50">
+                <GlobalAudioSettings />
+              </div>
             </BrowserRouter>
           </IndustryProvider>
         </AuthProvider>
