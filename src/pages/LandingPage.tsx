@@ -258,7 +258,7 @@ const LandingPage = () => {
                 {/* Play button replacing video content text */}
                 <div className="w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" onClick={navigateToAuth}>
                   <div className="relative group">
-                    <div className="absolute inset-0 bg-crm-blue/20 rounded-full -m-3 group-hover:bg-crm-blue/30 transition-all duration-300 animate-pulse"></div>
+                    <div className="absolute inset-0 bg-crm-blue/20 rounded-full -m-3 group-hover:bg-crm-blue/30 transition-all duration-300 animate-[pulse_5s_ease-in-out_infinite]"></div>
                     <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
                       <Play size={40} className="text-white ml-2" fill="white" />
                     </div>
