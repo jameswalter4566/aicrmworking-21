@@ -289,6 +289,16 @@ const LandingPage = () => {
               </div>
             </div>
             
+            {/* Restored Access Portal button */}
+            <div className="pt-6 flex justify-center">
+              <div className="relative mx-auto w-[300px]">
+                <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
+                <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)] pulse-animation">
+                  Access Portal
+                </Button>
+              </div>
+            </div>
+            
             {/* Main content section with increased top margin to avoid overlap */}
             <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-24 flex flex-col items-center justify-center">
               <div className="flex justify-center mb-6 pt-40">
