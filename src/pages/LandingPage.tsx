@@ -252,46 +252,46 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Video container with 9:16 aspect ratio */}
-            <div className="w-full max-w-[80vw] md:max-w-[70vw] mx-auto pt-40 relative z-20">
-              <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative" style={{
-                aspectRatio: "9/16", /* 9:16 aspect ratio */
-                width: "auto",
-                maxHeight: "65vh"
-              }}>
-                <video
-                  className="w-full h-full object-cover"
-                  muted
-                  controls
-                  poster="/placeholder.svg"
-                >
-                  <source src="/0429.mp4" type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-                
-                {/* Play button overlay */}
-                <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" onClick={(e) => {
-                  e.preventDefault();
-                  const video = e.currentTarget.previousElementSibling as HTMLVideoElement;
-                  if (video.paused) {
-                    video.play();
-                    e.currentTarget.style.display = 'none';
-                  }
+            {/* Video container with 9:16 aspect ratio - Centered and Expanded */}
+            <div className="w-full flex justify-center items-center pt-40 relative z-20">
+              <div className="w-full max-w-[500px] mx-auto">
+                <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative" style={{
+                  aspectRatio: "9/16", /* 9:16 aspect ratio */
+                  maxHeight: "65vh"
                 }}>
-                  <div className="relative group">
-                    
-                    <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
-                      <Play size={40} className="text-white ml-2" fill="white" />
+                  <video
+                    className="w-full h-full object-cover"
+                    muted
+                    controls
+                    poster="/placeholder.svg"
+                  >
+                    <source src="/0429.mp4" type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                  
+                  {/* Play button overlay */}
+                  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" onClick={(e) => {
+                    e.preventDefault();
+                    const video = e.currentTarget.previousElementSibling as HTMLVideoElement;
+                    if (video.paused) {
+                      video.play();
+                      e.currentTarget.style.display = 'none';
+                    }
+                  }}>
+                    <div className="relative group">
+                      <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
+                        <Play size={40} className="text-white ml-2" fill="white" />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-              
-              {/* Copy of the Start Calling button placed underneath the video container */}
-              <div className="pt-6 flex justify-center">
-                <div className="relative mx-auto w-[300px]">
-                  <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
-                  <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)] pulse-animation">Access Portal</Button>
+                
+                {/* Access Portal button - Maintain position */}
+                <div className="pt-6 flex justify-center">
+                  <div className="relative mx-auto w-[300px]">
+                    <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
+                    <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)] pulse-animation">Access Portal</Button>
+                  </div>
                 </div>
               </div>
             </div>
