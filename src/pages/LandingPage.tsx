@@ -252,11 +252,11 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Video container with 9:16 aspect ratio - centered and expanded horizontally */}
-            <div className="flex justify-center w-full mx-auto pt-40 relative z-20">
-              <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative mx-auto" style={{
+            {/* Video container with 9:16 aspect ratio */}
+            <div className="w-full max-w-[80vw] md:max-w-[70vw] mx-auto pt-40 relative z-20">
+              <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative" style={{
                 aspectRatio: "9/16", /* 9:16 aspect ratio */
-                width: "min(85vw, 500px)",
+                width: "auto",
                 maxHeight: "65vh"
               }}>
                 <video
@@ -287,7 +287,7 @@ const LandingPage = () => {
                 </div>
               </div>
               
-              {/* Access Portal button positioned properly below the video */}
+              {/* Copy of the Start Calling button placed underneath the video container */}
               <div className="pt-6 flex justify-center">
                 <div className="relative mx-auto w-[300px]">
                   <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
