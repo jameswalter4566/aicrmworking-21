@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
 import FloatingAnimation from "@/components/FloatingAnimation";
 import { FeatureCard } from "@/components/FloatingCards";
-import { Phone, Bot, LineChart, MessageSquare, Zap, Inbox } from "lucide-react";
+import { Phone, Bot, LineChart, MessageSquare, Zap, Inbox, Play } from "lucide-react";
 import GlowingCard from "@/components/GlowingCard";
 import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuLink } from "@/components/ui/navigation-menu";
 import { MockCRMInterface } from "@/components/demo/MockCRMInterface";
@@ -254,10 +254,15 @@ const LandingPage = () => {
             
             {/* Video container positioned with more space */}
             <div className="w-full max-w-4xl mx-auto pt-40 relative z-20">
-              <div className="aspect-video bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
-                {/* Video will be placed here later */}
-                <div className="w-full h-full flex items-center justify-center">
-                  <p className="text-gray-400 text-lg">Video Content</p>
+              <div className="aspect-video bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative">
+                {/* Play button replacing video content text */}
+                <div className="w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" onClick={navigateToAuth}>
+                  <div className="relative group">
+                    <div className="absolute inset-0 bg-crm-blue/20 rounded-full -m-3 group-hover:bg-crm-blue/30 transition-all duration-300 animate-pulse"></div>
+                    <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
+                      <Play size={40} className="text-white ml-2" fill="white" />
+                    </div>
+                  </div>
                 </div>
               </div>
               
