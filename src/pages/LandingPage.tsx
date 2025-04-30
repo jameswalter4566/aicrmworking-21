@@ -265,9 +265,9 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Improved video container with mobile compatibility */}
-            <div className="w-full flex justify-center items-center pt-40 relative z-20">
-              <div className="w-full max-w-[500px] mx-auto flex justify-center">
+            {/* Improved video container with better responsive design */}
+            <div className="w-full flex justify-center items-center pt-20 sm:pt-28 md:pt-40 relative z-20 px-4">
+              <div className="w-full max-w-[300px] xs:max-w-[350px] sm:max-w-[400px] md:max-w-[500px] mx-auto">
                 <VideoPlayer 
                   src="0429.mp4" 
                   poster="/placeholder.svg"
@@ -277,9 +277,9 @@ const LandingPage = () => {
               </div>
             </div>
             
-            {/* Restored Access Portal button */}
-            <div className="pt-6 flex justify-center">
-              <div className="relative mx-auto w-[300px]">
+            {/* Restored Access Portal button with responsive sizing */}
+            <div className="pt-6 flex justify-center w-full px-4">
+              <div className="relative mx-auto w-full max-w-[300px]">
                 <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
                 <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)] pulse-animation">
                   Access Portal
@@ -288,7 +288,7 @@ const LandingPage = () => {
             </div>
             
             {/* Main content section with increased top margin to avoid overlap */}
-            <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-24 flex flex-col items-center justify-center">
+            <div className="w-full max-w-4xl mx-auto text-center space-y-8 relative z-20 mt-12 sm:mt-16 md:mt-24 flex flex-col items-center justify-center px-4">
               <div className="flex justify-center mb-6 pt-40">
                 <div className="h-16 w-16 flex items-center justify-center bg-crm-blue text-white rounded-xl flex-shrink-0">
                   <span className="font-bold text-2xl">CRM</span>

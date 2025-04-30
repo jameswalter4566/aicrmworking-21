@@ -177,11 +177,13 @@ const VideoPlayer = ({
 
   return (
     <div 
-      className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative"
+      className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative mx-auto"
       style={{
         aspectRatio: aspectRatio,
         maxHeight: "65vh",
-        width: "100%"
+        width: "100%",
+        maxWidth: "100%", // Ensure container doesn't exceed available width
+        minWidth: "280px", // Prevent container from becoming too small
       }}
     >
       <video
@@ -206,8 +208,8 @@ const VideoPlayer = ({
           onClick={handlePlayClick}
         >
           <div className="relative group">
-            <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
-              <Play size={40} className="text-white ml-2" fill="white" />
+            <div className="relative z-10 w-16 h-16 sm:w-20 sm:h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
+              <Play size={32} className="text-white ml-1.5" fill="white" />
             </div>
           </div>
         </div>
@@ -216,7 +218,7 @@ const VideoPlayer = ({
       {/* Loading indicator - when video is loading but not ready */}
       {!videoLoaded && !loadError && (
         <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center bg-black/70">
-          <Loader2 size={48} className="text-blue-500 animate-spin mb-4" />
+          <Loader2 size={40} className="text-blue-500 animate-spin mb-3" />
           <p className="text-white text-sm">Loading video...</p>
         </div>
       )}
