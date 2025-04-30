@@ -116,6 +116,20 @@
   }
 }
 
+/* Button pulse animation */
+@keyframes pulse-scale {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.pulse-animation {
+  animation: pulse-scale 3s infinite ease-in-out;
+}
+
 .metric-card {
   @apply bg-white rounded-2xl p-4 border border-gray-200 shadow-sm;
 }

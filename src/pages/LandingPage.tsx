@@ -10,6 +10,7 @@ import { NavigationMenu, NavigationMenuList, NavigationMenuItem, NavigationMenuL
 import { MockCRMInterface } from "@/components/demo/MockCRMInterface";
 import { Switch } from "@/components/ui/switch";
 import { useIsMobile } from "@/hooks/use-mobile";
+
 const CategoryCard = ({
   bgColor,
   title
@@ -23,6 +24,7 @@ const CategoryCard = ({
       <div className="font-semibold text-lg">{title}</div>
     </div>
   </div>;
+
 const LandingPage = () => {
   const navigate = useNavigate();
   const [featuresVisible, setFeaturesVisible] = useState(false);
@@ -263,7 +265,7 @@ const LandingPage = () => {
               <div className="pt-6 flex justify-center">
                 <div className="relative mx-auto w-[300px]">
                   <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
-                  <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)]">Access Portal</Button>
+                  <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)] pulse-animation">Access Portal</Button>
                 </div>
               </div>
             </div>
@@ -308,7 +310,7 @@ const LandingPage = () => {
                   }}></div>;
                 })}
 
-                  <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)]">
+                  <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)] pulse-animation">
                     Start Calling
                   </Button>
                 </div>
@@ -406,4 +408,5 @@ const LandingPage = () => {
       </div>
     </div>;
 };
+
 export default LandingPage;
