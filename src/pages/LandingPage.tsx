@@ -252,12 +252,13 @@ const LandingPage = () => {
               {isActive && <FloatingAnimation items={floatingFeatureCards} className="h-full" />}
             </div>
             
-            {/* Video container with 9:16 aspect ratio - Centered and Expanded */}
+            {/* Video container with 9:16 aspect ratio - Properly centered */}
             <div className="w-full flex justify-center items-center pt-40 relative z-20">
-              <div className="w-full max-w-[500px] mx-auto">
+              <div className="w-full max-w-[500px] mx-auto flex justify-center">
                 <div className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative" style={{
                   aspectRatio: "9/16", /* 9:16 aspect ratio */
-                  maxHeight: "65vh"
+                  maxHeight: "65vh",
+                  width: "100%"
                 }}>
                   <video
                     className="w-full h-full object-cover"
@@ -283,14 +284,6 @@ const LandingPage = () => {
                         <Play size={40} className="text-white ml-2" fill="white" />
                       </div>
                     </div>
-                  </div>
-                </div>
-                
-                {/* Access Portal button - Maintain position */}
-                <div className="pt-6 flex justify-center">
-                  <div className="relative mx-auto w-[300px]">
-                    <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
-                    <Button onClick={navigateToAuth} className="w-full text-lg py-6 h-auto bg-crm-blue hover:bg-crm-blue/90 relative z-10 font-extrabold tracking-wide shadow-[inset_0_0_15px_rgba(255,255,255,0.7),0_0_20px_rgba(51,195,240,0.8)] pulse-animation">Access Portal</Button>
                   </div>
                 </div>
               </div>
