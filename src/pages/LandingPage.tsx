@@ -269,7 +269,7 @@ const LandingPage = () => {
             <div className="w-full flex justify-center items-center pt-40 relative z-20">
               <div className="w-full max-w-[500px] mx-auto flex justify-center">
                 <VideoPlayer 
-                  src="/0429.mp4" 
+                  src="0429.mp4" 
                   poster="/placeholder.svg"
                   fallbackImageSrc="/images/crm-screenshot.jpg"
                   aspectRatio="9/16"

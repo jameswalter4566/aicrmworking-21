@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from 'react';
 import { Play, Loader2 } from 'lucide-react';
 
@@ -28,6 +29,22 @@ const VideoPlayer = ({
   // Function to check if device is mobile
   const isMobile = () => {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  // Function to get corrected path for production
+  const getVideoPath = (path: string) => {
+    // If the path is already a full URL, return it as is
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    
+    // If path starts with a slash, assume it's from the root public directory
+    if (path.startsWith('/')) {
+      // Remove the leading slash to match what Vite expects in production
+      return path.startsWith('/') ? path.substring(1) : path;
+    }
+    
+    return path;
   };
 
   useEffect(() => {
@@ -154,6 +171,10 @@ const VideoPlayer = ({
     );
   }
 
+  // Process the video src to ensure it works in production
+  const processedSrc = getVideoPath(src);
+  console.log("🎥 Using video source:", processedSrc);
+
   return (
     <div 
       className="bg-gray-800 rounded-2xl shadow-2xl overflow-hidden border border-gray-700 relative"
@@ -174,7 +195,7 @@ const VideoPlayer = ({
         poster={poster}
         onLoadedMetadata={() => console.log("🎥 Video metadata loaded")}
       >
-        <source src={src} type="video/mp4" />
+        <source src={processedSrc} type="video/mp4" />
         Your browser does not support the video tag.
       </video>
       
