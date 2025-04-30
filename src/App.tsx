@@ -47,6 +47,7 @@ import ClientPortalOnboarding from './pages/ClientPortalOnboarding';
 import Smart1003Builder from "./pages/Smart1003Builder";
 import SmartDocumentManager from "@/pages/SmartDocumentManager";
 import AuthRedirect from "./pages/AuthRedirect";
+import { AudioInitializer } from "./components/AudioInitializer";
 
 const queryClient = new QueryClient();
 
@@ -251,19 +252,21 @@ function App() {
                 <Route path="/auth-redirect" element={<AuthRedirect />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
                 
-                <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-                <Route path="/people" element={<ProtectedRoute><People /></ProtectedRoute>} />
-                <Route path="/lead/:id" element={<ProtectedRoute><LeadProfile /></ProtectedRoute>} />
-                <Route path="/deals" element={<ProtectedRoute><Deals /></ProtectedRoute>} />
-                <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
-                <Route path="/power-dialer" element={<PowerDialer />} />
-                <Route path="/predictive-dialer" element={<PredictiveDialer />} />
-                <Route path="/ai-dialer" element={<AIDialer />} />
-                <Route path="/ai-realtor" element={<ProtectedRoute><AIRealtor /></ProtectedRoute>} />
-                <Route path="/listing-presentation" element={<ProtectedRoute><ListingPresentation /></ProtectedRoute>} />
+                {/* Add AudioInitializer only to protected routes and specific pages where it's needed */}
+                <Route path="/" element={<ProtectedRoute><AudioInitializer /><Index /></ProtectedRoute>} />
+                <Route path="/people" element={<ProtectedRoute><AudioInitializer /><People /></ProtectedRoute>} />
+                <Route path="/lead/:id" element={<ProtectedRoute><AudioInitializer /><LeadProfile /></ProtectedRoute>} />
+                <Route path="/deals" element={<ProtectedRoute><AudioInitializer /><Deals /></ProtectedRoute>} />
+                <Route path="/pipeline" element={<ProtectedRoute><AudioInitializer /><Pipeline /></ProtectedRoute>} />
+                <Route path="/power-dialer" element={<AudioInitializer /><PowerDialer />} />
+                <Route path="/predictive-dialer" element={<AudioInitializer /><PredictiveDialer />} />
+                <Route path="/ai-dialer" element={<AudioInitializer /><AIDialer />} />
+                <Route path="/ai-realtor" element={<ProtectedRoute><AudioInitializer /><AIRealtor /></ProtectedRoute>} />
+                <Route path="/listing-presentation" element={<ProtectedRoute><AudioInitializer /><ListingPresentation /></ProtectedRoute>} />
                 <Route path="/sms-campaign" element={<SMSCampaign />} />
-                <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                <Route path="/settings" element={<ProtectedRoute><AudioInitializer /><Settings /></ProtectedRoute>} />
                 
+                {/* Rest of the routes without AudioInitializer */}
                 <Route path="/amortization" element={<ProtectedRoute><AmortizationCalculator /></ProtectedRoute>} />
                 <Route path="/pitch-deck" element={<ProtectedRoute><PitchDeckPro /></ProtectedRoute>} />
                 <Route path="/pitch-deck/builder/:id" element={<ProtectedRoute><PitchDeckBuilder /></ProtectedRoute>} />

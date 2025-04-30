@@ -1,11 +1,9 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Phone, PhoneOff, Mic, MicOff, Volume, Volume2, RefreshCw } from "lucide-react";
 import { ActiveCall } from "@/hooks/use-twilio";
 import AudioDeviceSelector from "./AudioDeviceSelector";
 import { AudioDebugModal } from "./AudioDebugModal";
-import { AudioInitializer } from "./AudioInitializer";
 import AudioDeviceDropdown from "./AudioDeviceDropdown";
 import { toast } from "@/components/ui/use-toast";
 
@@ -178,8 +176,6 @@ export function CallControls({
 
   return (
     <>
-      <AudioInitializer />
-      
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-center gap-2">
           {!isInCall ? (
