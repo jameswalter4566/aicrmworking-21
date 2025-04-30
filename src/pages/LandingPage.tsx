@@ -287,7 +287,7 @@ const LandingPage = () => {
                 </div>
               </div>
               
-              {/* Copy of the Start Calling button placed underneath the video container */}
+              {/* Access Portal button positioned properly below the video */}
               <div className="pt-6 flex justify-center">
                 <div className="relative mx-auto w-[300px]">
                   <div className="absolute inset-0 rounded-xl border-2 border-crm-blue/40 backdrop-blur-sm shadow-[0_0_20px_rgba(51,195,240,0.4)]"></div>
