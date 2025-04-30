@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import AnimatedText from "@/components/AnimatedText";
@@ -32,16 +32,34 @@ const LandingPage = () => {
   const [isActive, setIsActive] = useState(false);
   const [selectedIndustry, setSelectedIndustry] = useState<'mortgage' | 'realEstate' | 'debtSettlement'>('mortgage');
   const isMobile = useIsMobile();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
   useEffect(() => {
     const timer = setTimeout(() => {
       setFeaturesVisible(true);
     }, 300);
     setIsActive(true);
+    
+    // Autoplay video with sound when the component mounts
+    if (videoRef.current) {
+      videoRef.current.muted = false;
+      videoRef.current.play().catch(error => {
+        console.log("Autoplay prevented:", error);
+        // If autoplay with sound is prevented (common due to browser policies),
+        // try to play muted first, then unmute after user interaction
+        if (videoRef.current) {
+          videoRef.current.muted = true;
+          videoRef.current.play().catch(e => console.log("Muted autoplay also failed:", e));
+        }
+      });
+    }
+    
     return () => {
       clearTimeout(timer);
       setIsActive(false);
     };
   }, []);
+  
   useEffect(() => {
     if (!isActive) return;
     let animationId: number;
@@ -62,11 +80,14 @@ const LandingPage = () => {
       cancelAnimationFrame(animationId);
     };
   }, [isActive]);
+  
   const rotatingTexts = ["Mortgage Loan Officers", "Real Estate Agents", "Debt Officers"];
   const textColors = ["text-crm-blue", "text-purple-500", "text-orange-500"];
+  
   const navigateToAuth = () => {
     navigate("/auth");
   };
+  
   const floatingFeatureCards = React.useMemo(() => [{
     id: 1,
     component: <div onClick={navigateToAuth} className="cursor-pointer">
@@ -134,6 +155,7 @@ const LandingPage = () => {
     delay: 200,
     zIndex: 10
   }], [navigateToAuth]);
+  
   const getLoadingPosition = React.useCallback((progress: number) => {
     const width = 300;
     const height = 56;
@@ -181,11 +203,14 @@ const LandingPage = () => {
       y
     };
   }, []);
+  
   const loadingPos = isActive ? getLoadingPosition(loadingProgress) : {
     x: 0,
     y: 0
   };
+  
   const trailSegments = 20;
+  
   const section2Content = <div className="
         w-[90vw] max-w-6xl bg-white rounded-3xl shadow-2xl mx-auto my-0 flex flex-col items-center justify-center
         min-h-[50vh] relative z-40 border border-gray-100 transition-shadow
@@ -194,6 +219,7 @@ const LandingPage = () => {
         <MockCRMInterface industry={selectedIndustry} />
       </div>
     </div>;
+  
   const handleIndustryToggle = (industry: 'mortgage' | 'realEstate' | 'debtSettlement') => {
     setSelectedIndustry(current => current === industry ? industry : industry);
     document.querySelectorAll('[data-industry]').forEach(el => {
@@ -202,6 +228,7 @@ const LandingPage = () => {
       }
     });
   };
+  
   return <div className="min-h-screen w-full overflow-x-hidden" style={{
     background: "linear-gradient(to bottom, #1e3a8a 0%, #111827 100%)"
   }}>
@@ -261,8 +288,10 @@ const LandingPage = () => {
                   width: "100%"
                 }}>
                   <video
+                    ref={videoRef}
                     className="w-full h-full object-cover"
-                    muted
+                    muted={false}
+                    autoPlay
                     controls
                     poster="/placeholder.svg"
                   >
@@ -270,15 +299,24 @@ const LandingPage = () => {
                     Your browser does not support the video tag.
                   </video>
                   
-                  {/* Play button overlay */}
-                  <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" onClick={(e) => {
-                    e.preventDefault();
-                    const video = e.currentTarget.previousElementSibling as HTMLVideoElement;
-                    if (video.paused) {
-                      video.play();
-                      e.currentTarget.style.display = 'none';
-                    }
-                  }}>
+                  {/* Play button overlay - Now automatically hides when video plays */}
+                  <div 
+                    className="absolute inset-0 w-full h-full flex items-center justify-center bg-black/50 cursor-pointer" 
+                    style={{ display: videoRef.current?.paused ? 'flex' : 'none' }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (videoRef.current) {
+                        videoRef.current.muted = false;
+                        videoRef.current.play()
+                          .then(() => {
+                            e.currentTarget.style.display = 'none';
+                          })
+                          .catch(error => {
+                            console.log("Play failed:", error);
+                          });
+                      }
+                    }}
+                  >
                     <div className="relative group">
                       <div className="relative z-10 w-20 h-20 bg-crm-blue rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(51,195,240,0.7)] group-hover:shadow-[0_0_25px_rgba(51,195,240,0.9)] transition-all duration-300">
                         <Play size={40} className="text-white ml-2" fill="white" />
